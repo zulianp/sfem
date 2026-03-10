@@ -125,14 +125,14 @@ update_hex_quad_node_cuda(                                           //
 
     real_t *const SFEM_RESTRICT out = &hex_element_field[base_index];
 
-    out[off0] += w_c0 * one_minus_lz;
-    out[off1] += w_c1 * one_minus_lz;
-    out[off2] += w_c2 * one_minus_lz;
-    out[off3] += w_c3 * one_minus_lz;
-    out[off4] += w_c0 * l_z;
-    out[off5] += w_c1 * l_z;
-    out[off6] += w_c2 * l_z;
-    out[off7] += w_c3 * l_z;
+    atomicAdd(&out[off0], w_c0 * one_minus_lz);
+    atomicAdd(&out[off1], w_c1 * one_minus_lz);
+    atomicAdd(&out[off2], w_c2 * one_minus_lz);
+    atomicAdd(&out[off3], w_c3 * one_minus_lz);
+    atomicAdd(&out[off4], w_c0 * l_z);
+    atomicAdd(&out[off5], w_c1 * l_z);
+    atomicAdd(&out[off6], w_c2 * l_z);
+    atomicAdd(&out[off7], w_c3 * l_z);
 
     return 0;
 }  // END Function: update_hex_quad_node
@@ -141,11 +141,11 @@ update_hex_quad_node_cuda(                                           //
 // update_hex_field
 ///////////////////////////////////////////////
 __device__ int                                                      //
-update_hex_field(cell_list_split_3d_2d_map_t  *split_map,           // Cell list split map data structure
-                 boxes_t                      *boxes,               // Boxes data structure
-                 const mesh_tet_geom_device_t *mesh_geom,           // Mesh geometry data structure
-                 const ptrdiff_t               i_grid,              // The i index of the grid point in the hex mesh
-                 const ptrdiff_t               j_grid,              // The j index of the grid point in the hex mesh
+update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list split map data structure
+                 const boxes_t                     *boxes,          // Boxes data structure
+                 const mesh_tet_geom_device_t      *mesh_geom,      // Mesh geometry data structure
+                 const ptrdiff_t                    i_grid,         // The i index of the grid point in the hex mesh
+                 const ptrdiff_t                    j_grid,         // The j index of the grid point in the hex mesh
                  const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
                  const ptrdiff_t n0,                                // SDF: n[3]
                  const ptrdiff_t n1,                                //
@@ -226,32 +226,32 @@ update_hex_field(cell_list_split_3d_2d_map_t  *split_map,           // Cell list
 /////////////////////////////////////////////////
 // transfer_to_hex_field_cell_split_tet4_kernel
 /////////////////////////////////////////////////
-__global__ void                                            //
-transfer_to_hex_field_cell_split_tet4_kernel(              //
-        cell_list_split_3d_2d_map_t  *split_map,           // Cell list split map data structure
-        boxes_t                      *boxes,               // Boxes data structure
-        const mesh_tet_geom_device_t *mesh_geom,           // Mesh geometry data structure
-        const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
-        const int       start_i,                           // Starting i index for the grid points in the hex mesh
-        const int       start_j,                           // Starting j index for the grid points in the hex mesh
-        const int       delta_i,                           // Cell list jump in x direction.
-        const int       delta_j,                           // Cell list jump in y direction.
-        const int       size_i,                            // Number of grid points in x direction
-        const int       size_j,                            // Number of grid points in y direction
-        const ptrdiff_t n0,                                // SDF: n[3]
-        const ptrdiff_t n1,                                //
-        const ptrdiff_t n2,                                //
-        const ptrdiff_t stride0,                           // SDF: stride[3]
-        const ptrdiff_t stride1,                           //
-        const ptrdiff_t stride2,                           //
-        const geom_t    origin0,                           // SDF: origin[3]
-        const geom_t    origin1,                           //
-        const geom_t    origin2,                           //
-        const geom_t    delta0,                            // SDF: delta[3]
-        const geom_t    delta1,                            //
-        const geom_t    delta2,                            //
-        const real_t *const __restrict__ weighted_field,   // Weighted field
-        real_t *const __restrict__ hex_field) {            // Output field values for the hex nodes
+__global__ void                                           //
+transfer_to_hex_field_cell_split_tet4_kernel(             //
+        const cell_list_split_3d_2d_map_t split_map,      // Cell list split map data structure
+        const boxes_t                     boxes,          // Boxes data structure
+        const mesh_tet_geom_device_t      mesh_geom,      // Mesh geometry data structure
+        const elems_tet4_device           mesh,           // Mesh: mesh_t struct
+        const int                         start_i,        // Starting i index for the grid points in the hex mesh
+        const int                         start_j,        // Starting j index for the grid points in the hex mesh
+        const int                         delta_i,        // Cell list jump in x direction.
+        const int                         delta_j,        // Cell list jump in y direction.
+        const int                         size_i,         // Number of grid points in x direction
+        const int                         size_j,         // Number of grid points in y direction
+        const ptrdiff_t                   n0,             // SDF: n[3]
+        const ptrdiff_t                   n1,             //
+        const ptrdiff_t                   n2,             //
+        const ptrdiff_t                   stride0,        // SDF: stride[3]
+        const ptrdiff_t                   stride1,        //
+        const ptrdiff_t                   stride2,        //
+        const geom_t                      origin0,        // SDF: origin[3]
+        const geom_t                      origin1,        //
+        const geom_t                      origin2,        //
+        const geom_t                      delta0,         // SDF: delta[3]
+        const geom_t                      delta1,         //
+        const geom_t                      delta2,         //
+        const real_t *const __restrict__ weighted_field,  // Weighted field
+        real_t *const __restrict__ hex_field) {           // Output field values for the hex nodes
 
     const int i_grid = start_i + (blockIdx.x * blockDim.x + threadIdx.x) * delta_i;
     const int j_grid = start_j + (blockIdx.y * blockDim.y + threadIdx.y) * delta_j;
@@ -260,12 +260,12 @@ transfer_to_hex_field_cell_split_tet4_kernel(              //
         return;  // Out of bounds, exit the kernel
     }
 
-    update_hex_field(split_map,  //
-                     boxes,
-                     mesh_geom,
+    update_hex_field(&split_map,  //
+                     &boxes,
+                     &mesh_geom,
                      i_grid,
                      j_grid,
-                     mesh,
+                     &mesh,
                      n0,
                      n1,
                      n2,
