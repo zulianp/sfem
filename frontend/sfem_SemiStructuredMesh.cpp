@@ -15,7 +15,7 @@
 // 
 // #include "smesh_mesh.hpp"
 // 
-// #include "sfem_glob.hpp"
+// #include "smesh_glob.hpp"
 
 // // STL
 // #include <fstream>
@@ -277,7 +277,7 @@
 //             SFEM_ERROR("Exporting multi-block meshes is not supported");
 //         }
 
-//         sfem::create_directory(path);
+//         smesh::create_directory(path);
 
 //         std::string folder   = path;
 //         auto        elements = impl_->default_elements();
@@ -345,7 +345,7 @@
 //             SFEM_ERROR("Writing multi-block meshes is not supported");
 //         }
 
-//         sfem::create_directory(path);
+//         smesh::create_directory(path);
 
 //         std::string folder   = path;
 //         auto        elements = impl_->default_elements();

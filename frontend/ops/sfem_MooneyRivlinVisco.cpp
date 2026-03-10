@@ -14,7 +14,7 @@
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_API.hpp"
 
@@ -182,8 +182,8 @@ namespace sfem {
             const int n_qp = 8; 
             const ptrdiff_t total_size = total_elements * n_qp * history_per_qp();
             
-            history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
-            new_history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
+            history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
+            new_history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
             
             auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
             blas->zeros(total_size, history_buffer->data());
@@ -191,7 +191,7 @@ namespace sfem {
             
             // Allocate prev_u buffer
             ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
-            prev_u_buffer = create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+            prev_u_buffer = smesh::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
             blas->zeros(ndofs, prev_u_buffer->data());
         }
         

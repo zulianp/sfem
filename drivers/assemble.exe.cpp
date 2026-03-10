@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     if (SFEM_EXPORT_FP32) {
         array_dtof(nnz, (const real_t *)values->data(), (float *)values->data());

@@ -55,7 +55,7 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        sfem::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir.c_str());
 
         if (fs->has_semi_structured_mesh()) {
             m->write(smesh::Path((output_dir + "/coarse_mesh")));

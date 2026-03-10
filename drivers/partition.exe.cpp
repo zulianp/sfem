@@ -18,7 +18,7 @@
 
 
 #include "sfem_API.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 #include "smesh_distributed_aura.hpp"
 
 int main(int argc, char *argv[]) {
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data

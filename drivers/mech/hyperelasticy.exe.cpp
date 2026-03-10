@@ -323,7 +323,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
 
     // Output to disk
-    sfem::create_directory(output_path.c_str());
+    smesh::create_directory(output_path.c_str());
     if (fs->has_semi_structured_mesh()) {
         sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
@@ -332,7 +332,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     }
 
     auto out = f->output();
-    sfem::create_directory((output_path + "/out").c_str());
+    smesh::create_directory((output_path + "/out").c_str());
     out->set_output_dir((output_path + "/out").c_str());
     out->enable_AoS_to_SoA(true);
 

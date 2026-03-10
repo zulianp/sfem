@@ -22,7 +22,7 @@
 
 
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include "sfem_API.hpp"
 
@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
     const geom_t outer_thickness = atof(argv[3]);
     const char* output_folder = argv[4];
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

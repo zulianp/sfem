@@ -106,7 +106,7 @@ int test_stencil3_against_original() {
     
     double tack = MPI_Wtime();
 
-    sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
+    smesh::sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
     
     double tock = MPI_Wtime();
 

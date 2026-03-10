@@ -4,7 +4,7 @@
 #include "sfem_defs.hpp"
 
 #include "sfem_aliases.hpp"
-#include "sfem_Grid.hpp"
+#include "smesh_grid.hpp"
 
 #include <mpi.h>
 #include <memory>
@@ -67,7 +67,7 @@ namespace sfem {
         static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator>& comm,
                                                              const std::string        &path,
                                                              const enum ExecutionSpace es);
-        static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace es);
+        static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf, const enum ExecutionSpace es);
 
     public:
         class Impl;

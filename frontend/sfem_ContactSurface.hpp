@@ -5,7 +5,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Grid.hpp"
+#include "smesh_grid.hpp"
 
 #include <mpi.h>
 #include <memory>

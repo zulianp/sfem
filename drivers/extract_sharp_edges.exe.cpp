@@ -18,7 +18,7 @@
 #include "sortreduce.hpp"
 
 #include "smesh_extractions.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include "sfem_API.hpp"
 
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     }
 
     double tick = MPI_Wtime();
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 
         snprintf(path, sizeof(path), "%s/corners", output_folder);
 
-        sfem::create_directory(path);
+        smesh::create_directory(path);
 
         snprintf(path, sizeof(path), "%s/corners/i0.raw", output_folder);
         array_write(comm, path, SFEM_MPI_COUNT_T, corners->data(), n_corners, n_corners);
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
             }
 
             snprintf(path, sizeof(path), "%s/disconnected", output_folder);
-            sfem::create_directory(path);
+            smesh::create_directory(path);
 
             delems->to_files(smesh::Path(std::string(output_folder) + "/disconnected/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
         }

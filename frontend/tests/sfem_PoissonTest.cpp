@@ -59,7 +59,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
-                    affine_sshex8_laplacian_bjacobi_fff(sfem::semi_structured_level(fs->mesh()),
+                    affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(fs->mesh()),
                                                         fs->mesh().n_elements(),
                                                         sfem::semi_structured_element_data(fs->mesh()),
                                                         fff->data(),
@@ -96,9 +96,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     {
         max_it      = 80;
         auto output = f->output();
-        sfem::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir.c_str());
         std::string dbg_dir = output_dir + "/dbg";
-        sfem::create_directory(dbg_dir.c_str());
+        smesh::create_directory(dbg_dir.c_str());
         output->set_output_dir(dbg_dir.c_str());
 
         solver->interceptor = [=](real_t *x) {
@@ -132,7 +132,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     }
 
 #if 1
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
         SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
@@ -214,7 +214,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        sfem::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir.c_str());
 
         if (fs->has_semi_structured_mesh()) {
             SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);

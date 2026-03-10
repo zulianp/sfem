@@ -2,7 +2,8 @@
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
-#include "ssquad4_interpolate.hpp"
+#include "smesh_ssquad4_prolongation.hpp"
+#include "smesh_ssquad4_restriction.hpp"
 
 #include "lumped_ptdp.hpp"
 
@@ -141,7 +142,7 @@ namespace sfem {
 
             auto            fs             = f->space();
             auto           &ssmesh         = f->space()->mesh();
-            const int       L              = sfem::semi_structured_level(ssmesh);
+            const int       L              = smesh::semistructured_level(ssmesh);
             const ptrdiff_t sym_block_size = (fs->block_size() == 3 ? 6 : 3);
 
             std::vector<int> levels = sfem::semi_structured_derefinement_levels(ssmesh);
@@ -238,10 +239,10 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = sfem::semi_structured_level(fine_space->mesh());
+                const int level        = smesh::semistructured_level(fine_space->mesh());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? sfem::semi_structured_level(coarse_space->mesh()) : 1;
+                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
 
                 auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
                 coarse->sides     = coarse_sides;
@@ -255,7 +256,7 @@ namespace sfem {
                 coarse->sbv = sfem::create_sparse_block_vector(coarse->mapping, coarse_normal_prod);
 
                 fine->count = sfem::create_host_buffer<uint16_t>(fine->mapping->size());
-                ssquad4_element_node_incidence_count(
+                smesh::ssquad4_element_node_incidence_count(
                         level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
 
 #ifdef SFEM_ENABLE_CUDA
@@ -266,7 +267,7 @@ namespace sfem {
                 }
 #endif
 
-                restrict_sbv.push_back(SurfaceRestrict<real_t>::create(level,
+                restrict_sbv.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
                                                                        fine_space->element_type(),
                                                                        fine->mapping->size(),
                                                                        fine->sides,
@@ -276,9 +277,9 @@ namespace sfem {
                                                                        coarse->mapping->size(),
                                                                        coarse->sides,
                                                                        es,
-                                                                       sym_block_size));
+                                                                       sym_block_size)));
 
-                restrict_penalization.push_back(SurfaceRestrict<real_t>::create(level,
+                restrict_penalization.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
                                                                                 fine_space->element_type(),
                                                                                 fine->mapping->size(),
                                                                                 fine->sides,
@@ -288,7 +289,7 @@ namespace sfem {
                                                                                 coarse->mapping->size(),
                                                                                 coarse->sides,
                                                                                 es,
-                                                                                1));
+                                                                                1)));
             }
         }
 
@@ -447,7 +448,7 @@ namespace sfem {
 
             for (int i = 0; i < nlevels; i++) {
                 auto s = levels[i]->function->space();
-                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? sfem::semi_structured_level(s->mesh()) : 1);
+                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
 
                 levels[i]->function->describe(std::cout);
             }

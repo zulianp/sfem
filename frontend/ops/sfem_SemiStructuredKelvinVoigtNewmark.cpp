@@ -9,7 +9,7 @@
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include <mpi.h>
 
@@ -112,9 +112,9 @@ namespace sfem {
     int SemiStructuredKelvinVoigtNewmark::hessian_block_diag_sym(const real_t *const, real_t *const values) {
         auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::hessian_block_diag_sym",
-                                 sfem::semi_structured_level(ssm));
+                                 smesh::semistructured_level(ssm));
 
-        return affine_sshex8_kelvin_voigt_newmark_block_diag_sym(sfem::semi_structured_level(ssm),
+        return affine_sshex8_kelvin_voigt_newmark_block_diag_sym(smesh::semistructured_level(ssm),
                                                                  ssm.n_elements(),
                                                                  sfem::semi_structured_interior_start(ssm),
                                                                  sfem::semi_structured_element_data(ssm),
@@ -138,9 +138,9 @@ namespace sfem {
     int SemiStructuredKelvinVoigtNewmark::hessian_diag(const real_t *const x, real_t *const values) {
         auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::hessian_diag",
-                                 sfem::semi_structured_level(ssm));
+                                 smesh::semistructured_level(ssm));
 
-        return affine_sshex8_kelvin_voigt_newmark_diag(sfem::semi_structured_level(ssm),
+        return affine_sshex8_kelvin_voigt_newmark_diag(smesh::semistructured_level(ssm),
                                                        ssm.n_elements(),
                                                        sfem::semi_structured_interior_start(ssm),
                                                        sfem::semi_structured_element_data(ssm),
@@ -161,7 +161,7 @@ namespace sfem {
     int SemiStructuredKelvinVoigtNewmark::gradient(const real_t *const x, real_t *const out) {
         auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::gradient",
-                                 sfem::semi_structured_level(ssm));
+                                 smesh::semistructured_level(ssm));
 
         assert(is_semistructured_type(element_type));
 
@@ -184,7 +184,7 @@ namespace sfem {
         int    err;
 
         // We only provide affine path for now (consistent with sshex8_kv.c)
-        err = affine_sshex8_kelvin_voigt_newmark_gradient(sfem::semi_structured_level(ssm),
+        err = affine_sshex8_kelvin_voigt_newmark_gradient(smesh::semistructured_level(ssm),
                                                           ssm.n_elements(),
                                                           sfem::semi_structured_interior_start(ssm),
                                                           sfem::semi_structured_element_data(ssm),
@@ -216,7 +216,7 @@ namespace sfem {
     int SemiStructuredKelvinVoigtNewmark::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::apply",
-                                 sfem::semi_structured_level(ssm));
+                                 smesh::semistructured_level(ssm));
 
         assert(is_semistructured_type(element_type));
 
@@ -225,7 +225,7 @@ namespace sfem {
         int    err;
 
         // We only provide affine path for now (consistent with sshex8_kv.c)
-        err = affine_sshex8_kelvin_voigt_newmark_apply(sfem::semi_structured_level(ssm),
+        err = affine_sshex8_kelvin_voigt_newmark_apply(smesh::semistructured_level(ssm),
                                                        ssm.n_elements(),
                                                        sfem::semi_structured_interior_start(ssm),
                                                        sfem::semi_structured_element_data(ssm),
@@ -265,7 +265,7 @@ namespace sfem {
     SemiStructuredKelvinVoigtNewmark::~SemiStructuredKelvinVoigtNewmark() {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredKelvinVoigtNewmark[%d]::apply called %ld times. Total: %g [s], Avg: %g [s]\n",
-                   sfem::semi_structured_level(space->mesh()),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls);

@@ -17,7 +17,7 @@
 #include "sfem_Input.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
 #include "smesh_sshex8_graph.hpp"
@@ -410,7 +410,7 @@ namespace sfem {
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
         auto &ssmesh = space->mesh();
-        const int level = sfem::semi_structured_level(ssmesh);
+        const int level = smesh::semistructured_level(ssmesh);
 
         if (sidesets.size() > 1) {
             SFEM_ERROR("Not implemented!\n");

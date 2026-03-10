@@ -14,7 +14,7 @@
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 // FIXME
 #include "hex8_neohookean_ogden.hpp"

@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
                hex8_points->data()[1],
                hex8_points->data()[2]);
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     std::string path_output_format = std::string(output_folder) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value());
     hex8_elements->to_files(smesh::Path(path_output_format));

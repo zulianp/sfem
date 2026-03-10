@@ -41,7 +41,7 @@
 // #include "sfem_Communicator.hpp"
 // #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 
 #include "smesh_path.hpp"

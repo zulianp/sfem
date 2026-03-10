@@ -74,7 +74,7 @@ int test_amg_poisson() {
     f->apply_constraints(rhs->data());
     solver->apply(rhs->data(), x->data());
 
-    SFEM_TEST_ASSERT(sfem::create_directory("test_amg_poisson") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::create_directory("test_amg_poisson") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_poisson/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();
@@ -173,7 +173,7 @@ int test_amg_sqp() {
     f->apply_constraints(rhs->data());
     solver->apply(rhs->data(), x->data());
 
-    SFEM_TEST_ASSERT(sfem::create_directory("test_amg_sqp") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::create_directory("test_amg_sqp") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_sqp/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();

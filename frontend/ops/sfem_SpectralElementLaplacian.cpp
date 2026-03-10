@@ -10,7 +10,7 @@
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -38,7 +38,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->mesh()),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -101,7 +101,7 @@ namespace sfem {
 
         double tick = MPI_Wtime();
 
-        int err = spectral_hex_laplacian_apply(sfem::semi_structured_level(ssm),
+        int err = spectral_hex_laplacian_apply(smesh::semistructured_level(ssm),
                                                ssm.n_elements(),
                                                sfem::semi_structured_interior_start(ssm),
                                                sfem::semi_structured_element_data(ssm),

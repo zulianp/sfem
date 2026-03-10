@@ -3,7 +3,7 @@
 #include "cvfem_operators.hpp"
 #include "smesh_mesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include "matrixio_array.h"
 

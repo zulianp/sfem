@@ -9,7 +9,7 @@
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -36,7 +36,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->mesh()),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -76,7 +76,7 @@ namespace sfem {
         auto &ssm      = space->mesh();
         auto  mesh     = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
-        return sshex8_laplacian_element_matrix(sfem::semi_structured_level(ssm),
+        return sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
                                                mesh->n_elements(),
                                                mesh->n_nodes(),
                                                mesh->elements(0)->data(),
@@ -96,7 +96,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
 
         auto &ssm = space->mesh();
-        return affine_sshex8_laplacian_diag(sfem::semi_structured_level(ssm),
+        return affine_sshex8_laplacian_diag(smesh::semistructured_level(ssm),
                                             ssm.n_elements(),
                                             sfem::semi_structured_interior_start(ssm),
                                             sfem::semi_structured_element_data(ssm),
@@ -118,7 +118,7 @@ namespace sfem {
 
         double tick = MPI_Wtime();
 
-        int err = sshex8_stencil_element_matrix_apply(sfem::semi_structured_level(ssm),
+        int err = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
                                                       ssm.n_elements(),
                                                       sfem::semi_structured_element_data(ssm),
                                                       element_matrix->data(),

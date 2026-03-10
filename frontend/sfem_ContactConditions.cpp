@@ -4,28 +4,25 @@
 #include "boundary_condition_io.hpp"
 #include "dirichlet.hpp"
 #include "neumann.hpp"
-#include "sfem_prolongation_restriction.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
 
 #include "sfem_API.hpp"
 
 #include "obstacle.hpp"
 // 
-#include "sfem_sshex8_skin.hpp"
 
-
-
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_SDFObstacle.hpp"
 #include "sfem_resample_gap.hpp"
+
+#include "smesh_restriction.hpp"
 
 #include <vector>
 
@@ -82,7 +79,7 @@ namespace sfem {
             ptrdiff_t coarse_local_size = 0;
             idx_t    *coarse_indices    = nullptr;
             real_t   *coarse_values     = nullptr;
-            hierarchical_create_coarse_indices(max_coarse_idx,
+            smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
                                                impl_->conditions[i].local_size,
                                                impl_->conditions[i].idx,
                                                &coarse_local_size,
@@ -91,7 +88,7 @@ namespace sfem {
             if (!as_zero && impl_->conditions[i].values) {
                 coarse_values = (real_t *)malloc(coarse_local_size * sizeof(real_t));
 
-                hierarchical_collect_coarse_values(max_coarse_idx,
+                smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
                                                    impl_->conditions[i].local_size,
                                                    impl_->conditions[i].idx,
                                                    impl_->conditions[i].values,
@@ -357,7 +354,7 @@ namespace sfem {
     ContactConditions::~ContactConditions() = default;
 
     std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace>        &space,
-                                                                 const std::shared_ptr<Grid<geom_t>>         &sdf,
+                                                                 const std::shared_ptr<smesh::Grid<geom_t>>         &sdf,
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
@@ -369,7 +366,7 @@ namespace sfem {
             cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        cc->impl_->normals         = create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
+        cc->impl_->normals         = smesh::create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
         cc->impl_->execution_space = es;
         cc->impl_->blas_           = sfem::blas<real_t>(es);
         cc->impl_->assemble_mass_vector();
@@ -397,7 +394,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        auto sideset = Sideset::create_from_file(mesh->comm(), smesh::Path(path_surface));
+        auto sideset = smesh::Sideset::create_from_file(mesh->comm(), smesh::Path(path_surface));
 
         std::string path_sdf;
         in->require("sdf", path_sdf);
@@ -406,7 +403,7 @@ namespace sfem {
             path_sdf = path + "/" + path_sdf;
         }
 
-        auto sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
+        auto sdf = smesh::Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
         return create(space, std::move(sdf), {sideset}, es);
     }

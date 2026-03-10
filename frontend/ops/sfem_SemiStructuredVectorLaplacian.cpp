@@ -11,7 +11,7 @@
 #include "sfem_SemiStructuredMesh.hpp"
 
 #include "sfem_VectorLaplacian.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -78,7 +78,7 @@ namespace sfem {
             vec_out[d] = &out[d];
         }
 
-        int err = affine_sshex8_vector_laplacian_apply_fff(sfem::semi_structured_level(ssm),
+        int err = affine_sshex8_vector_laplacian_apply_fff(smesh::semistructured_level(ssm),
                                                            ssm.n_elements(),
                                                            sfem::semi_structured_element_data(ssm),
                                                            this->fff->data(),
@@ -134,7 +134,7 @@ namespace sfem {
             printf("SemiStructuredVectorLaplacian[%d]::apply called %ld times. "
                    "Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->mesh()),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,

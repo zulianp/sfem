@@ -10,7 +10,7 @@ namespace sfem {
 
     class SDFObstacle::Impl {
     public:
-        std::shared_ptr<Grid<geom_t>> sdf;
+        std::shared_ptr<smesh::Grid<geom_t>> sdf;
         bool                          variational{true};
         enum ExecutionSpace           execution_space { EXECUTION_SPACE_HOST };
     };
@@ -18,10 +18,10 @@ namespace sfem {
     std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(const std::shared_ptr<Communicator> &comm,
                                                                const std::string                   &path,
                                                                const enum ExecutionSpace            es) {
-        return create(Grid<geom_t>::create_from_file(comm, path.c_str()), es);
+        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), es);
     }
 
-    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf,
+    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                                                      const enum ExecutionSpace            execution_space) {
         auto obs = std::make_shared<SDFObstacle>();
 #ifdef SFEM_ENABLE_CUDA

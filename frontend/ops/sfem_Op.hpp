@@ -12,7 +12,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_defs.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 

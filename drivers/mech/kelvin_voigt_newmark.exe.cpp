@@ -136,8 +136,8 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     out->enable_AoS_to_SoA(true);
 
     // Write mesh
-    sfem::create_directory(output_path.c_str());
-    sfem::create_directory((output_path + "/out").c_str());
+    smesh::create_directory(output_path.c_str());
+    smesh::create_directory((output_path + "/out").c_str());
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));

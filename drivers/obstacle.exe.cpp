@@ -24,7 +24,7 @@
 #include "matrixio_array.h"
 
 #include "sfem_SSMultigrid.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    sfem::create_directory(output_path);
+    smesh::create_directory(output_path);
 
     double tick = MPI_Wtime();
 

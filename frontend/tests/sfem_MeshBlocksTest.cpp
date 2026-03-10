@@ -4,7 +4,7 @@
 
 #include "smesh_mesh.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 
 int test_mesh_blocks_basic() {

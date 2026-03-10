@@ -69,8 +69,8 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 
     assert(bottom_ss[0]->size() > 0);
 
-    const int n   = base_resolution * sfem::semi_structured_level(fs->mesh());
-    auto      sdf = sfem::create_sdf(comm,
+    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    auto      sdf = smesh::create_sdf(comm,
                                 n * resolution_ratio * 2,
                                 n * 1 * 2,
                                 n * resolution_ratio * 2,
@@ -138,8 +138,8 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * sfem::semi_structured_level(fs->mesh());
-    auto      sdf = sfem::create_sdf(comm,
+    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    auto      sdf = smesh::create_sdf(comm,
                                 n * resolution_ratio * 2,
                                 n * 1 * 2,
                                 n * resolution_ratio * 2,
@@ -218,10 +218,10 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n              = base_resolution * sfem::semi_structured_level(fs->mesh());
+    const int n              = base_resolution * smesh::semistructured_level(fs->mesh());
     int       SFEM_N_SPHERES = 2;
     SFEM_READ_ENV(SFEM_N_SPHERES, atoi);
-    auto sdf = sfem::create_sdf(comm,
+    auto sdf = smesh::create_sdf(comm,
                                 n * 5 * 2,
                                 n * 1 * 2,
                                 n * 5 * 2,
@@ -321,7 +321,7 @@ int test_contact() {
 
     f->add_operator(op);
 
-    if (SFEM_ENABLE_OUTPUT) sfem::create_directory("test_contact");
+    if (SFEM_ENABLE_OUTPUT) smesh::create_directory("test_contact");
 
     const char *SFEM_CONTACT_CASE = "sphere";
     SFEM_READ_ENV(SFEM_CONTACT_CASE, );

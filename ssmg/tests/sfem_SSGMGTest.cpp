@@ -39,8 +39,8 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     int SFEM_ENABLE_OUTPUT = 0;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) {
-        sfem::create_directory(name.c_str());
-        sfem::create_directory((name + "/fields").c_str());
+        smesh::create_directory(name.c_str());
+        smesh::create_directory((name + "/fields").c_str());
 
         // SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name + "/mesh").c_str()) == SFEM_SUCCESS);
 

@@ -4,8 +4,6 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_prolongation_restriction.hpp"
-
 #include "sfem_aliases.hpp"
 // 
 // #include "sfem_SemiStructuredMesh.hpp"
@@ -13,6 +11,18 @@
 #include "smesh_packed_mesh.hpp"
 
 namespace sfem {
+
+    template <typename idx_t>
+    ptrdiff_t max_node_id(const enum smesh::ElemType type, const ptrdiff_t nelements, idx_t **const SMESH_RESTRICT elements) {
+        const int nxe = elem_num_nodes(type);
+        idx_t     ret = 0;
+        for (int i = 0; i < nxe; i++) {
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                ret = std::max(ret, elements[i][e]);
+            }
+        }
+        return ret;
+    }
 
     class FunctionSpace::Impl {
     public:
@@ -172,7 +182,7 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
             assert(mesh->n_blocks() == 1);
             // FIXME in parallel it will not work
             impl_->nlocal =
-                    (max_node_id(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements(0)->data()) + 1) *
+                    (max_node_id<idx_t>(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements(0)->data()) + 1) *
                     block_size;
             impl_->nglobal = impl_->nlocal;
         }

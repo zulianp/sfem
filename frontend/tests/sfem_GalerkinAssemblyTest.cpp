@@ -258,8 +258,8 @@ int test_cube() {
             }
 
             if (SFEM_DEBUG_EXPORT) {
-                sfem::create_directory("galerkin");
-                sfem::create_directory("galerkin/fields");
+                smesh::create_directory("galerkin");
+                smesh::create_directory("galerkin/fields");
 
                 {  // COARSE
                     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs_coarse->mesh_ptr(), "galerkin") == SFEM_SUCCESS);
@@ -281,8 +281,8 @@ int test_cube() {
                     auto h_prolongated = prolongated;
 #endif
 
-                    sfem::create_directory("galerkin_fine");
-                    sfem::create_directory("galerkin_fine/fields");
+                    smesh::create_directory("galerkin_fine");
+                    smesh::create_directory("galerkin_fine/fields");
                     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
 
                     sfem::Output out(fs);

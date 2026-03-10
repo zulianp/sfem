@@ -23,6 +23,8 @@
 #include <sstream>
 #include <vector>
 
+#include "smesh_glob.hpp"
+
 // Mesh
 
 #include "hex8_fff.hpp"
@@ -35,7 +37,7 @@
 // 
 // #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -112,7 +114,7 @@ namespace sfem {
                 if (SFEM_NEUMANN_SURFACE) {
                     std::string pattern = pch;
                     pattern += "/i*.raw";
-                    std::vector<std::string> paths = find_files(pattern);
+                    std::vector<std::string> paths = smesh::find_files(pattern);
 
                     int nnxs = elem_num_nodes(st);
                     if (int(paths.size()) != nnxs) {
