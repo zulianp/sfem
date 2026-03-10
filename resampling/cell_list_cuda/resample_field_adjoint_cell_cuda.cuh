@@ -232,10 +232,12 @@ transfer_to_hex_field_cell_split_tet4_kernel(              //
         boxes_t                      *boxes,               // Boxes data structure
         const mesh_tet_geom_device_t *mesh_geom,           // Mesh geometry data structure
         const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
-        const int       delta_x,                           // Cell list box size in x direction
-        const int       delta_y,                           // Cell list box size in y direction
-        const int       size_x,                            // Number of grid points in x direction
-        const int       size_y,                            // Number of grid points in y direction
+        const int       start_i,                           // Starting i index for the grid points in the hex mesh
+        const int       start_j,                           // Starting j index for the grid points in the hex mesh
+        const int       delta_i,                           // Cell list jump in x direction.
+        const int       delta_j,                           // Cell list jump in y direction.
+        const int       size_i,                            // Number of grid points in x direction
+        const int       size_j,                            // Number of grid points in y direction
         const ptrdiff_t n0,                                // SDF: n[3]
         const ptrdiff_t n1,                                //
         const ptrdiff_t n2,                                //
@@ -251,10 +253,10 @@ transfer_to_hex_field_cell_split_tet4_kernel(              //
         const real_t *const __restrict__ weighted_field,   // Weighted field
         real_t *const __restrict__ hex_field) {            // Output field values for the hex nodes
 
-    const int i_grid = (blockIdx.x * blockDim.x + threadIdx.x) * delta_x;
-    const int j_grid = (blockIdx.y * blockDim.y + threadIdx.y) * delta_y;
+    const int i_grid = start_i + (blockIdx.x * blockDim.x + threadIdx.x) * delta_i;
+    const int j_grid = start_j + (blockIdx.y * blockDim.y + threadIdx.y) * delta_j;
 
-    if (i_grid >= size_x || j_grid >= size_y) {
+    if (i_grid >= size_i - 1 || j_grid >= size_j - 1) {
         return;  // Out of bounds, exit the kernel
     }
 
