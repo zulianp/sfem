@@ -141,24 +141,24 @@ update_hex_quad_node_cuda(                                           //
 // update_hex_field
 ///////////////////////////////////////////////
 __device__ int                                                      //
-update_hex_field(cell_list_split_3d_2d_map_t *split_map,            // Cell list split map data structure
-                 boxes_t                     *boxes,                // Boxes data structure
-                 const mesh_tet_geom_t       *mesh_geom,            // Mesh geometry data structure
-                 const ptrdiff_t              i_grid,               // The i index of the grid point in the hex mesh
-                 const ptrdiff_t              j_grid,               // The j index of the grid point in the hex mesh
+update_hex_field(cell_list_split_3d_2d_map_t  *split_map,           // Cell list split map data structure
+                 boxes_t                      *boxes,               // Boxes data structure
+                 const mesh_tet_geom_device_t *mesh_geom,           // Mesh geometry data structure
+                 const ptrdiff_t               i_grid,              // The i index of the grid point in the hex mesh
+                 const ptrdiff_t               j_grid,              // The j index of the grid point in the hex mesh
                  const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
                  const ptrdiff_t n0,                                // SDF: n[3]
                  const ptrdiff_t n1,                                //
                  const ptrdiff_t n2,                                //
-                 const ptrdiff_t const __restrict__ stride0,        // SDF: stride[3]
-                 const ptrdiff_t const __restrict__ stride1,        //
-                 const ptrdiff_t const __restrict__ stride2,        //
-                 const geom_t const __restrict__ origin0,           // SDF: origin[3]
-                 const geom_t const __restrict__ origin1,           //
-                 const geom_t const __restrict__ origin2,           //
-                 const geom_t const __restrict__ delta0,            // SDF: delta[3]
-                 const geom_t const __restrict__ delta1,            //
-                 const geom_t const __restrict__ delta2,            //
+                 const ptrdiff_t stride0,                           // SDF: stride[3]
+                 const ptrdiff_t stride1,                           //
+                 const ptrdiff_t stride2,                           //
+                 const geom_t    origin0,                           // SDF: origin[3]
+                 const geom_t    origin1,                           //
+                 const geom_t    origin2,                           //
+                 const geom_t    delta0,                            // SDF: delta[3]
+                 const geom_t    delta1,                            //
+                 const geom_t    delta2,                            //
                  const real_t *const __restrict__ weighted_field,   // Weighted field
                  real_t *const __restrict__ hex_field) {            //
 
@@ -190,9 +190,35 @@ update_hex_field(cell_list_split_3d_2d_map_t *split_map,            // Cell list
             const real_t z = phys_z_base + (real_t)k * delta_z;
 
             // Query of the tet. for GPU CUDA ...
-            // That's tricky
+            const int tet_idx =                                                               //
+                    query_cell_list_3d_2d_split_map_mesh_given_xy_gpu(split_map,              //
+                                                                      boxes,                  //
+                                                                      mesh_geom,              //
+                                                                      grid_x + q_x * delta0,  //
+                                                                      grid_y + q_y * delta1,  //
+                                                                      z);                     //
 
-            // Update filed given the tet.
+            if (tet_idx > -1) {
+                // Update field given the tet.
+                update_hex_quad_node_cuda(grid_x + q_x * delta0,  //
+                                          grid_y + q_y * delta1,  //
+                                          z,                      //
+                                          q_w,                    //
+                                          tet_idx,                //
+                                          mesh,                   //
+                                          mesh_geom,              //
+                                          stride0,                //
+                                          stride1,                //
+                                          stride2,                //
+                                          origin0,                //
+                                          origin1,                //
+                                          origin2,                //
+                                          delta0,                 //
+                                          delta1,                 //
+                                          delta2,                 //
+                                          weighted_field,         //
+                                          hex_field);             //
+            }
         }
     }
 }
@@ -202,9 +228,9 @@ update_hex_field(cell_list_split_3d_2d_map_t *split_map,            // Cell list
 /////////////////////////////////////////////////
 __global__ void                                            //
 transfer_to_hex_field_cell_split_tet4_kernel(              //
-        cell_list_split_3d_2d_map_t *split_map,            // Cell list split map data structure
-        boxes_t                     *boxes,                // Boxes data structure
-        const mesh_tet_geom_t       *mesh_geom,            // Mesh geometry data structure
+        cell_list_split_3d_2d_map_t  *split_map,           // Cell list split map data structure
+        boxes_t                      *boxes,               // Boxes data structure
+        const mesh_tet_geom_device_t *mesh_geom,           // Mesh geometry data structure
         const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
         const int       delta_x,                           // Cell list box size in x direction
         const int       delta_y,                           // Cell list box size in y direction
