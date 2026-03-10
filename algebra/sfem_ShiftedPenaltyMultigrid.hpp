@@ -17,7 +17,7 @@
 #include "sfem_tpl_blas.hpp"
 
 #include "sfem_aliases.hpp"
-#include "sfem_Tracer.hpp"
+
 
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring

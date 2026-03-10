@@ -2,7 +2,7 @@
 #define SFEM_BCRS_SYM_SPMV_HPP
 
 #include <iostream>
-#include "sfem_Tracer.hpp"
+
 
 namespace sfem {
     template <typename R, typename C, typename TStorage, typename T = TStorage>

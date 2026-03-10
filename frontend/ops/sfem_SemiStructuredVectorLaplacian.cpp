@@ -9,7 +9,7 @@
 #include "sfem_LinearElasticity.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sfem_VectorLaplacian.hpp"
 #include "sfem_glob.hpp"
 

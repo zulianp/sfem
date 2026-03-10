@@ -5,7 +5,7 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "sfem_Tracer.hpp"
+
 #include "sfem_glob.hpp"
 
 #ifdef SFEM_ENABLE_CUDA

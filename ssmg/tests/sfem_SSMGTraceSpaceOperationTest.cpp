@@ -14,7 +14,7 @@
 #include "sfem_API.hpp"
 #include "sfem_ssgmg.hpp"
 
-#include "sfem_hex8_mesh_graph.hpp"
+
 #include "smesh_sshex8_graph.hpp"
 #include "ssquad4_interpolate.hpp"
 

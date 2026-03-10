@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.hpp"
+
 #include "sshex8.hpp"
 #include "sshex8_laplacian.hpp"
 #include "sshex8_linear_elasticity.hpp"

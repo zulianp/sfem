@@ -9,7 +9,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
-#include "sfem_Tracer.hpp"
+
 
 #include <mpi.h>
 #include "hex8_jacobian.hpp"

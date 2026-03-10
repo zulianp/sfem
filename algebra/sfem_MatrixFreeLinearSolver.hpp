@@ -7,7 +7,7 @@
 // C++ includes
 #include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
-#include "sfem_Tracer.hpp"
+
 
 // STL includes
 #include <cassert>

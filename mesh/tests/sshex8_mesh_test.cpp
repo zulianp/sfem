@@ -5,7 +5,7 @@
 
 #include "sfem_test.hpp"
 
-#include "sfem_hex8_mesh_graph.hpp"
+
 #include "smesh_sshex8_graph.hpp"
 
 int test_sshex8_hierarchical_renumbering() {

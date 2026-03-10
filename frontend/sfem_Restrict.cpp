@@ -3,7 +3,7 @@
 #include "sfem_API.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sshex8.hpp"
 #include "ssquad4_interpolate.hpp"
 

@@ -10,7 +10,7 @@
 #include "sfem_mask.hpp"
 #include "sfem_openmp_blas.hpp"
 
-#include "sfem_Tracer.hpp"
+
 
 // This class might be better off as just a sparse matrix, but the coarsen method is an optimized
 // version of the matrix triple product ptap and transposing is basically a NOP

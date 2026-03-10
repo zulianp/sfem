@@ -1,6 +1,6 @@
 #include "sfem_PlugInOp.hpp"
 
-#include "sfem_Tracer.hpp"
+
 #include "sfem_logger.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_FunctionSpace.hpp"

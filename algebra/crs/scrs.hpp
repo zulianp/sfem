@@ -3,7 +3,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
-#include "sfem_Tracer.hpp"
+
 
 #include <algorithm>
 #include <cassert>

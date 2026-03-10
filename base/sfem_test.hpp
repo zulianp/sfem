@@ -8,7 +8,7 @@
 #include <iostream>
 
 
-#include "sfem_Tracer.hpp"
+
 #include "sfem_base.hpp"
 
 #ifdef _OPENMP

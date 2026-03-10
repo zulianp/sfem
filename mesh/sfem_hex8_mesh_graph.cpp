@@ -1,9 +1,9 @@
-// #include "sfem_hex8_mesh_graph.hpp"
+// 
 
 // 
 // #include "sortreduce.hpp"
 
-// #include "adj_table.hpp"
+// 
 // #include "sshex8.hpp"   //FIXME
 // #include "ssquad4.hpp"  //FIXME
 
