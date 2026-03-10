@@ -54,7 +54,7 @@ query_cell_list_3d_2d_map_mesh_given_xy(         //
     const int start_index = map->cell_ptr[cell_index];
     const int end_index   = map->cell_ptr[cell_index + 1];
 
-    int num_boxes_local = end_index - start_index;
+    const int num_boxes_local = end_index - start_index;
 
     int boxes_found = 0;
 
@@ -102,8 +102,8 @@ query_cell_list_3d_2d_map_mesh_given_xy(         //
                 if (check_box_contains_pt(boxes, box_index, x, y, z)) {
                     // We can further check if the point is actually inside the tet from which the box was generated, using
                     // mesh_geom and box_index to get the tet geometry and vertices.
-                    real_t *inv_Jacobian  = get_inv_Jacobian_geom(mesh_geom, box_index);
-                    real_t *vertices_zero = get_vertices_zero_geom(mesh_geom, box_index);
+                    const real_t *inv_Jacobian  = get_inv_Jacobian_geom(mesh_geom, box_index);
+                    const real_t *vertices_zero = get_vertices_zero_geom(mesh_geom, box_index);
 
                     const bool is_out = is_point_out_of_tet(inv_Jacobian,  //
                                                             vertices_zero[0],
