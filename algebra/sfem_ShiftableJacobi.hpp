@@ -11,11 +11,6 @@
 #include "sfem_openmp_ShiftableJacobi.hpp"
 
 namespace sfem {
-    template <typename T>
-    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
-
-    template <typename T>
-    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es);
 
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {

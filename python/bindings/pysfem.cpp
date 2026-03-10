@@ -783,7 +783,7 @@ NB_MODULE(pysfem, m) {
           });
     m.def("semi_structured_apply_hierarchical_renumbering",
           [](const std::shared_ptr<Mesh> &mesh) { return sfem::semi_structured_apply_hierarchical_renumbering(*mesh); });
-    m.def("semi_structured_level", [](const std::shared_ptr<Mesh> &mesh) { return sfem::semi_structured_level(*mesh); });
+    m.def("semi_structured_level", [](const std::shared_ptr<Mesh> &mesh) { return smesh::semistructured_level(*mesh); });
 
     // Expose the C++ types as Python dtypes
     try {

@@ -18,7 +18,7 @@ namespace sfem {
 
         auto      fs     = f->space();
         auto     &ssmesh = f->space()->mesh();
-        const int L      = sfem::semi_structured_level(ssmesh);
+        const int L      = smesh::semistructured_level(ssmesh);
 
         std::vector<int> levels = sfem::semi_structured_derefinement_levels(ssmesh);
 
@@ -86,7 +86,7 @@ namespace sfem {
 
         for (int i = 0; i < nlevels; i++) {
             auto s = functions[i]->space();
-            printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? sfem::semi_structured_level(s->mesh()) : 1);
+            printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
 
             functions[i]->describe(std::cout);
         }

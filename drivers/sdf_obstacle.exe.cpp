@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    sfem::create_directory(output_path);
+    smesh::create_directory(output_path);
 
     double tick = MPI_Wtime();
 

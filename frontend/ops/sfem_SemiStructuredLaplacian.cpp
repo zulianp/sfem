@@ -11,7 +11,7 @@
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -66,7 +66,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->mesh()),
+                   smesh::semistructured_level(space->mesh()),
                    use_affine_approximation ? (use_stencil ? "stencil" : "affine") : "isoparametric",
                    calls,
                    total_time,
@@ -130,9 +130,9 @@ namespace sfem {
 
     int SemiStructuredLaplacian::hessian_diag(const real_t *const x, real_t *const values) {
         auto &ssm = space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", smesh::semistructured_level(ssm));
 
-        return affine_sshex8_laplacian_diag(sfem::semi_structured_level(ssm),
+        return affine_sshex8_laplacian_diag(smesh::semistructured_level(ssm),
                                             ssm.n_elements(),
                                             sfem::semi_structured_interior_start(ssm),
                                             sfem::semi_structured_element_data(ssm),
@@ -155,7 +155,7 @@ namespace sfem {
 
         if (this->fff) {
             SFEM_TRACE_SCOPE("affine_sshex8_laplacian_stencil_apply_fff");
-            affine_sshex8_laplacian_stencil_apply_fff(sfem::semi_structured_level(ssm),
+            affine_sshex8_laplacian_stencil_apply_fff(smesh::semistructured_level(ssm),
                                                       ssm.n_elements(),
                                                       sfem::semi_structured_element_data(ssm),
                                                       this->fff->data(),
@@ -163,7 +163,7 @@ namespace sfem {
                                                       out);
         } else {
             if (use_stencil) {
-                err = affine_sshex8_laplacian_stencil_apply(sfem::semi_structured_level(ssm),
+                err = affine_sshex8_laplacian_stencil_apply(smesh::semistructured_level(ssm),
                                                             ssm.n_elements(),
                                                             sfem::semi_structured_interior_start(ssm),
                                                             sfem::semi_structured_element_data(ssm),
@@ -171,7 +171,7 @@ namespace sfem {
                                                             h,
                                                             out);
             } else if (use_affine_approximation) {
-                err = affine_sshex8_laplacian_apply(sfem::semi_structured_level(ssm),
+                err = affine_sshex8_laplacian_apply(smesh::semistructured_level(ssm),
                                                     ssm.n_elements(),
                                                     sfem::semi_structured_interior_start(ssm),
                                                     sfem::semi_structured_element_data(ssm),
@@ -180,7 +180,7 @@ namespace sfem {
                                                     out);
 
             } else {
-                err = sshex8_laplacian_apply(sfem::semi_structured_level(ssm),
+                err = sshex8_laplacian_apply(smesh::semistructured_level(ssm),
                                              ssm.n_elements(),
                                              sfem::semi_structured_interior_start(ssm),
                                              sfem::semi_structured_element_data(ssm),

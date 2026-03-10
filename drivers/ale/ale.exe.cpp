@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::string output_folder = "ale_fvm_out";
-    sfem::create_directory(output_folder.c_str());
+    smesh::create_directory(output_folder.c_str());
 
 
     // 1) Initialize fields, grids and other paramerers

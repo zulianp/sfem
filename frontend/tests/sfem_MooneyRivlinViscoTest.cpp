@@ -40,7 +40,7 @@ static void compute_contact_lower_bound(
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto fs = f->space();
 
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir.c_str());
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
     output->set_output_dir(output_dir.c_str());

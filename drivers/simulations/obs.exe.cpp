@@ -85,8 +85,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         f->add_constraint(dirichlet_conditions);
     }
 
-    auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
-    auto contact_boundary = sfem::Sideset::create_from_file(comm, smesh::Path(contact_boundary_path));
+    auto sdf              = smesh::Grid<geom_t>::create_from_file(comm, sdf_path);
+    auto contact_boundary = smesh::Sideset::create_from_file(comm, smesh::Path(contact_boundary_path));
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -117,7 +117,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
 
     // Output to disk
-    sfem::create_directory(output_path.c_str());
+    smesh::create_directory(output_path.c_str());
 
     fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());

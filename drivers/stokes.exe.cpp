@@ -29,7 +29,7 @@
 
 #include "stokes_mini.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 #include "sfem_API.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = argv[2];
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

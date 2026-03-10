@@ -197,7 +197,7 @@ static void compute_contact_lower_bound_hemisphere(
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto fs = f->space();
 
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir.c_str());
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
     output->set_output_dir(output_dir.c_str());
@@ -218,7 +218,7 @@ void export_obstacle_mesh(const std::string &output_dir,
                           real_t y_min, real_t y_max,
                           real_t z_min, real_t z_max) {
     std::string obstacle_dir = output_dir + "/obstacle";
-    sfem::create_directory(obstacle_dir.c_str());
+    smesh::create_directory(obstacle_dir.c_str());
 
     // Create 4 corner points of the obstacle plane
     // The plane equation: x = base_plane + slope * y (if slope_dir=1)
@@ -307,7 +307,7 @@ void export_flat_obstacle_mesh(const std::string &output_dir,
                                real_t a_min, real_t a_max,
                                real_t b_min, real_t b_max) {
     std::string obstacle_dir = output_dir + "/obstacle";
-    sfem::create_directory(obstacle_dir.c_str());
+    smesh::create_directory(obstacle_dir.c_str());
     
     int h1, h2;
     if (contact_dir == 0) { h1 = 1; h2 = 2; }       // x = const, span y,z
@@ -391,7 +391,7 @@ void export_stepped_obstacle_mesh(const std::string &output_dir,
                                   int n_steps,
                                   real_t z_min, real_t z_max) {
     std::string obstacle_dir = output_dir + "/obstacle";
-    sfem::create_directory(obstacle_dir.c_str());
+    smesh::create_directory(obstacle_dir.c_str());
     
     // Each step has 4 corners (forms a horizontal surface)
     // Plus vertical risers between steps
@@ -471,7 +471,7 @@ void export_hemisphere_obstacle_mesh(const std::string &output_dir,
                                      int contact_dir,
                                      int n_segments = 16) {
     std::string obstacle_dir = output_dir + "/obstacle";
-    sfem::create_directory(obstacle_dir.c_str());
+    smesh::create_directory(obstacle_dir.c_str());
     
     int h1, h2;
     if (contact_dir == 0) { h1 = 1; h2 = 2; }

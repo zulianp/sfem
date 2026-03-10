@@ -3,7 +3,7 @@
 #include "mass.hpp"
 #include "smesh_mesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 

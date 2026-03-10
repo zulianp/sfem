@@ -27,7 +27,7 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
     // Recursive way
     auto l1_mesh_from_l2 = sfem::semi_structured_derefine(l2_mesh, levels[1]);
 
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir.c_str());
 
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(l2_mesh, (output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
@@ -153,7 +153,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     restriction->apply(fine_field->data(), coarse_field->data());
     // coarse_field->print(std::cout);
 
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir.c_str());
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(coarse_fs->mesh_ptr(), (output_dir + "/coarse").c_str()) ==
                      SFEM_SUCCESS);

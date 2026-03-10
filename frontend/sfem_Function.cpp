@@ -9,6 +9,7 @@
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_glob.hpp"
 
 #include "boundary_condition.hpp"
 #include "boundary_condition_io.hpp"
@@ -34,18 +35,12 @@
 #include "hex8_fff.hpp"
 #include "hex8_jacobian.hpp"
 // 
-#include "sshex8.hpp"
 
-
-// Multigrid
-#include "sfem_prolongation_restriction.hpp"
-
-// C++ includes
-// 
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
-
+#include "smesh_sshex8.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_restriction.hpp"
 #include "smesh_common.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
@@ -112,7 +107,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write");
 
         MPI_Comm comm = impl_->space->mesh_ptr()->comm()->get();
-        sfem::create_directory(impl_->output_dir.c_str());
+        smesh::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
         if (impl_->AoS_to_SoA && block_size > 1) {
@@ -156,7 +151,7 @@ namespace sfem {
         auto      mesh       = space->mesh_ptr();
         const int block_size = space->block_size();
 
-        sfem::create_directory(impl_->output_dir.c_str());
+        smesh::create_directory(impl_->output_dir.c_str());
 
         char path[2048];
 
@@ -597,7 +592,7 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
-        auto files   = sfem::find_files(pattern);
+        auto files   = smesh::find_files(pattern);
         int  n_files = files.size();
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));

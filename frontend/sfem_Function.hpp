@@ -22,7 +22,7 @@
 #include "sfem_ForwardDeclarations.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 #include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "smesh_output.hpp"

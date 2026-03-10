@@ -30,7 +30,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto top_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    const int n = base_resolution * (fs->has_semi_structured_mesh() ? sfem::semi_structured_level(fs->mesh()) : 1);
+    const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(fs->mesh()) : 1);
 
     sfem::DirichletConditions::Condition xtop{.sidesets = {top_ss}, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sidesets = {top_ss}, .value = -0.05, .component = 1};

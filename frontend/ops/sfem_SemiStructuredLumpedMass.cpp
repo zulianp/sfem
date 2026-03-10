@@ -8,7 +8,7 @@
 #include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
     // ... Implementation copied from sfem_Function.cpp ...
@@ -54,7 +54,7 @@ namespace sfem {
 
         auto &ssm = space->mesh();
         if (space->block_size() == 1) {
-            return affine_sshex8_mass_lumped(sfem::semi_structured_level(ssm),
+            return affine_sshex8_mass_lumped(smesh::semistructured_level(ssm),
                                              ssm.n_elements(),
                                              sfem::semi_structured_interior_start(ssm),
                                              sfem::semi_structured_element_data(ssm),
@@ -65,7 +65,7 @@ namespace sfem {
 
             auto    buff = create_host_buffer<real_t>(n);
             real_t *temp = buff->data();
-            int     err  = affine_sshex8_mass_lumped(sfem::semi_structured_level(ssm),
+            int     err  = affine_sshex8_mass_lumped(smesh::semistructured_level(ssm),
                                                      ssm.n_elements(),
                                                      sfem::semi_structured_interior_start(ssm),
                                                      sfem::semi_structured_element_data(ssm),

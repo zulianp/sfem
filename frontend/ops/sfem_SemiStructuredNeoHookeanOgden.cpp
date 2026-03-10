@@ -10,7 +10,7 @@
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include <mpi.h>
 
@@ -94,7 +94,7 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::hessian_diag(const real_t *const x, real_t *const values) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::hessian_diag", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::hessian_diag", smesh::semistructured_level(ssm));
 
         // return affine_sshex8_linear_elasticity_diag(ssm.level(),
         //                                             ssm.n_elements(),
@@ -114,7 +114,7 @@ namespace sfem {
     int SemiStructuredNeoHookeanOgden::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
         auto &ssm = impl_->space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::hessian_block_diag_sym",
-                                 sfem::semi_structured_level(ssm));
+                                 smesh::semistructured_level(ssm));
 
         //     return affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
         //                                                           ssm.n_elements(),
@@ -136,9 +136,9 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::gradient(const real_t *const x, real_t *const out) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::gradient", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::gradient", smesh::semistructured_level(ssm));
 
-        return sshex8_neohookean_ogden_gradient(sfem::semi_structured_level(ssm),
+        return sshex8_neohookean_ogden_gradient(smesh::semistructured_level(ssm),
                                                 ssm.n_elements(),
                                                 1,
                                                 ssm.n_nodes(),
@@ -158,9 +158,9 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::apply", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::apply", smesh::semistructured_level(ssm));
 
-        return sshex8_neohookean_ogden_partial_assembly_apply(sfem::semi_structured_level(ssm),
+        return sshex8_neohookean_ogden_partial_assembly_apply(smesh::semistructured_level(ssm),
                                                               ssm.n_elements(),
                                                               1,
                                                               sfem::semi_structured_element_data(ssm),
@@ -177,9 +177,9 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::value(const real_t *x, real_t *const out) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::value", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::value", smesh::semistructured_level(ssm));
 
-        return sshex8_neohookean_ogden_objective(sfem::semi_structured_level(ssm),
+        return sshex8_neohookean_ogden_objective(smesh::semistructured_level(ssm),
                                                  ssm.n_elements(),
                                                  1,
                                                  ssm.n_nodes(),
@@ -201,9 +201,9 @@ namespace sfem {
                                                    const real_t *const steps,
                                                    real_t *const       out) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::value_steps", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::value_steps", smesh::semistructured_level(ssm));
 
-        return sshex8_neohookean_ogden_objective_steps(sfem::semi_structured_level(ssm),
+        return sshex8_neohookean_ogden_objective_steps(smesh::semistructured_level(ssm),
                                                        ssm.n_elements(),
                                                        1,
                                                        ssm.n_nodes(),
@@ -296,13 +296,13 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::update(const real_t *const x) {
         auto &ssm = impl_->space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::update", sfem::semi_structured_level(ssm));
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredNeoHookeanOgden[%d]::update", smesh::semistructured_level(ssm));
 
         if (!impl_->partial_assembly) {
             impl_->partial_assembly = sfem::create_host_buffer<metric_tensor_t>(ssm.n_elements() * HEX8_S_IKMN_SIZE);
         }
 
-        sshex8_neohookean_ogden_hessian_partial_assembly(sfem::semi_structured_level(ssm),
+        sshex8_neohookean_ogden_hessian_partial_assembly(smesh::semistructured_level(ssm),
                                                          ssm.n_elements(),
                                                          1,
                                                          sfem::semi_structured_element_data(ssm),
