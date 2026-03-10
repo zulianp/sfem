@@ -29,7 +29,7 @@
 // C++ includes
 #include "sfem_API.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
+
 
 namespace sfem {
     template <typename T>

@@ -3,6 +3,8 @@
 
 #include "sfem_base.hpp"
 
+#include "sfem_aliases.hpp"
+
 #include <cstdio>
 #include <cmath>
 

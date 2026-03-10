@@ -7,7 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
-#include "sfem_Tracer.hpp"
+
 
 namespace sfem {
 

@@ -9,7 +9,7 @@
 #include "lagrange_legendre_gauss_lobatto.hpp"
 #include "line_quadrature.hpp"
 #include "line_quadrature_gauss_lobatto.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sshex8.hpp"
 #include "tet4_inline_cpu.hpp"
 #include "spectral_hex_laplacian_inline.hpp"

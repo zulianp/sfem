@@ -9,7 +9,7 @@
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
-#include "sfem_P1toP2.hpp"
+// #include "sfem_P1toP2.hpp"
 
 #include "smesh_mesh_reorder.hpp"
 
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
-            m = sfem::convert_p1_mesh_to_p2(m);
+            m = smesh::promote_to(smesh::TET10, m);
         }
 
         if (smesh::Env::read("SFEM_USE_SFC", false)) {

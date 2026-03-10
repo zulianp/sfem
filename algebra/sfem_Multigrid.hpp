@@ -15,7 +15,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include "sfem_aliases.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sfem_openmp_blas.hpp"
 #include "sfem_tpl_blas.hpp"
 

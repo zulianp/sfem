@@ -15,9 +15,6 @@
 #include "sfem_DirichletConditions.hpp"
 #include "smesh_env.hpp"
 #include "smesh_sideset.hpp"
-#include "sfem_P1toP2.hpp"
-
-#include "sfem_SFC.hpp"
 
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
@@ -217,7 +214,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
 
     if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
-        mesh = sfem::convert_p1_mesh_to_p2(mesh);
+        mesh = smesh::promote_to(smesh::TET10, mesh);
     } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }

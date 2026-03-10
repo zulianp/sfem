@@ -11,7 +11,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sfem_glob.hpp"
 
 #include "generic_hyperelasticity.hpp"

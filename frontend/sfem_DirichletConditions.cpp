@@ -29,18 +29,18 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.hpp"
+
 #include "hex8_fff.hpp"
 #include "hex8_jacobian.hpp"
-#include "sfem_hex8_mesh_graph.hpp"
+// 
 #include "sshex8.hpp"
-#include "sshex8_mesh.hpp"
+
 
 // C++ includes
 // 
 // #include "sfem_Communicator.hpp"
 // #include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sfem_glob.hpp"
 
 

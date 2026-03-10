@@ -2,10 +2,12 @@
 #define LAGRANGE_HEX_LAPLACIAN_INLINE_HPP
 
 #include "sfem_base.hpp"
+
+#include "sfem_aliases.hpp"
 #include <cstdio>
 
 
-#include "sfem_Tracer.hpp"
+
 // #define DEBUG_SUMFACT
 
 template <int N, int Q, typename T>

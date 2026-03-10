@@ -1,10 +1,11 @@
 #include "sfem_ContactSurface.hpp"
 
 // C
-#include "adj_table.hpp"
-#include "sfem_hex8_mesh_graph.hpp"
-#include "sfem_sshex8_skin.hpp"
-#include "sshex8_mesh.hpp"
+
+// 
+// #include "sfem_sshex8_skin.hpp"
+#include "smesh_ssquad4_mesh.hpp"
+
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_contact_surface.hpp"
@@ -15,7 +16,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_Input.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sfem_glob.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
@@ -449,7 +450,7 @@ namespace sfem {
         const int nexs  = level * level;
         auto      sides = sfem::create_host_buffer<idx_t>(nnxs, semi_structured_sides->extent(1) * nexs);
 
-        ssquad4_to_standard_quad4_mesh(
+        smesh::ssquad4_to_standard_quad4_mesh(
                 level, semi_structured_sides->extent(1), semi_structured_sides->data(), sides->data());
 
         // Create object

@@ -18,9 +18,9 @@
 
 #include "sfem_defs.hpp"
 
-#include "argsort.hpp"
+#include "smesh_sort.hpp"
 
-#include "adj_table.hpp"
+
 
 #include "sfem_glob.hpp"
 

@@ -6,7 +6,7 @@
 #include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 #include "smesh_mesh_reorder.hpp"
-#include "sfem_P1toP2.hpp"
+
 
 int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
@@ -102,7 +102,7 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     sfc->reorder(*m);
 
     if(smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
-        m = sfem::convert_p1_mesh_to_p2(m);
+        m = smesh::promote_to(smesh::TET10, m);
     } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }

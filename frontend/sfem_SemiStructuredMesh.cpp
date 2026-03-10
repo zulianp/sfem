@@ -5,16 +5,16 @@
 // #include "sfem_macros.hpp"
 
 // // Mesh
-// #include "adj_table.hpp"
-// #include "sfem_hex8_mesh_graph.hpp"
+// 
+// 
 // #include "smesh_sshex8_graph.hpp"
 // #include "sshex8.hpp"
-// #include "sshex8_mesh.hpp"
+// 
 
 // // C++ Includes
 // 
 // #include "smesh_mesh.hpp"
-// #include "sfem_Tracer.hpp"
+// 
 // #include "sfem_glob.hpp"
 
 // // STL

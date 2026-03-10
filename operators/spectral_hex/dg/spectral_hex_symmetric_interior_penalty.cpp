@@ -9,7 +9,7 @@
 
 #include "lagrange_hex_interpolate_inline.hpp"
 #include "lagrange_hex_laplacian_inline.hpp"
-#include "sfem_Tracer.hpp"
+
 #include "sshex_side_code.hpp"
 
 #include <cassert>

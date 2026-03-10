@@ -15,11 +15,11 @@
 #include "sfem_API.hpp"
 
 #include "obstacle.hpp"
-#include "sfem_hex8_mesh_graph.hpp"
+// 
 #include "sfem_sshex8_skin.hpp"
-#include "sshex8_mesh.hpp"
 
-#include "sfem_Tracer.hpp"
+
+
 #include "sfem_glob.hpp"
 
 #include "sfem_ContactSurface.hpp"

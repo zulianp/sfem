@@ -2,7 +2,8 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "argsort.hpp"
+// #include "smesh_sort.hpp"
+#include "smesh_sort.hpp"
 #include "ssquad4.hpp"
 
 #include <assert.h>
@@ -694,7 +695,7 @@ int ssquad4_prolongation_crs_fill(const int                    level,
                 };
 
                 idx_t order[4] = {0, 1, 2, 3};
-                argsort_i(4, c, order);
+                smesh::argsort(4, c, order);
 
                 assert(c[order[0]] < c[order[1]]);
                 assert(c[order[1]] < c[order[2]]);
