@@ -218,9 +218,11 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
                                           delta2,                 //
                                           weighted_field,         //
                                           hex_field);             //
-            }
-        }
-    }
+            }  // END if (tet_idx > -1)
+        }  // END for (int block_k = 0; block_k < n2; block_k += threads_per_block)
+    }  // END for (int q_ijk = 0; q_ijk < QUAD_TOTAL; q_ijk++)
+
+    return 0;
 }
 
 /////////////////////////////////////////////////
@@ -253,8 +255,8 @@ transfer_to_hex_field_cell_split_tet4_kernel(             //
         const real_t *const __restrict__ weighted_field,  // Weighted field
         real_t *const __restrict__ hex_field) {           // Output field values for the hex nodes
 
-    const int i_grid = start_i + (blockIdx.x * blockDim.x + threadIdx.x) * delta_i;
-    const int j_grid = start_j + (blockIdx.y * blockDim.y + threadIdx.y) * delta_j;
+    const int i_grid = start_i + blockIdx.x * delta_i;
+    const int j_grid = start_j + blockIdx.y * delta_j;
 
     if (i_grid >= size_i - 1 || j_grid >= size_j - 1) {
         return;  // Out of bounds, exit the kernel

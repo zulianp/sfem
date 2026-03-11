@@ -10,6 +10,7 @@
 #include "sfem_resample_field_adjoint_cell.h"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "cell_list_resampling_gpu.h"
 #include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #endif
 
@@ -1622,16 +1623,16 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 #endif
 
             //
-            ret = tet4_resample_field_adjoint_cell_quad(0,
-                                                        mesh->nelements,      //
-                                                        mesh,                 //
-                                                        n,                    // SDF
-                                                        stride,               //
-                                                        origin,               //
-                                                        delta,                //
-                                                        mass_vector,          // Input weighted field
-                                                        mini_tet_parameters,  //
-                                                        data);                //
+            ret = tet4_resample_field_adjoint_cell_quad_gpu(0,
+                                                            mesh->nelements,      //
+                                                            mesh,                 //
+                                                            n,                    // SDF
+                                                            stride,               //
+                                                            origin,               //
+                                                            delta,                //
+                                                            mass_vector,          // Input weighted field
+                                                            mini_tet_parameters,  //
+                                                            data);                //
 
             // ret = tet4_resample_field_adjoint_hex_quad_norm  //
             //                                                  // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //

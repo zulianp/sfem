@@ -808,6 +808,8 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
                                     min_grid_z,                     //
                                     max_grid_z);                    //
 
+    const double tick_transfer = MPI_Wtime();
+
     transfer_to_hex_field_cell_split_par_tet4(split_map,           //
                                               bounding_boxes_ptr,  //
                                               geom,                //
@@ -818,6 +820,8 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
                                               delta,               //
                                               weighted_field,      //
                                               data);               //
+
+    const double tock_transfer = MPI_Wtime();
 
     ///////// FREE RESOURCES /////////
     free_cell_list_split_3d_2d_map(split_map);
@@ -834,6 +838,8 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
     MPI_Barrier(MPI_COMM_WORLD);
     const double tock = MPI_Wtime();
     printf("Time taken for tet4_resample_field_adjoint_cell_quad: %f seconds\n", tock - tick);
+    printf("Time taken for data transfer: %f seconds\n", tock_transfer - tick_transfer);
+    printf("Time taken for cell list construction and setup: %f seconds\n", tick_transfer - tick);
 
     RETURN_FROM_FUNCTION(0);
 }  // END Function: tet4_resample_field_adjoint_cell_quad
