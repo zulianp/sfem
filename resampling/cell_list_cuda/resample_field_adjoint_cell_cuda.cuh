@@ -11,7 +11,7 @@
 //////////////////////////////////////////////
 // update_hex_field
 //////////////////////////////////////////////
-__device__ int                                                       //
+__device__ __forceinline__ int                                       //
 update_hex_quad_node_cuda(                                           //
         const real_t    x,                                           // Physical x coordinate of the quadrature point
         const real_t    y,                                           // Physical y coordinate of the quadrature point
@@ -26,9 +26,9 @@ update_hex_quad_node_cuda(                                           //
         const geom_t    origin0,                                     // SDF: origin[3]
         const geom_t    origin1,                                     //
         const geom_t    origin2,                                     //
-        const geom_t    delta0,                                      // SDF: delta[3]
-        const geom_t    delta1,                                      //
-        const geom_t    delta2,                                      //
+        const real_t    inv_delta0,                                  // Precomputed 1.0 / delta0
+        const real_t    inv_delta1,                                  // Precomputed 1.0 / delta1
+        const real_t    inv_delta2,                                  // Precomputed 1.0 / delta2
         const real_t *const __restrict__ weighted_field,             // Weighted field
         real_t *const SFEM_RESTRICT hex_element_field) {             // Output field values for the 8 hex nodes
 
@@ -45,13 +45,9 @@ update_hex_quad_node_cuda(                                           //
     const real_t oy = origin1;
     const real_t oz = origin2;
 
-    const real_t inv_dx = 1.0 / delta0;
-    const real_t inv_dy = 1.0 / delta1;
-    const real_t inv_dz = 1.0 / delta2;
-
-    const real_t grid_x = (x - ox) * inv_dx;
-    const real_t grid_y = (y - oy) * inv_dy;
-    const real_t grid_z = (z - oz) * inv_dz;
+    const real_t grid_x = (x - ox) * inv_delta0;
+    const real_t grid_y = (y - oy) * inv_delta1;
+    const real_t grid_z = (z - oz) * inv_delta2;
 
     const ptrdiff_t i = floor(grid_x);
     const ptrdiff_t j = floor(grid_y);
@@ -134,13 +130,22 @@ update_hex_quad_node_cuda(                                           //
     atomicAdd(&out[off6], w_c2 * l_z);
     atomicAdd(&out[off7], w_c3 * l_z);
 
+    // out[off0] += w_c0 * one_minus_lz;
+    // out[off1] += w_c1 * one_minus_lz;
+    // out[off2] += w_c2 * one_minus_lz;
+    // out[off3] += w_c3 * one_minus_lz;
+    // out[off4] += w_c0 * l_z;
+    // out[off5] += w_c1 * l_z;
+    // out[off6] += w_c2 * l_z;
+    // out[off7] += w_c3 * l_z;
+
     return 0;
 }  // END Function: update_hex_quad_node
 
 ///////////////////////////////////////////////
 // update_hex_field
 ///////////////////////////////////////////////
-__device__ int                                                      //
+__device__ __forceinline__ int                                      //
 update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list split map data structure
                  const boxes_t                     *boxes,          // Boxes data structure
                  const mesh_tet_geom_device_t      *mesh_geom,      // Mesh geometry data structure
@@ -162,12 +167,18 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
                  const real_t *const __restrict__ weighted_field,   // Weighted field
                  real_t *const __restrict__ hex_field) {            //
 
+    (void)n0;
+    (void)n1;
+
     const int threads_per_block = blockDim.x * blockDim.y;
     const int block_thread_id   = threadIdx.y * blockDim.x + threadIdx.x;
 
-    const real_t grid_x  = real_t(origin0) + real_t(i_grid) * real_t(delta0);
-    const real_t grid_y  = real_t(origin1) + real_t(j_grid) * real_t(delta1);
-    const real_t delta_z = delta2;
+    const real_t grid_x     = real_t(origin0) + real_t(i_grid) * real_t(delta0);
+    const real_t grid_y     = real_t(origin1) + real_t(j_grid) * real_t(delta1);
+    const real_t delta_z    = delta2;
+    const real_t inv_delta0 = 1.0 / delta0;
+    const real_t inv_delta1 = 1.0 / delta1;
+    const real_t inv_delta2 = 1.0 / delta2;
 
     const real_t *quad_x = QuadPoints<real_t>::x();
     const real_t *quad_y = QuadPoints<real_t>::y();
@@ -180,45 +191,47 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
         const real_t q_z = quad_z[q_ijk];
         const real_t q_w = quad_w[q_ijk];
 
+        const real_t x_q         = grid_x + q_x * delta0;
+        const real_t y_q         = grid_y + q_y * delta1;
         const real_t phys_z_base = origin2 + q_z * delta2;
 
         for (int block_k = 0; block_k < n2; block_k += threads_per_block) {
             const int k = block_k + block_thread_id;
 
-            if (k >= n2) break;
+            if (k < n2) {
+                const real_t z = phys_z_base + (real_t)k * delta_z;
 
-            const real_t z = phys_z_base + (real_t)k * delta_z;
+                // Query of the tet. for GPU CUDA ...
+                const int tet_idx =                                                   //
+                        query_cell_list_3d_2d_split_map_mesh_given_xy_gpu(split_map,  //
+                                                                          boxes,      //
+                                                                          mesh_geom,  //
+                                                                          x_q,        //
+                                                                          y_q,        //
+                                                                          z);         //
 
-            // Query of the tet. for GPU CUDA ...
-            const int tet_idx =                                                               //
-                    query_cell_list_3d_2d_split_map_mesh_given_xy_gpu(split_map,              //
-                                                                      boxes,                  //
-                                                                      mesh_geom,              //
-                                                                      grid_x + q_x * delta0,  //
-                                                                      grid_y + q_y * delta1,  //
-                                                                      z);                     //
-
-            if (tet_idx > -1) {
-                // Update field given the tet.
-                update_hex_quad_node_cuda(grid_x + q_x * delta0,  //
-                                          grid_y + q_y * delta1,  //
-                                          z,                      //
-                                          q_w,                    //
-                                          tet_idx,                //
-                                          mesh,                   //
-                                          mesh_geom,              //
-                                          stride0,                //
-                                          stride1,                //
-                                          stride2,                //
-                                          origin0,                //
-                                          origin1,                //
-                                          origin2,                //
-                                          delta0,                 //
-                                          delta1,                 //
-                                          delta2,                 //
-                                          weighted_field,         //
-                                          hex_field);             //
-            }  // END if (tet_idx > -1)
+                if (tet_idx > -1) {
+                    // Update field given the tet.
+                    update_hex_quad_node_cuda(x_q,             //
+                                              y_q,             //
+                                              z,               //
+                                              q_w,             //
+                                              tet_idx,         //
+                                              mesh,            //
+                                              mesh_geom,       //
+                                              stride0,         //
+                                              stride1,         //
+                                              stride2,         //
+                                              origin0,         //
+                                              origin1,         //
+                                              origin2,         //
+                                              inv_delta0,      //
+                                              inv_delta1,      //
+                                              inv_delta2,      //
+                                              weighted_field,  //
+                                              hex_field);      //
+                }  // END if (tet_idx > -1)
+            }  // END if (k < n2)
         }  // END for (int block_k = 0; block_k < n2; block_k += threads_per_block)
     }  // END for (int q_ijk = 0; q_ijk < QUAD_TOTAL; q_ijk++)
 
