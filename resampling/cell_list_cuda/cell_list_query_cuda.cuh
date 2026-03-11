@@ -256,8 +256,6 @@ query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu(const cell_list_3d_2d_map_t *map
 
     const int num_boxes_local = end_index - start_index;
 
-    int boxes_found = 0;
-
     if (num_boxes_local > 0) {
         int lower_bound_index = lower_bound_float_gpu<real_t>(&map->upper_bounds_z[start_index], num_boxes_local, z);
 
