@@ -2,6 +2,7 @@
 #define __CELL_LIST_QUERY_CUDA_CUH__
 
 #include "cell_list_cuda.cuh"
+#include "sfem_gpu_math.cuh"
 
 //////////////////////////////////////////////
 // Convert 2D coordinates to grid indices
@@ -132,7 +133,7 @@ lower_bound_float_gpu<double>(const double *elements_array, size_t nmemb, double
 /////////////////////////////////////////////////////
 // get_inv_Jacobian_geom
 /////////////////////////////////////////////////////
-__device__ real_t *                                                            //
+__device__ real_t *                                                                   //
 get_inv_Jacobian_geom_gpu(const mesh_tet_geom_device_t *geom, ptrdiff_t element_i) {  //
     if (geom == NULL || geom->inv_Jacobian == NULL) {
         printf("Error: Invalid input to get_inv_Jacobian_geom\n");
@@ -150,7 +151,7 @@ get_inv_Jacobian_geom_gpu(const mesh_tet_geom_device_t *geom, ptrdiff_t element_
 /////////////////////////////////////////////////////
 // get_vertices_zero_geom
 /////////////////////////////////////////////////////
-__device__ real_t *                                                             //
+__device__ real_t *                                                                    //
 get_vertices_zero_geom_gpu(const mesh_tet_geom_device_t *geom, ptrdiff_t element_i) {  //
     if (geom == NULL || geom->vetices_zero == NULL) {
         printf("Error: Invalid input to get_vertices_zero_geom\n");
@@ -212,9 +213,9 @@ is_point_out_of_tet_gpu(const real_t inv_J_tet[9],  //
     const real_t dy = vertex_y - tet_origin_y;
     const real_t dz = vertex_z - tet_origin_z;
 
-    const real_t ref_x = inv_J00 * dx + inv_J01 * dy + inv_J02 * dz;
-    const real_t ref_y = inv_J10 * dx + inv_J11 * dy + inv_J12 * dz;
-    const real_t ref_z = inv_J20 * dx + inv_J21 * dy + inv_J22 * dz;
+    const real_t ref_x = fast_fma(inv_J00, dx, fast_fma(inv_J01, dy, inv_J02 * dz));
+    const real_t ref_y = fast_fma(inv_J10, dx, fast_fma(inv_J11, dy, inv_J12 * dz));
+    const real_t ref_z = fast_fma(inv_J20, dx, fast_fma(inv_J21, dy, inv_J22 * dz));
 
     // Check if point is inside reference tetrahedron
     // A point is inside if: ref_x >= 0, ref_y >= 0, ref_z >= 0, and ref_x + ref_y + ref_z <= 1
@@ -232,13 +233,13 @@ is_point_out_of_tet_gpu(const real_t inv_J_tet[9],  //
 // Query the cell list for a given 3D point (x, y, z)
 // and return the corresponding tetrahedra in tets_array
 //////////////////////////////////////////////////////////
-__device__ int                                                                           //
-query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu(const cell_list_3d_2d_map_t *map,        //
-                                                const boxes_t               *boxes,      //
+__device__ int                                                                            //
+query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu(const cell_list_3d_2d_map_t  *map,        //
+                                                const boxes_t                *boxes,      //
                                                 const mesh_tet_geom_device_t *mesh_geom,  //
-                                                const real_t                 x,          //
-                                                const real_t                 y,          //
-                                                const real_t                 z) {                        //
+                                                const real_t                  x,          //
+                                                const real_t                  y,          //
+                                                const real_t                  z) {                         //
 
     int ixiy[2];
     coord_to_grid_indices_gpu(x, y, map->min_x, map->min_y, map->delta_x, map->delta_y, ixiy);

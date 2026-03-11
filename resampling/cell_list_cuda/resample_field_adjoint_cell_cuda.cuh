@@ -6,6 +6,7 @@
 #include "cell_list_cuda.cuh"
 #include "cell_list_query_cuda.cuh"
 #include "cubature_cuda.cuh"
+#include "sfem_gpu_math.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
 //////////////////////////////////////////////
@@ -92,16 +93,16 @@ update_hex_quad_node_cuda(                                           //
     const real_t inv_J_21 = inv_J_tet[7];
     const real_t inv_J_22 = inv_J_tet[8];
 
-    const real_t x_ref = inv_J_00 * x_o + inv_J_01 * y_o + inv_J_02 * z_o;
-    const real_t y_ref = inv_J_10 * x_o + inv_J_11 * y_o + inv_J_12 * z_o;
-    const real_t z_ref = inv_J_20 * x_o + inv_J_21 * y_o + inv_J_22 * z_o;
+    const real_t x_ref = fast_fma(inv_J_02, z_o, fast_fma(inv_J_01, y_o, inv_J_00 * x_o));
+    const real_t y_ref = fast_fma(inv_J_12, z_o, fast_fma(inv_J_11, y_o, inv_J_10 * x_o));
+    const real_t z_ref = fast_fma(inv_J_22, z_o, fast_fma(inv_J_21, y_o, inv_J_20 * x_o));
 
     const real_t f0 = 1.0 - x_ref - y_ref - z_ref;
     const real_t f1 = x_ref;
     const real_t f2 = y_ref;
     const real_t f3 = z_ref;
 
-    const real_t wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
+    const real_t wf_quad = fast_fma(f3, wf3, fast_fma(f2, wf2, fast_fma(f1, wf1, f0 * wf0)));
 
     const real_t one_minus_lx = (1.0 - l_x);
     const real_t one_minus_ly = (1.0 - l_y);
@@ -121,6 +122,9 @@ update_hex_quad_node_cuda(                                           //
 
     real_t *const SFEM_RESTRICT out = &hex_element_field[base_index];
 
+    // There is no conflict in between threads.
+    // Since threads update the grid points shifted by 1 along z-axis.
+    // beside they update adiacent grid points.
     atomicAdd(&out[off0], w_c0 * one_minus_lz);
     atomicAdd(&out[off1], w_c1 * one_minus_lz);
     atomicAdd(&out[off2], w_c2 * one_minus_lz);
