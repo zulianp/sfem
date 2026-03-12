@@ -34,7 +34,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=${SFEM_TORUS_MESH:-torus4}
+mesh=${SFEM_TORUS_MESH:-torus}
 # mesh=impeller_tet4
 
 out=resampled
@@ -104,7 +104,7 @@ Nsight_OUTPUT="/home/simone/App/ncu_out/ncu_grid_to_mesh"
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
 
-PROFILE=0
+PROFILE=1
 if [[ $PROFILE -eq 1 ]]
 then
 LAUNCH="${Nsight_PATH}/ncu \
@@ -124,7 +124,7 @@ LAUNCH="${Nsight_PATH}/ncu \
 fi
 
 GRID_TO_MESH="grid_to_mesh"
-GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
+# GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 # LAUNCH="lldb --"
 

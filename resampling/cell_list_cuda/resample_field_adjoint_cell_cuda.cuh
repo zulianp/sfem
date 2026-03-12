@@ -50,9 +50,9 @@ update_hex_quad_node_cuda(                                           //
     const real_t grid_y = (y - oy) * inv_delta1;
     const real_t grid_z = (z - oz) * inv_delta2;
 
-    const ptrdiff_t i = floor(grid_x);
-    const ptrdiff_t j = floor(grid_y);
-    const ptrdiff_t k = floor(grid_z);
+    const ptrdiff_t i = fast_floor(grid_x);
+    const ptrdiff_t j = fast_floor(grid_y);
+    const ptrdiff_t k = fast_floor(grid_z);
 
     const real_t l_x = (grid_x - (real_t)i);
     const real_t l_y = (grid_y - (real_t)j);
