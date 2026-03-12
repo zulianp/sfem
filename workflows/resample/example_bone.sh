@@ -76,7 +76,7 @@ Nsight_OUTPUT="/home/simone/App/ncu_out/ncu_grid_to_mesh"
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
 
-PROFILE=1
+PROFILE=0
 if [[ $PROFILE -eq 1 ]]
 then
 LAUNCH="${Nsight_PATH}/ncu \
