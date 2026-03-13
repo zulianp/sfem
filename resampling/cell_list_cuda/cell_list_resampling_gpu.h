@@ -16,6 +16,7 @@ extern "C" {
 
 typedef struct {
     boxes_t                     *bounding_boxes;
+    boxes_interleaved_t         *bounding_boxes_interleaved;
     mesh_tet_geom_t             *geom;
     cell_list_split_3d_2d_map_t *split_map;
     side_length_histograms_t     histograms;

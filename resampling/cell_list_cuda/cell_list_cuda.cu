@@ -238,31 +238,63 @@ void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom, cudaStream_t stre
     d_geom->nelements    = 0;
 }
 
+/* ── copy to device ── */
+boxes_interleaved_t  //
+copy_boxes_interleaved_to_device(const boxes_interleaved_t *h_boxes, cudaStream_t stream) {
+    boxes_interleaved_t d_boxes;
+
+    /* ── scalar fields ── */
+    d_boxes.num_boxes = h_boxes->num_boxes;
+
+    /* ── size: 6 real_t per box (min_x, min_y, min_z, max_x, max_y, max_z) ── */
+    const size_t bytes = h_boxes->num_boxes * 6 * sizeof(real_t);
+
+    /* ── async allocate ── */
+    cudaMallocAsync((void **)&d_boxes.min_max_xyz, bytes, stream);
+
+    /* ── wait for allocation ── */
+    cudaStreamSynchronize(stream);
+
+    /* ── async H→D copy ── */
+    cudaMemcpyAsync(d_boxes.min_max_xyz, h_boxes->min_max_xyz, bytes, cudaMemcpyHostToDevice, stream);
+
+    return d_boxes;
+}
+
+/* ── companion free ── */
+void  //
+free_boxes_interleaved_device(boxes_interleaved_t *d_boxes, cudaStream_t stream) {
+    cudaFreeAsync(d_boxes->min_max_xyz, stream);
+
+    d_boxes->min_max_xyz = NULL;
+    d_boxes->num_boxes   = 0;
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_field_adjoint_cell_quad_gpu_launch
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-extern "C" int tet4_resample_field_adjoint_cell_quad_gpu_launch(
-        const tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data,        //
-        const mesh_t                                               *mesh,            //
-        const ptrdiff_t *const SFEM_RESTRICT                        n,               //
-        const ptrdiff_t *const SFEM_RESTRICT                        stride,          //
-        const geom_t *const SFEM_RESTRICT                           origin,          //
-        const geom_t *const SFEM_RESTRICT                           delta,           //
-        const real_t *const SFEM_RESTRICT                           weighted_field,  //
-        real_t *const SFEM_RESTRICT                                 data) {                                          //
+extern "C" int                                                                                                                //
+tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data,        //
+                                                 const mesh_t                                               *mesh,            //
+                                                 const ptrdiff_t *const SFEM_RESTRICT                        n,               //
+                                                 const ptrdiff_t *const SFEM_RESTRICT                        stride,          //
+                                                 const geom_t *const SFEM_RESTRICT                           origin,          //
+                                                 const geom_t *const SFEM_RESTRICT                           delta,           //
+                                                 const real_t *const SFEM_RESTRICT                           weighted_field,  //
+                                                 real_t *const SFEM_RESTRICT                                 data) {                                          //
     int ret = 0;
 
     PRINT_CURRENT_FUNCTION;
 
-    if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL || cpu_data->geom == NULL ||
-        mesh == NULL || n == NULL || stride == NULL || origin == NULL || delta == NULL || weighted_field == NULL ||
-        data == NULL) {
+    if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL ||
+        cpu_data->bounding_boxes_interleaved == NULL || cpu_data->geom == NULL || mesh == NULL || n == NULL || stride == NULL ||
+        origin == NULL || delta == NULL || weighted_field == NULL || data == NULL) {
         fprintf(stderr, "Error: Invalid input to tet4_resample_field_adjoint_cell_quad_gpu_launch\n");
         ret = EXIT_FAILURE;
         RETURN_FROM_FUNCTION(ret);
-    }  // END if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL || cpu_data->geom == NULL ||
+    }  // END if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL || cpu_data->geom == NULL |
        // mesh == NULL || n == NULL || stride == NULL || origin == NULL || delta == NULL || weighted_field == NULL || data ==
        // NULL)
 
@@ -285,7 +317,8 @@ extern "C" int tet4_resample_field_adjoint_cell_quad_gpu_launch(
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    boxes_t bounding_boxes_device = copy_boxes_to_device(cpu_data->bounding_boxes, stream);
+    boxes_interleaved_t bounding_boxes_interleaved_device =
+            copy_boxes_interleaved_to_device(cpu_data->bounding_boxes_interleaved, stream);
 
     cell_list_split_3d_2d_map_t split_map_device = copy_cell_list_split_3d_2d_map_to_device(cpu_data->split_map, stream);
 
@@ -313,31 +346,33 @@ extern "C" int tet4_resample_field_adjoint_cell_quad_gpu_launch(
 
     const double tick_kernel = MPI_Wtime();
 
+#define index_type int
+
     for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++) {
         for (ptrdiff_t start_j = 0; start_j < delta_j; start_j++) {
             dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
             dim3 block_size(256, 1, 1);
 
-            transfer_to_hex_field_cell_split_tet4_kernel   //
-                    <<<grid_size,                          //
-                       block_size,                         //
-                       0,                                  //
-                       stream_kernel>>>(split_map_device,  //
-                                        bounding_boxes_device,
+            transfer_to_hex_field_cell_split_tet4_il_kernel<index_type>     //
+                    <<<grid_size,                                           //
+                       block_size,                                          //
+                       0,                                                   //
+                       stream_kernel>>>(split_map_device,                   //
+                                        bounding_boxes_interleaved_device,  //
                                         geom_device,
                                         mesh_device,
-                                        start_i,
-                                        start_j,
-                                        delta_i,
-                                        delta_j,
-                                        i_size,
-                                        j_size,
-                                        n[0],
-                                        n[1],
-                                        n[2],
-                                        stride[0],
-                                        stride[1],
-                                        stride[2],
+                                        static_cast<index_type>(start_i),
+                                        static_cast<index_type>(start_j),
+                                        static_cast<index_type>(delta_i),
+                                        static_cast<index_type>(delta_j),
+                                        static_cast<index_type>(i_size),
+                                        static_cast<index_type>(j_size),
+                                        static_cast<index_type>(n[0]),
+                                        static_cast<index_type>(n[1]),
+                                        static_cast<index_type>(n[2]),
+                                        static_cast<index_type>(stride[0]),
+                                        static_cast<index_type>(stride[1]),
+                                        static_cast<index_type>(stride[2]),
                                         origin[0],
                                         origin[1],
                                         origin[2],
@@ -359,7 +394,7 @@ extern "C" int tet4_resample_field_adjoint_cell_quad_gpu_launch(
     free_elems_tet4_device_async(&mesh_device, stream);
     free_mesh_tet_geom_device(&geom_device, stream);
     free_cell_list_split_3d_2d_map_device(&split_map_device, stream);
-    free_boxes_device(&bounding_boxes_device, stream);
+    free_boxes_interleaved_device(&bounding_boxes_interleaved_device, stream);
     cudaFreeAsync(weighted_field_device_ptr, stream_wf);
 
     cudaStreamSynchronize(stream);

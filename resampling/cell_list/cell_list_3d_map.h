@@ -30,8 +30,46 @@ typedef struct {
 } boxes_t;
 
 /**
+ * @brief Structure to hold axis-aligned bounding boxes in an
+ * interleaved format (min_x, min_y, min_z, max_x, max_y, max_z)
+ */
+typedef struct {
+    real_t *min_max_xyz;
+    int     num_boxes;
+} boxes_interleaved_t;
+
+/**
+ * @brief Create an empty boxes_interleaved_t structure
+ * @return An empty boxes_interleaved_t structure
+ */
+boxes_interleaved_t              //
+make_boxes_interleaved_t(void);  //
+
+/**
+ * @brief Initialize boxes_interleaved_t structure
+ * @param boxes Pointer to boxes_interleaved_t structure to initialize
+ */
+void                                                   //
+init_boxes_interleaved_t(boxes_interleaved_t *boxes);  //
+
+/**
+ * @brief Allocate memory for boxes_interleaved_t structure
+ * @param num_boxes Number of boxes to allocate
+ * @return Pointer to allocated boxes_interleaved_t structure
+ */
+boxes_interleaved_t *                               //
+allocate_boxes_interleaved_t(const int num_boxes);  //
+
+/**
+ * @brief Free memory allocated for boxes_interleaved_t structure
+ * @param boxes Pointer to boxes_interleaved_t structure to free
+ */
+void                                                   //
+free_boxes_interleaved_t(boxes_interleaved_t *boxes);  //
+
+/**
  * @brief Create an empty boxes_t structure
- * @return
+ * @return An empty boxes_t structure
  */
 boxes_t              //
 make_boxes_t(void);  //
@@ -57,6 +95,25 @@ allocate_boxes_t(const int num_boxes);  //
  */
 void                           //
 free_boxes_t(boxes_t *boxes);  //
+
+/**
+ * @brief Copy boxes from boxes_t format to interleaved format
+ * @param boxes Pointer to boxes_t structure to copy from
+ * @param interleaved Pointer to boxes_interleaved_t structure to copy to
+ * @note This function will free any existing data in interleaved->min_max_xyz before copying
+ * @return void
+ */
+void
+copy_boxes_to_interleaved(const boxes_t *boxes, boxes_interleaved_t *interleaved);
+
+/**
+ * @brief Get the bounds of a box in interleaved format
+ * @param boxes Pointer to boxes_interleaved_t structure
+ * @param box_index Index of the box to get bounds for
+ * @param bounds Output array of size 6 to hold min_x, min_y, min_z, max_x, max_y, max_z
+ */
+void 
+get_box_bounds_il(const boxes_interleaved_t *boxes, const int box_index, real_t bounds[6]);
 
 /**
  * @brief Check if a box contains a given point
