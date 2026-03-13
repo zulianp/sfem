@@ -15,9 +15,10 @@ static void tet4_resample_field_adjoint_cell_quad_gpu_init_cpu_data(
         return;
     }  // END if (cpu_data == NULL)
 
-    cpu_data->bounding_boxes = NULL;
-    cpu_data->geom           = NULL;
-    cpu_data->split_map      = NULL;
+    cpu_data->bounding_boxes             = NULL;
+    cpu_data->geom                       = NULL;
+    cpu_data->split_map                  = NULL;
+    cpu_data->bounding_boxes_interleaved = NULL;
     memset(&cpu_data->histograms, 0, sizeof(cpu_data->histograms));
 }  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_init_cpu_data
 
@@ -26,8 +27,8 @@ static void tet4_resample_field_adjoint_cell_quad_gpu_init_cpu_data(
 // tet4_resample_field_adjoint_cell_quad_gpu_destroy_cpu_data
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static void tet4_resample_field_adjoint_cell_quad_gpu_destroy_cpu_data(
-        tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data) {
+static void  //
+tet4_resample_field_adjoint_cell_quad_gpu_destroy_cpu_data(tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data) {
     if (cpu_data == NULL) {
         return;
     }  // END if (cpu_data == NULL)
@@ -46,6 +47,11 @@ static void tet4_resample_field_adjoint_cell_quad_gpu_destroy_cpu_data(
         free_boxes_t(cpu_data->bounding_boxes);
         cpu_data->bounding_boxes = NULL;
     }  // END if (cpu_data->bounding_boxes != NULL)
+
+    if (cpu_data->bounding_boxes_interleaved != NULL) {
+        free_boxes_interleaved_t(cpu_data->bounding_boxes_interleaved);
+        cpu_data->bounding_boxes_interleaved = NULL;
+    }  // END if (cpu_data->bounding_boxes_interleaved != NULL)
 
     free_side_length_histograms(&cpu_data->histograms);
     memset(&cpu_data->histograms, 0, sizeof(cpu_data->histograms));
@@ -86,6 +92,15 @@ tet4_resample_field_adjoint_cell_quad_gpu_build_cpu_data(const ptrdiff_t        
         ret = EXIT_FAILURE;
         goto exit;
     }  // END if (fb_error != 0 || cpu_data->bounding_boxes == NULL)
+
+    cpu_data->bounding_boxes_interleaved = allocate_boxes_interleaved_t(cpu_data->bounding_boxes->num_boxes);
+    if (cpu_data->bounding_boxes_interleaved == NULL) {
+        fprintf(stderr, "Error: allocate_boxes_interleaved_t failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (cpu_data->bounding_boxes_interleaved == NULL)
+
+    copy_boxes_to_interleaved(cpu_data->bounding_boxes, cpu_data->bounding_boxes_interleaved);
 
     bounding_box_statistics_t stats = calculate_bounding_box_statistics(cpu_data->bounding_boxes);
     print_bounding_box_statistics(&stats);

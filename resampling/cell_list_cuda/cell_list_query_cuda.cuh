@@ -17,8 +17,8 @@ coord_to_grid_indices_gpu(const real_t coord0,   //
                           const real_t delta1,   //
                           int          indices[2]) {      //
                                                  //
-    const real_t inv_delta0 = 1.0 / delta0;
-    const real_t inv_delta1 = 1.0 / delta1;
+    const real_t inv_delta0 = (real_t)(1) / delta0;
+    const real_t inv_delta1 = (real_t)(1) / delta1;
 
     indices[0] = (int)((coord0 - origin0) * inv_delta0);
     indices[1] = (int)((coord1 - origin1) * inv_delta1);
@@ -100,17 +100,24 @@ template <typename real_t>
 __device__ int  //
 upper_bound_float_gpu(const real_t *elements_array, size_t nmemb, real_t to_search);
 
+////////////////////////////////////////////////
+// lower_bound_float (template)
+////////////////////////////////////////////////
 template <>
 __device__ int  //
 upper_bound_float_gpu<float>(const float *elements_array, size_t nmemb, float to_search) {
     return upper_bound_float32_gpu(elements_array, nmemb, to_search);
 }
 
+/////////////////////////////////////////////
+// upper_bound_float (template specialization for double)
+/////////////////////////////////////////////
 template <>
 __device__ int  //
 upper_bound_float_gpu<double>(const double *elements_array, size_t nmemb, double to_search) {
     return upper_bound_float64_gpu(elements_array, nmemb, to_search);
 }
+
 ////////////////////////////////////////////////
 // lower_bound_float (template)
 ////////////////////////////////////////////////
@@ -169,18 +176,40 @@ get_vertices_zero_geom_gpu(const mesh_tet_geom_device_t *geom, ptrdiff_t element
 ////////////////////////////////////////////////
 // check_box_containment
 ////////////////////////////////////////////////
-__device__ bool check_box_contains_pt_gpu(const boxes_t *boxes,      //
-                                          const int      box_index,  //
-                                          const real_t   x,          //
-                                          const real_t   y,          //
-                                          const real_t   z) {          //
-                                                                     //
-    return (x >= boxes->min_x[box_index] &&                          //
-            x <= boxes->max_x[box_index] &&                          //
-            y >= boxes->min_y[box_index] &&                          //
-            y <= boxes->max_y[box_index] &&                          //
-            z >= boxes->min_z[box_index] &&                          //
+__device__ bool                                      //
+check_box_contains_pt_gpu(const boxes_t *boxes,      //
+                          const int      box_index,  //
+                          const real_t   x,          //
+                          const real_t   y,          //
+                          const real_t   z) {          //
+                                                     //
+    return (x >= boxes->min_x[box_index] &&          //
+            x <= boxes->max_x[box_index] &&          //
+            y >= boxes->min_y[box_index] &&          //
+            y <= boxes->max_y[box_index] &&          //
+            z >= boxes->min_z[box_index] &&          //
             z <= boxes->max_z[box_index]);
+}
+
+////////////////////////////////////////////////
+// check_box_containment
+////////////////////////////////////////////////
+__device__ bool                                                     //
+check_box_il_contains_pt_gpu(const boxes_interleaved_t *boxes,      //
+                             const int                  box_index,  //
+                             const real_t               x,          //
+                             const real_t               y,          //
+                             const real_t               z) {                      //
+
+    real_t bound[6];
+    memcpy(&bound[0], &boxes->min_max_xyz[box_index * 6], 6 * sizeof(real_t));
+    //
+    return (x >= bound[0] &&  //
+            x <= bound[3] &&  //
+            y >= bound[1] &&  //
+            y <= bound[4] &&  //
+            z >= bound[2] &&  //
+            z <= bound[5]);
 }
 
 /////////////////////////////////////////////////////////
@@ -219,10 +248,10 @@ is_point_out_of_tet_gpu(const real_t inv_J_tet[9],  //
 
     // Check if point is inside reference tetrahedron
     // A point is inside if: ref_x >= 0, ref_y >= 0, ref_z >= 0, and ref_x + ref_y + ref_z <= 1
-    const bool inside = (ref_x >= 0.0) &&                  //
-                        (ref_y >= 0.0) &&                  //
-                        (ref_z >= 0.0) &&                  //
-                        ((ref_x + ref_y + ref_z) <= 1.0);  //
+    const bool inside = ref_x >= (real_t)(0) &&                    //
+                        ref_y >= (real_t)(0) &&                    //
+                        ref_z >= (real_t)(0) &&                    //
+                        ((ref_x + ref_y + ref_z) <= (real_t)(1));  //
 
     // Return true if point is outside
     return !(inside);
@@ -329,5 +358,106 @@ query_cell_list_3d_2d_split_map_mesh_given_xy_gpu(     //
 
     return query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu(map->map_upper, boxes, mesh_geom, x, y, z);
 }  // END Function: query_cell_list_3d_2d_split_map_mesh_given_xy_gpu
+
+//////////////////////////////////////////////////////////
+// Query the cell list for a given 3D point (x, y, z)
+// and return the corresponding tetrahedra in tets_array
+//////////////////////////////////////////////////////////
+__device__ int                                                                               //
+query_cell_list_3d_2d_map_mesh_given_xy_tet_il_gpu(const cell_list_3d_2d_map_t  *map,        //
+                                                   const boxes_interleaved_t    *boxes,      //
+                                                   const mesh_tet_geom_device_t *mesh_geom,  //
+                                                   const real_t                  x,          //
+                                                   const real_t                  y,          //
+                                                   const real_t                  z) {                         //
+
+    int ixiy[2];
+    coord_to_grid_indices_gpu(x, y, map->min_x, map->min_y, map->delta_x, map->delta_y, ixiy);
+
+    int ix = ixiy[0];
+    int iy = ixiy[1];
+
+    ix = (ix < 0) ? 0 : (ix >= map->num_cells_x) ? map->num_cells_x - 1 : ix;
+    iy = (iy < 0) ? 0 : (iy >= map->num_cells_y) ? map->num_cells_y - 1 : iy;
+
+    const int cell_index = grid_to_cell_index_gpu(ix, iy, map->num_cells_x);
+
+    const int start_index = map->cell_ptr[cell_index];
+    const int end_index   = map->cell_ptr[cell_index + 1];
+
+    const int num_boxes_local = end_index - start_index;
+
+    if (num_boxes_local > 0) {
+        int lower_bound_index = lower_bound_float_gpu<real_t>(&map->upper_bounds_z[start_index], num_boxes_local, z);
+
+        const int start_index_up = (lower_bound_index > 1) ? start_index + lower_bound_index - 2 : start_index;
+        const int size_up        = (lower_bound_index > 1) ? num_boxes_local - (lower_bound_index - 2) : num_boxes_local;
+        const int offset_up      = start_index_up - start_index;
+
+        int upper_bound_index = upper_bound_float_gpu<real_t>(&map->lower_bounds_z[start_index_up], size_up, z);
+
+        // Adjust upper_bound_index back to be relative to start_index
+        upper_bound_index += offset_up;
+
+        lower_bound_index =
+                lower_bound_index < 0 ? 0 : (lower_bound_index > num_boxes_local ? num_boxes_local : lower_bound_index);
+        upper_bound_index =
+                upper_bound_index < 0 ? 0 : (upper_bound_index > num_boxes_local ? num_boxes_local : upper_bound_index);
+
+        if (lower_bound_index >= upper_bound_index) {
+            return -1;  // No boxes found for this z value
+        }
+
+        for (int i = lower_bound_index; i < upper_bound_index; i++) {
+            const int box_index = map->cell_dict[start_index + i];
+
+            if (check_box_il_contains_pt_gpu(boxes, box_index, x, y, z)) {
+                const real_t *inv_Jacobian  = get_inv_Jacobian_geom_gpu(mesh_geom, box_index);
+                const real_t *vertices_zero = get_vertices_zero_geom_gpu(mesh_geom, box_index);
+
+                const bool is_out = is_point_out_of_tet_gpu(inv_Jacobian,  //
+                                                            vertices_zero[0],
+                                                            vertices_zero[1],
+                                                            vertices_zero[2],
+                                                            x,
+                                                            y,
+                                                            z);
+
+                if (!is_out) {
+                    return box_index;  // Return the index of the first box found containing the point
+                    // If the mesh is well-behaved and the boxes are tight around the tets,
+                    // we can expect to find at most one box containing the point.
+                }
+            }
+        }
+    }  // END if (num_boxes_local > 0)
+    return -1;  // No box found containing the point
+}  // END Function: query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu
+
+//////////////////////////////////////////////////////////
+// Query the cell list for a given 3D point (x, y, z)
+// and return the corresponding tetrahedra in tets_array
+//////////////////////////////////////////////////////////
+__device__ int                                         //
+query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu(  //
+        const cell_list_split_3d_2d_map_t *map,        //
+        const boxes_interleaved_t         *boxes,      //
+        const mesh_tet_geom_device_t      *mesh_geom,  //
+        const real_t                       x,          //
+        const real_t                       y,          //
+        const real_t                       z) {                              //
+
+    if (map == NULL || boxes == NULL || mesh_geom == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    const int tet_lower_idx = query_cell_list_3d_2d_map_mesh_given_xy_tet_il_gpu(map->map_lower, boxes, mesh_geom, x, y, z);
+
+    if (tet_lower_idx != -1) {
+        return tet_lower_idx;  // Found in lower map
+    }
+
+    return query_cell_list_3d_2d_map_mesh_given_xy_tet_il_gpu(map->map_upper, boxes, mesh_geom, x, y, z);
+}  // END Function: query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu
 
 #endif  // __CELL_LIST_QUERY_CUDA_CUH__

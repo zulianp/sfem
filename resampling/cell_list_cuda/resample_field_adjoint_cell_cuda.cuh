@@ -12,35 +12,36 @@
 //////////////////////////////////////////////
 // update_hex_field
 //////////////////////////////////////////////
+template <typename index_t>
 __device__ __forceinline__ int                                       //
 update_hex_quad_node_cuda(                                           //
-        const real_t    x,                                           // Physical x coordinate of the quadrature point
-        const real_t    y,                                           // Physical y coordinate of the quadrature point
-        const real_t    z,                                           // Physical z coordinate of the quadrature point
-        const real_t    phys_w,                                      // Quadrature weight for the quadrature point
-        const ptrdiff_t index_tet,                                   // The index of the tet containing the quadrature point
+        const real_t  x,                                             // Physical x coordinate of the quadrature point
+        const real_t  y,                                             // Physical y coordinate of the quadrature point
+        const real_t  z,                                             // Physical z coordinate of the quadrature point
+        const real_t  phys_w,                                        // Quadrature weight for the quadrature point
+        const index_t index_tet,                                     // The index of the tet containing the quadrature point
         const elems_tet4_device *const __restrict__ mesh,            // Mesh: mesh_t struct
         const mesh_tet_geom_device_t *const __restrict__ mesh_geom,  // Mesh geometry data structure
-        const ptrdiff_t stride0,                                     // SDF: stride[3]
-        const ptrdiff_t stride1,                                     //
-        const ptrdiff_t stride2,                                     //
-        const geom_t    origin0,                                     // SDF: origin[3]
-        const geom_t    origin1,                                     //
-        const geom_t    origin2,                                     //
-        const real_t    inv_delta0,                                  // Precomputed 1.0 / delta0
-        const real_t    inv_delta1,                                  // Precomputed 1.0 / delta1
-        const real_t    inv_delta2,                                  // Precomputed 1.0 / delta2
+        const index_t stride0,                                       // SDF: stride[3]
+        const index_t stride1,                                       //
+        const index_t stride2,                                       //
+        const geom_t  origin0,                                       // SDF: origin[3]
+        const geom_t  origin1,                                       //
+        const geom_t  origin2,                                       //
+        const real_t  inv_delta0,                                    // Precomputed 1.0 / delta0
+        const real_t  inv_delta1,                                    // Precomputed 1.0 / delta1
+        const real_t  inv_delta2,                                    // Precomputed 1.0 / delta2
         const real_t *const __restrict__ weighted_field,             // Weighted field
         real_t *const SFEM_RESTRICT hex_element_field) {             // Output field values for the 8 hex nodes
 
-    const ptrdiff_t off0 = 0;
-    const ptrdiff_t off1 = stride0;
-    const ptrdiff_t off2 = stride0 + stride1;
-    const ptrdiff_t off3 = stride1;
-    const ptrdiff_t off4 = stride2;
-    const ptrdiff_t off5 = stride0 + stride2;
-    const ptrdiff_t off6 = stride0 + stride1 + stride2;
-    const ptrdiff_t off7 = stride1 + stride2;
+    const index_t off0 = 0;
+    const index_t off1 = stride0;
+    const index_t off2 = stride0 + stride1;
+    const index_t off3 = stride1;
+    const index_t off4 = stride2;
+    const index_t off5 = stride0 + stride2;
+    const index_t off6 = stride0 + stride1 + stride2;
+    const index_t off7 = stride1 + stride2;
 
     const real_t ox = origin0;
     const real_t oy = origin1;
@@ -50,17 +51,17 @@ update_hex_quad_node_cuda(                                           //
     const real_t grid_y = (y - oy) * inv_delta1;
     const real_t grid_z = (z - oz) * inv_delta2;
 
-    const ptrdiff_t i = fast_floor(grid_x);
-    const ptrdiff_t j = fast_floor(grid_y);
-    const ptrdiff_t k = fast_floor(grid_z);
+    const index_t i = fast_floor(grid_x);
+    const index_t j = fast_floor(grid_y);
+    const index_t k = fast_floor(grid_z);
 
     const real_t l_x = (grid_x - (real_t)i);
     const real_t l_y = (grid_y - (real_t)j);
     const real_t l_z = (grid_z - (real_t)k);
 
-    const ptrdiff_t base_index = i * stride0 +  //
-                                 j * stride1 +  //
-                                 k * stride2;   //
+    const index_t base_index = i * stride0 +  //
+                               j * stride1 +  //
+                               k * stride2;   //
 
     const idx_t ev0 = mesh->elems_v0[index_tet];
     const idx_t ev1 = mesh->elems_v1[index_tet];
@@ -74,9 +75,11 @@ update_hex_quad_node_cuda(                                           //
 
     const real_t *inv_J_tet = &(mesh_geom->inv_Jacobian[index_tet * 9]);  // Inverse Jacobian for the current tet
 
-    const real_t x0_n = mesh_geom->vetices_zero[index_tet * 3 + 0];  // x coordinate of vertex 0
-    const real_t y0_n = mesh_geom->vetices_zero[index_tet * 3 + 1];  // y coordinate of vertex 0
-    const real_t z0_n = mesh_geom->vetices_zero[index_tet * 3 + 2];  // z coordinate of vertex 0
+    const index_t base_vertex_idx = index_tet * 3;
+
+    const real_t x0_n = mesh_geom->vetices_zero[base_vertex_idx + 0];  // x coordinate of vertex 0
+    const real_t y0_n = mesh_geom->vetices_zero[base_vertex_idx + 1];  // y coordinate of vertex 0
+    const real_t z0_n = mesh_geom->vetices_zero[base_vertex_idx + 2];  // z coordinate of vertex 0
 
     // Compute the coordinates of the quadrature point in the reference tetrahedron using the inverse Jacobian transformation.
     const real_t x_o = x - x0_n;
@@ -97,16 +100,16 @@ update_hex_quad_node_cuda(                                           //
     const real_t y_ref = fast_fma(inv_J_12, z_o, fast_fma(inv_J_11, y_o, inv_J_10 * x_o));
     const real_t z_ref = fast_fma(inv_J_22, z_o, fast_fma(inv_J_21, y_o, inv_J_20 * x_o));
 
-    const real_t f0 = 1.0 - x_ref - y_ref - z_ref;
+    const real_t f0 = real_t(1) - x_ref - y_ref - z_ref;
     const real_t f1 = x_ref;
     const real_t f2 = y_ref;
     const real_t f3 = z_ref;
 
     const real_t wf_quad = fast_fma(f3, wf3, fast_fma(f2, wf2, fast_fma(f1, wf1, f0 * wf0)));
 
-    const real_t one_minus_lx = (1.0 - l_x);
-    const real_t one_minus_ly = (1.0 - l_y);
-    const real_t one_minus_lz = (1.0 - l_z);
+    const real_t one_minus_lx = (real_t(1) - l_x);
+    const real_t one_minus_ly = (real_t(1) - l_y);
+    const real_t one_minus_lz = (real_t(1) - l_z);
 
     const real_t c0 = one_minus_lx * one_minus_ly;
     const real_t c1 = l_x * one_minus_ly;
@@ -125,23 +128,23 @@ update_hex_quad_node_cuda(                                           //
     // There is no conflict in between threads.
     // Since threads update the grid points shifted by 1 along z-axis.
     // beside they update adiacent grid points.
-    atomicAdd(&out[off0], w_c0 * one_minus_lz);
-    atomicAdd(&out[off1], w_c1 * one_minus_lz);
-    atomicAdd(&out[off2], w_c2 * one_minus_lz);
-    atomicAdd(&out[off3], w_c3 * one_minus_lz);
-    atomicAdd(&out[off4], w_c0 * l_z);
-    atomicAdd(&out[off5], w_c1 * l_z);
-    atomicAdd(&out[off6], w_c2 * l_z);
-    atomicAdd(&out[off7], w_c3 * l_z);
+    // atomicAdd(&out[off0], w_c0 * one_minus_lz);
+    // atomicAdd(&out[off1], w_c1 * one_minus_lz);
+    // atomicAdd(&out[off2], w_c2 * one_minus_lz);
+    // atomicAdd(&out[off3], w_c3 * one_minus_lz);
+    // atomicAdd(&out[off4], w_c0 * l_z);
+    // atomicAdd(&out[off5], w_c1 * l_z);
+    // atomicAdd(&out[off6], w_c2 * l_z);
+    // atomicAdd(&out[off7], w_c3 * l_z);
 
-    // out[off0] += w_c0 * one_minus_lz;
-    // out[off1] += w_c1 * one_minus_lz;
-    // out[off2] += w_c2 * one_minus_lz;
-    // out[off3] += w_c3 * one_minus_lz;
-    // out[off4] += w_c0 * l_z;
-    // out[off5] += w_c1 * l_z;
-    // out[off6] += w_c2 * l_z;
-    // out[off7] += w_c3 * l_z;
+    out[off0] += w_c0 * one_minus_lz;
+    out[off1] += w_c1 * one_minus_lz;
+    out[off2] += w_c2 * one_minus_lz;
+    out[off3] += w_c3 * one_minus_lz;
+    out[off4] += w_c0 * l_z;
+    out[off5] += w_c1 * l_z;
+    out[off6] += w_c2 * l_z;
+    out[off7] += w_c3 * l_z;
 
     return 0;
 }  // END Function: update_hex_quad_node
@@ -149,25 +152,26 @@ update_hex_quad_node_cuda(                                           //
 ///////////////////////////////////////////////
 // update_hex_field
 ///////////////////////////////////////////////
+template <typename index_t>
 __device__ __forceinline__ int                                      //
 update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list split map data structure
                  const boxes_t                     *boxes,          // Boxes data structure
                  const mesh_tet_geom_device_t      *mesh_geom,      // Mesh geometry data structure
-                 const ptrdiff_t                    i_grid,         // The i index of the grid point in the hex mesh
-                 const ptrdiff_t                    j_grid,         // The j index of the grid point in the hex mesh
+                 const index_t                      i_grid,         // The i index of the grid point in the hex mesh
+                 const index_t                      j_grid,         // The j index of the grid point in the hex mesh
                  const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
-                 const ptrdiff_t n0,                                // SDF: n[3]
-                 const ptrdiff_t n1,                                //
-                 const ptrdiff_t n2,                                //
-                 const ptrdiff_t stride0,                           // SDF: stride[3]
-                 const ptrdiff_t stride1,                           //
-                 const ptrdiff_t stride2,                           //
-                 const geom_t    origin0,                           // SDF: origin[3]
-                 const geom_t    origin1,                           //
-                 const geom_t    origin2,                           //
-                 const geom_t    delta0,                            // SDF: delta[3]
-                 const geom_t    delta1,                            //
-                 const geom_t    delta2,                            //
+                 const index_t n0,                                  // SDF: n[3]
+                 const index_t n1,                                  //
+                 const index_t n2,                                  //
+                 const index_t stride0,                             // SDF: stride[3]
+                 const index_t stride1,                             //
+                 const index_t stride2,                             //
+                 const geom_t  origin0,                             // SDF: origin[3]
+                 const geom_t  origin1,                             //
+                 const geom_t  origin2,                             //
+                 const geom_t  delta0,                              // SDF: delta[3]
+                 const geom_t  delta1,                              //
+                 const geom_t  delta2,                              //
                  const real_t *const __restrict__ weighted_field,   // Weighted field
                  real_t *const __restrict__ hex_field) {            //
 
@@ -180,9 +184,9 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
     const real_t grid_x     = real_t(origin0) + real_t(i_grid) * real_t(delta0);
     const real_t grid_y     = real_t(origin1) + real_t(j_grid) * real_t(delta1);
     const real_t delta_z    = delta2;
-    const real_t inv_delta0 = 1.0 / delta0;
-    const real_t inv_delta1 = 1.0 / delta1;
-    const real_t inv_delta2 = 1.0 / delta2;
+    const real_t inv_delta0 = real_t(1) / delta0;
+    const real_t inv_delta1 = real_t(1) / delta1;
+    const real_t inv_delta2 = real_t(1) / delta2;
 
     const real_t *quad_x = QuadPoints<real_t>::x();
     const real_t *quad_y = QuadPoints<real_t>::y();
@@ -216,24 +220,121 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
 
                 if (tet_idx > -1) {
                     // Update field given the tet.
-                    update_hex_quad_node_cuda(x_q,             //
-                                              y_q,             //
-                                              z,               //
-                                              q_w,             //
-                                              tet_idx,         //
-                                              mesh,            //
-                                              mesh_geom,       //
-                                              stride0,         //
-                                              stride1,         //
-                                              stride2,         //
-                                              origin0,         //
-                                              origin1,         //
-                                              origin2,         //
-                                              inv_delta0,      //
-                                              inv_delta1,      //
-                                              inv_delta2,      //
-                                              weighted_field,  //
-                                              hex_field);      //
+                    update_hex_quad_node_cuda<index_t>(x_q,  //
+                                                       y_q,  //
+                                                       z,    //
+                                                       q_w,  //
+                                                       static_cast<index_t>(tet_idx),
+                                                       mesh,  //
+                                                       mesh_geom,
+                                                       stride0,  //
+                                                       stride1,  //
+                                                       stride2,  //
+                                                       origin0,  //
+                                                       origin1,  //
+                                                       origin2,  //
+                                                       inv_delta0,
+                                                       inv_delta1,
+                                                       inv_delta2,
+                                                       weighted_field,
+                                                       hex_field);  //
+                }  // END if (tet_idx > -1)
+            }  // END if (k < n2)
+        }  // END for (int block_k = 0; block_k < n2; block_k += threads_per_block)
+    }  // END for (int q_ijk = 0; q_ijk < QUAD_TOTAL; q_ijk++)
+
+    return 0;
+}
+
+///////////////////////////////////////////////
+// update_hex_field_il
+///////////////////////////////////////////////
+template <typename index_t>
+__device__ __forceinline__ int                                         //
+update_hex_field_il(const cell_list_split_3d_2d_map_t *split_map,      // Cell list split map data structure
+                    const boxes_interleaved_t         *boxes,          // Interleaved boxes data structure
+                    const mesh_tet_geom_device_t      *mesh_geom,      // Mesh geometry data structure
+                    const index_t                      i_grid,         // The i index of the grid point in the hex mesh
+                    const index_t                      j_grid,         // The j index of the grid point in the hex mesh
+                    const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
+                    const index_t n0,                                  // SDF: n[3]
+                    const index_t n1,                                  //
+                    const index_t n2,                                  //
+                    const index_t stride0,                             // SDF: stride[3]
+                    const index_t stride1,                             //
+                    const index_t stride2,                             //
+                    const geom_t  origin0,                             // SDF: origin[3]
+                    const geom_t  origin1,                             //
+                    const geom_t  origin2,                             //
+                    const geom_t  delta0,                              // SDF: delta[3]
+                    const geom_t  delta1,                              //
+                    const geom_t  delta2,                              //
+                    const real_t *const __restrict__ weighted_field,   // Weighted field
+                    real_t *const __restrict__ hex_field) {            //
+
+    (void)n0;
+    (void)n1;
+
+    const int threads_per_block = blockDim.x * blockDim.y;
+    const int block_thread_id   = threadIdx.y * blockDim.x + threadIdx.x;
+
+    const real_t grid_x     = real_t(origin0) + real_t(i_grid) * real_t(delta0);
+    const real_t grid_y     = real_t(origin1) + real_t(j_grid) * real_t(delta1);
+    const real_t delta_z    = delta2;
+    const real_t inv_delta0 = real_t(1) / delta0;
+    const real_t inv_delta1 = real_t(1) / delta1;
+    const real_t inv_delta2 = real_t(1) / delta2;
+
+    const real_t *quad_x = QuadPoints<real_t>::x();
+    const real_t *quad_y = QuadPoints<real_t>::y();
+    const real_t *quad_z = QuadPoints<real_t>::z();
+    const real_t *quad_w = QuadPoints<real_t>::w();
+
+    for (int q_ijk = 0; q_ijk < QUAD_TOTAL; q_ijk++) {
+        const real_t q_x = quad_x[q_ijk];
+        const real_t q_y = quad_y[q_ijk];
+        const real_t q_z = quad_z[q_ijk];
+        const real_t q_w = quad_w[q_ijk];
+
+        const real_t x_q         = grid_x + q_x * delta0;
+        const real_t y_q         = grid_y + q_y * delta1;
+        const real_t phys_z_base = origin2 + q_z * delta2;
+
+        for (int block_k = 0; block_k < n2; block_k += threads_per_block) {
+            const int k = block_k + block_thread_id;
+
+            if (k < n2) {
+                const real_t z = phys_z_base + (real_t)k * delta_z;
+
+                // Query of the tet. for GPU CUDA with interleaved boxes ...
+                const int tet_idx =                                                      //
+                        query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu(split_map,  //
+                                                                             boxes,      //
+                                                                             mesh_geom,  //
+                                                                             x_q,        //
+                                                                             y_q,        //
+                                                                             z);         //
+
+                if (tet_idx > -1) {
+                    // Update field given the tet.
+                    update_hex_quad_node_cuda<index_t>(x_q,  //
+                                                       y_q,  //
+                                                       z,    //
+                                                       q_w,  //
+                                                       static_cast<index_t>(tet_idx),
+                                                       mesh,  //
+                                                       mesh_geom,
+                                                       stride0,  //
+                                                       stride1,  //
+                                                       stride2,  //
+                                                       origin0,  //
+                                                       origin1,  //
+                                                       origin2,  //
+                                                       inv_delta0,
+                                                       inv_delta1,
+                                                       inv_delta2,
+                                                       weighted_field,
+                                                       hex_field);  //
                 }  // END if (tet_idx > -1)
             }  // END if (k < n2)
         }  // END for (int block_k = 0; block_k < n2; block_k += threads_per_block)
@@ -245,24 +346,25 @@ update_hex_field(const cell_list_split_3d_2d_map_t *split_map,      // Cell list
 /////////////////////////////////////////////////
 // transfer_to_hex_field_cell_split_tet4_kernel
 /////////////////////////////////////////////////
+template <typename index_t = int>
 __global__ void                                           //
 transfer_to_hex_field_cell_split_tet4_kernel(             //
         const cell_list_split_3d_2d_map_t split_map,      // Cell list split map data structure
         const boxes_t                     boxes,          // Boxes data structure
         const mesh_tet_geom_device_t      mesh_geom,      // Mesh geometry data structure
         const elems_tet4_device           mesh,           // Mesh: mesh_t struct
-        const int                         start_i,        // Starting i index for the grid points in the hex mesh
-        const int                         start_j,        // Starting j index for the grid points in the hex mesh
-        const int                         delta_i,        // Cell list jump in x direction.
-        const int                         delta_j,        // Cell list jump in y direction.
-        const int                         size_i,         // Number of grid points in x direction
-        const int                         size_j,         // Number of grid points in y direction
-        const ptrdiff_t                   n0,             // SDF: n[3]
-        const ptrdiff_t                   n1,             //
-        const ptrdiff_t                   n2,             //
-        const ptrdiff_t                   stride0,        // SDF: stride[3]
-        const ptrdiff_t                   stride1,        //
-        const ptrdiff_t                   stride2,        //
+        const index_t                     start_i,        // Starting i index for the grid points in the hex mesh
+        const index_t                     start_j,        // Starting j index for the grid points in the hex mesh
+        const index_t                     delta_i,        // Cell list jump in x direction.
+        const index_t                     delta_j,        // Cell list jump in y direction.
+        const index_t                     size_i,         // Number of grid points in x direction
+        const index_t                     size_j,         // Number of grid points in y direction
+        const index_t                     n0,             // SDF: n[3]
+        const index_t                     n1,             //
+        const index_t                     n2,             //
+        const index_t                     stride0,        // SDF: stride[3]
+        const index_t                     stride1,        //
+        const index_t                     stride2,        //
         const geom_t                      origin0,        // SDF: origin[3]
         const geom_t                      origin1,        //
         const geom_t                      origin2,        //
@@ -272,33 +374,93 @@ transfer_to_hex_field_cell_split_tet4_kernel(             //
         const real_t *const __restrict__ weighted_field,  // Weighted field
         real_t *const __restrict__ hex_field) {           // Output field values for the hex nodes
 
-    const int i_grid = start_i + blockIdx.x * delta_i;
-    const int j_grid = start_j + blockIdx.y * delta_j;
+    const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
+    const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
 
     if (i_grid >= size_i - 1 || j_grid >= size_j - 1) {
         return;  // Out of bounds, exit the kernel
     }
 
-    update_hex_field(&split_map,  //
-                     &boxes,
-                     &mesh_geom,
-                     i_grid,
-                     j_grid,
-                     &mesh,
-                     n0,
-                     n1,
-                     n2,
-                     stride0,
-                     stride1,
-                     stride2,
-                     origin0,
-                     origin1,
-                     origin2,
-                     delta0,
-                     delta1,
-                     delta2,
-                     weighted_field,
-                     hex_field);
+    update_hex_field<index_t>(&split_map,  //
+                              &boxes,
+                              &mesh_geom,
+                              i_grid,
+                              j_grid,
+                              &mesh,
+                              n0,
+                              n1,
+                              n2,
+                              stride0,
+                              stride1,
+                              stride2,
+                              origin0,
+                              origin1,
+                              origin2,
+                              delta0,
+                              delta1,
+                              delta2,
+                              weighted_field,
+                              hex_field);
+}
+
+////////////////////////////////////////////////////
+// transfer_to_hex_field_cell_split_tet4_il_kernel
+////////////////////////////////////////////////////
+template <typename index_t = int>
+__global__ void                                           //
+transfer_to_hex_field_cell_split_tet4_il_kernel(          //
+        const cell_list_split_3d_2d_map_t split_map,      // Cell list split map data structure
+        const boxes_interleaved_t         boxes,          // Interleaved boxes data structure
+        const mesh_tet_geom_device_t      mesh_geom,      // Mesh geometry data structure
+        const elems_tet4_device           mesh,           // Mesh: mesh_t struct
+        const index_t                     start_i,        // Starting i index for the grid points in the hex mesh
+        const index_t                     start_j,        // Starting j index for the grid points in the hex mesh
+        const index_t                     delta_i,        // Cell list jump in x direction.
+        const index_t                     delta_j,        // Cell list jump in y direction.
+        const index_t                     size_i,         // Number of grid points in x direction
+        const index_t                     size_j,         // Number of grid points in y direction
+        const index_t                     n0,             // SDF: n[3]
+        const index_t                     n1,             //
+        const index_t                     n2,             //
+        const index_t                     stride0,        // SDF: stride[3]
+        const index_t                     stride1,        //
+        const index_t                     stride2,        //
+        const geom_t                      origin0,        // SDF: origin[3]
+        const geom_t                      origin1,        //
+        const geom_t                      origin2,        //
+        const geom_t                      delta0,         // SDF: delta[3]
+        const geom_t                      delta1,         //
+        const geom_t                      delta2,         //
+        const real_t *const __restrict__ weighted_field,  // Weighted field
+        real_t *const __restrict__ hex_field) {           // Output field values for the hex nodes
+
+    const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
+    const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
+
+    if (i_grid >= size_i - 1 || j_grid >= size_j - 1) {
+        return;  // Out of bounds, exit the kernel
+    }
+
+    update_hex_field_il<index_t>(&split_map,  //
+                                 &boxes,
+                                 &mesh_geom,
+                                 i_grid,
+                                 j_grid,
+                                 &mesh,
+                                 n0,
+                                 n1,
+                                 n2,
+                                 stride0,
+                                 stride1,
+                                 stride2,
+                                 origin0,
+                                 origin1,
+                                 origin2,
+                                 delta0,
+                                 delta1,
+                                 delta2,
+                                 weighted_field,
+                                 hex_field);
 }
 
 #endif /* __RESAMPLE_FIELD_ADJOINT_CELL_CUDA_CUH__ */

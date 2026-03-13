@@ -82,4 +82,21 @@ mesh_tet_geom_device_t copy_mesh_tet_geom_to_device(const mesh_tet_geom_t *h_geo
 void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom,  //
                                cudaStream_t            stream);            //
 
+/**
+ * @brief Copies a boxes_interleaved_t from host to device, including async allocations and async H2D copy.
+ * @param h_boxes Pointer to the host boxes_interleaved struct to copy.
+ * @param stream CUDA stream to use for async operations.
+ * @return A boxes_interleaved_t struct containing device pointers and scalar fields.
+ */
+boxes_interleaved_t                                                                         //
+copy_boxes_interleaved_to_device(const boxes_interleaved_t *h_boxes, cudaStream_t stream);  //
+
+/**
+ * @brief Frees device memory for arrays in a boxes_interleaved_t and sets pointers to NULL.
+ * @param d_boxes Pointer to the device boxes_interleaved struct to free.
+ * @param stream CUDA stream used for async frees.
+ */
+void                                                                               //
+free_boxes_interleaved_device(boxes_interleaved_t *d_boxes, cudaStream_t stream);  //
+
 #endif  // CELL_LIST_CUDA_CUH
