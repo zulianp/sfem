@@ -76,15 +76,22 @@ update_hex_quad_node_cuda(                                           //
     const real_t *inv_J_tet = &(mesh_geom->inv_Jacobian[index_tet * 9]);  // Inverse Jacobian for the current tet
 
     const index_t base_vertex_idx = index_tet * 3;
+    const real_t *base_vertex     = &mesh_geom->vetices_zero[base_vertex_idx];  // Pointer to vertex-0 xyz in packed array
 
-    const real_t x0_n = mesh_geom->vetices_zero[base_vertex_idx + 0];  // x coordinate of vertex 0
-    const real_t y0_n = mesh_geom->vetices_zero[base_vertex_idx + 1];  // y coordinate of vertex 0
-    const real_t z0_n = mesh_geom->vetices_zero[base_vertex_idx + 2];  // z coordinate of vertex 0
+    // real_t xyz_n[3];
+    // memcpy(xyz_n, &mesh_geom->vetices_zero[base_vertex_idx], 3 * sizeof(real_t));
+
+    const real_t x0_n = base_vertex[0];  // x coordinate of vertex 0
+    const real_t y0_n = base_vertex[1];  // y coordinate of vertex 0
+    const real_t z0_n = base_vertex[2];  // z coordinate of vertex 0
 
     // Compute the coordinates of the quadrature point in the reference tetrahedron using the inverse Jacobian transformation.
     const real_t x_o = x - x0_n;
     const real_t y_o = y - y0_n;
     const real_t z_o = z - z0_n;
+
+    // real_t inv_J[9];
+    // memcpy(inv_J, inv_J_tet, 9 * sizeof(real_t));
 
     const real_t inv_J_00 = inv_J_tet[0];
     const real_t inv_J_01 = inv_J_tet[1];
@@ -125,9 +132,6 @@ update_hex_quad_node_cuda(                                           //
 
     real_t *const SFEM_RESTRICT out = &hex_element_field[base_index];
 
-    // There is no conflict in between threads.
-    // Since threads update the grid points shifted by 1 along z-axis.
-    // beside they update adiacent grid points.
     // atomicAdd(&out[off0], w_c0 * one_minus_lz);
     // atomicAdd(&out[off1], w_c1 * one_minus_lz);
     // atomicAdd(&out[off2], w_c2 * one_minus_lz);
@@ -137,6 +141,9 @@ update_hex_quad_node_cuda(                                           //
     // atomicAdd(&out[off6], w_c2 * l_z);
     // atomicAdd(&out[off7], w_c3 * l_z);
 
+    // There is no conflict in between threads.
+    // Since threads update the grid points shifted by 1 along z-axis.
+    // beside they update adiacent grid points.
     out[off0] += w_c0 * one_minus_lz;
     out[off1] += w_c1 * one_minus_lz;
     out[off2] += w_c2 * one_minus_lz;
