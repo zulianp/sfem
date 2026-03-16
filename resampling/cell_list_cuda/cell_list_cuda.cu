@@ -283,7 +283,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
                                                  const geom_t *const SFEM_RESTRICT                           origin,          //
                                                  const geom_t *const SFEM_RESTRICT                           delta,           //
                                                  const real_t *const SFEM_RESTRICT                           weighted_field,  //
-                                                 real_t *const SFEM_RESTRICT                                 data) {                                          //
+                                                 real_t *const SFEM_RESTRICT                                 data) {          //
     int ret = 0;
 
     PRINT_CURRENT_FUNCTION;
@@ -351,7 +351,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++) {
         for (ptrdiff_t start_j = 0; start_j < delta_j; start_j++) {
             dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
-            dim3 block_size(256, 1, 1);
+            dim3 block_size(800, 1, 1);
 
             transfer_to_hex_field_cell_split_tet4_il_kernel<index_type>     //
                     <<<grid_size,                                           //
