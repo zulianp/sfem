@@ -65,6 +65,9 @@ cell_list_3d_2d_map_t *make_empty_cell_list_3d_2d_map(void) {
     map->delta_x     = 0.0;
     map->delta_y     = 0.0;
     map->delta_z     = 0.0;
+    map->inv_delta_x = 0.0;
+    map->inv_delta_y = 0.0;
+    map->inv_delta_z = 0.0;
     map->num_cells_x = 0;
     map->num_cells_y = 0;
     map->num_cells_z = 0;
@@ -125,7 +128,7 @@ int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
                               const real_t           y_min,      //
                               const real_t           y_max,      //
                               const real_t           z_min,      //
-                              const real_t           z_max) {              //
+                              const real_t           z_max) {    //
 
     real_t max_delta_x = 0.0;
     real_t max_delta_y = 0.0;
@@ -155,6 +158,10 @@ int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
     map->delta_x = max_delta_x;
     map->delta_y = max_delta_y;
     map->delta_z = max_delta_z;
+
+    map->inv_delta_x = (max_delta_x > 0) ? 1.0 / max_delta_x : 0.0;
+    map->inv_delta_y = (max_delta_y > 0) ? 1.0 / max_delta_y : 0.0;
+    map->inv_delta_z = (max_delta_z > 0) ? 1.0 / max_delta_z : 0.0;
 
     map->num_cells_x = (int)ceil((x_max - x_min) / map->delta_x);
     map->num_cells_y = (int)ceil((y_max - y_min) / map->delta_y);
@@ -318,7 +325,7 @@ int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map,          //
                               const real_t                 y,            //
                               const real_t                 z,            //
                               int                        **box_indices,  //
-                              int                         *num_boxes) {                          //
+                              int                         *num_boxes) {  //
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);
     // int iy = coord_to_grid_index(y, map->min_y, map->delta_y);
 
@@ -388,7 +395,7 @@ int query_cell_list_3d_2d_map_given_xy(
         const real_t                *z_array,      //
         const int                    size_z,       //
         int                       ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int                        **num_boxes)                           // it produces a pointer of a vector (size_z)
+        int                        **num_boxes)    // it produces a pointer of a vector (size_z)
                                                    // storing the number of boxes for each Z coordinate
 {
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);

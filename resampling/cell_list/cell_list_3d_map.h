@@ -103,8 +103,7 @@ free_boxes_t(boxes_t *boxes);  //
  * @note This function will free any existing data in interleaved->min_max_xyz before copying
  * @return void
  */
-void
-copy_boxes_to_interleaved(const boxes_t *boxes, boxes_interleaved_t *interleaved);
+void copy_boxes_to_interleaved(const boxes_t *boxes, boxes_interleaved_t *interleaved);
 
 /**
  * @brief Get the bounds of a box in interleaved format
@@ -112,8 +111,7 @@ copy_boxes_to_interleaved(const boxes_t *boxes, boxes_interleaved_t *interleaved
  * @param box_index Index of the box to get bounds for
  * @param bounds Output array of size 6 to hold min_x, min_y, min_z, max_x, max_y, max_z
  */
-void 
-get_box_bounds_il(const boxes_interleaved_t *boxes, const int box_index, real_t bounds[6]);
+void get_box_bounds_il(const boxes_interleaved_t *boxes, const int box_index, real_t bounds[6]);
 
 /**
  * @brief Check if a box contains a given point
@@ -129,14 +127,14 @@ check_box_contains_pt(const boxes_t *boxes,      //
                       const int      box_index,  //
                       const real_t   x,          //
                       const real_t   y,          //
-                      const real_t   z);           //
+                      const real_t   z);         //
 
 bool                                                  //
 check_box_contains_pt_fast(const boxes_t *boxes,      //
                            const int      box_index,  //
                            const real_t   x,          //
                            const real_t   y,          //
-                           const real_t   z);           //
+                           const real_t   z);         //
 
 /**
  * @brief Generate random boxes within specified bounds
@@ -187,6 +185,10 @@ typedef struct {
     real_t delta_x;
     real_t delta_y;
     real_t delta_z;
+
+    real_t inv_delta_x;
+    real_t inv_delta_y;
+    real_t inv_delta_z;
 
     real_t min_x;
     real_t min_y;
@@ -256,7 +258,7 @@ build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
                           const real_t           y_min,      //
                           const real_t           y_max,      //
                           const real_t           z_min,      //
-                          const real_t           z_max);               //
+                          const real_t           z_max);     //
 
 /**
  * @brief Query the cell list to find boxes containing a given point
@@ -275,7 +277,7 @@ query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map,          //
                           const real_t                 y,            //
                           const real_t                 z,            //
                           int                        **box_indices,  //
-                          int                         *num_boxes);                           //
+                          int                         *num_boxes);   //
 
 /**
  * @brief Query the cell list to find boxes containing points with given X, Y and array of Z coordinates
@@ -296,7 +298,7 @@ query_cell_list_3d_2d_map_given_xy(const cell_list_3d_2d_map_t *map,      //
                                    const real_t                *z_array,  //
                                    const int                    size_z,   //
                                    int ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-                                   int  **num_boxes);    //
+                                   int  **num_boxes);   //
 
 /**
  * @brief Linear search for boxes containing a given point
@@ -313,7 +315,7 @@ query_linear_search_boxes(const boxes_t *boxes,        //
                           const real_t   y,            //
                           const real_t   z,            //
                           int          **box_indices,  //
-                          int           *num_boxes);             //
+                          int           *num_boxes);   //
 
 /**
  * @brief Create an empty cell_list_split_3d_2d_map_t structure
@@ -362,7 +364,7 @@ fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
                                 const real_t           y_min,      //
                                 const real_t           y_max,      //
                                 const real_t           z_min,      //
-                                const real_t           z_max);               //
+                                const real_t           z_max);     //
 
 /**
  * @brief Build the 3D cell list with 2D mapping using a x and y sides length split
@@ -399,7 +401,7 @@ build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
                                 const real_t                  y_min,      //
                                 const real_t                  y_max,      //
                                 const real_t                  z_min,      //
-                                const real_t                  z_max);                      //
+                                const real_t                  z_max);     //
 
 /**
  * @brief Query the split cell list to find boxes containing a given point
@@ -418,7 +420,7 @@ query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map,   
                                 const real_t                       y,            //
                                 const real_t                       z,            //
                                 int                              **box_indices,  //
-                                int                               *num_boxes);                                 //
+                                int                               *num_boxes);   //
 
 /**
  * @brief Query the split cell list to find boxes containing points with given X, Y and array of Z coordinates
@@ -440,7 +442,7 @@ query_cell_list_3d_2d_split_map_given_xy(
         const real_t                      *z_array,      //
         const int                          size_z,       //
         int                             ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int                              **num_boxes);                                //
+        int                              **num_boxes);   //
 
 /**
  * @brief Calculate the memory usage of the cell list
