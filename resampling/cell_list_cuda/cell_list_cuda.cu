@@ -21,6 +21,9 @@ copy_cell_list_3d_2d_map_to_device(const cell_list_3d_2d_map_t *h_map,  //
     d_map.delta_x                = h_map->delta_x;
     d_map.delta_y                = h_map->delta_y;
     d_map.delta_z                = h_map->delta_z;
+    d_map.inv_delta_x            = h_map->inv_delta_x;
+    d_map.inv_delta_y            = h_map->inv_delta_y;
+    d_map.inv_delta_z            = h_map->inv_delta_z;
     d_map.min_x                  = h_map->min_x;
     d_map.min_y                  = h_map->min_y;
     d_map.min_z                  = h_map->min_z;
@@ -375,8 +378,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
 
             // printf("Launching kernel for start_i = %td, start_j = %td\n", start_i, start_j);
 
-                const int shared_mem_size =
-                    2 * threads_per_block_x * (sizeof(int) + sizeof(real_t)) + sizeof(int);
+            const int shared_mem_size = 2 * threads_per_block_x * (sizeof(int) + sizeof(real_t)) + sizeof(int);
 
             transfer_to_hex_field_cell_split_tet4_shm_il_kernel<index_type>  //
                     <<<grid_size,                                            //

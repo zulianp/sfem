@@ -31,12 +31,12 @@ static int cmp_real_t(const void *a, const void *b) {
 // increment_cell_counts_for_box
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static void increment_cell_counts_for_box(cell_list_3d_2d_map_t *map,        //
-                                          const real_t           box_min_x,  //
-                                          const real_t           box_min_y,  //
-                                          const real_t           box_max_x,  //
-                                          const real_t           box_max_y) {          //
-                                                                             //
+static void increment_cell_counts_for_box(cell_list_3d_2d_map_t *map,          //
+                                          const real_t           box_min_x,    //
+                                          const real_t           box_min_y,    //
+                                          const real_t           box_max_x,    //
+                                          const real_t           box_max_y) {  //
+                                                                               //
     int ix_min = coord_to_grid_index(box_min_x, map->min_x, map->delta_x);
     int iy_min = coord_to_grid_index(box_min_y, map->min_y, map->delta_y);
     int ix_max = coord_to_grid_index(box_max_x, map->min_x, map->delta_x);
@@ -60,7 +60,7 @@ static void increment_cell_counts_for_box(cell_list_3d_2d_map_t *map,        //
 // allocate_map_dict_entries
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static void allocate_map_dict_entries(cell_list_3d_2d_map_t *map,      //
+static void allocate_map_dict_entries(cell_list_3d_2d_map_t *map,                   //
                                       const int              total_num_2d_cells) {  //
 
     const int total_num_dict_entries = map->cell_ptr[total_num_2d_cells];
@@ -84,7 +84,7 @@ static void fill_cell_dict_for_box(cell_list_3d_2d_map_t *map,            //
                                    const real_t           box_min_z,      //
                                    const real_t           box_max_x,      //
                                    const real_t           box_max_y,      //
-                                   const real_t           box_max_z) {              //
+                                   const real_t           box_max_z) {    //
                                                                           //
     int ix_min = coord_to_grid_index(box_min_x, map->min_x, map->delta_x);
     int iy_min = coord_to_grid_index(box_min_y, map->min_y, map->delta_y);
@@ -115,9 +115,9 @@ static void fill_cell_dict_for_box(cell_list_3d_2d_map_t *map,            //
 // sort_cell_entries_by_z
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static void sort_cell_entries_by_z(cell_list_3d_2d_map_t *map,      //
+static void sort_cell_entries_by_z(cell_list_3d_2d_map_t *map,                   //
                                    const int              total_num_2d_cells) {  //
-                                                                    //
+                                                                                 //
     int     size_arg_indices = 2024;
     int    *arg_indices      = (int *)malloc(size_arg_indices * sizeof(int));
     real_t *buffer           = (real_t *)malloc(size_arg_indices * sizeof(real_t));
@@ -178,9 +178,9 @@ static void sort_cell_entries_by_z(cell_list_3d_2d_map_t *map,      //
 // ensure_upper_bounds_non_decreasing
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static void ensure_upper_bounds_non_decreasing(cell_list_3d_2d_map_t *map,      //
+static void ensure_upper_bounds_non_decreasing(cell_list_3d_2d_map_t *map,                   //
                                                const int              total_num_2d_cells) {  //
-                                                                                //
+                                                                                             //
     for (int cell_index = 0; cell_index < total_num_2d_cells; cell_index++) {
         const int start_index = map->cell_ptr[cell_index];
         const int end_index   = map->cell_ptr[cell_index + 1];
@@ -251,7 +251,7 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
                                     const real_t           y_min,      //
                                     const real_t           y_max,      //
                                     const real_t           z_min,      //
-                                    const real_t           z_max) {              //
+                                    const real_t           z_max) {    //
 
     real_t max_delta_lower_x = 0.0;
     real_t max_delta_lower_y = 0.0;
@@ -292,6 +292,14 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
     map_lower->delta_x = max_delta_lower_x;
     map_lower->delta_y = max_delta_lower_y;
     map_lower->delta_z = max_delta_lower_z;
+
+    map_lower->inv_delta_x = (max_delta_lower_x > 0) ? 1.0 / max_delta_lower_x : 0.0;
+    map_lower->inv_delta_y = (max_delta_lower_y > 0) ? 1.0 / max_delta_lower_y : 0.0;
+    map_lower->inv_delta_z = (max_delta_lower_z > 0) ? 1.0 / max_delta_lower_z : 0.0;
+
+    map_upper->inv_delta_x = (map_upper->delta_x > 0) ? 1.0 / map_upper->delta_x : 0.0;
+    map_upper->inv_delta_y = (map_upper->delta_y > 0) ? 1.0 / map_upper->delta_y : 0.0;
+    map_upper->inv_delta_z = (map_upper->delta_z > 0) ? 1.0 / map_upper->delta_z : 0.0;
 
     map_lower->num_cells_x = (int)ceil((x_max - x_min) / map_lower->delta_x);
     map_lower->num_cells_y = (int)ceil((y_max - y_min) / map_lower->delta_y);
@@ -414,7 +422,7 @@ int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
                                     const real_t                  y_min,      //
                                     const real_t                  y_max,      //
                                     const real_t                  z_min,      //
-                                    const real_t                  z_max) {                     //
+                                    const real_t                  z_max) {    //
 
     if (split_map == NULL) {
         return -1;  // Invalid pointer
@@ -460,7 +468,7 @@ int query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map
                                     const real_t                       y,            //
                                     const real_t                       z,            //
                                     int                              **box_indices,  //
-                                    int                               *num_boxes) {                                //
+                                    int                               *num_boxes) {  //
     if (split_map == NULL || boxes == NULL || box_indices == NULL || num_boxes == NULL) {
         return -1;  // Invalid pointer
     }
@@ -529,7 +537,7 @@ int query_cell_list_3d_2d_split_map_given_xy(
         const real_t                      *z_array,      //
         const int                          size_z,       //
         int                             ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int                              **num_boxes) {                               //
+        int                              **num_boxes) {  //
                                                          //
     if (split_map == NULL || boxes == NULL || box_indices == NULL || num_boxes == NULL) {
         return -1;  // Invalid pointer
