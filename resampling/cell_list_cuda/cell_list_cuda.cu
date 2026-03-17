@@ -5,6 +5,7 @@
 #include "cell_list_cuda.cuh"
 #include "cell_list_resampling_gpu.h"
 #include "resample_field_adjoint_cell_cuda.cuh"
+#include "resample_field_adjoint_cell_cuda_shm.cuh"
 
 //////////////////////////////////////////////////
 // copy_cell_list_3d_2d_map_to_device
@@ -335,11 +336,21 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     cudaStreamSynchronize(stream_data);
     cudaStreamSynchronize(stream_wf);
 
-    const ptrdiff_t delta_i = 3;
-    const ptrdiff_t delta_j = 3;
+    const ptrdiff_t delta_i = 2;
+    const ptrdiff_t delta_j = 2;
 
     const ptrdiff_t i_size = n[0];
     const ptrdiff_t j_size = n[1];
+
+    int current_device = 0;
+    cudaGetDevice(&current_device);
+
+    cudaDeviceProp device_prop;
+    cudaGetDeviceProperties(&device_prop, current_device);
+
+    const int threads_per_block_x = (n[2] > static_cast<ptrdiff_t>(device_prop.maxThreadsPerBlock))
+                                            ? device_prop.maxThreadsPerBlock
+                                            : static_cast<int>(n[2]);
 
     cudaStream_t stream_kernel;
     cudaStreamCreate(&stream_kernel);
@@ -348,17 +359,32 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
 
 #define index_type int
 
+    printf("Launching kernel with grid size (%d, %d, %d) and block size (%d, %d, %d)\n",
+           (i_size + delta_i - 1) / delta_i + delta_i,  // gridDim.x
+           (j_size + delta_j - 1) / delta_j + delta_j,  // gridDim.y
+           1,                                           // gridDim.z
+           threads_per_block_x,                         // blockDim.x
+           1,                                           // blockDim.y
+           1);                                          // blockDim.z
+
     for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++) {
         for (ptrdiff_t start_j = 0; start_j < delta_j; start_j++) {
             dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
-            dim3 block_size(800, 1, 1);
 
-            transfer_to_hex_field_cell_split_tet4_il_kernel<index_type>     //
-                    <<<grid_size,                                           //
-                       block_size,                                          //
-                       0,                                                   //
-                       stream_kernel>>>(split_map_device,                   //
-                                        bounding_boxes_interleaved_device,  //
+            dim3 block_size(threads_per_block_x, 1, 1);
+
+            // printf("Launching kernel for start_i = %td, start_j = %td\n", start_i, start_j);
+
+                const int shared_mem_size =
+                    2 * threads_per_block_x * (sizeof(int) + sizeof(real_t)) + sizeof(int);
+
+            transfer_to_hex_field_cell_split_tet4_shm_il_kernel<index_type>  //
+                    <<<grid_size,                                            //
+                       block_size,                                           //
+                       shared_mem_size,                                      //
+                       stream_kernel>>>(shared_mem_size,                     //
+                                        split_map_device,                    //
+                                        bounding_boxes_interleaved_device,   //
                                         geom_device,
                                         mesh_device,
                                         static_cast<index_type>(start_i),
@@ -387,7 +413,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     }  // END for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++)
 
     const double tock_kernel = MPI_Wtime();
-    printf("Time Raw taken for kernel execution: %f seconds\n", tock_kernel - tick_kernel);
+    printf("Raw Kernel Clock taken for kernel execution: %f seconds\n", tock_kernel - tick_kernel);
 
     cudaMemcpyAsync(data, data_device_ptr, sizeof(real_t) * n[0] * n[1] * n[2], cudaMemcpyDeviceToHost, stream_data);
 
