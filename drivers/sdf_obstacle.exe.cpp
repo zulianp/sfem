@@ -117,8 +117,6 @@ int main(int argc, char *argv[]) {
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
-   
-
 #ifdef SFEM_ENABLE_CUDA
     {
         auto elements = fs->device_elements();
@@ -247,13 +245,8 @@ int main(int argc, char *argv[]) {
 
     double solve_tock = MPI_Wtime();
 
-#ifdef SFEM_ENABLE_CUDA
-    auto h_x   = sfem::to_host(x);
-    auto h_rhs = sfem::to_host(rhs);
-#else
-    auto h_x   = x;
-    auto h_rhs = rhs;
-#endif
+    auto h_x   = smesh::to_host(x);
+    auto h_rhs = smesh::to_host(rhs);
 
     auto upper_bound_viz = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
     contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data());

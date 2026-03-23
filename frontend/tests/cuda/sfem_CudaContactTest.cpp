@@ -7,6 +7,10 @@
 #include "smesh_grid.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 #include "smesh_ssquad4_restriction.hpp"
+#ifdef SMESH_ENABLE_CUDA
+#include "smesh_ssquad4_prolongation.cuh"
+#include "smesh_ssquad4_restriction.cuh"
+#endif
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -108,22 +112,22 @@ struct TestOutput {
     }
 
     struct TestOutput to_host() {
-        TestOutput to{.x   = sfem::to_host(x),
-                      .rhs = sfem::to_host(rhs),
-                      .g   = sfem::to_host(g),
+        TestOutput to{.x   = smesh::to_host(x),
+                      .rhs = smesh::to_host(rhs),
+                      .g   = smesh::to_host(g),
                       // .upper_bound = sfem::to_host(upper_bound),
-                      .diag        = sfem::to_host(diag),
-                      .mask        = sfem::to_host(mask),
-                      .normal_prod = sfem::to_host(normal_prod),
-                      .cc_op_x     = sfem::to_host(cc_op_x),
-                      .cc_op_t_r   = sfem::to_host(cc_op_t_r),
-                      .rpen        = sfem::to_host(rpen),
-                      .Jpen        = sfem::to_host(Jpen),
+                      .diag        = smesh::to_host(diag),
+                      .mask        = smesh::to_host(mask),
+                      .normal_prod = smesh::to_host(normal_prod),
+                      .cc_op_x     = smesh::to_host(cc_op_x),
+                      .cc_op_t_r   = smesh::to_host(cc_op_t_r),
+                      .rpen        = smesh::to_host(rpen),
+                      .Jpen        = smesh::to_host(Jpen),
                       .e_pen       = e_pen,
-                      .lagr_ub     = sfem::to_host(lagr_ub)};
+                      .lagr_ub     = smesh::to_host(lagr_ub)};
 
         if (is_ml) {
-            to.restricted = sfem::to_host(restricted);
+            to.restricted = smesh::to_host(restricted);
         }
 
         return to;
@@ -139,17 +143,14 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto m = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
+    int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 2);
+    if (refine_level > 1) {
+        m = smesh::to_semistructured(refine_level, m, true, false);
+    }
+
     const int block_size = m->spatial_dimension();
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
-
-    int SFEM_ELEMENT_REFINE_LEVEL = 2;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
-    }
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, "LinearElasticity", es);
@@ -243,18 +244,20 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                   .lagr_ub     = lagr_ub};
 
     if (is_ml) {
-        int coarse_level = SFEM_ELEMENT_REFINE_LEVEL / 2;
+        int coarse_level = refine_level / 2;
 
         auto coarse_fs = fs->derefine(coarse_level);
 
-        auto &ssmesh       = fs->mesh();
-        auto  fine_sides   = contact_conds->ss_sides();
-        auto  coarse_sides = sfem::ssquad4_derefine_element_connectivity(ssmesh.level(), coarse_level, to_host(fine_sides));
+        auto &ssmesh     = fs->mesh();
+        auto  fine_sides = contact_conds->ss_sides();
+
+        int  level        = smesh::semistructured_level(ssmesh);
+        auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, smesh::to_host(fine_sides));
 
         auto fine_mapping = contact_conds->node_mapping();
         auto count        = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
         smesh::ssquad4_element_node_incidence_count(
-                ssmesh.level(), 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
+                level, 1, fine_sides->extent(1), smesh::to_host(fine_sides)->data(), count->data());
 
         const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
 
@@ -274,7 +277,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
             count        = to_device(count);
 
             smesh::cu_ssquad4_restrict(fine_sides->extent(1),
-                                       ssmesh.level(),
+                                       level,
                                        1,
                                        fine_sides->data(),
                                        count->data(),
@@ -291,7 +294,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                                        SFEM_DEFAULT_STREAM);
         } else {
             smesh::ssquad4_restrict(fine_sides->extent(1),
-                                    ssmesh.level(),
+                                    level,
                                     1,
                                     fine_sides->data(),
                                     count->data(),
