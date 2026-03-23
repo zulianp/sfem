@@ -8,8 +8,6 @@
 
 #include <assert.h>
 
-enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
-enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
 typedef const char* OperatorType;
 static OperatorType MATRIX_FREE = "MF";
@@ -42,7 +40,6 @@ typedef enum {
 
 static void* SFEM_DEFAULT_STREAM = 0;
 
-#ifdef __cplusplus
 namespace sfem {
 using smesh::crs_to_coo;
 using smesh::elem_higher_order;
@@ -62,99 +59,6 @@ using smesh::shell_type;
 using smesh::side_type;
 using smesh::type_from_string;
 using smesh::type_to_string;
-
-SFEM_INLINE static int real_type_size(enum RealType type) {
-    switch (type) {
-        case SFEM_FLOAT16:
-            return 2;
-        case SFEM_FLOAT32:
-            return 4;
-        case SFEM_FLOAT64:
-            return 8;
-        case SFEM_REAL_DEFAULT:
-            return sizeof(real_t);
-        default:
-            assert(0);
-            return SFEM_FAILURE;
-    }
 }
-
-SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
-    switch (type) {
-        case SFEM_FLOAT16:
-            return "SFEM_FLOAT16";
-        case SFEM_FLOAT32:
-            return "SFEM_FLOAT32";
-        case SFEM_FLOAT64:
-            return "SFEM_FLOAT64";
-        case SFEM_REAL_DEFAULT:
-            return "SFEM_REAL_DEFAULT";
-        default:
-            return "SFEM_FLOAT_UNDEFINED";
-    }
-}
-
-SFEM_INLINE static const char* integer_type_to_string(enum IntegerType type) {
-    switch (type) {
-        case SFEM_INT16:
-            return "SFEM_INT16";
-        case SFEM_INT32:
-            return "SFEM_INT32";
-        case SFEM_INT64:
-            return "SFEM_INT64";
-        case SFEM_INT_DEFAULT:
-            return "SFEM_INT_DEFAULT";
-        default:
-            return "SFEM_INT_UNDEFINED";
-    }
-}
-}  // namespace sfem
-#else
-SFEM_INLINE static int real_type_size(enum RealType type) {
-    switch (type) {
-        case SFEM_FLOAT16:
-            return 2;
-        case SFEM_FLOAT32:
-            return 4;
-        case SFEM_FLOAT64:
-            return 8;
-        case SFEM_REAL_DEFAULT:
-            return sizeof(real_t);
-        default:
-            assert(0);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
-    switch (type) {
-        case SFEM_FLOAT16:
-            return "SFEM_FLOAT16";
-        case SFEM_FLOAT32:
-            return "SFEM_FLOAT32";
-        case SFEM_FLOAT64:
-            return "SFEM_FLOAT64";
-        case SFEM_REAL_DEFAULT:
-            return "SFEM_REAL_DEFAULT";
-        default:
-            return "SFEM_FLOAT_UNDEFINED";
-    }
-}
-
-SFEM_INLINE static const char* integer_type_to_string(enum IntegerType type) {
-    switch (type) {
-        case SFEM_INT16:
-            return "SFEM_INT16";
-        case SFEM_INT32:
-            return "SFEM_INT32";
-        case SFEM_INT64:
-            return "SFEM_INT64";
-        case SFEM_INT_DEFAULT:
-            return "SFEM_INT_DEFAULT";
-        default:
-            return "SFEM_INT_UNDEFINED";
-    }
-}
-#endif
 
 #endif  // SFEM_DEFS_H

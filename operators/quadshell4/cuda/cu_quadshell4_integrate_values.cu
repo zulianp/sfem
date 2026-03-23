@@ -231,19 +231,19 @@ extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nele
                                          const real_t                       value,
                                          const int                          vec_size,
                                          const int                          component,
-                                         const enum RealType                real_type,
+                                         const enum smesh::PrimitiveType                real_type,
                                          void *const SFEM_RESTRICT          out,
                                          void                              *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_quadshell4_integrate_value_tpl<real_t>(
                     nelements, elements, coords_stride, coords, value, vec_size, component, (real_t *)out, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_quadshell4_integrate_value_tpl<float>(
                     nelements, elements, coords_stride, coords, value, vec_size, component, (float *)out, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_quadshell4_integrate_value_tpl<double>(
                     nelements, elements, coords_stride, coords, value, vec_size, component, (double *)out, stream);
         }
@@ -253,7 +253,7 @@ extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nele
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -264,22 +264,22 @@ extern int cu_quadshell4_integrate_values(const ptrdiff_t                    nel
                                           idx_t **const SFEM_RESTRICT        elements,
                                           const ptrdiff_t                    coords_stride,
                                           const geom_t **const SFEM_RESTRICT coords,
-                                          const enum RealType                real_type,
+                                          const enum smesh::PrimitiveType                real_type,
                                           void *const SFEM_RESTRICT          values,
                                           const int                          vec_size,
                                           const int                          component,
                                           void *const SFEM_RESTRICT          out,
                                           void                              *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_quadshell4_integrate_values_tpl<real_t>(
                     nelements, elements, coords_stride, coords, (real_t *)values, vec_size, component, (real_t *)out, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_quadshell4_integrate_values_tpl<float>(
                     nelements, elements, coords_stride, coords, (float *)values, vec_size, component, (float *)out, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_quadshell4_integrate_values_tpl<double>(
                     nelements, elements, coords_stride, coords, (double *)values, vec_size, component, (double *)out, stream);
         }
@@ -289,7 +289,7 @@ extern int cu_quadshell4_integrate_values(const ptrdiff_t                    nel
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }

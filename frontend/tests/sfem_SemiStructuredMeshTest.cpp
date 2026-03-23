@@ -88,7 +88,7 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &o
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        coarse_field = sfem::to_device(coarse_field);
+        coarse_field = smesh::to_device(coarse_field);
     }
 #endif
 
@@ -146,7 +146,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        fine_field = sfem::to_device(fine_field);
+        fine_field = smesh::to_device(fine_field);
     }
 #endif
 

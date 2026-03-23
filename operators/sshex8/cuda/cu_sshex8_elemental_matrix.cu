@@ -138,27 +138,27 @@ int cu_affine_hex8_elemental_matrix_apply_tpl(const ptrdiff_t              nelem
 
 extern int cu_affine_hex8_elemental_matrix_apply(const ptrdiff_t                 nelements,
                                                  idx_t **const SFEM_RESTRICT     elements,
-                                                 const enum RealType             real_type,
+                                                 const enum smesh::PrimitiveType             real_type,
                                                  void **const SFEM_RESTRICT      elemental_matrix,
                                                  const void *const SFEM_RESTRICT x,
                                                  void *const SFEM_RESTRICT       y,
                                                  void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_hex8_elemental_matrix_apply_tpl<real_t>(
                     nelements, elements, (real_t **)elemental_matrix, (const real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_hex8_elemental_matrix_apply_tpl<float>(
                     nelements, elements, (float **)elemental_matrix, (const float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_hex8_elemental_matrix_apply_tpl<double>(
                     nelements, elements, (double **)elemental_matrix, (const double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_hex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type),
+                       smesh::to_string(real_type),
                        real_type);
             return SFEM_FAILURE;
         }
@@ -381,27 +381,27 @@ int cu_affine_sshex8_elemental_matrix_apply_tpl(const int                    lev
 extern int cu_affine_sshex8_elemental_matrix_apply(const int                       level,
                                                    const ptrdiff_t                 nelements,
                                                    idx_t **const SFEM_RESTRICT     elements,
-                                                   const enum RealType             real_type,
+                                                   const enum smesh::PrimitiveType             real_type,
                                                    void **const SFEM_RESTRICT      elemental_matrix,
                                                    const void *const SFEM_RESTRICT x,
                                                    void *const SFEM_RESTRICT       y,
                                                    void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_elemental_matrix_apply_tpl<real_t>(
                     level, nelements, elements, (real_t **)elemental_matrix, (const real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_elemental_matrix_apply_tpl<float>(
                     level, nelements, elements, (float **)elemental_matrix, (const float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_elemental_matrix_apply_tpl<double>(
                     level, nelements, elements, (double **)elemental_matrix, (const double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_sshex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type),
+                       smesh::to_string(real_type),
                        real_type);
             return SFEM_FAILURE;
         }
@@ -798,27 +798,27 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
 int cu_affine_sshex8_elemental_matrix_apply_AoS(const int                        level,
                                                 const ptrdiff_t                  nelements,
                                                 const idx_t *const SFEM_RESTRICT elements,
-                                                const enum RealType              real_type,
+                                                const enum smesh::PrimitiveType              real_type,
                                                 const void *const SFEM_RESTRICT  elemental_matrix,
                                                 const void *const SFEM_RESTRICT  x,
                                                 void *const SFEM_RESTRICT        y,
                                                 void                            *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_elemental_matrix_apply_AoS_tpl<real_t>(
                     level, nelements, elements, (const real_t *)elemental_matrix, (const real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_elemental_matrix_apply_AoS_tpl<float>(
                     level, nelements, elements, (const float *)elemental_matrix, (const float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_elemental_matrix_apply_AoS_tpl<double>(
                     level, nelements, elements, (const double *)elemental_matrix, (const double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_sshex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type),
+                       smesh::to_string(real_type),
                        real_type);
             return SFEM_FAILURE;
         }

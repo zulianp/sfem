@@ -1,7 +1,7 @@
 #ifndef SFEM_ShiftedPenalty_IMPL_HPP
 #define SFEM_ShiftedPenalty_IMPL_HPP
 
-
+#include "sfem_aliases.hpp"
 
 #include <algorithm>
 #include <cassert>

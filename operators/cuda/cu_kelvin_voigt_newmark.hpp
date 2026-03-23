@@ -23,7 +23,7 @@ int cu_kelvin_voigt_newmark_apply(const smesh::ElemType             element_type
     const real_t                    K,
     const real_t                    eta,
     const real_t                    rho,
-    const enum RealType             real_type,
+    const enum smesh::PrimitiveType             real_type,
     const real_t *const             d_x,
     const real_t *const             d_v,
     const real_t *const             d_a,

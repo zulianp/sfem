@@ -234,7 +234,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
                                            const void *const SFEM_RESTRICT jacobian_determinant,
                                            const real_t                    mu,
                                            const real_t                    lambda,
-                                           const enum RealType             real_type,
+                                           const enum smesh::PrimitiveType             real_type,
                                            const ptrdiff_t                 u_stride,
                                            const void *const SFEM_RESTRICT ux,
                                            const void *const SFEM_RESTRICT uy,
@@ -245,7 +245,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
                                            void *const SFEM_RESTRICT       outz,
                                            void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_tet4_linear_elasticity_apply_tpl(nelements,
                                                        elements,
                                                        jacobian_stride,
@@ -263,7 +263,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
                                                        (real_t *)outz,
                                                        stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_tet4_linear_elasticity_apply_tpl(nelements,
                                                        elements,
                                                        jacobian_stride,
@@ -281,7 +281,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
                                                        (float *)outz,
                                                        stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_tet4_linear_elasticity_apply_tpl(nelements,
                                                        elements,
                                                        jacobian_stride,
@@ -303,7 +303,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
             SFEM_ERROR(
                     "[Error] cu_tet4_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -319,14 +319,14 @@ extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 neleme
                                           const void *const SFEM_RESTRICT jacobian_determinant,
                                           const real_t                    mu,
                                           const real_t                    lambda,
-                                          const enum RealType             real_type,
+                                          const enum smesh::PrimitiveType             real_type,
                                           const ptrdiff_t                 diag_stride,
                                           void *const SFEM_RESTRICT       diagx,
                                           void *const SFEM_RESTRICT       diagy,
                                           void *const SFEM_RESTRICT       diagz,
                                           void                           *stream) {
     switch (real_type) {
-        // case SFEM_REAL_DEFAULT: {
+        // case smesh::SMESH_DEFAULT: {
         //     return cu_tet4_linear_elasticity_diag_tpl(nelements,
         //                                                     stride,
         //                                                     elements,
@@ -340,7 +340,7 @@ extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 neleme
         //                                                     (real_t *)diagz,
         //                                                     stream);
         // }
-        // case SFEM_FLOAT32: {
+        // case smesh::SMESH_FLOAT32: {
         //     return cu_tet4_linear_elasticity_diag_tpl(nelements,
         //                                                     stride,
         //                                                     elements,
@@ -354,7 +354,7 @@ extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 neleme
         //                                                     (float *)diagz,
         //                                                     stream);
         // }
-        // case SFEM_FLOAT64: {
+        // case smesh::SMESH_FLOAT64: {
         //     return cu_tet4_linear_elasticity_diag_tpl(nelements,
         //                                                     stride,
         //                                                     elements,
@@ -372,7 +372,7 @@ extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 neleme
             SFEM_ERROR(
                     "[Error] cu_tet4_linear_elasticity_diag: not implemented for type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }

@@ -330,7 +330,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == execution_space) {
-                mass_vector = sfem::to_device(mass_vector);
+                mass_vector = smesh::to_device(mass_vector);
             }
 #endif
 

@@ -6,29 +6,29 @@
 #include "hex8_laplacian_inline_cpu.hpp"
 
 static int cu_hex8_fff_allocate_generic(const ptrdiff_t nelements,
-                                        const enum RealType real_type,
+                                        const enum smesh::PrimitiveType real_type,
                                         void **const SFEM_RESTRICT fff) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(cu_jacobian_t)));
             return SFEM_SUCCESS;
         }
-        case SFEM_FLOAT16: {
+        case smesh::SMESH_FLOAT16: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(half)));
             return SFEM_SUCCESS;
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(float)));
             return SFEM_SUCCESS;
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(double)));
             return SFEM_SUCCESS;
         }
         default: {
             fprintf(stderr,
                     "[Error] cu_hex8_fff_allocate: not implemented for type %s (code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             assert(0);
             *fff = 0;
@@ -145,25 +145,25 @@ static int cu_hex8_fff_fill_tpl(const ptrdiff_t nelements,
 static int cu_hex8_fff_fill_generic(const ptrdiff_t nelements,
                                     idx_t **const SFEM_RESTRICT elements,
                                     geom_t **const SFEM_RESTRICT points,
-                                    const enum RealType real_type,
+                                    const enum smesh::PrimitiveType real_type,
                                     void *const SFEM_RESTRICT fff) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_hex8_fff_fill_tpl(nelements, elements, points, (cu_jacobian_t *)fff);
         }
-        case SFEM_FLOAT16: {
+        case smesh::SMESH_FLOAT16: {
             return cu_hex8_fff_fill_tpl(nelements, elements, points, (half *)fff);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_hex8_fff_fill_tpl(nelements, elements, points, (float *)fff);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_hex8_fff_fill_tpl(nelements, elements, points, (double *)fff);
         }
         default: {
             fprintf(stderr,
                     "[Error] cu_hex8_fff_fill: not implemented for type %s (code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             assert(0);
             return SFEM_FAILURE;
@@ -173,7 +173,7 @@ static int cu_hex8_fff_fill_generic(const ptrdiff_t nelements,
 
 extern int cu_hex8_fff_allocate(const ptrdiff_t nelements, void **const SFEM_RESTRICT fff) {
     // Currently this is the only one supported
-    return cu_hex8_fff_allocate_generic(nelements, SFEM_REAL_DEFAULT, fff);
+    return cu_hex8_fff_allocate_generic(nelements, smesh::SMESH_DEFAULT, fff);
 }
 
 extern int cu_hex8_fff_fill(const ptrdiff_t nelements,
@@ -181,5 +181,5 @@ extern int cu_hex8_fff_fill(const ptrdiff_t nelements,
                             geom_t **const SFEM_RESTRICT points,
                             void *const SFEM_RESTRICT fff) {
     // Currently this is the only one supported
-    return cu_hex8_fff_fill_generic(nelements, elements, points, SFEM_REAL_DEFAULT, fff);
+    return cu_hex8_fff_fill_generic(nelements, elements, points, smesh::SMESH_DEFAULT, fff);
 }

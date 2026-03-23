@@ -2,27 +2,26 @@
 #include <memory>
 #include "boundary_condition.hpp"
 
-#include "sfem_defs.hpp"
+#include <cuda_runtime_api.h>
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
-#include <cuda_runtime_api.h>
 
 // CPU
 #include "sshex8_laplacian.hpp"
 
 // GPU
 #include "cu_boundary_condition.hpp"
-#include "cu_integrate_values.hpp"
 #include "cu_hex8_adjugate.hpp"
 #include "cu_hex8_fff.hpp"
+#include "cu_integrate_values.hpp"
+#include "cu_kelvin_voigt_newmark.hpp"
 #include "cu_laplacian.hpp"
 #include "cu_linear_elasticity.hpp"
-#include "cu_kelvin_voigt_newmark.hpp"
 #include "cu_mask.hpp"
 #include "cu_sshex8_elemental_matrix.hpp"
+#include "cu_sshex8_kelvin_voigt_newmark.hpp"
 #include "cu_sshex8_laplacian.hpp"
 #include "cu_sshex8_linear_elasticity.hpp"
-#include "cu_sshex8_kelvin_voigt_newmark.hpp"
 #include "cu_tet4_adjugate.hpp"
 #include "cu_tet4_fff.hpp"
 
@@ -30,6 +29,8 @@
 #include "sfem_API.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
+#include "smesh_device_buffer.hpp"
+#include "smesh_device_sideset.hpp"
 
 namespace sfem {
     template <typename T>
@@ -55,38 +56,39 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
-                                                            const smesh::ElemType                   element_type) {
+                                                            const smesh::ElemType                 element_type) {
         if (space->has_semi_structured_mesh()) {
-            return to_device(space->mesh().elements());
+            return smesh::to_device(space->mesh().elements(0));
 
         } else {
-            return to_device(space->mesh().elements(0));
+            return smesh::to_device(space->mesh().elements(0));
         }
     }
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
-                                                              const smesh::ElemType                   element_type) {
+                                                              const smesh::ElemType                 element_type) {
         if (space->has_semi_structured_mesh()) {
-            auto nxe = space->mesh().n_nodes_per_element();
-            return to_device(soa_to_aos(1, nxe, space->mesh().elements()));
+            auto nxe = space->mesh().n_nodes_per_element(0);
+            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
 
         } else {
             auto nxe = space->mesh().n_nodes_per_element(0);
-            return to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
+            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
         }
     }
 
-    std::shared_ptr<Sideset> to_device(const std::shared_ptr<Sideset> &sideset) {
-        return std::make_shared<Sideset>(sideset->comm(), to_device(sideset->parent()), to_device(sideset->lfi()));
-    }
+    // std::shared_ptr<Sideset> smesh::to_device(const std::shared_ptr<Sideset> &sideset) {
+    //     return std::make_shared<Sideset>(sideset->comm(), smesh::to_device(sideset->parent()),
+    //     smesh::to_device(sideset->lfi()));
+    // }
 
-    std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss) {
-        std::vector<std::shared_ptr<Sideset>> ret;
-        for (const auto &s : ss) {
-            ret.push_back(to_device(s));
-        }
-        return ret;
-    }
+    // std::vector<std::shared_ptr<Sideset>> smesh::to_device(const std::vector<std::shared_ptr<Sideset>> &ss) {
+    //     std::vector<std::shared_ptr<Sideset>> ret;
+    //     for (const auto &s : ss) {
+    //         ret.push_back(smesh::to_device(s));
+    //     }
+    //     return ret;
+    // }
 
     template <typename T>
     std::shared_ptr<Buffer<T>> manage_device_buffer(const ptrdiff_t n, T *data) {
@@ -110,20 +112,20 @@ namespace sfem {
             fff_ = manage_device_buffer<void>(mesh.n_elements() * 6, fff);
         }
 
-        FFF(smesh::ElemType                           element_type,
+        FFF(smesh::ElemType                         element_type,
             const std::shared_ptr<Buffer<idx_t *>> &elements,
             const std::shared_ptr<Buffer<void>>    &fff)
             : element_type_(element_type), elements_(elements), fff_(fff) {}
 
         ~FFF() {}
 
-        smesh::ElemType                    element_type() const { return element_type_; }
+        smesh::ElemType                  element_type() const { return element_type_; }
         ptrdiff_t                        n_elements() const { return elements_->extent(1); }
         std::shared_ptr<Buffer<idx_t *>> elements() const { return elements_; }
         std::shared_ptr<Buffer<void>>    fff() const { return fff_; }
 
     private:
-        smesh::ElemType                    element_type_;
+        smesh::ElemType                  element_type_;
         std::shared_ptr<Buffer<idx_t *>> elements_;
         std::shared_ptr<Buffer<void>>    fff_;
     };
@@ -157,7 +159,7 @@ namespace sfem {
             jacobian_determinant_ = manage_device_buffer<void>(mesh.n_elements(), jacobian_determinant);
         }
 
-        Adjugate(smesh::ElemType                           element_type,
+        Adjugate(smesh::ElemType                         element_type,
                  const std::shared_ptr<Buffer<idx_t *>> &elements,
                  const std::shared_ptr<Buffer<void>>    &jacobian_adjugate,
                  const std::shared_ptr<Buffer<void>>    &jacobian_determinant)
@@ -168,14 +170,14 @@ namespace sfem {
 
         ~Adjugate() {}
 
-        smesh::ElemType                    element_type() const { return element_type_; }
+        smesh::ElemType                  element_type() const { return element_type_; }
         ptrdiff_t                        n_elements() const { return elements_->extent(1); }
         std::shared_ptr<Buffer<idx_t *>> elements() const { return elements_; }
         std::shared_ptr<Buffer<void>>    jacobian_determinant() const { return jacobian_determinant_; }
         std::shared_ptr<Buffer<void>>    jacobian_adjugate() const { return jacobian_adjugate_; }
 
     private:
-        smesh::ElemType                    element_type_;
+        smesh::ElemType                  element_type_;
         std::shared_ptr<Buffer<idx_t *>> elements_;
         std::shared_ptr<Buffer<void>>    jacobian_adjugate_;
         std::shared_ptr<Buffer<void>>    jacobian_determinant_;
@@ -189,9 +191,10 @@ namespace sfem {
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) : space(dc->space()), h_dirichlet(dc) {
             for (auto &c : dc->conditions()) {
-                DirichletConditions::Condition cond{.sidesets   = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
-                                                    .nodeset   = to_device(c.nodeset),
-                                                    .values    = (c.values) ? to_device(c.values) : nullptr,
+                DirichletConditions::Condition cond{.sidesets  = (!c.sidesets.empty()) ? smesh::to_device(c.sidesets)
+                                                                                       : std::vector<std::shared_ptr<Sideset>>(),
+                                                    .nodeset   = smesh::to_device(c.nodeset),
+                                                    .values    = (c.values) ? smesh::to_device(c.values) : nullptr,
                                                     .value     = c.value,
                                                     .component = c.component};
                 conditions.push_back(cond);
@@ -284,9 +287,10 @@ namespace sfem {
         GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
             for (auto &c : nc->conditions()) {
                 NeumannConditions::Condition cond{.element_type = c.element_type,
-                                                  .sidesets      = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
-                                                  .surface      = to_device(c.surface),
-                                                  .values       = (c.values) ? to_device(c.values) : nullptr,
+                                                  .sidesets     = (!c.sidesets.empty()) ? smesh::to_device(c.sidesets)
+                                                                                        : std::vector<std::shared_ptr<Sideset>>(),
+                                                  .surface      = smesh::to_device(c.surface),
+                                                  .values       = (c.values) ? smesh::to_device(c.values) : nullptr,
                                                   .value        = c.value,
                                                   .component    = c.component};
                 conditions.push_back(cond);
@@ -327,16 +331,17 @@ namespace sfem {
                 const auto &hc = hconds[i];
                 const auto &dc = conditions[i];
 
-                const smesh::ElemType st     = hc.element_type;
-                const int           nnxs   = elem_num_nodes(st);
-                const int           dim    = mesh->spatial_dimension();
-                const ptrdiff_t     ne     = dc.surface->extent(1);
+                const smesh::ElemType st   = hc.element_type;
+                const int             nnxs = elem_num_nodes(st);
+                const int             dim  = mesh->spatial_dimension();
+                const ptrdiff_t       ne   = dc.surface->extent(1);
 
                 if (ne == 0) continue;
 
                 if (st != smesh::QUADSHELL4) {
-                    SFEM_ERROR("GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only smesh::QUADSHELL4)\n",
-                               type_to_string(st));
+                    SFEM_ERROR(
+                            "GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only smesh::QUADSHELL4)\n",
+                            type_to_string(st));
                     return SFEM_FAILURE;
                 }
 
@@ -348,15 +353,15 @@ namespace sfem {
                     for (ptrdiff_t e = 0; e < ne; ++e) {
                         for (int v = 0; v < nnxs; ++v) {
                             const idx_t node = hc.surface->data()[v][e];
-                            cx[v * ne + e] = px[node];
+                            cx[v * ne + e]   = px[node];
                         }
                     }
                 }
 
-                auto coords_d = sfem::to_device(coords_h);
+                auto coords_d = smesh::to_device(coords_h);
 
                 if (hc.values && hc.values->size() && dc.values) {
-                    auto scaled = sfem::create_device_buffer<real_t>(ne);
+                    auto scaled = smesh::create_device_buffer<real_t>(ne);
 
                     d_copy(ne, dc.values->data(), scaled->data());
                     d_scal(ne, -hc.value, scaled->data());
@@ -365,7 +370,7 @@ namespace sfem {
                                                       ne,
                                                       dc.surface->data(),
                                                       (const geom_t **)coords_d->data(),
-                                                      SFEM_REAL_DEFAULT,
+                                                      smesh::SMESH_DEFAULT,
                                                       (void *)scaled->data(),
                                                       space->block_size(),
                                                       hc.component,
@@ -380,7 +385,7 @@ namespace sfem {
                                                      -hc.value,
                                                      space->block_size(),
                                                      hc.component,
-                                                     SFEM_REAL_DEFAULT,
+                                                     smesh::SMESH_DEFAULT,
                                                      (void *)out_dev,
                                                      SFEM_DEFAULT_STREAM);
                     err |= gpu_ret;
@@ -392,21 +397,21 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-    int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
 
-    int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
-    
-    int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) override { return SFEM_SUCCESS; }
+        int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
 
-    inline bool is_linear() const override { return true; }
-    inline ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
-    inline ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+        int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) override { return SFEM_SUCCESS; }
 
-    int n_conditions() const;
+        inline bool      is_linear() const override { return true; }
+        inline ptrdiff_t n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t n_dofs_image() const override { return space->n_dofs(); }
 
-    ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        int n_conditions() const;
 
-    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
@@ -417,9 +422,9 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<FFF>           fff;
-        enum RealType                  real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
         void                          *stream{SFEM_DEFAULT_STREAM};
-        smesh::ElemType                  element_type { smesh::INVALID };
+        smesh::ElemType                element_type{smesh::INVALID};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(1 == space->block_size());
@@ -535,9 +540,9 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<FFF>           fff;
-        enum RealType                  real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
         void                          *stream{SFEM_DEFAULT_STREAM};
-        smesh::ElemType                  element_type { smesh::INVALID };
+        smesh::ElemType                element_type{smesh::INVALID};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(1 == space->block_size());
@@ -570,12 +575,11 @@ namespace sfem {
             if (derefined_space->has_semi_structured_mesh()) {
                 auto ret          = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
                 ret->element_type = element_type;
-                ret->fff          = std::make_shared<FFF>(
-                        element_type,
-                        sshex8_derefine_element_connectivity(space->mesh().level(),
-                                                             derefined_space->mesh().level(),
-                                                             fff->elements()),
-                        fff->fff());
+
+                int level   = smesh::semistructured_level(space->mesh());
+                int delevel = smesh::semistructured_level(derefined_space->mesh());
+                ret->fff    = std::make_shared<FFF>(
+                        element_type, sshex8_derefine_element_connectivity(level, delevel, fff->elements()), fff->fff());
                 ret->real_type = real_type;
                 ret->stream    = stream;
                 return ret;
@@ -599,9 +603,11 @@ namespace sfem {
 
         int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
             auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_diag[%d]", ssm.level());
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_diag[%d]", smesh::semistructured_level(ssm));
 
-            return cu_affine_sshex8_laplacian_diag(ssm.level(),
+            const int level = smesh::semistructured_level(ssm);
+
+            return cu_affine_sshex8_laplacian_diag(level,
                                                    fff->n_elements(),
                                                    fff->elements()->data(),
                                                    fff->n_elements(),  // stride
@@ -613,9 +619,9 @@ namespace sfem {
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", smesh::semistructured_level(ssm));
 
-            return cu_affine_sshex8_laplacian_apply(ssm.level(),
+            return cu_affine_sshex8_laplacian_apply(smesh::semistructured_level(ssm),
                                                     fff->n_elements(),
                                                     fff->elements()->data(),
                                                     fff->n_elements(),  // stride
@@ -627,10 +633,11 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", level);
 
-            return cu_affine_sshex8_laplacian_apply(ssm.level(),
+            return cu_affine_sshex8_laplacian_apply(level,
                                                     fff->n_elements(),
                                                     fff->elements()->data(),
                                                     fff->n_elements(),  // stride
@@ -654,9 +661,9 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<Adjugate>      adjugate;
-        enum RealType                  real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
         void                          *stream{SFEM_DEFAULT_STREAM};
-        smesh::ElemType                  element_type { smesh::INVALID };
+        smesh::ElemType                element_type{smesh::INVALID};
         real_t                         mu{1};
         real_t                         lambda{1};
 
@@ -805,6 +812,205 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
+    // class SemiStructuredGPULinearElasticity final : public Op {
+    // public:
+    //     std::shared_ptr<FunctionSpace> space;
+    //     std::shared_ptr<Adjugate>      adjugate;
+
+    //     real_t mu{1}, lambda{1};
+
+    //     enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
+    //     void                     *stream{SFEM_DEFAULT_STREAM};
+
+    //     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+    //         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+    //         return std::make_unique<SemiStructuredGPULinearElasticity>(space);
+    //     }
+
+    //     std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+    //         SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity::derefine_op");
+
+    //         if (derefined_space->has_semi_structured_mesh()) {
+    //             auto ret = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
+
+    //             ret->adjugate = std::make_shared<Adjugate>(
+    //                     derefined_space->element_type(),
+    //                     sshex8_derefine_element_connectivity(smesh::semistructured_level(space->mesh()),
+    //                                                          smesh::semistructured_level(derefined_space->mesh()),
+    //                                                          adjugate->elements()),
+    //                     adjugate->jacobian_adjugate(),
+    //                     adjugate->jacobian_determinant());
+
+    //             ret->mu     = mu;
+    //             ret->lambda = lambda;
+
+    //             ret->real_type = real_type;
+    //             ret->stream    = stream;
+    //             return ret;
+    //         } else {
+    //             auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
+    //             assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+    //             assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+    //             // SFEM_ERROR("AVOID replicating indices create view!\n");  // TODO
+    //             ret->initialize();
+    //             return ret;
+    //         }
+    //     }
+
+    //     const char *name() const override { return "ss::gpu::LinearElasticity"; }
+    //     inline bool is_linear() const override { return true; }
+    //     ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+    //     ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+
+    //     int initialize(const std::vector<std::string> &block_names = {}) override {
+    //         SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
+
+    //         real_t SFEM_SHEAR_MODULUS        = mu;
+    //         real_t SFEM_FIRST_LAME_PARAMETER = lambda;
+
+    //         SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
+    //         SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+    //         mu     = SFEM_SHEAR_MODULUS;
+    //         lambda = SFEM_FIRST_LAME_PARAMETER;
+
+    //         auto elements = space->device_elements();
+    //         if (!elements) {
+    //             elements = create_device_elements(space, space->element_type());
+    //             space->set_device_elements(elements);
+    //         }
+
+    //         adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
+    //         return SFEM_SUCCESS;
+    //     }
+
+    //     SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    //     int hessian_crs(const real_t *const  x,
+    //                     const count_t *const rowptr,
+    //                     const idx_t *const   colidx,
+    //                     real_t *const        values) override {
+    //         SFEM_IMPLEMENT_ME();
+    //         return SFEM_FAILURE;
+    //     }
+
+    //     int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+    //         auto     &ssm   = space->mesh();
+    //         const int level = smesh::semistructured_level(ssm);
+    //         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", level);
+
+    //         return cu_affine_sshex8_linear_elasticity_diag(level,
+    //                                                        adjugate->n_elements(),
+    //                                                        adjugate->elements()->data(),
+    //                                                        adjugate->n_elements(),  // stride
+    //                                                        adjugate->jacobian_adjugate()->data(),
+    //                                                        adjugate->jacobian_determinant()->data(),
+    //                                                        mu,
+    //                                                        lambda,
+    //                                                        real_type,
+    //                                                        3,
+    //                                                        &values[0],
+    //                                                        &values[1],
+    //                                                        &values[2],
+    //                                                        SFEM_DEFAULT_STREAM);
+    //     }
+
+    //     int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
+    //         auto     &ssm   = space->mesh();
+    //         const int level = smesh::semistructured_level(ssm);
+    //         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", level);
+
+    //         return cu_affine_sshex8_linear_elasticity_block_diag_sym(level,
+    //                                                                  adjugate->n_elements(),
+    //                                                                  adjugate->elements()->data(),
+    //                                                                  adjugate->n_elements(),  // stride
+    //                                                                  adjugate->jacobian_adjugate()->data(),
+    //                                                                  adjugate->jacobian_determinant()->data(),
+    //                                                                  this->mu,
+    //                                                                  this->lambda,
+    //                                                                  6,
+    //                                                                  real_type,
+    //                                                                  // Outputs
+    //                                                                  out,
+    //                                                                  &out[1],
+    //                                                                  &out[2],
+    //                                                                  &out[3],
+    //                                                                  &out[4],
+    //                                                                  &out[5],
+    //                                                                  SFEM_DEFAULT_STREAM);
+
+    //         // return cu_affine_sshex8_linear_elasticity_block_diag_sym_AoS(ssm.level(),
+    //         //                                                          adjugate->n_elements(),
+    //         //                                                          adjugate->elements()->data(),
+    //         //                                                          adjugate->n_elements(),  // stride
+    //         //                                                          adjugate->jacobian_adjugate()->data(),
+    //         //                                                          adjugate->jacobian_determinant()->data(),
+    //         //                                                          this->mu,
+    //         //                                                          this->lambda,
+    //         //                                                          real_type,
+    //         //                                                          // Outputs
+    //         //                                                          out,
+    //         //                                                          SFEM_DEFAULT_STREAM);
+    //     }
+
+    //     int gradient(const real_t *const x, real_t *const out) override {
+    //         auto     &ssm   = space->mesh();
+    //         const int level = smesh::semistructured_level(ssm);
+    //         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
+
+    //         return cu_affine_sshex8_linear_elasticity_apply(level,
+    //                                                         adjugate->n_elements(),
+    //                                                         adjugate->elements()->data(),
+    //                                                         adjugate->n_elements(),  // stride
+    //                                                         adjugate->jacobian_adjugate()->data(),
+    //                                                         adjugate->jacobian_determinant()->data(),
+    //                                                         mu,
+    //                                                         lambda,
+    //                                                         real_type,
+    //                                                         3,
+    //                                                         &x[0],
+    //                                                         &x[1],
+    //                                                         &x[2],
+    //                                                         3,
+    //                                                         &out[0],
+    //                                                         &out[1],
+    //                                                         &out[2],
+    //                                                         SFEM_DEFAULT_STREAM);
+    //     }
+
+    //     int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+    //         auto     &ssm   = space->mesh();
+    //         const int level = smesh::semistructured_level(ssm);
+    //         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
+
+    //         return cu_affine_sshex8_linear_elasticity_apply(level,
+    //                                                         adjugate->n_elements(),
+    //                                                         adjugate->elements()->data(),
+    //                                                         adjugate->n_elements(),  // stride
+    //                                                         adjugate->jacobian_adjugate()->data(),
+    //                                                         adjugate->jacobian_determinant()->data(),
+    //                                                         mu,
+    //                                                         lambda,
+    //                                                         real_type,
+    //                                                         3,
+    //                                                         &h[0],
+    //                                                         &h[1],
+    //                                                         &h[2],
+    //                                                         3,
+    //                                                         &out[0],
+    //                                                         &out[1],
+    //                                                         &out[2],
+    //                                                         SFEM_DEFAULT_STREAM);
+    //     }
+
+    //     int value(const real_t *x, real_t *const out) override {
+    //         SFEM_IMPLEMENT_ME();
+    //         return SFEM_FAILURE;
+    //     }
+
+    //     int            report(const real_t *const) override { return SFEM_SUCCESS; }
+    //     ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    // };
+
     class SemiStructuredGPULinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -812,8 +1018,8 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
 
-        enum RealType real_type { SFEM_REAL_DEFAULT };
-        void         *stream{SFEM_DEFAULT_STREAM};
+        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
+        void                     *stream{SFEM_DEFAULT_STREAM};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
@@ -828,8 +1034,8 @@ namespace sfem {
 
                 ret->adjugate = std::make_shared<Adjugate>(
                         derefined_space->element_type(),
-                        sshex8_derefine_element_connectivity(space->mesh().level(),
-                                                             derefined_space->mesh().level(),
+                        sshex8_derefine_element_connectivity(smesh::semistructured_level(space->mesh()),
+                                                             smesh::semistructured_level(derefined_space->mesh()),
                                                              adjugate->elements()),
                         adjugate->jacobian_adjugate(),
                         adjugate->jacobian_determinant());
@@ -887,10 +1093,11 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", ssm.level());
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", level);
 
-            return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_diag(level,
                                                            adjugate->n_elements(),
                                                            adjugate->elements()->data(),
                                                            adjugate->n_elements(),  // stride
@@ -907,10 +1114,11 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", ssm.level());
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", level);
 
-            return cu_affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_block_diag_sym(level,
                                                                      adjugate->n_elements(),
                                                                      adjugate->elements()->data(),
                                                                      adjugate->n_elements(),  // stride
@@ -944,10 +1152,11 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
 
-            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_apply(level,
                                                             adjugate->n_elements(),
                                                             adjugate->elements()->data(),
                                                             adjugate->n_elements(),  // stride
@@ -968,10 +1177,11 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
 
-            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_apply(level,
                                                             adjugate->n_elements(),
                                                             adjugate->elements()->data(),
                                                             adjugate->n_elements(),  // stride
@@ -999,408 +1209,219 @@ namespace sfem {
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
-
-    class SemiStructuredGPULinearElasticity final : public Op {
-    public:
-        std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<Adjugate>      adjugate;
-
-        real_t mu{1}, lambda{1};
-
-        enum RealType real_type { SFEM_REAL_DEFAULT };
-        void         *stream{SFEM_DEFAULT_STREAM};
-
-        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-            return std::make_unique<SemiStructuredGPULinearElasticity>(space);
-        }
-
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity::derefine_op");
-
-            if (derefined_space->has_semi_structured_mesh()) {
-                auto ret = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
-
-                ret->adjugate = std::make_shared<Adjugate>(
-                        derefined_space->element_type(),
-                        sshex8_derefine_element_connectivity(space->mesh().level(),
-                                                             derefined_space->mesh().level(),
-                                                             adjugate->elements()),
-                        adjugate->jacobian_adjugate(),
-                        adjugate->jacobian_determinant());
-
-                ret->mu     = mu;
-                ret->lambda = lambda;
-
-                ret->real_type = real_type;
-                ret->stream    = stream;
-                return ret;
-            } else {
-                auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
-                assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
-                assert(ret->element_type == macro_base_elem(adjugate->element_type()));
-                // SFEM_ERROR("AVOID replicating indices create view!\n");  // TODO
-                ret->initialize();
-                return ret;
-            }
-        }
-
-        const char *name() const override { return "ss::gpu::LinearElasticity"; }
-        inline bool is_linear() const override { return true; }
-        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
-        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
-
-        int initialize(const std::vector<std::string> &block_names = {}) override {
-            SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
-
-            real_t SFEM_SHEAR_MODULUS        = mu;
-            real_t SFEM_FIRST_LAME_PARAMETER = lambda;
-
-            SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
-            SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
-            mu     = SFEM_SHEAR_MODULUS;
-            lambda = SFEM_FIRST_LAME_PARAMETER;
-
-            auto elements = space->device_elements();
-            if (!elements) {
-                elements = create_device_elements(space, space->element_type());
-                space->set_device_elements(elements);
-            }
-
-            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
-            return SFEM_SUCCESS;
-        }
-
-        SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
-            SFEM_IMPLEMENT_ME();
-            return SFEM_FAILURE;
-        }
-
-        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", ssm.level());
-
-            return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
-                                                           adjugate->n_elements(),
-                                                           adjugate->elements()->data(),
-                                                           adjugate->n_elements(),  // stride
-                                                           adjugate->jacobian_adjugate()->data(),
-                                                           adjugate->jacobian_determinant()->data(),
-                                                           mu,
-                                                           lambda,
-                                                           real_type,
-                                                           3,
-                                                           &values[0],
-                                                           &values[1],
-                                                           &values[2],
-                                                           SFEM_DEFAULT_STREAM);
-        }
-
-        int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", ssm.level());
-
-            return cu_affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
-                                                                     adjugate->n_elements(),
-                                                                     adjugate->elements()->data(),
-                                                                     adjugate->n_elements(),  // stride
-                                                                     adjugate->jacobian_adjugate()->data(),
-                                                                     adjugate->jacobian_determinant()->data(),
-                                                                     this->mu,
-                                                                     this->lambda,
-                                                                     6,
-                                                                     real_type,
-                                                                     // Outputs
-                                                                     out,
-                                                                     &out[1],
-                                                                     &out[2],
-                                                                     &out[3],
-                                                                     &out[4],
-                                                                     &out[5],
-                                                                     SFEM_DEFAULT_STREAM);
-
-            // return cu_affine_sshex8_linear_elasticity_block_diag_sym_AoS(ssm.level(),
-            //                                                          adjugate->n_elements(),
-            //                                                          adjugate->elements()->data(),
-            //                                                          adjugate->n_elements(),  // stride
-            //                                                          adjugate->jacobian_adjugate()->data(),
-            //                                                          adjugate->jacobian_determinant()->data(),
-            //                                                          this->mu,
-            //                                                          this->lambda,
-            //                                                          real_type,
-            //                                                          // Outputs
-            //                                                          out,
-            //                                                          SFEM_DEFAULT_STREAM);
-        }
-
-        int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
-
-            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
-                                                            adjugate->n_elements(),
-                                                            adjugate->elements()->data(),
-                                                            adjugate->n_elements(),  // stride
-                                                            adjugate->jacobian_adjugate()->data(),
-                                                            adjugate->jacobian_determinant()->data(),
-                                                            mu,
-                                                            lambda,
-                                                            real_type,
-                                                            3,
-                                                            &x[0],
-                                                            &x[1],
-                                                            &x[2],
-                                                            3,
-                                                            &out[0],
-                                                            &out[1],
-                                                            &out[2],
-                                                            SFEM_DEFAULT_STREAM);
-        }
-
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->mesh();
-            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
-
-            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
-                                                            adjugate->n_elements(),
-                                                            adjugate->elements()->data(),
-                                                            adjugate->n_elements(),  // stride
-                                                            adjugate->jacobian_adjugate()->data(),
-                                                            adjugate->jacobian_determinant()->data(),
-                                                            mu,
-                                                            lambda,
-                                                            real_type,
-                                                            3,
-                                                            &h[0],
-                                                            &h[1],
-                                                            &h[2],
-                                                            3,
-                                                            &out[0],
-                                                            &out[1],
-                                                            &out[2],
-                                                            SFEM_DEFAULT_STREAM);
-        }
-
-        int value(const real_t *x, real_t *const out) override {
-            SFEM_IMPLEMENT_ME();
-            return SFEM_FAILURE;
-        }
-
-        int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
-    };
-
 
     class GPUKelvinVoigtNewmark final : public Op {
-        public:
-            std::shared_ptr<FunctionSpace> space;
-            std::shared_ptr<Adjugate>      adjugate;
-            enum RealType                  real_type { SFEM_REAL_DEFAULT };
-            void                          *stream{SFEM_DEFAULT_STREAM};
-            smesh::ElemType                  element_type { smesh::INVALID };
-            real_t                         k{4};
-            real_t                         K{3};
-            real_t                         eta{0.1};
-            real_t                         rho{1};
-            // Newmark parameters for linearization in apply()
-            real_t                         dt{0.1};
-            real_t                         gamma{0.5};
-            real_t                         beta{0.25};
-            std::shared_ptr<Buffer<real_t>> vel_[3];
-            std::shared_ptr<Buffer<real_t>> acc_[3];
-    
-            static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-                assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-                return std::make_unique<GPUKelvinVoigtNewmark>(space);
-            }
-    
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Adjugate>      adjugate;
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        void                          *stream{SFEM_DEFAULT_STREAM};
+        smesh::ElemType                element_type{smesh::INVALID};
+        real_t                         k{4};
+        real_t                         K{3};
+        real_t                         eta{0.1};
+        real_t                         rho{1};
+        // Newmark parameters for linearization in apply()
+        real_t                          dt{0.1};
+        real_t                          gamma{0.5};
+        real_t                          beta{0.25};
+        std::shared_ptr<Buffer<real_t>> vel_[3];
+        std::shared_ptr<Buffer<real_t>> acc_[3];
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+            return std::make_unique<GPUKelvinVoigtNewmark>(space);
+        }
+
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
             assert(ret->element_type == macro_base_elem(adjugate->element_type()));
             ret->adjugate = adjugate;
-            
+
             // Copy physical parameters
-            ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
-            ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
-            ret->real_type = real_type; ret->stream = stream;
-            
+            ret->k         = k;
+            ret->K         = K;
+            ret->eta       = eta;
+            ret->rho       = rho;
+            ret->dt        = dt;
+            ret->gamma     = gamma;
+            ret->beta      = beta;
+            ret->real_type = real_type;
+            ret->stream    = stream;
+
             // Copy velocity and acceleration field references
             for (int c = 0; c < 3; c++) {
                 ret->vel_[c] = vel_[c];
                 ret->acc_[c] = acc_[c];
             }
-            
+
             return ret;
         }
-    
-            const char *name() const override { return "gpu:KelvinVoigtNewmark"; }
-            inline bool is_linear() const override { return true; }
-            ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
-            ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
-    
-            void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
-                if (strcmp(name, "velocity") == 0) {
-                    vel_[component] = vel;
-                } else if (strcmp(name, "acceleration") == 0) {
-                    acc_[component] = vel;
-                } else {
-                    SFEM_ERROR("Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, 0/1/2) first.\n");
-                }
+
+        const char *name() const override { return "gpu:KelvinVoigtNewmark"; }
+        inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+
+        void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &vel, int component) override {
+            if (strcmp(name, "velocity") == 0) {
+                vel_[component] = vel;
+            } else if (strcmp(name, "acceleration") == 0) {
+                acc_[component] = vel;
+            } else {
+                SFEM_ERROR(
+                        "Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, "
+                        "0/1/2) first.\n");
+            }
+        }
+
+        int initialize(const std::vector<std::string> &block_names = {}) override {
+            SFEM_TRACE_SCOPE("GPUKelvinVoigtNewmark:initialize");
+
+            real_t SFEM_SHEAR_STIFFNESS_KV = 4;
+            real_t SFEM_BULK_MODULUS       = 3;
+            real_t SFEM_DAMPING_RATIO      = 0.1;
+            real_t SFEM_DENSITY            = 1.0;
+
+            SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
+            SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
+            SFEM_READ_ENV(SFEM_DENSITY, atof);
+            k   = SFEM_SHEAR_STIFFNESS_KV;
+            K   = SFEM_BULK_MODULUS;
+            eta = SFEM_DAMPING_RATIO;
+            rho = SFEM_DENSITY;
+
+            // Optional Newmark parameters from env (defaults: beta=1/4, gamma=1/2)
+            real_t SFEM_DT            = dt;
+            real_t SFEM_NEWMARK_GAMMA = gamma;
+            real_t SFEM_NEWMARK_BETA  = beta;
+            SFEM_READ_ENV(SFEM_DT, atof);
+            SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
+            SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
+            dt    = SFEM_DT;
+            gamma = SFEM_NEWMARK_GAMMA;
+            beta  = SFEM_NEWMARK_BETA;
+
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
             }
 
+            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
+            return SFEM_SUCCESS;
+        }
 
-            int initialize(const std::vector<std::string> &block_names = {}) override {
-                SFEM_TRACE_SCOPE("GPUKelvinVoigtNewmark:initialize");
-    
-                real_t SFEM_SHEAR_STIFFNESS_KV        = 4;
-                real_t SFEM_BULK_MODULUS = 3;
-                real_t SFEM_DAMPING_RATIO = 0.1;
-                real_t SFEM_DENSITY = 1.0;
-    
-                SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
-                SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
-                SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
-                SFEM_READ_ENV(SFEM_DENSITY, atof);
-                k     = SFEM_SHEAR_STIFFNESS_KV;
-                K = SFEM_BULK_MODULUS;
-                eta = SFEM_DAMPING_RATIO;
-                rho = SFEM_DENSITY;
+        GPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
 
-                // Optional Newmark parameters from env (defaults: beta=1/4, gamma=1/2)
-                real_t SFEM_DT = dt;
-                real_t SFEM_NEWMARK_GAMMA = gamma;
-                real_t SFEM_NEWMARK_BETA = beta;
-                SFEM_READ_ENV(SFEM_DT, atof);
-                SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
-                SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
-                dt    = SFEM_DT;
-                gamma = SFEM_NEWMARK_GAMMA;
-                beta  = SFEM_NEWMARK_BETA;
-    
-                auto elements = space->device_elements();
-                if (!elements) {
-                    elements = create_device_elements(space, space->element_type());
-                    space->set_device_elements(elements);
-                }
-    
-                adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
-                return SFEM_SUCCESS;
-            }
-    
-            GPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
-    
-            int hessian_crs(const real_t *const  x,
-                            const count_t *const rowptr,
-                            const idx_t *const   colidx,
-                            real_t *const        values) override {
-                SFEM_IMPLEMENT_ME();
-                return SFEM_FAILURE;
-            }
-    
-            int hessian_bsr(const real_t *const  x,
-                            const count_t *const rowptr,
-                            const idx_t *const   colidx,
-                            real_t *const        values) override {
-                                SFEM_IMPLEMENT_ME();
-                                return SFEM_FAILURE;
-            }
-    
-            int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-                SFEM_IMPLEMENT_ME();
-                return SFEM_FAILURE;
-            }
-    
-            int gradient(const real_t *const x, real_t *const out) override {
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-                const real_t *v = vel_[0]->data();
-                const real_t *a = acc_[0]->data();
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_IMPLEMENT_ME();
+            return SFEM_FAILURE;
+        }
 
-                return cu_kelvin_voigt_newmark_apply(element_type,
-                                             adjugate->n_elements(),
-                                             adjugate->elements()->data(),
-                                             adjugate->n_elements(),  // stride
-                                             adjugate->jacobian_adjugate()->data(),
-                                             adjugate->jacobian_determinant()->data(),
-                                             k,
-                                             K,
-                                             eta,
-                                             rho,
-                                             real_type,
-                                             x,
-                                             v,
-                                             a,
-                                             out,
-                                             stream);
-            }
-    
-            int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-                const ptrdiff_t ndofs = space->n_dofs();
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_IMPLEMENT_ME();
+            return SFEM_FAILURE;
+        }
 
-                const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
-                const real_t a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            SFEM_IMPLEMENT_ME();
+            return SFEM_FAILURE;
+        }
 
-                auto v_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
-                auto a_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
-                d_copy(ndofs, h, v_lin_tmp->data());
-                d_scal(ndofs, v_scale, v_lin_tmp->data());
-                d_copy(ndofs, h, a_lin_tmp->data());
-                d_scal(ndofs, a_scale, a_lin_tmp->data());
+        int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+            const real_t *v = vel_[0]->data();
+            const real_t *a = acc_[0]->data();
 
-                return cu_kelvin_voigt_newmark_apply(element_type,
-                                             adjugate->n_elements(),
-                                             adjugate->elements()->data(),
-                                             adjugate->n_elements(),  // stride
-                                             adjugate->jacobian_adjugate()->data(),
-                                             adjugate->jacobian_determinant()->data(),
-                                             k,
-                                             K,
-                                             eta,
-                                             rho,
-                                             real_type,
-                                             h,
-                                             v_lin_tmp->data(),
-                                             a_lin_tmp->data(),
-                                             out,
-                                             stream);
-            }
+            return cu_kelvin_voigt_newmark_apply(element_type,
+                                                 adjugate->n_elements(),
+                                                 adjugate->elements()->data(),
+                                                 adjugate->n_elements(),  // stride
+                                                 adjugate->jacobian_adjugate()->data(),
+                                                 adjugate->jacobian_determinant()->data(),
+                                                 k,
+                                                 K,
+                                                 eta,
+                                                 rho,
+                                                 real_type,
+                                                 x,
+                                                 v,
+                                                 a,
+                                                 out,
+                                                 stream);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+            const ptrdiff_t ndofs = space->n_dofs();
+
+            const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
+            const real_t a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
+
+            auto v_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
+            auto a_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
+            d_copy(ndofs, h, v_lin_tmp->data());
+            d_scal(ndofs, v_scale, v_lin_tmp->data());
+            d_copy(ndofs, h, a_lin_tmp->data());
+            d_scal(ndofs, a_scale, a_lin_tmp->data());
+
+            return cu_kelvin_voigt_newmark_apply(element_type,
+                                                 adjugate->n_elements(),
+                                                 adjugate->elements()->data(),
+                                                 adjugate->n_elements(),  // stride
+                                                 adjugate->jacobian_adjugate()->data(),
+                                                 adjugate->jacobian_determinant()->data(),
+                                                 k,
+                                                 K,
+                                                 eta,
+                                                 rho,
+                                                 real_type,
+                                                 h,
+                                                 v_lin_tmp->data(),
+                                                 a_lin_tmp->data(),
+                                                 out,
+                                                 stream);
+        }
 
         int value(const real_t *x, real_t *const out) override {
             SFEM_IMPLEMENT_ME();
             return SFEM_FAILURE;
         }
 
-        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        int            report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
-
 
     class SemiStructuredGPUKelvinVoigtNewmark final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<Adjugate>      adjugate;
-        enum RealType                  real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
         void                          *stream{SFEM_DEFAULT_STREAM};
-        smesh::ElemType                  element_type { smesh::INVALID };
-       
-        real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
+        smesh::ElemType                element_type{smesh::INVALID};
+
+        real_t                          k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
         std::shared_ptr<Buffer<real_t>> vel_[3];
         std::shared_ptr<Buffer<real_t>> acc_[3];
 
-
-        void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
+        void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &vel, int component) override {
             if (strcmp(name, "velocity") == 0) {
                 vel_[component] = vel;
             } else if (strcmp(name, "acceleration") == 0) {
                 acc_[component] = vel;
             } else {
-                SFEM_ERROR("Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, 0/1/2) first.\n");
+                SFEM_ERROR(
+                        "Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, "
+                        "0/1/2) first.\n");
             }
         }
 
@@ -1411,17 +1432,23 @@ namespace sfem {
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             if (derefined_space->has_semi_structured_mesh()) {
-                auto ret = std::make_shared<SemiStructuredGPUKelvinVoigtNewmark>(derefined_space);
+                auto ret      = std::make_shared<SemiStructuredGPUKelvinVoigtNewmark>(derefined_space);
                 ret->adjugate = std::make_shared<Adjugate>(
-                    derefined_space->element_type(),
-                    sshex8_derefine_element_connectivity(space->mesh().level(),
-                                                         derefined_space->mesh().level(),
-                                                         adjugate->elements()),
-                    adjugate->jacobian_adjugate(),
-                    adjugate->jacobian_determinant());
-                ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
-                ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
-                ret->real_type = real_type; ret->stream = stream;
+                        derefined_space->element_type(),
+                        sshex8_derefine_element_connectivity(smesh::semistructured_level(space->mesh()),
+                                                             smesh::semistructured_level(derefined_space->mesh()),
+                                                             adjugate->elements()),
+                        adjugate->jacobian_adjugate(),
+                        adjugate->jacobian_determinant());
+                ret->k         = k;
+                ret->K         = K;
+                ret->eta       = eta;
+                ret->rho       = rho;
+                ret->dt        = dt;
+                ret->gamma     = gamma;
+                ret->beta      = beta;
+                ret->real_type = real_type;
+                ret->stream    = stream;
                 // Copy velocity and acceleration field references
                 for (int c = 0; c < 3; c++) {
                     ret->vel_[c] = vel_[c];
@@ -1431,18 +1458,24 @@ namespace sfem {
                 return ret;
             } else {
                 auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
-                
+
                 // Copy physical parameters
-                ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
-                ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
-                ret->real_type = real_type; ret->stream = stream;
-                
+                ret->k         = k;
+                ret->K         = K;
+                ret->eta       = eta;
+                ret->rho       = rho;
+                ret->dt        = dt;
+                ret->gamma     = gamma;
+                ret->beta      = beta;
+                ret->real_type = real_type;
+                ret->stream    = stream;
+
                 // Copy velocity and acceleration field references
                 for (int c = 0; c < 3; c++) {
                     ret->vel_[c] = vel_[c];
                     ret->acc_[c] = acc_[c];
                 }
-                
+
                 ret->initialize();
                 return ret;
             }
@@ -1453,8 +1486,7 @@ namespace sfem {
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
-        int initialize(const std::vector<std::string>& = {}) override {
-
+        int initialize(const std::vector<std::string> & = {}) override {
             real_t SFEM_SHEAR_STIFFNESS_KV = k, SFEM_BULK_MODULUS = K;
             real_t SFEM_DAMPING_RATIO = eta, SFEM_DENSITY = rho;
             real_t SFEM_DT = dt, SFEM_NEWMARK_GAMMA = gamma, SFEM_NEWMARK_BETA = beta;
@@ -1465,108 +1497,160 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_DT, atof);
             SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
             SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
-            k = SFEM_SHEAR_STIFFNESS_KV; K = SFEM_BULK_MODULUS;
-            eta = SFEM_DAMPING_RATIO; rho = SFEM_DENSITY;
-            dt = SFEM_DT; gamma = SFEM_NEWMARK_GAMMA; beta = SFEM_NEWMARK_BETA;
-    
+            k     = SFEM_SHEAR_STIFFNESS_KV;
+            K     = SFEM_BULK_MODULUS;
+            eta   = SFEM_DAMPING_RATIO;
+            rho   = SFEM_DENSITY;
+            dt    = SFEM_DT;
+            gamma = SFEM_NEWMARK_GAMMA;
+            beta  = SFEM_NEWMARK_BETA;
+
             auto elements = space->device_elements();
-            if (!elements) { elements = create_device_elements(space, space->element_type()); space->set_device_elements(elements); }
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
             adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
             return SFEM_SUCCESS;
         }
-    
-        SemiStructuredGPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace>& space) : space(space) {}
-    
-    int gradient(const real_t *const x, real_t *const out) override {
-        auto &ssm = space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
-        const real_t *v = vel_[0]->data();
-        const real_t *a = acc_[0]->data();
-        return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
-                                                           adjugate->n_elements(),
-                                                           adjugate->elements()->data(),
-                                                           adjugate->n_elements(),
-                                                           adjugate->jacobian_adjugate()->data(),
-                                                           adjugate->jacobian_determinant()->data(),
-                                                           k, K, eta, rho,
-                                                           dt, gamma, beta,
-                                                           real_type,
-                                                           3, &x[0], &x[1], &x[2], &v[0], &v[1], &v[2], &a[0], &a[1], &a[2],
-                                                           3, &out[0], &out[1], &out[2],
-                                                           SFEM_DEFAULT_STREAM);
-    }
 
-    int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-        auto &ssm = space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
-        
-        // In Newmark's apply (linearized operator), we construct v and a from h
-        // following the same logic as GPUKelvinVoigtNewmark::apply
-        const ptrdiff_t ndofs = space->n_dofs();
-        const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
-        const real_t a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
-        
-        auto v_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
-        auto a_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
-        d_copy(ndofs, h, v_lin_tmp->data());
-        d_scal(ndofs, v_scale, v_lin_tmp->data());
-        d_copy(ndofs, h, a_lin_tmp->data());
-        d_scal(ndofs, a_scale, a_lin_tmp->data());
-        
-        const real_t *v_lin = v_lin_tmp->data();
-        const real_t *a_lin = a_lin_tmp->data();
-        
-        return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
-                                                           adjugate->n_elements(),
-                                                           adjugate->elements()->data(),
-                                                           adjugate->n_elements(),
-                                                           adjugate->jacobian_adjugate()->data(),
-                                                           adjugate->jacobian_determinant()->data(),
-                                                           k, K, eta, rho,
-                                                           dt, gamma, beta,
-                                                           real_type,
-                                                           3, &h[0], &h[1], &h[2],
-                                                           &v_lin[0], &v_lin[1], &v_lin[2],
-                                                           &a_lin[0], &a_lin[1], &a_lin[2],
-                                                           3, &out[0], &out[1], &out[2],
-                                                           SFEM_DEFAULT_STREAM);
-    }
+        SemiStructuredGPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-    int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-        auto &ssm = space->mesh();
-        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_diag[%d]", ssm.level());
-        
-        return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
-                                                          adjugate->n_elements(),
-                                                          adjugate->elements()->data(),
-                                                          adjugate->n_elements(),
-                                                          adjugate->jacobian_adjugate()->data(),
-                                                          adjugate->jacobian_determinant()->data(),
-                                                          k, K, eta, rho,
-                                                          dt, gamma, beta,
-                                                          real_type,
-                                                          3, &values[0], &values[1], &values[2],
-                                                          SFEM_DEFAULT_STREAM);
-    }
-        
-        int hessian_crs(const real_t *const  /*x*/,
+        int gradient(const real_t *const x, real_t *const out) override {
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", level);
+            const real_t *v = vel_[0]->data();
+            const real_t *a = acc_[0]->data();
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply(level,
+                                                               adjugate->n_elements(),
+                                                               adjugate->elements()->data(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->jacobian_adjugate()->data(),
+                                                               adjugate->jacobian_determinant()->data(),
+                                                               k,
+                                                               K,
+                                                               eta,
+                                                               rho,
+                                                               dt,
+                                                               gamma,
+                                                               beta,
+                                                               real_type,
+                                                               3,
+                                                               &x[0],
+                                                               &x[1],
+                                                               &x[2],
+                                                               &v[0],
+                                                               &v[1],
+                                                               &v[2],
+                                                               &a[0],
+                                                               &a[1],
+                                                               &a[2],
+                                                               3,
+                                                               &out[0],
+                                                               &out[1],
+                                                               &out[2],
+                                                               SFEM_DEFAULT_STREAM);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", level);
+
+            // In Newmark's apply (linearized operator), we construct v and a from h
+            // following the same logic as GPUKelvinVoigtNewmark::apply
+            const ptrdiff_t ndofs   = space->n_dofs();
+            const real_t    v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
+            const real_t    a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
+
+            auto v_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
+            auto a_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
+            d_copy(ndofs, h, v_lin_tmp->data());
+            d_scal(ndofs, v_scale, v_lin_tmp->data());
+            d_copy(ndofs, h, a_lin_tmp->data());
+            d_scal(ndofs, a_scale, a_lin_tmp->data());
+
+            const real_t *v_lin = v_lin_tmp->data();
+            const real_t *a_lin = a_lin_tmp->data();
+
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply(level,
+                                                               adjugate->n_elements(),
+                                                               adjugate->elements()->data(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->jacobian_adjugate()->data(),
+                                                               adjugate->jacobian_determinant()->data(),
+                                                               k,
+                                                               K,
+                                                               eta,
+                                                               rho,
+                                                               dt,
+                                                               gamma,
+                                                               beta,
+                                                               real_type,
+                                                               3,
+                                                               &h[0],
+                                                               &h[1],
+                                                               &h[2],
+                                                               &v_lin[0],
+                                                               &v_lin[1],
+                                                               &v_lin[2],
+                                                               &a_lin[0],
+                                                               &a_lin[1],
+                                                               &a_lin[2],
+                                                               3,
+                                                               &out[0],
+                                                               &out[1],
+                                                               &out[2],
+                                                               SFEM_DEFAULT_STREAM);
+        }
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_diag[%d]", level);
+
+            return cu_affine_sshex8_kelvin_voigt_newmark_diag(level,
+                                                              adjugate->n_elements(),
+                                                              adjugate->elements()->data(),
+                                                              adjugate->n_elements(),
+                                                              adjugate->jacobian_adjugate()->data(),
+                                                              adjugate->jacobian_determinant()->data(),
+                                                              k,
+                                                              K,
+                                                              eta,
+                                                              rho,
+                                                              dt,
+                                                              gamma,
+                                                              beta,
+                                                              real_type,
+                                                              3,
+                                                              &values[0],
+                                                              &values[1],
+                                                              &values[2],
+                                                              SFEM_DEFAULT_STREAM);
+        }
+
+        int hessian_crs(const real_t *const /*x*/,
                         const count_t *const /*rowptr*/,
-                        const idx_t *const   /*colidx*/,
-                        real_t *const        /*values*/) override {
+                        const idx_t *const /*colidx*/,
+                        real_t *const /*values*/) override {
             SFEM_ERROR("[Error] SemiStructuredGPUKelvinVoigtNewmark::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
-    
-        int value(const real_t*, real_t*const) override { SFEM_IMPLEMENT_ME(); return SFEM_FAILURE; }
-        int report(const real_t*const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
+        int value(const real_t *, real_t *const) override {
+            SFEM_IMPLEMENT_ME();
+            return SFEM_FAILURE;
+        }
+        int            report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
     class GPUEMOp : public Op {
     public:
         std::shared_ptr<FunctionSpace>    space;
-        enum RealType                     real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType         real_type{smesh::SMESH_DEFAULT};
         std::shared_ptr<Buffer<idx_t *>>  elements;
         std::shared_ptr<Buffer<real_t *>> element_matrix;
 
@@ -1595,7 +1679,7 @@ namespace sfem {
             int err = 0;
             if (space->has_semi_structured_mesh()) {
                 auto &ssm = space->mesh();
-                err       = sshex8_laplacian_element_matrix(ssm.level(),
+                err       = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
                                                       mesh->n_elements(),
                                                       mesh->n_nodes(),
                                                       mesh->elements(0)->data(),
@@ -1611,7 +1695,7 @@ namespace sfem {
             }
 
             auto soa       = sfem::aos_to_soa(64, mesh->n_elements(), 1, 64, h_element_matrix);
-            element_matrix = sfem::to_device(soa);
+            element_matrix = smesh::to_device(soa);
 
             elements = create_device_elements(space, space->element_type());
             return err;
@@ -1622,8 +1706,9 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->mesh();
-                err       = cu_affine_sshex8_elemental_matrix_apply(ssm.level(),
+                auto     &ssm   = space->mesh();
+                const int level = smesh::semistructured_level(ssm);
+                err             = cu_affine_sshex8_elemental_matrix_apply(level,
                                                               ssm.n_elements(),
                                                               elements->data(),
                                                               real_type,
@@ -1676,7 +1761,7 @@ namespace sfem {
     class GPUEMWarpOp : public Op {
     public:
         std::shared_ptr<FunctionSpace>  space;
-        enum RealType                   real_type { SFEM_REAL_DEFAULT };
+        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
         std::shared_ptr<Buffer<idx_t>>  elements;
         std::shared_ptr<Buffer<real_t>> element_matrix;
         bool                            cartesian_ordering{true};
@@ -1707,14 +1792,14 @@ namespace sfem {
             if (space->has_semi_structured_mesh()) {
                 auto &ssm = space->mesh();
                 if (cartesian_ordering) {
-                    err = sshex8_laplacian_element_matrix_cartesian(ssm.level(),
+                    err = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
                                                                     mesh->n_elements(),
                                                                     mesh->n_nodes(),
                                                                     mesh->elements(0)->data(),
                                                                     mesh->points()->data(),
                                                                     h_element_matrix->data());
                 } else {
-                    err = sshex8_laplacian_element_matrix(ssm.level(),
+                    err = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
                                                           mesh->n_elements(),
                                                           mesh->n_nodes(),
                                                           mesh->elements(0)->data(),
@@ -1727,7 +1812,7 @@ namespace sfem {
             }
 
             elements       = create_device_elements_AoS(space, space->element_type());
-            element_matrix = sfem::to_device(h_element_matrix);
+            element_matrix = smesh::to_device(h_element_matrix);
 
             // h_element_matrix->print(std::cout);
             return err;
@@ -1738,8 +1823,9 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->mesh();
-                err       = cu_affine_sshex8_elemental_matrix_apply_AoS(ssm.level(),
+                auto     &ssm   = space->mesh();
+                const int level = smesh::semistructured_level(ssm);
+                err             = cu_affine_sshex8_elemental_matrix_apply_AoS(level,
                                                                   ssm.n_elements(),
                                                                   elements->data(),
                                                                   real_type,

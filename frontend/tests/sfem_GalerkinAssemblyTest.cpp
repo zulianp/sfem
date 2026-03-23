@@ -165,7 +165,7 @@ int test_cube() {
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        input = sfem::to_device(h_input);
+        input = smesh::to_device(h_input);
     } else
 #endif
     {

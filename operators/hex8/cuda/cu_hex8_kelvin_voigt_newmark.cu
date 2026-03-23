@@ -247,7 +247,7 @@ extern int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t            
                                                      const real_t                    K,
                                                      const real_t                    eta,
                                                      const real_t                    rho,
-                                                     const enum RealType             real_type,
+                                                     const enum smesh::PrimitiveType             real_type,
                                                      const ptrdiff_t                 u_stride,
                                                      const void *const SFEM_RESTRICT ux,
                                                      const void *const SFEM_RESTRICT uy,
@@ -264,7 +264,7 @@ extern int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t            
                                                      void *const SFEM_RESTRICT       outz,
                                                      void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_hex8_kelvin_voigt_newmark_apply_tpl(nelements,
                                                                  elements,
                                                                  jacobian_stride,
@@ -290,7 +290,7 @@ extern int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t            
                                                                  (real_t *)outz,
                                                                  stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_hex8_kelvin_voigt_newmark_apply_tpl(nelements,
                                                                  elements,
                                                                  jacobian_stride,
@@ -316,7 +316,7 @@ extern int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t            
                                                                  (float *)outz,
                                                                  stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_hex8_kelvin_voigt_newmark_apply_tpl(nelements,
                                                                  elements,
                                                                  jacobian_stride,
@@ -346,7 +346,7 @@ extern int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t            
             SFEM_ERROR(
                     "[Error] cu_affine_hex8_kelvin_voigt_newmark_apply: not implemented for type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }

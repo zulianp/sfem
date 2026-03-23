@@ -174,26 +174,26 @@ extern int cu_affine_sshex8_laplacian_apply(const int                       leve
                                             idx_t **const SFEM_RESTRICT     elements,
                                             const ptrdiff_t                 fff_stride,
                                             const void *const SFEM_RESTRICT fff,
-                                            const enum RealType             real_type_xy,
+                                            const enum smesh::PrimitiveType             real_type_xy,
                                             const void *const               x,
                                             void *const                     y,
                                             void                           *stream) {
     switch (real_type_xy) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_laplacian_apply_tpl(
                     level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_laplacian_apply_tpl(
                     level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_laplacian_apply_tpl(
                     level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type_xy),
+                       smesh::to_string(real_type_xy),
                        real_type_xy);
             return SFEM_FAILURE;
         }

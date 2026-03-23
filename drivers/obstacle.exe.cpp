@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef SFEM_ENABLE_CUDA
-    auto upper_bound = sfem::to_device(h_upper_bound);
+    auto upper_bound = smesh::to_device(h_upper_bound);
 #else
     auto upper_bound = h_upper_bound;
 #endif

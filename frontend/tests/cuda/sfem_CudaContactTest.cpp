@@ -281,10 +281,10 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                                 1,
                                 coarse_sides->data(),
                                 1,
-                                SFEM_REAL_DEFAULT,
+                                smesh::SMESH_DEFAULT,
                                 1,
                                 input->data(),
-                                SFEM_REAL_DEFAULT,
+                                smesh::SMESH_DEFAULT,
                                 1,
                                 restricted->data(),
                                 SFEM_DEFAULT_STREAM);

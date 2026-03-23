@@ -20,6 +20,7 @@
 #include "sfem_API.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_distributed_aura.hpp"
+#include "smesh_exchange.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -130,28 +131,8 @@ int main(int argc, char *argv[]) {
 
     {  // Count how many neighboring processes a master node is connected to
         if (dist) {
-            auto send_count = sfem::create_host_buffer<smesh::i64>(size);
-            auto send_displs = sfem::create_host_buffer<smesh::i64>(size + 1);
-            auto recv_count = sfem::create_host_buffer<smesh::i64>(size);
-            auto recv_displs = sfem::create_host_buffer<smesh::i64>(size + 1);
-            idx_t *sparse_idx = nullptr;
-
-            smesh::exchange_create<idx_t>(comm,
-                                          n_nodes,
-                                          n_owned_nodes,
-                                          node_owner->data(),
-                                          dist->node_offsets()->data(),
-                                          ghosts->data(),
-                                          send_count->data(),
-                                          send_displs->data(),
-                                          recv_count->data(),
-                                          recv_displs->data(),
-                                          &sparse_idx);
-
-            const ptrdiff_t buffer_size = recv_count->data()[size - 1] + recv_displs->data()[size - 1];
-            auto sparse_idx_buffer = sfem::manage_host_buffer<idx_t>(recv_displs->data()[size], sparse_idx);
-            auto real_buffer = sfem::create_host_buffer<float>(buffer_size);
-
+            auto exchange = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsOnly);
+            
             for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
                 neigh_count[i] = 0;
             }
@@ -165,23 +146,8 @@ int main(int argc, char *argv[]) {
                 neigh_count[i] = 1;
             }
 
-            smesh::exchange_scatter_add<idx_t, float>(comm,
-                                                      n_owned_nodes,
-                                                      send_count->data(),
-                                                      send_displs->data(),
-                                                      recv_count->data(),
-                                                      recv_displs->data(),
-                                                      sparse_idx_buffer->data(),
-                                                      neigh_count,
-                                                      real_buffer->data());
+            exchange->scatter_add(neigh_count);
 
-            for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
-                neigh_count[i] = neigh_count[i];
-            }
-
-            for (ptrdiff_t i = n_owned_nodes; i < n_nodes; i++) {
-                neigh_count[i] = -1;
-            }
         } else {
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 neigh_count[i] = 0;
