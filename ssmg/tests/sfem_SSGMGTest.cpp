@@ -50,7 +50,7 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
         out.enable_AoS_to_SoA(true);
 
         out.set_output_dir((name + "/fields").c_str());
-        SFEM_TEST_ASSERT(out.write("u", x->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(out.write("u", smesh::to_host(x)->data()) == SFEM_SUCCESS);
     }
     return SFEM_TEST_SUCCESS;
 }
