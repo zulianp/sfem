@@ -51,15 +51,15 @@ int main(int argc, char *argv[]) {
     // Read inputs
     // -------------------------------
 
-    const char *folder = argv[1];
-    const char *output_path = argv[2];
-    const char *SFEM_OPERATOR = "Laplacian";
-    int SFEM_BLOCK_SIZE = 1;
-    int SFEM_USE_PRECONDITIONER = 0;
-    int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    int SFEM_MAX_IT = 1000;
-    bool SFEM_USE_GPU = true;
-    int SFEM_USE_AMG = false;
+    const char *folder                    = argv[1];
+    const char *output_path               = argv[2];
+    const char *SFEM_OPERATOR             = "Laplacian";
+    int         SFEM_BLOCK_SIZE           = 1;
+    int         SFEM_USE_PRECONDITIONER   = 0;
+    int         SFEM_ELEMENT_REFINE_LEVEL = 0;
+    int         SFEM_MAX_IT               = 1000;
+    bool        SFEM_USE_GPU              = true;
+    int         SFEM_USE_AMG              = false;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
@@ -69,8 +69,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
     SFEM_READ_ENV(SFEM_USE_AMG, atoi);
 
-    sfem::ExecutionSpace es =
-            SFEM_USE_GPU ? sfem::EXECUTION_SPACE_DEVICE : sfem::EXECUTION_SPACE_HOST;
+    sfem::ExecutionSpace es = SFEM_USE_GPU ? sfem::EXECUTION_SPACE_DEVICE : sfem::EXECUTION_SPACE_HOST;
 
     // -------------------------------
     // Create discretization
@@ -83,8 +82,6 @@ int main(int argc, char *argv[]) {
     }
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-  
-
     // -------------------------------
     // Create problem
     // -------------------------------
@@ -92,11 +89,11 @@ int main(int argc, char *argv[]) {
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
-    auto f = sfem::Function::create(fs);
+    auto f     = sfem::Function::create(fs);
     f->add_constraint(conds);
     f->add_operator(op);
 
-    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     // -------------------------------
@@ -116,9 +113,9 @@ int main(int argc, char *argv[]) {
     } else if (SFEM_USE_AMG) {
         auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
 
-        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
-        auto off_diag_rows = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
+        auto off_diag_rows   = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
 
         f->hessian_crs_sym(x->data(),
                            crs_graph->rowptr()->data(),
@@ -126,8 +123,8 @@ int main(int argc, char *argv[]) {
                            diag_values->data(),
                            off_diag_values->data());
 
-        count_t *row_ptr = crs_graph->rowptr()->data();
-        idx_t *col_indices = crs_graph->colidx()->data();
+        count_t *row_ptr     = crs_graph->rowptr()->data();
+        idx_t   *col_indices = crs_graph->colidx()->data();
         for (idx_t i = 0; i < fs->n_dofs(); i++) {
             for (idx_t idx = row_ptr[i]; idx < row_ptr[i + 1]; idx++) {
                 off_diag_rows->data()[idx] = i;
@@ -137,13 +134,12 @@ int main(int argc, char *argv[]) {
 
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constraints_mask(mask->data());
-        auto fine_mat = sfem::h_coosym<idx_t, real_t>(
-                mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
+        auto fine_mat = sfem::h_coosym<idx_t, real_t>(mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 
         auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
         real_t coarsening_factor = 7.5;
-        auto amg = builder(coarsening_factor, mask, near_null, fine_mat);
+        auto   amg               = builder(coarsening_factor, mask, near_null, fine_mat);
         if (!amg->test_interp()) {
             printf("tests passed\n");
         } else {
@@ -170,9 +166,9 @@ int main(int argc, char *argv[]) {
         */
 #else
         amg->set_max_it(1);
-        amg->verbose = false;
-        auto cg = sfem::create_cg<real_t>(fine_mat, es);
-        cg->verbose = true;
+        amg->verbose   = false;
+        auto cg        = sfem::create_cg<real_t>(fine_mat, es);
+        cg->verbose    = true;
         cg->check_each = 1;
         cg->set_max_it(SFEM_MAX_IT);
         cg->set_op(fine_mat);
@@ -190,8 +186,8 @@ int main(int argc, char *argv[]) {
 #endif  // SFEM_ENABLE_AMG
     {
         auto linear_op = sfem::make_linear_op(f);
-        auto cg = sfem::create_cg<real_t>(linear_op, es);
-        cg->verbose = true;
+        auto cg        = sfem::create_cg<real_t>(linear_op, es);
+        cg->verbose    = true;
         cg->set_max_it(SFEM_MAX_IT);
         cg->set_op(linear_op);
         solver = cg;
@@ -222,7 +218,7 @@ int main(int argc, char *argv[]) {
     auto output = f->output();
 
 #ifdef SFEM_ENABLE_CUDA
-    auto h_x = sfem::to_host(x);
+    auto h_x = smesh::to_host(x);
 #else
     auto h_x = x;
 #endif
@@ -231,10 +227,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #dofs %ld\n",
-               (long)m->n_elements(),
-               (long)m->n_nodes(),
-               (long)fs->n_dofs());
+        printf("#elements %ld #nodes %ld #dofs %ld\n", (long)m->n_elements(), (long)m->n_nodes(), (long)fs->n_dofs());
         printf("TTS:\t\t\t%g seconds (solve: %g)\n", tock - tick, solve_tock - solve_tick);
     }
 

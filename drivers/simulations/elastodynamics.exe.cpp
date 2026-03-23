@@ -12,8 +12,8 @@
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
-#include "smesh_env.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "smesh_env.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -53,7 +53,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 
     const bool verbose = smesh::Env::read("SFEM_VERBOSE", false);
 
-    auto      mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }
@@ -79,7 +79,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        f->add_constraint(smesh::to_device(dirichlet_conditions));
+        f->add_constraint(sfem::to_device(dirichlet_conditions));
     } else
 #endif  // SFEM_ENABLE_CUDA
     {
@@ -108,14 +108,13 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     blas->zeros(ndofs, velocity->data());
     {
         auto nnodes = fs->mesh().n_nodes();
-        auto dims = fs->mesh_ptr()->spatial_dimension();
-        auto v = velocity->data();
+        auto dims   = fs->mesh_ptr()->spatial_dimension();
+        auto v      = velocity->data();
         for (int i = 0; i < nnodes; i++) {
             v[i * dims + 1] = 0.1;
         }
     }
 
-    
     blas->zeros(ndofs, acceleration->data());
     blas->zeros(ndofs, solution->data());
     blas->zeros(ndofs, increment->data());
@@ -185,9 +184,9 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         auto a = acceleration;
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            u = sfem::to_host(u);
-            v = sfem::to_host(v);
-            a = sfem::to_host(a);
+            u = smesh::to_host(u);
+            v = smesh::to_host(v);
+            a = smesh::to_host(a);
         }
 #endif
         out->write_time_step("disp", t, u->data());
@@ -258,16 +257,15 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
             auto a = acceleration;
 #ifdef SFEM_ENABLE_CUDA
             if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                u = sfem::to_host(u);
-                v = sfem::to_host(v);
-                a = sfem::to_host(a);
+                u = smesh::to_host(u);
+                v = smesh::to_host(v);
+                a = smesh::to_host(a);
             }
 #endif
             // Write to disk
             out->write_time_step("disp", t, u->data());
             out->write_time_step("velocity", t, v->data());
             out->write_time_step("acceleration", t, a->data());
-            
 
             // if (es != sfem::EXECUTION_SPACE_DEVICE) {
             contact_conds->update(displacement->data());

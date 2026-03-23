@@ -148,7 +148,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
 #ifdef SFEM_ENABLE_CUDA
     if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
-        SFEM_TEST_ASSERT(output->write("x", sfem::to_host(x)->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(output->write("x", smesh::to_host(x)->data()) == SFEM_SUCCESS);
     } else
 #endif
     {
@@ -230,7 +230,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
 
 #ifdef SFEM_ENABLE_CUDA
         if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
-            SFEM_TEST_ASSERT(output->write("x", sfem::to_host(x)->data()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(output->write("x", smesh::to_host(x)->data()) == SFEM_SUCCESS);
         } else
 #endif
         {
@@ -669,9 +669,9 @@ int test_poisson_yaml() {
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
-    m = smesh::to_semistructured(16, m, true, false);
+    m       = smesh::to_semistructured(16, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, 1);
-    auto f = sfem::Function::create(fs);
+    auto f  = sfem::Function::create(fs);
 
     auto conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
     f->add_constraint(conds);

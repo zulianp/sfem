@@ -1,12 +1,13 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
+#include "cu_kelvin_voigt_newmark.hpp"
 #include "cu_hex8_kelvin_voigt_newmark.hpp"
 
 #include <mpi.h>
 #include <stdio.h>
 
-extern int cu_kelvin_voigt_newmark_apply(const smesh::ElemType             element_type,
+int cu_kelvin_voigt_newmark_apply(const smesh::ElemType             element_type,
                                       const ptrdiff_t                 nelements,
                                       idx_t **const SFEM_RESTRICT     elements,
                                       const ptrdiff_t                 jacobian_stride,
@@ -57,3 +58,4 @@ extern int cu_kelvin_voigt_newmark_apply(const smesh::ElemType             eleme
         }
     }
 }
+

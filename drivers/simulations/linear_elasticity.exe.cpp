@@ -3,10 +3,9 @@
 #include "sfem_defs.hpp"
 
 #include "sfem_API.hpp"
-#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
+#include "smesh_env.hpp"
 #include "smesh_mesh_reorder.hpp"
-
 
 int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
@@ -70,8 +69,8 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
 
 #ifdef SFEM_ENABLE_CUDA
         if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
-            output->write("x", sfem::to_host(x)->data());
-            output->write("rhs", sfem::to_host(rhs)->data());
+            output->write("x", smesh::to_host(x)->data());
+            output->write("rhs", smesh::to_host(rhs)->data());
         } else
 #endif
         {
@@ -86,11 +85,11 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
 int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("solve_linear_elasticity");
 
-    if(argc != 4) {
+    if (argc != 4) {
         fprintf(stderr, "usage %s <mesh> <dirichlet.yaml> <output>\n", argv[0]);
         return SFEM_FAILURE;
     }
-    
+
     auto es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto SFEM_OPERATOR             = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity");
     int  SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
@@ -101,7 +100,7 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     auto sfc = smesh::SFC::create_from_env();
     sfc->reorder(*m);
 
-    if(smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+    if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
         m = smesh::promote_to(smesh::TET10, m);
     } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
