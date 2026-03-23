@@ -7,8 +7,6 @@
 #include <exception>
 #include <iostream>
 
-
-
 #include "sfem_base.hpp"
 
 #ifdef _OPENMP
@@ -52,9 +50,9 @@ static void sfem_print_test_info() {
     printf("=======================\n");
 }
 
-#define SFEM_UNIT_TEST_INIT(argc, argv)  \
-    sfem::Context context__(argc, argv); \
-    sfem_print_test_info();              \
+#define SFEM_UNIT_TEST_INIT(argc, argv)            \
+    auto context__ = sfem::initialize(argc, argv); \
+    sfem_print_test_info();                        \
     int err = 0;
 
 #define SFEM_RUN_TEST(test_)                                                                                    \
@@ -129,15 +127,15 @@ static inline int sfem_assert_array_approx_eq(const ptrdiff_t i,
         return SFEM_TEST_FAILURE;                                                        \
     }
 
-#define SFEM_ASSERT_ARRAY_APPROX_EQ(n__, a__, b__, tol__)                                                               \
-    do {                                                                                                                \
-        ptrdiff_t nfails = 0;                                                                                           \
-        for (ptrdiff_t i__ = 0; i__ < (n__); i__++) {                                                                     \
+#define SFEM_ASSERT_ARRAY_APPROX_EQ(n__, a__, b__, tol__)                                                                   \
+    do {                                                                                                                    \
+        ptrdiff_t nfails = 0;                                                                                               \
+        for (ptrdiff_t i__ = 0; i__ < (n__); i__++) {                                                                       \
             if (sfem_assert_array_approx_eq(i__, (a__)[i__], (b__)[i__], tol__, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
-                nfails++;                                                                                                \
-            }                                                                                                           \
-        }                                                                                                               \
-        if (nfails) return SFEM_TEST_FAILURE;                                                                           \
+                nfails++;                                                                                                   \
+            }                                                                                                               \
+        }                                                                                                                   \
+        if (nfails) return SFEM_TEST_FAILURE;                                                                               \
     } while (0)
 
 #ifdef __cplusplus
