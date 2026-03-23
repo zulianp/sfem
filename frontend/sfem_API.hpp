@@ -46,8 +46,9 @@
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_sshex8_interpolate.hpp"
-#include "cu_tet4_prolongation_restriction.hpp"
+#include "smesh_tet4_prolongation_restriction.cuh"
+#include "smesh_sshex8_prolongation.cuh"
+#include "smesh_sshex8_restriction.cuh"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftableJacobi.hpp"
@@ -105,37 +106,37 @@ namespace sfem {
                 es);
     }
 
-//     template <typename T>
-//     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
-// #ifdef SFEM_ENABLE_CUDA
-//         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
-// #endif  // SFEM_ENABLE_CUDA
-//         return sfem::create_host_buffer<T>(n0, n1);
-//     }
+    //     template <typename T>
+    //     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n0, n1);
+    //     }
 
-//     template <typename T>
-//     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
-// #ifdef SFEM_ENABLE_CUDA
-//         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
-// #endif  // SFEM_ENABLE_CUDA
-//         return sfem::create_host_buffer<T>(n0, n1);
-//     }
+    //     template <typename T>
+    //     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n0, n1);
+    //     }
 
-//     template <typename T>
-//     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
-// #ifdef SFEM_ENABLE_CUDA
-//         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
-// #endif  // SFEM_ENABLE_CUDA
-//         return sfem::create_host_buffer<T>(n);
-//     }
+    //     template <typename T>
+    //     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n);
+    //     }
 
-//     template <typename T>
-//     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
-// #ifdef SFEM_ENABLE_CUDA
-//         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
-// #endif  // SFEM_ENABLE_CUDA
-//         return sfem::create_host_buffer<T>(n);
-//     }
+    //     template <typename T>
+    //     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n);
+    //     }
 
     static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                          const std::string                    &name,
@@ -330,7 +331,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -344,7 +345,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -358,7 +359,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -371,7 +372,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -422,18 +423,21 @@ namespace sfem {
                                 auto &from_ssm = from_space->mesh();
                                 auto &to_ssm   = to_space->mesh();
 
-                                cu_sshex8_prolongate(from_ssm.n_elements(),
-                                                     from_ssm.level(),
+                                int to_level   = smesh::semistructured_level(to_ssm);
+                                int from_level = smesh::semistructured_level(from_ssm);
+
+                                smesh::cu_sshex8_prolongate(from_ssm.n_elements(),
+                                                     from_level,
                                                      1,
                                                      from_elements->data(),
-                                                     to_ssm.level(),
+                                                     to_level,
                                                      1,
                                                      elements->data(),
                                                      from_space->block_size(),
-                                                     SFEM_REAL_DEFAULT,
+                                                     smesh::SMESH_DEFAULT,
                                                      1,
                                                      from,
-                                                     SFEM_REAL_DEFAULT,
+                                                     smesh::SMESH_DEFAULT,
                                                      1,
                                                      to,
                                                      SFEM_DEFAULT_STREAM);
@@ -447,18 +451,19 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
 
-                                auto &ssm = to_space->mesh();
-                                cu_sshex8_hierarchical_prolongation(ssm.level(),
-                                                                    ssm.n_elements(),
-                                                                    elements->data(),
-                                                                    from_space->block_size(),
-                                                                    SFEM_REAL_DEFAULT,
-                                                                    1,
-                                                                    from,
-                                                                    SFEM_REAL_DEFAULT,
-                                                                    1,
-                                                                    to,
-                                                                    SFEM_DEFAULT_STREAM);
+                                auto     &ssm   = to_space->mesh();
+                                const int level = smesh::semistructured_level(ssm);
+                                smesh::cu_sshex8_hierarchical_prolongation(level,
+                                                                           ssm.n_elements(),
+                                                                           elements->data(),
+                                                                           from_space->block_size(),
+                                                                           smesh::SMESH_DEFAULT,
+                                                                           1,
+                                                                           from,
+                                                                           smesh::SMESH_DEFAULT,
+                                                                           1,
+                                                                           to,
+                                                                           SFEM_DEFAULT_STREAM);
                             },
                             es);
                 }
@@ -467,18 +472,18 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_prolongation_element_based");
+                            SFEM_TRACE_SCOPE("smesh::cu_macrotet4_to_tet4_prolongation_element_based");
 
-                            cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
-                                                                            elements->data(),
-                                                                            from_space->block_size(),
-                                                                            SFEM_REAL_DEFAULT,
-                                                                            1,
-                                                                            from,
-                                                                            SFEM_REAL_DEFAULT,
-                                                                            1,
-                                                                            to,
-                                                                            SFEM_DEFAULT_STREAM);
+                            smesh::cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
+                                                                                   elements->data(),
+                                                                                   from_space->block_size(),
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   from,
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   to,
+                                                                                   SFEM_DEFAULT_STREAM);
                         },
                         es);
             }
@@ -548,8 +553,7 @@ namespace sfem {
         }
     }
 
-    static std::shared_ptr<Operator<real_t>> make_op(
-        const std::shared_ptr<smesh::AbstractRestrict<real_t>> &op) {
+    static std::shared_ptr<Operator<real_t>> make_op(const std::shared_ptr<smesh::AbstractRestrict<real_t>> &op) {
         return make_op<real_t>(
                 op->rows(),
                 op->cols(),
@@ -581,22 +585,22 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto d_edges     = to_device(edges);
-            auto d_crs_graph = to_device(crs_graph);
+            auto d_edges     = smesh::to_device(edges);
+            auto d_crs_graph = smesh::to_device(crs_graph);
 
             return make_op<real_t>(
                     rows,
                     cols,
                     [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
-                        cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
+                        smesh::cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
                                                          d_crs_graph->rowptr()->data(),
                                                          d_crs_graph->colidx()->data(),
                                                          d_edges->data(),
                                                          block_size,
-                                                         SFEM_REAL_DEFAULT,
+                                                         smesh::SMESH_DEFAULT,
                                                          from,
-                                                         SFEM_REAL_DEFAULT,
+                                                         smesh::SMESH_DEFAULT,
                                                          to,
                                                          SFEM_DEFAULT_STREAM);
                     },
@@ -609,12 +613,12 @@ namespace sfem {
                 cols,
                 [=](const real_t *const from, real_t *const to) {
                     smesh::hierarchical_restriction_with_edge_map(n_coarse_nodes,
-                                                             crs_graph->rowptr()->data(),
-                                                             crs_graph->colidx()->data(),
-                                                             edges->data(),
-                                                             block_size,
-                                                             from,
-                                                             to);
+                                                                  crs_graph->rowptr()->data(),
+                                                                  crs_graph->colidx()->data(),
+                                                                  edges->data(),
+                                                                  block_size,
+                                                                  from,
+                                                                  to);
                 },
                 EXECUTION_SPACE_HOST);
     }
@@ -646,9 +650,9 @@ namespace sfem {
                                                           d_crs_graph->colidx()->data(),
                                                           d_edges->data(),
                                                           block_size,
-                                                          SFEM_REAL_DEFAULT,
+                                                          smesh::SMESH_DEFAULT,
                                                           from,
-                                                          SFEM_REAL_DEFAULT,
+                                                          smesh::SMESH_DEFAULT,
                                                           to,
                                                           SFEM_DEFAULT_STREAM);
 
@@ -664,12 +668,12 @@ namespace sfem {
                 cols,
                 [=](const real_t *const from, real_t *const to) {
                     smesh::hierarchical_prolongation_with_edge_map(n_coarse_nodes,
-                                                              crs_graph->rowptr()->data(),
-                                                              crs_graph->colidx()->data(),
-                                                              edges->data(),
-                                                              block_size,
-                                                              from,
-                                                              to);
+                                                                   crs_graph->rowptr()->data(),
+                                                                   crs_graph->colidx()->data(),
+                                                                   edges->data(),
+                                                                   block_size,
+                                                                   from,
+                                                                   to);
 
                     function->apply_zero_constraints(to);
                 },
@@ -728,7 +732,7 @@ namespace sfem {
     static auto hessian_crs(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
             f.hessian_crs(nullptr, d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
@@ -757,7 +761,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
             f->hessian_crs(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
@@ -803,7 +807,7 @@ namespace sfem {
         // FIXME: there is a memory leak here!
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
@@ -972,7 +976,7 @@ namespace sfem {
         std::shared_ptr<sfem::Operator<real_t>> spmv;
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
 
             f->hessian_crs_sym(x_data,
                                d_crs_graph->rowptr()->data(),
@@ -982,7 +986,7 @@ namespace sfem {
 
             auto h_row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), sfem::EXECUTION_SPACE_HOST);
             crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), h_row_idx->data());
-            auto row_idx = sfem::to_device(h_row_idx);
+            auto row_idx = smesh::to_device(h_row_idx);
 
             spmv = sfem::d_sym_coo_spmv(fs->n_dofs(), row_idx, crs_graph->colidx(), off_diag_values, diag_values, 1);
 
@@ -1251,8 +1255,9 @@ namespace sfem {
             for (int zi = 0; zi <= to_level; zi++) {
                 for (int yi = 0; yi <= to_level; yi++) {
                     for (int xi = 0; xi <= to_level; xi++) {
-                        const int from_lidx = smesh::sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
-                        const int to_lidx   = smesh::sshex8_lidx(to_level, xi, yi, zi);
+                        const int from_lidx =
+                                smesh::sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const int to_lidx = smesh::sshex8_lidx(to_level, xi, yi, zi);
 
                         assert(from_lidx < elements->extent(0));
                         assert(to_lidx < host_dev_ptrs.size());

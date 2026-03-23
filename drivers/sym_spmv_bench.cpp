@@ -143,20 +143,20 @@ int main(int argc, char* argv[]) {
 
         auto y1 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
         auto y2 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
-        auto x  = sfem::to_device(x_host);
+        auto x  = smesh::to_device(x_host);
 
         // CSR buffers device
-        auto colidx = sfem::to_device(colidx_host);
-        auto rowidx = sfem::to_device(rowidx_host);
-        auto rowptr = sfem::to_device(rowptr_host);
-        auto values = sfem::to_device(values_host);
+        auto colidx = smesh::to_device(colidx_host);
+        auto rowidx = smesh::to_device(rowidx_host);
+        auto rowptr = smesh::to_device(rowptr_host);
+        auto values = smesh::to_device(values_host);
 
         // Diagonal sparse matrix buffers device
-        auto diag_values    = sfem::to_device(diag_values_host);
-        auto offdiag_values = sfem::to_device(offdiag_values_host);
-        auto offdiag_colidx = sfem::to_device(offdiag_colidx_host);
-        auto offdiag_rowidx = sfem::to_device(offdiag_rowidx_host);
-        auto offdiag_rowptr = sfem::to_device(offdiag_rowptr_host);
+        auto diag_values    = smesh::to_device(diag_values_host);
+        auto offdiag_values = smesh::to_device(offdiag_values_host);
+        auto offdiag_colidx = smesh::to_device(offdiag_colidx_host);
+        auto offdiag_rowidx = smesh::to_device(offdiag_rowidx_host);
+        auto offdiag_rowptr = smesh::to_device(offdiag_rowptr_host);
 
         // TODO
         // GPU: coo, csr sym, bsr, bsr sym

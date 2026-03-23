@@ -79,7 +79,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        f->add_constraint(sfem::to_device(dirichlet_conditions));
+        f->add_constraint(smesh::to_device(dirichlet_conditions));
     } else
 #endif  // SFEM_ENABLE_CUDA
     {

@@ -76,26 +76,26 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t                 nelements,
                                    idx_t **const SFEM_RESTRICT     elements,
                                    const ptrdiff_t                 fff_stride,
                                    const void *const SFEM_RESTRICT fff,
-                                   const enum RealType             real_type_xy,
+                                   const enum smesh::PrimitiveType             real_type_xy,
                                    const void *const SFEM_RESTRICT x,
                                    void *const SFEM_RESTRICT       y,
                                    void                           *stream) {
     switch (real_type_xy) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type_xy),
+                       smesh::to_string(real_type_xy),
                        real_type_xy);
             return SFEM_FAILURE;
         }
@@ -168,22 +168,22 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t                 nelements,
                                   idx_t **const SFEM_RESTRICT     elements,
                                   const ptrdiff_t                 fff_stride,
                                   const void *const SFEM_RESTRICT fff,
-                                  const enum RealType             real_type_diag,
+                                  const enum smesh::PrimitiveType             real_type_diag,
                                   void *const                     diag,
                                   void                           *stream) {
     switch (real_type_diag) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_tet4_laplacian_diag_tpl(nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)diag, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_tet4_laplacian_diag_tpl(nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)diag, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_tet4_laplacian_diag_tpl(nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)diag, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_diag: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type_diag),
+                       smesh::to_string(real_type_diag),
                        real_type_diag);
             return SFEM_FAILURE;
         }
@@ -258,25 +258,25 @@ extern int cu_tet4_laplacian_crs(const ptrdiff_t                    nelements,
                                  const void *const SFEM_RESTRICT    fff,
                                  const count_t *const SFEM_RESTRICT rowptr,
                                  const idx_t *const SFEM_RESTRICT   colidx,
-                                 const enum RealType                real_type,
+                                 const enum smesh::PrimitiveType                real_type,
                                  void *const SFEM_RESTRICT          values,
                                  void                              *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_tet4_laplacian_crs_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (real_t *)values, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_tet4_laplacian_crs_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (float *)values, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_tet4_laplacian_crs_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (double *)values, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_crs: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type),
+                       smesh::to_string(real_type),
                        real_type);
             return SFEM_FAILURE;
         }

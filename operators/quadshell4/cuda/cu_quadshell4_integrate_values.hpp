@@ -14,7 +14,7 @@ int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
                                   const real_t                       value,
                                   const int                          block_size,
                                   const int                          component,
-                                  const enum RealType                real_type,
+                                  const enum smesh::PrimitiveType                real_type,
                                   void *const SFEM_RESTRICT          out,
                                   void                              *stream);
 
@@ -22,7 +22,7 @@ int cu_quadshell4_integrate_values(const ptrdiff_t                    nelements,
                                    idx_t **const SFEM_RESTRICT        elements,
                                    const ptrdiff_t                    coords_stride,
                                    const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
-                                   const enum RealType                real_type,
+                                   const enum smesh::PrimitiveType                real_type,
                                    void *const SFEM_RESTRICT          values,
                                    const int                          block_size,
                                    const int                          component,

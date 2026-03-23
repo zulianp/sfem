@@ -6,6 +6,7 @@
 // #include "sfem_sshex8_skin.hpp"
 #include "smesh_ssquad4_mesh.hpp"
 
+#include "smesh_device_buffer.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_contact_surface.hpp"
@@ -183,7 +184,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 // FIXME: maybe this could be optimized by avoiding deallocating and allocating the buffer
-                surface_points_rest_device = to_device(surface_points);
+                surface_points_rest_device = smesh::to_device(surface_points);
             }
 #endif
         }
@@ -199,7 +200,7 @@ namespace sfem {
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 if (!surface_points_device) {
                     // Lazy initialization of the device buffer
-                    surface_points_device = create_device_buffer<geom_t>(dim, n);
+                    surface_points_device = smesh::create_device_buffer<geom_t>(dim, n);
                 }
 
                 cu_displace_surface_points(dim,
@@ -358,7 +359,7 @@ namespace sfem {
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 if (!surface_points_device) {
                     // Lazy initialization of the device buffer
-                    surface_points_device = create_device_buffer<geom_t>(dim, n);
+                    surface_points_device = smesh::create_device_buffer<geom_t>(dim, n);
                 }
 
                 cu_displace_surface_points(dim,

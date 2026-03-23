@@ -209,7 +209,7 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t                 neleme
                                           idx_t **const SFEM_RESTRICT     elements,
                                           const ptrdiff_t                 fff_stride,
                                           const void *const SFEM_RESTRICT fff,
-                                          const enum RealType             real_type_xy,
+                                          const enum smesh::PrimitiveType             real_type_xy,
                                           const void *const               x,
                                           void *const                     y,
                                           void                           *stream) {
@@ -226,21 +226,21 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t                 neleme
     if (SFEM_AFFINE_HEX8_TILED) {
         // This is slower than the other variant
         switch (real_type_xy) {
-            case SFEM_REAL_DEFAULT: {
+            case smesh::SMESH_DEFAULT: {
                 return cu_affine_hex8_laplacian_apply_tiled_tpl(
                         nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
             }
-            case SFEM_FLOAT32: {
+            case smesh::SMESH_FLOAT32: {
                 return cu_affine_hex8_laplacian_apply_tiled_tpl(
                         nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
             }
-            case SFEM_FLOAT64: {
+            case smesh::SMESH_FLOAT64: {
                 return cu_affine_hex8_laplacian_apply_tiled_tpl(
                         nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
             }
             default: {
                 SFEM_ERROR("[Error] cu_hex8_laplacian_apply: not implemented for type %s (code %d)\n",
-                           real_type_to_string(real_type_xy),
+                           smesh::to_string(real_type_xy),
                            real_type_xy);
                 return SFEM_FAILURE;
             }
@@ -248,21 +248,21 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t                 neleme
     }
 
     switch (real_type_xy) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_hex8_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_hex8_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_hex8_laplacian_apply_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
         }
         default: {
             SFEM_ERROR("[Error] cu_hex8_laplacian_apply: not implemented for type %s (code %d)\n",
-                       real_type_to_string(real_type_xy),
+                       smesh::to_string(real_type_xy),
                        real_type_xy);
             return SFEM_FAILURE;
         }
@@ -342,20 +342,20 @@ extern int cu_affine_hex8_laplacian_taylor_apply(const ptrdiff_t                
                                                  idx_t **const SFEM_RESTRICT     elements,
                                                  const ptrdiff_t                 fff_stride,
                                                  const void *const SFEM_RESTRICT fff,
-                                                 const enum RealType             real_type_xy,
+                                                 const enum smesh::PrimitiveType             real_type_xy,
                                                  const void *const               x,
                                                  void *const                     y,
                                                  void                           *stream) {
     switch (real_type_xy) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_hex8_laplacian_apply_taylor_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_hex8_laplacian_apply_taylor_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_hex8_laplacian_apply_taylor_tpl(
                     nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
         }
@@ -363,7 +363,7 @@ extern int cu_affine_hex8_laplacian_taylor_apply(const ptrdiff_t                
             SFEM_ERROR(
                     "[Error] cu_hex8_laplacian_apply: not implemented for type %s (code "
                     "%d)\n",
-                    real_type_to_string(real_type_xy),
+                    smesh::to_string(real_type_xy),
                     real_type_xy);
             return SFEM_FAILURE;
         }
@@ -467,12 +467,12 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
                                             const void *const SFEM_RESTRICT    fff,
                                             const count_t *const SFEM_RESTRICT rowptr,
                                             const idx_t *const SFEM_RESTRICT        colidx,
-                                            const enum RealType                real_type,
+                                            const enum smesh::PrimitiveType                real_type,
                                             void *const SFEM_RESTRICT          diag,
                                             void *const SFEM_RESTRICT          offdiag,
                                             void                              *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
                                                         elements,
                                                         fff_stride,
@@ -483,7 +483,7 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
                                                         (real_t *)offdiag,
                                                         stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
                                                         elements,
                                                         fff_stride,
@@ -494,7 +494,7 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
                                                         (float *)offdiag,
                                                         stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
                                                         elements,
                                                         fff_stride,
@@ -509,7 +509,7 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
             SFEM_ERROR(
                     "[Error] cu_hex8_laplacian_apply: not implemented for type %s (code "
                     "%d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }

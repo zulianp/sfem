@@ -19,7 +19,7 @@ extern int cu_linear_elasticity_apply(const smesh::ElemType             element_
                                       const void *const SFEM_RESTRICT jacobian_determinant,
                                       const real_t                    mu,
                                       const real_t                    lambda,
-                                      const enum RealType             real_type,
+                                      const enum smesh::PrimitiveType             real_type,
                                       const real_t *const             d_x,
                                       real_t *const                   d_y,
                                       void                           *stream) {
@@ -116,7 +116,7 @@ extern int cu_linear_elasticity_diag(const smesh::ElemType             element_t
                                      const void *const SFEM_RESTRICT jacobian_determinant,
                                      const real_t                    mu,
                                      const real_t                    lambda,
-                                     const enum RealType             real_type,
+                                     const enum smesh::PrimitiveType             real_type,
                                      real_t *const                   d_t,
                                      void                           *stream) {
     switch (element_type) {
@@ -180,7 +180,7 @@ int cu_linear_elasticity_bsr(const smesh::ElemType                element_type,
                              const void *const SFEM_RESTRICT    jacobian_determinant,
                              const real_t                       mu,
                              const real_t                       lambda,
-                             const enum RealType                real_type,
+                             const enum smesh::PrimitiveType                real_type,
                              const count_t *const SFEM_RESTRICT rowptr,
                              const idx_t *const SFEM_RESTRICT   colidx,
                              void *const SFEM_RESTRICT          values,
@@ -215,7 +215,7 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType             el
                                             const void *const SFEM_RESTRICT jacobian_determinant,
                                             const real_t                    mu,
                                             const real_t                    lambda,
-                                            const enum RealType             real_type,
+                                            const enum smesh::PrimitiveType             real_type,
                                             void *const                     out,
                                             void                           *stream) {
     switch (element_type) {
@@ -230,12 +230,12 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType             el
                                                                    6,
                                                                    real_type,
                                                                    // Offset for AoS to SoA style function
-                                                                   out + 0 * real_type_size(real_type),
-                                                                   out + 1 * real_type_size(real_type),
-                                                                   out + 2 * real_type_size(real_type),
-                                                                   out + 3 * real_type_size(real_type),
-                                                                   out + 4 * real_type_size(real_type),
-                                                                   out + 5 * real_type_size(real_type),
+                                                                   out + 0 * smesh::num_bytes(real_type),
+                                                                   out + 1 * smesh::num_bytes(real_type),
+                                                                   out + 2 * smesh::num_bytes(real_type),
+                                                                   out + 3 * smesh::num_bytes(real_type),
+                                                                   out + 4 * smesh::num_bytes(real_type),
+                                                                   out + 5 * smesh::num_bytes(real_type),
                                                                    stream);
         }
         default: {

@@ -18,7 +18,7 @@ int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t                 ne
     const real_t                    K,
     const real_t                    eta,
     const real_t                    rho,
-    const enum RealType             real_type,
+    const enum smesh::PrimitiveType             real_type,
     const ptrdiff_t                 u_stride,
     const void *const SFEM_RESTRICT ux,
     const void *const SFEM_RESTRICT uy,

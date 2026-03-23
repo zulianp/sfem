@@ -14,7 +14,7 @@ int cu_tet10_laplacian_apply(const ptrdiff_t                 nelements,
                              idx_t **const SFEM_RESTRICT     elements,
                              const ptrdiff_t                 fff_stride,
                              const void *const SFEM_RESTRICT fff,
-                             const enum RealType             real_type_xy,
+                             const enum smesh::PrimitiveType             real_type_xy,
                              const void *const SFEM_RESTRICT x,
                              void *const SFEM_RESTRICT       y,
                              void                           *stream);

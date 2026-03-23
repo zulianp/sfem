@@ -796,7 +796,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
                                                     const void *const SFEM_RESTRICT jacobian_determinant,
                                                     const real_t                    mu,
                                                     const real_t                    lambda,
-                                                    const enum RealType             real_type,
+                                                    const enum smesh::PrimitiveType             real_type,
                                                     const ptrdiff_t                 u_stride,
                                                     const void *const SFEM_RESTRICT ux,
                                                     const void *const SFEM_RESTRICT uy,
@@ -809,7 +809,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
     // init_quadrature();
 
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_linear_elasticity_apply_tpl<real_t>(level,
                                                                         nelements,
                                                                         elements,
@@ -828,7 +828,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
                                                                         (real_t *)outz,
                                                                         stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_linear_elasticity_apply_tpl<float>(level,
                                                                        nelements,
                                                                        elements,
@@ -847,7 +847,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
                                                                        (float *)outz,
                                                                        stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_linear_elasticity_apply_tpl<double>(level,
                                                                         nelements,
                                                                         elements,
@@ -872,7 +872,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -1004,14 +1004,14 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
                                                    const void *const SFEM_RESTRICT jacobian_determinant,
                                                    const real_t                    mu,
                                                    const real_t                    lambda,
-                                                   const enum RealType             real_type,
+                                                   const enum smesh::PrimitiveType             real_type,
                                                    const ptrdiff_t                 out_stride,
                                                    void *const SFEM_RESTRICT       outx,
                                                    void *const SFEM_RESTRICT       outy,
                                                    void *const SFEM_RESTRICT       outz,
                                                    void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_linear_elasticity_diag_tpl<real_t>(level,
                                                                        nelements,
                                                                        elements,
@@ -1026,7 +1026,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
                                                                        (real_t *)outz,
                                                                        stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_linear_elasticity_diag_tpl<float>(level,
                                                                       nelements,
                                                                       elements,
@@ -1041,7 +1041,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
                                                                       (float *)outz,
                                                                       stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_linear_elasticity_diag_tpl<double>(level,
                                                                        nelements,
                                                                        elements,
@@ -1062,7 +1062,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -1238,7 +1238,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                                                              const real_t                    mu,
                                                              const real_t                    lambda,
                                                              const ptrdiff_t                 out_stride,
-                                                             const enum RealType             real_type,
+                                                             const enum smesh::PrimitiveType             real_type,
                                                              void *const                     out0,
                                                              void *const                     out1,
                                                              void *const                     out2,
@@ -1247,7 +1247,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                                                              void *const                     out5,
                                                              void                           *stream) {
     switch (real_type) {
-        case SFEM_REAL_DEFAULT: {
+        case smesh::SMESH_DEFAULT: {
             return cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl<real_t>(level,
                                                                                  nelements,
                                                                                  elements,
@@ -1265,7 +1265,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                                                                                  (real_t *)out5,
                                                                                  stream);
         }
-        case SFEM_FLOAT32: {
+        case smesh::SMESH_FLOAT32: {
             return cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl<float>(level,
                                                                                 nelements,
                                                                                 elements,
@@ -1283,7 +1283,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                                                                                 (float *)out5,
                                                                                 stream);
         }
-        case SFEM_FLOAT64: {
+        case smesh::SMESH_FLOAT64: {
             return cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl<double>(level,
                                                                                  nelements,
                                                                                  elements,
@@ -1306,7 +1306,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                     "[Error] cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl: not implemented for "
                     "type %s "
                     "(code %d)\n",
-                    real_type_to_string(real_type),
+                    smesh::to_string(real_type),
                     real_type);
             return SFEM_FAILURE;
         }

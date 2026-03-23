@@ -106,6 +106,10 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling/adjoint
         resampling/data_structures
     )
+
+    if(SFEM_ENABLE_CUDA)
+        list(APPEND SFEM_MODULES resampling/cuda)
+    endif()
 endif()
 
 list(APPEND SFEM_MODULES 
@@ -143,7 +147,6 @@ if(SFEM_ENABLE_CUDA)
         operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
-        resampling/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
     )
