@@ -52,7 +52,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         }
     }
 
-    auto      mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }
@@ -71,14 +71,14 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 #endif
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-    auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    auto f                    = sfem::Function::create(fs);
+    auto op                   = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        f->add_constraint(smesh::to_device(dirichlet_conditions));
+        f->add_constraint(sfem::to_device(dirichlet_conditions));
     } else
 #endif  // SFEM_ENABLE_CUDA
     {
@@ -127,8 +127,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     out->set_output_dir((output_path + "/out").c_str());
     out->enable_AoS_to_SoA(true);
 
-    out->write("rhs", sfem::to_host(rhs)->data());
-    out->write("disp", sfem::to_host(x)->data());
+    out->write("rhs", smesh::to_host(rhs)->data());
+    out->write("disp", smesh::to_host(x)->data());
 
     if (es != sfem::EXECUTION_SPACE_DEVICE) {
         // FIXME

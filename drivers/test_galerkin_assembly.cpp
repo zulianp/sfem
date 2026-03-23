@@ -1,10 +1,10 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
-#include "sfem_aliases.hpp"
 
 #include "matrixio_array.h"
 
@@ -29,7 +29,7 @@
         double start = MPI_Wtime();                            \
         op->apply(x, y);                                       \
         sfem::device_synchronize();                            \
-        double stop = MPI_Wtime();                             \
+        double stop    = MPI_Wtime();                          \
         double elapsed = stop - start;                         \
         printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
                #op,                                            \
@@ -40,8 +40,6 @@
                (op)->cols());                                  \
         fflush(stdout);                                        \
     } while (0)
-
-
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -66,14 +64,14 @@ int main(int argc, char *argv[]) {
     sfem::register_device_ops();
 #endif
 
-    const char *SFEM_OPERATOR = "Laplacian";
-    bool SFEM_USE_GPU = true;
-    int SFEM_BLOCK_SIZE = 1;
-    int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    int SFEM_PRINT_VECTORS = 0;
-    int SFEM_SKIP_VERIFICATION = 0;
-    const char * SFEM_FINE_OP_TYPE = MATRIX_FREE;
-    const char * SFEM_COARSE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_OPERATOR             = "Laplacian";
+    bool        SFEM_USE_GPU              = true;
+    int         SFEM_BLOCK_SIZE           = 1;
+    int         SFEM_ELEMENT_REFINE_LEVEL = 0;
+    int         SFEM_PRINT_VECTORS        = 0;
+    int         SFEM_SKIP_VERIFICATION    = 0;
+    const char *SFEM_FINE_OP_TYPE         = MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE       = MATRIX_FREE;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -90,7 +88,7 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    const char *folder = argv[1];
+    const char *folder      = argv[1];
     const char *output_path = argv[2];
 
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
@@ -98,8 +96,6 @@ int main(int argc, char *argv[]) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
-
-
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -112,9 +108,9 @@ int main(int argc, char *argv[]) {
 #endif
 
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
-    auto f = sfem::Function::create(fs);
-    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    auto f     = sfem::Function::create(fs);
+    auto x     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto op    = sfem::create_op(fs, SFEM_OPERATOR, es);
 
     op->initialize();
     // f->add_constraint(conds);
@@ -126,14 +122,14 @@ int main(int argc, char *argv[]) {
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
     auto fs_coarse = fs->derefine();
-    auto f_coarse = f->derefine(fs_coarse, true);
+    auto f_coarse  = f->derefine(fs_coarse, true);
 
     printf("Coarse op:\t%s\n", SFEM_COARSE_OP_TYPE);
-    coarse_op  = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
+    coarse_op = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
-    auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+    auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
     auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-    auto prolongation = sfem::make_op<real_t>(
+    auto prolongation     = sfem::make_op<real_t>(
             prolong_unconstr->rows(),
             prolong_unconstr->cols(),
             [=](const real_t *const from, real_t *const to) {
@@ -144,8 +140,8 @@ int main(int argc, char *argv[]) {
 
     auto h_input = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
     {
-        ptrdiff_t n = fs_coarse->n_dofs();
-        auto data = h_input->data();
+        ptrdiff_t n    = fs_coarse->n_dofs();
+        auto      data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
             data[i] = i;
             // data[i] = i % 2;
@@ -163,10 +159,10 @@ int main(int argc, char *argv[]) {
         input = h_input;
     }
 
-    auto prolongated = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto Ax_fine = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto restricted = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
-    auto Ax_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+    auto prolongated = smesh::create_buffer<real_t>(fs->n_dofs(), es);
+    auto Ax_fine     = smesh::create_buffer<real_t>(fs->n_dofs(), es);
+    auto restricted  = smesh::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+    auto Ax_coarse   = smesh::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
     double tick = MPI_Wtime();
 
@@ -186,11 +182,11 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_PRINT_VECTORS) {
 #ifdef SFEM_ENABLE_CUDA
-        sfem::to_host(input)->print(std::cout);
-        sfem::to_host(prolongated)->print(std::cout);
-        sfem::to_host(Ax_fine)->print(std::cout);
-        sfem::to_host(Ax_coarse)->print(std::cout);
-        sfem::to_host(restricted)->print(std::cout);
+        smesh::to_host(input)->print(std::cout);
+        smesh::to_host(prolongated)->print(std::cout);
+        smesh::to_host(Ax_fine)->print(std::cout);
+        smesh::to_host(Ax_coarse)->print(std::cout);
+        smesh::to_host(restricted)->print(std::cout);
 #else
         input->print(std::cout);
         prolongated->print(std::cout);
@@ -212,27 +208,27 @@ int main(int argc, char *argv[]) {
     if (!SFEM_SKIP_VERIFICATION) {
         // Compare two results
 #ifdef SFEM_ENABLE_CUDA
-        auto h_actual = sfem::to_host(restricted);
-        auto h_expected = sfem::to_host(Ax_coarse);
+        auto h_actual   = smesh::to_host(restricted);
+        auto h_expected = smesh::to_host(Ax_coarse);
 #else
-        auto h_actual = restricted;
+        auto h_actual   = restricted;
         auto h_expected = Ax_coarse;
 #endif
         {
             // printf("dof actual != expected, (diff, actual/expected)\n");
-            auto err = error->data();
-            ptrdiff_t n = fs_coarse->n_dofs();
-            auto actual = h_actual->data();
-            auto expected = h_expected->data();
+            auto      err      = error->data();
+            ptrdiff_t n        = fs_coarse->n_dofs();
+            auto      actual   = h_actual->data();
+            auto      expected = h_expected->data();
 
-            real_t largest_diff = 0;
-            real_t largest_diff_factor = 0;
-            ptrdiff_t arg_largest_diff = -1;
+            real_t    largest_diff        = 0;
+            real_t    largest_diff_factor = 0;
+            ptrdiff_t arg_largest_diff    = -1;
             for (ptrdiff_t i = 0; i < n; i++) {
                 // actual: is composition of operators
                 // expected: is application of coarse operator
                 real_t diff = fabs(actual[i] - expected[i]);
-                err[i] = diff;
+                err[i]      = diff;
                 if (diff > 1e-8) {
                     printf("%ld) %g != %g (%g, %g)\n",
                            i,
@@ -243,17 +239,14 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (diff > largest_diff) {
-                    largest_diff = diff;
-                    arg_largest_diff = i;
+                    largest_diff        = diff;
+                    arg_largest_diff    = i;
                     largest_diff_factor = actual[i] / expected[i];
                 }
             }
 
             if (arg_largest_diff != -1) {
-                printf("largest_diff(%ld) = %g, %g\n",
-                       arg_largest_diff,
-                       largest_diff,
-                       largest_diff_factor);
+                printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
             }
         }
 

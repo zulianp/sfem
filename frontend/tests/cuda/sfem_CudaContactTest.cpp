@@ -2,16 +2,17 @@
 
 #include "sfem_test.hpp"
 
-#include "cu_ssquad4_interpolate.hpp"
 #include "matrixio_array.h"
 #include "sfem_base.hpp"
-#include "ssquad4_interpolate.hpp"
+#include "smesh_grid.hpp"
+#include "smesh_ssquad4_prolongation.hpp"
+#include "smesh_ssquad4_restriction.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_aliases.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.hpp"
@@ -42,28 +43,28 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    auto sdf = sfem::create_sdf(comm,
-                                n * 2,
-                                n * 2,
-                                n * 2,
-                                -0.1,
-                                -0.1,
-                                -0.1,
-                                1.1,
-                                1.1,
-                                1.1,
-                                [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    // Half-sphere
-                                    geom_t cx = 0.5, cy = -0.5, cz = 0.5;
-                                    geom_t radius = 0.5;
+    auto sdf = smesh::create_sdf(comm,
+                                 n * 2,
+                                 n * 2,
+                                 n * 2,
+                                 -0.1,
+                                 -0.1,
+                                 -0.1,
+                                 1.1,
+                                 1.1,
+                                 1.1,
+                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                     // Half-sphere
+                                     geom_t cx = 0.5, cy = -0.5, cz = 0.5;
+                                     geom_t radius = 0.5;
 
-                                    geom_t dx = cx - x;
-                                    geom_t dy = cy - y;
-                                    geom_t dz = cz - z;
+                                     geom_t dx = cx - x;
+                                     geom_t dy = cy - y;
+                                     geom_t dz = cz - z;
 
-                                    geom_t dd = radius - sqrt(dx * dx + dy * dy + dz * dz);
-                                    return dd;
-                                });
+                                     geom_t dd = radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                     return dd;
+                                 });
 
     sdf->to_file(smesh::Path("test_contact/sdf"));
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
@@ -239,7 +240,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                   .rpen        = rpen,
                   .Jpen        = Jpen,
                   .e_pen       = e_pen,
-                  .lagr_ub      = lagr_ub};
+                  .lagr_ub     = lagr_ub};
 
     if (is_ml) {
         int coarse_level = SFEM_ELEMENT_REFINE_LEVEL / 2;
@@ -252,7 +253,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
 
         auto fine_mapping = contact_conds->node_mapping();
         auto count        = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
-        ssquad4_element_node_incidence_count(
+        smesh::ssquad4_element_node_incidence_count(
                 ssmesh.level(), 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
 
         const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
@@ -272,34 +273,34 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
             coarse_sides = to_device(coarse_sides);
             count        = to_device(count);
 
-            cu_ssquad4_restrict(fine_sides->extent(1),
-                                ssmesh.level(),
-                                1,
-                                fine_sides->data(),
-                                count->data(),
-                                coarse_level,
-                                1,
-                                coarse_sides->data(),
-                                1,
-                                smesh::SMESH_DEFAULT,
-                                1,
-                                input->data(),
-                                smesh::SMESH_DEFAULT,
-                                1,
-                                restricted->data(),
-                                SFEM_DEFAULT_STREAM);
+            smesh::cu_ssquad4_restrict(fine_sides->extent(1),
+                                       ssmesh.level(),
+                                       1,
+                                       fine_sides->data(),
+                                       count->data(),
+                                       coarse_level,
+                                       1,
+                                       coarse_sides->data(),
+                                       1,
+                                       smesh::SMESH_DEFAULT,
+                                       1,
+                                       input->data(),
+                                       smesh::SMESH_DEFAULT,
+                                       1,
+                                       restricted->data(),
+                                       SFEM_DEFAULT_STREAM);
         } else {
-            ssquad4_restrict(fine_sides->extent(1),
-                             ssmesh.level(),
-                             1,
-                             fine_sides->data(),
-                             count->data(),
-                             coarse_level,
-                             1,
-                             coarse_sides->data(),
-                             1,
-                             input->data(),
-                             restricted->data());
+            smesh::ssquad4_restrict(fine_sides->extent(1),
+                                    ssmesh.level(),
+                                    1,
+                                    fine_sides->data(),
+                                    count->data(),
+                                    coarse_level,
+                                    1,
+                                    coarse_sides->data(),
+                                    1,
+                                    input->data(),
+                                    restricted->data());
         }
 
         to.restricted = restricted;

@@ -8,11 +8,10 @@
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "sfem_API.hpp"
-#include "sfem_aliases.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 
@@ -194,8 +193,8 @@ int main(int argc, char* argv[]) {
         time_operator_gpu(crs_gpu, "csr", x->data(), y2->data());
         time_operator_gpu(coo_sym_gpu, "coo sym", x->data(), y1->data());
 
-        auto y1_tocpu = sfem::to_host(y1);
-        auto y2_tocpu = sfem::to_host(y2);
+        auto y1_tocpu = smesh::to_host(y1);
+        auto y2_tocpu = smesh::to_host(y2);
 
         gpu_blas->axpy(ndofs, -1, y2->data(), y1->data());
         auto norm_y1 = gpu_blas->norm2(ndofs, y1->data());

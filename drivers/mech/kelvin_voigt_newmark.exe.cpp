@@ -6,9 +6,9 @@
 
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
-#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "smesh_env.hpp"
 
 #include "sfem_ssgmg.hpp"
 
@@ -158,9 +158,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         auto a = acceleration;
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            u = sfem::to_host(u);
-            v = sfem::to_host(v);
-            a = sfem::to_host(a);
+            u = smesh::to_host(u);
+            v = smesh::to_host(v);
+            a = smesh::to_host(a);
         }
 #endif
         out->write_time_step("disp", t, u->data());
@@ -255,9 +255,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             auto a = acceleration;
 #ifdef SFEM_ENABLE_CUDA
             if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                u = sfem::to_host(u);
-                v = sfem::to_host(v);
-                a = sfem::to_host(a);
+                u = smesh::to_host(u);
+                v = smesh::to_host(v);
+                a = smesh::to_host(a);
             }
 #endif
             // Write to disk

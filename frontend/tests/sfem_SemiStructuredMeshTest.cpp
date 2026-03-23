@@ -9,7 +9,7 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
     int L = 8;
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
-    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
 
     // Create the points to avoid duplication in coarse levels (lazy init)!
     // Otherwise every level will construct its points
@@ -32,7 +32,8 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(l2_mesh, (output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(l1_mesh, (output_dir + "/l1_mesh").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(l1_mesh_from_l2, (output_dir + "/l1_mesh_from_l2").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(l1_mesh_from_l2, (output_dir + "/l1_mesh_from_l2").c_str()) ==
+                     SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/og_mesh").c_str()) == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
@@ -45,7 +46,16 @@ int test_derefine_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 2,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          2,
+                                          1,
+                                          1);
 
     return test_derefine(m, "test_derefine_cube");
 }
@@ -57,10 +67,10 @@ int test_derefine_mesh() {
 }
 
 int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
-    int  L  = 8;
+    int L = 8;
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
-    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
     auto levels = sfem::semi_structured_derefinement_levels(fs->mesh());
 
     auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
@@ -97,7 +107,7 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &o
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        fine_field = sfem::to_host(fine_field);
+        fine_field = smesh::to_host(fine_field);
     }
 #endif
 
@@ -122,9 +132,9 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    int  L  = 4;
+    int  L      = 4;
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
-    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
 
     auto levels = sfem::semi_structured_derefinement_levels(fs->mesh());
 
@@ -157,12 +167,11 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(coarse_fs->mesh_ptr(), (output_dir + "/coarse").c_str()) ==
                      SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/fine").c_str()) ==
-                     SFEM_SUCCESS);
-    
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/fine").c_str()) == SFEM_SUCCESS);
+
     sfem::Output out(coarse_fs);
     out.set_output_dir((output_dir + "/coarse/fields").c_str());
-    SFEM_TEST_ASSERT(out.write("u", coarse_field->data()) == SFEM_SUCCESS); 
+    SFEM_TEST_ASSERT(out.write("u", coarse_field->data()) == SFEM_SUCCESS);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -172,7 +181,16 @@ int test_prolongation_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 2,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          2,
+                                          1,
+                                          1);
 
     return test_prolongation(m, "test_derefine_cube");
 }
@@ -183,7 +201,16 @@ int test_restrict_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          1,
+                                          1);
 
     return test_restriction(m, "test_restrict_cube");
 }

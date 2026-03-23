@@ -93,12 +93,20 @@ int test_cube() {
     int SFEM_BLOCK_SIZE = 1;
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          1,
+                                          1);
 
-            if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-                m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
-            }
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
@@ -128,7 +136,10 @@ int test_cube() {
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
     auto f_coarse  = f->derefine(fs_coarse, true);
 
-    printf("Coarse op (%d,%s):\t%s\n", levels[SFEM_ELEMENT_DEREFINE], type_to_string(fs_coarse->element_type()), SFEM_COARSE_OP_TYPE);
+    printf("Coarse op (%d,%s):\t%s\n",
+           levels[SFEM_ELEMENT_DEREFINE],
+           type_to_string(fs_coarse->element_type()),
+           SFEM_COARSE_OP_TYPE);
     coarse_op = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
     auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
@@ -198,8 +209,8 @@ int test_cube() {
 
         // Compare two results
 #ifdef SFEM_ENABLE_CUDA
-        auto h_restricted = sfem::to_host(restricted);
-        auto h_Ax_coarse  = sfem::to_host(Ax_coarse);
+        auto h_restricted = smesh::to_host(restricted);
+        auto h_Ax_coarse  = smesh::to_host(Ax_coarse);
 #else
         auto h_restricted = restricted;
         auto h_Ax_coarse  = Ax_coarse;
@@ -239,7 +250,7 @@ int test_cube() {
                 std::cout << "Prolongated\n";
                 std::cout << "--------------\n";
 #ifdef SFEM_ENABLE_CUDA
-                sfem::to_host(prolongated)->print(std::cout);
+                smesh::to_host(prolongated)->print(std::cout);
 #else
                 prolongated->print(std::cout);
 #endif
@@ -276,7 +287,7 @@ int test_cube() {
 
                 {  // FINE
 #ifdef SFEM_ENABLE_CUDA
-                    auto h_prolongated = sfem::to_host(prolongated);
+                    auto h_prolongated = smesh::to_host(prolongated);
 #else
                     auto h_prolongated = prolongated;
 #endif
