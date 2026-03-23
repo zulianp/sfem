@@ -10,6 +10,17 @@ foreach(_candidate_path
     endif()
 endforeach()
 
+# CUDA must be enabled before add_subdirectory(smesh): otherwise CMake does not
+# treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
+# are never compiled into libsmesh.
+if(SFEM_ENABLE_CUDA)
+    enable_language(CUDA)
+    if(NOT DEFINED CMAKE_CUDA_STANDARD)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    endif()
+endif()
+
 if(SFEM_SMESH_PATH)
     set(SMESH_ENABLE_AVX2 ${SFEM_ENABLE_AVX2} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_AVX512 ${SFEM_ENABLE_AVX512} CACHE BOOL "" FORCE)
@@ -30,14 +41,6 @@ if(SFEM_SMESH_PATH)
     endif()
 else()
     message(FATAL_ERROR "Could not find SMESH in ../external/smesh or ../externals/smesh.")
-endif()
-
-if(SFEM_ENABLE_CUDA)
-    enable_language(CUDA)
-    if(NOT DEFINED CMAKE_CUDA_STANDARD)
-        set(CMAKE_CUDA_STANDARD 17)
-        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-    endif()
 endif()
 
 if(SFEM_ENABLE_OPENMP)
