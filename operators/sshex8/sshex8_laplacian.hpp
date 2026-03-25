@@ -10,7 +10,6 @@ extern "C" {
 
 int sshex8_laplacian_apply(const int                         level,
                            const ptrdiff_t                   nelements,
-                           ptrdiff_t                         interior_start,
                            idx_t **const SFEM_RESTRICT       elements,
                            geom_t **const SFEM_RESTRICT      points,
                            const real_t *const SFEM_RESTRICT u,
@@ -18,7 +17,6 @@ int sshex8_laplacian_apply(const int                         level,
 
 int affine_sshex8_laplacian_apply(const int                         level,
                                   const ptrdiff_t                   nelements,
-                                  ptrdiff_t                         interior_start,
                                   idx_t **const SFEM_RESTRICT       elements,
                                   geom_t **const SFEM_RESTRICT      points,
                                   const real_t *const SFEM_RESTRICT u,
@@ -26,18 +24,22 @@ int affine_sshex8_laplacian_apply(const int                         level,
 
 int affine_sshex8_laplacian_diag(const int                    level,
                                  const ptrdiff_t              nelements,
-                                 ptrdiff_t                    interior_start,
                                  idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT std_hex8_points,
                                  real_t *const SFEM_RESTRICT  diag);
 
 int affine_sshex8_laplacian_stencil_apply(const int                         level,
                                           const ptrdiff_t                   nelements,
-                                          ptrdiff_t                         interior_start,
                                           idx_t **const SFEM_RESTRICT       elements,
                                           geom_t **const SFEM_RESTRICT      std_hex8_points,
                                           const real_t *const SFEM_RESTRICT u,
                                           real_t *const SFEM_RESTRICT       values);
+
+int sshex8_macro_fff_fill(const int                       level,
+                          const ptrdiff_t                 nelements,
+                          idx_t **const SFEM_RESTRICT     elements,
+                          geom_t **const SFEM_RESTRICT    points,
+                          jacobian_t *const SFEM_RESTRICT fff);
 
 int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
                                               const ptrdiff_t                       nelements,

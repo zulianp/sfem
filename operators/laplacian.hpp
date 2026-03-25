@@ -3,11 +3,12 @@
 
 #include <stddef.h>
 #include "sfem_base.hpp"
+#include "smesh_elem_type.hpp"
 #include "tet4_fff.hpp"
 
-int laplacian_is_opt(int element_type);
+int laplacian_is_opt(smesh::ElemType element_type);
 
-int laplacian_assemble_value(int element_type,
+int laplacian_assemble_value(smesh::ElemType element_type,
                              const ptrdiff_t nelements,
                              const ptrdiff_t nnodes,
                              idx_t **const SFEM_RESTRICT elems,
@@ -15,7 +16,7 @@ int laplacian_assemble_value(int element_type,
                              const real_t *const SFEM_RESTRICT u,
                              real_t *const SFEM_RESTRICT value);
 
-int laplacian_apply(int element_type,
+int laplacian_apply(smesh::ElemType element_type,
                     const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
                     idx_t **const SFEM_RESTRICT elements,
@@ -23,7 +24,7 @@ int laplacian_apply(int element_type,
                     const real_t *const SFEM_RESTRICT u,
                     real_t *const SFEM_RESTRICT values);
 
-int laplacian_assemble_gradient(int element_type,
+int laplacian_assemble_gradient(smesh::ElemType element_type,
                                 const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elements,
@@ -31,7 +32,7 @@ int laplacian_assemble_gradient(int element_type,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values);
 
-int laplacian_crs(int element_type,
+int laplacian_crs(smesh::ElemType element_type,
                   const ptrdiff_t nelements,
                   const ptrdiff_t nnodes,
                   idx_t **const SFEM_RESTRICT elems,
@@ -40,7 +41,7 @@ int laplacian_crs(int element_type,
                   const idx_t *const SFEM_RESTRICT colidx,
                   real_t *const SFEM_RESTRICT values);
 
-int laplacian_diag(int element_type,
+int laplacian_diag(smesh::ElemType element_type,
                    const ptrdiff_t nelements,
                    const ptrdiff_t nnodes,
                    idx_t **const SFEM_RESTRICT elements,
@@ -48,14 +49,14 @@ int laplacian_diag(int element_type,
                    real_t *const SFEM_RESTRICT values);
 
 // Optimized for matrix-free
-int laplacian_apply_opt(int element_type,
+int laplacian_apply_opt(smesh::ElemType element_type,
                         const ptrdiff_t nelements,
                         idx_t **const SFEM_RESTRICT elements,
                         const jacobian_t *const SFEM_RESTRICT fff,
                         const real_t *const SFEM_RESTRICT u,
                         real_t *const SFEM_RESTRICT values);
 
-int laplacian_crs_sym(int element_type,
+int laplacian_crs_sym(smesh::ElemType element_type,
                       const ptrdiff_t nelements,
                       const ptrdiff_t nnodes,
                       idx_t **const SFEM_RESTRICT elements,

@@ -93,12 +93,11 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::hessian_diag(const real_t *const, real_t *const out) {
-        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
+        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
         auto &ssm = space->mesh();
         return affine_sshex8_laplacian_diag(smesh::semistructured_level(ssm),
                                             ssm.n_elements(),
-                                            sfem::semi_structured_interior_start(ssm),
                                             sfem::semi_structured_element_data(ssm),
                                             sfem::semi_structured_point_data(ssm),
                                             out);

@@ -70,7 +70,13 @@ int main(int argc, char *argv[]) {
     real_t *lapl_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(lapl_u, 0, u_n_local * sizeof(real_t));
 
-    laplacian_apply(mesh->element_type(0), n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), u, lapl_u);
+    laplacian_apply(mesh->element_type(0),
+                    n_elements,
+                    n_nodes,
+                    mesh->elements(0)->data(),
+                    mesh->points()->data(),
+                    u,
+                    lapl_u);
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);

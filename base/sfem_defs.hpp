@@ -54,6 +54,7 @@ using smesh::macro_base_elem;
 using smesh::macro_type_variant;
 using smesh::proteus_hex_micro_elements_per_dim;
 using smesh::proteus_hex_type;
+using smesh::semistructured_level;
 using smesh::semistructured_type;
 using smesh::shell_type;
 using smesh::side_type;

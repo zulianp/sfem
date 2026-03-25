@@ -82,8 +82,13 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_USE_OPT, atoi);
     SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
-    if(SFEM_USE_OPT) {
-        SFEM_USE_OPT = laplacian_is_opt(SFEM_USE_OPT);
+    smesh::ElemType elem_type = static_cast<smesh::ElemType>(mesh.element_type);
+    if (SFEM_USE_MACRO) {
+        elem_type = macro_type_variant(elem_type);
+    }
+
+    if (SFEM_USE_OPT) {
+        SFEM_USE_OPT = laplacian_is_opt(elem_type);
     }
 
     if (rank == 0) {
@@ -114,12 +119,6 @@ int main(int argc, char *argv[]) {
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
-    smesh::ElemType elem_type = (smesh::ElemType)mesh.element_type;
-
-    if (SFEM_USE_MACRO) {
-        elem_type = macro_type_variant(elem_type);
-    }
-
     // using Solver_t = sfem::ConjugateGradient<real_t>;
     using Solver_t = sfem::BiCGStab<real_t>;
 
@@ -139,7 +138,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_USE_PRECONDITIONER) {
         diag.resize(mesh.nnodes, 0);
 
-        laplacian_diag(elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,diag.data());
+        laplacian_diag(elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, diag.data());
 
         solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
 
@@ -158,8 +157,13 @@ int main(int argc, char *argv[]) {
         if (SFEM_USE_OPT) {
             laplacian_apply_opt(elem_type, fff.nelements, fff.elements, fff.data, x, y);
         } else {
-            laplacian_apply(
-                    elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+            laplacian_apply(elem_type,
+                            mesh.nelements,
+                            mesh.nnodes,
+                            mesh.elements,
+                            mesh.points,
+                            x,
+                            y);
         }
 
         copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, 1, x, y);

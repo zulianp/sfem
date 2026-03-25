@@ -109,6 +109,7 @@ namespace sfem {
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
+        void set_option(const std::string &name, bool val) override;
 
     private:
         class Impl;
