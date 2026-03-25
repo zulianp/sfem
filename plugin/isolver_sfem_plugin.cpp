@@ -186,8 +186,13 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_value(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    laplacian_assemble_value(static_cast<smesh::ElemType>(mesh->element_type),
+                             mesh->nelements,
+                             mesh->nnodes,
+                             mesh->elements,
+                             mesh->points,
+                             x,
+                             out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -199,8 +204,13 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_gradient(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    laplacian_assemble_gradient(static_cast<smesh::ElemType>(mesh->element_type),
+                                mesh->nelements,
+                                mesh->nnodes,
+                                mesh->elements,
+                                mesh->points,
+                                x,
+                                out);
 
     if (problem->nlocal_neumann) {
         surface_forcing_function(side_type(mesh->element_type),
@@ -225,14 +235,14 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_crs(mesh->element_type,
-                               mesh->nelements,
-                               mesh->nnodes,
-                               mesh->elements,
-                               mesh->points,
-                               rowptr,
-                               colidx,
-                               values);
+    laplacian_crs(static_cast<smesh::ElemType>(mesh->element_type),
+                  mesh->nelements,
+                  mesh->nnodes,
+                  mesh->elements,
+                  mesh->points,
+                  rowptr,
+                  colidx,
+                  values);
 
     crs_constraint_nodes_to_identity(
         problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
@@ -250,8 +260,13 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(mesh);
 
     // Equivalent to operator application due to linearity of the problem
-    laplacian_assemble_gradient(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+    laplacian_assemble_gradient(static_cast<smesh::ElemType>(mesh->element_type),
+                                mesh->nelements,
+                                mesh->nnodes,
+                                mesh->elements,
+                                mesh->points,
+                                h,
+                                out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 

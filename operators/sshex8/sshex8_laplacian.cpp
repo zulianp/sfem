@@ -38,7 +38,6 @@ void print_matrix(int r, int c, const accumulator_t *const m) {
 
 int sshex8_laplacian_apply(const int                         level,
                            const ptrdiff_t                   nelements,
-                           ptrdiff_t                         interior_start,
                            idx_t **const SFEM_RESTRICT       elements,
                            geom_t **const SFEM_RESTRICT      points,
                            const real_t *const SFEM_RESTRICT u,
@@ -184,7 +183,6 @@ int sshex8_laplacian_apply(const int                         level,
 
 int affine_sshex8_laplacian_apply(const int                         level,
                                   const ptrdiff_t                   nelements,
-                                  ptrdiff_t                         interior_start,
                                   idx_t **const SFEM_RESTRICT       elements,
                                   geom_t **const SFEM_RESTRICT      std_hex8_points,
                                   const real_t *const SFEM_RESTRICT u,
@@ -334,7 +332,6 @@ int affine_sshex8_laplacian_apply(const int                         level,
 
 int affine_sshex8_laplacian_diag(const int                    level,
                                  const ptrdiff_t              nelements,
-                                 ptrdiff_t                    interior_start,
                                  idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT std_hex8_points,
                                  real_t *const SFEM_RESTRICT  diag) {
@@ -439,7 +436,6 @@ int affine_sshex8_laplacian_diag(const int                    level,
 
 int affine_sshex8_laplacian_stencil_apply(const int                         level,
                                           const ptrdiff_t                   nelements,
-                                          ptrdiff_t                         interior_start,
                                           idx_t **const SFEM_RESTRICT       elements,
                                           geom_t **const SFEM_RESTRICT      std_hex8_points,
                                           const real_t *const SFEM_RESTRICT u,
@@ -1042,3 +1038,46 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
     return SFEM_SUCCESS;
 }
+
+int sshex8_macro_fff_fill(const int                       level,
+                          const ptrdiff_t                 nelements,
+                          idx_t **const SFEM_RESTRICT     elements,
+                          geom_t **const SFEM_RESTRICT    points,
+                          jacobian_t *const SFEM_RESTRICT fff) {
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                sshex8_lidx(level, 0, 0, 0),
+                                                sshex8_lidx(level, level, 0, 0),
+                                                sshex8_lidx(level, level, level, 0),
+                                                sshex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                sshex8_lidx(level, 0, 0, level),
+                                                sshex8_lidx(level, level, 0, level),
+                                                sshex8_lidx(level, level, level, level),
+                                                sshex8_lidx(level, 0, level, level)};
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
+        scalar_t lx[8], ly[8], lz[8];
+        for (int d = 0; d < 8; ++d) {
+            const idx_t nid = elements[proteus_to_std_hex8_corners[d]][e];
+            lx[d]             = x[nid];
+            ly[d]             = y[nid];
+            lz[d]             = z[nid];
+        }
+
+        scalar_t l_fff[6];
+        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, l_fff);
+
+        for (int d = 0; d < 6; ++d) {
+            fff[e * 6 + d] = l_fff[d];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+

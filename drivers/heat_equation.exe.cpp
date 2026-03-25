@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = rowptr[mesh.nnodes];
     system_matrix = (real_t*)calloc(nnz, sizeof(real_t));
 
-    laplacian_crs(mesh.element_type,
+    laplacian_crs(static_cast<smesh::ElemType>(mesh.element_type),
                                mesh.nelements,
                                mesh.nnodes,
                                mesh.elements,
