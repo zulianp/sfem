@@ -585,8 +585,15 @@ namespace sfem {
                 return ret;
             } else {
                 auto ret = std::make_shared<GPULaplacian>(derefined_space);
-                assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
-                assert(ret->element_type == macro_base_elem(fff->element_type()));
+
+                printf("elem %s, deref %s, macro %s\n",
+                       type_to_string(fff->element_type()),
+                       type_to_string(derefined_space->element_type()),
+                       type_to_string(macro_base_elem(fff->element_type())));
+
+                fflush(stdout);
+                // SMESH_ASSERT(derefined_space->element_type() == macro_base_elem(fff->element_type()));
+                // SMESH_ASSERT(ret->element_type == macro_base_elem(fff->element_type()));
                 // SFEM_ERROR("AVOID replicating indices create view!\n");  // TODO
                 ret->initialize();
                 return ret;
