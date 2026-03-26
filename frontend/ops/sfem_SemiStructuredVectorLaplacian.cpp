@@ -120,8 +120,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SemiStructuredVectorLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        fprintf(stderr, "[Error] ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
-        assert(false);
+        SMESH_ERROR("ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 

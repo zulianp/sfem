@@ -47,8 +47,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        fprintf(stderr, "[Error] SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
-        assert(false);
+        SMESH_ERROR("SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 

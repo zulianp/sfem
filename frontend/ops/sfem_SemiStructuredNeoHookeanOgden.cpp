@@ -258,8 +258,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SemiStructuredNeoHookeanOgden::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        assert(false);
-        fprintf(stderr, "[Error] ss:NeoHookeanOgden::lor_op NOT IMPLEMENTED!\n");
+        SMESH_ERROR("ss:NeoHookeanOgden::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
