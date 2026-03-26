@@ -1,5 +1,6 @@
 #include "sfem_Parameters.hpp"
 
+#include <assert.h>
 #include <map>
 
 namespace sfem {
@@ -35,10 +36,20 @@ namespace sfem {
     real_t ScalarValue::value() const { return value_; }
 
     real_t Parameters::get_real_value(const std::string &var_name, const real_t default_value) const {
-        auto value = dynamic_cast<ScalarValue*>(find_value(var_name).get());
+        auto value = dynamic_cast<ScalarValue *>(find_value(var_name).get());
         if (value) {
             return value->value();
         }
         return default_value;
     }
+
+    real_t Parameters::require_real_value(const std::string &var_name) const {
+        auto *const value = dynamic_cast<ScalarValue *>(find_value(var_name).get());
+        if (!value) {
+            SFEM_ERROR("Parameters: required scalar parameter '%s' is missing or not a real value\n", var_name.c_str());
+        }
+        return value->value();
+    }
+
 }  // namespace sfem
+

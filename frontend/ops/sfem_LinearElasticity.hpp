@@ -45,19 +45,13 @@ namespace sfem {
         ptrdiff_t  n_dofs_domain() const override;
         ptrdiff_t  n_dofs_image() const override;
 
-        real_t get_mu() const;
-        void   set_mu(real_t val);
-        real_t get_lambda() const;
-        void   set_lambda(real_t val);
-
         /**
          * @brief Create a LinearElasticity operator
          * @param space Function space
          * @return Unique pointer to the operator
          *
-         * The operator reads material parameters from environment variables:
-         * - SFEM_SHEAR_MODULUS: Shear modulus μ (default: 1.0)
-         * - SFEM_FIRST_LAME_PARAMETER: First Lamé parameter λ (default: 1.0)
+         * Reads @c SFEM_HEX8_ASSUME_AFFINE for the affine-adjugate apply flag. Lamé parameters are set in
+         * initialize() from @c SFEM_SHEAR_MODULUS and @c SFEM_FIRST_LAME_PARAMETER.
          */
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -85,6 +79,8 @@ namespace sfem {
          * smesh::JacobianAdjugateAndDeterminant (macro corners for semistructured Proteus hex)
          * so apply()/gradient() use the affine optimized path (linear_elasticity_apply_adjugate_aos).
          * Without cached Jacobians, apply uses isoparametric linear_elasticity_apply_aos from mesh points.
+         * Writes @c "mu" and @c "lambda" on every domain from @c SFEM_SHEAR_MODULUS and
+         * @c SFEM_FIRST_LAME_PARAMETER (defaults 1.0); override per block with set_value_in_block().
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
