@@ -12,6 +12,10 @@
 #include <mpi.h>
 #include <stdio.h>
 
+int linear_elasticity_is_opt(smesh::ElemType element_type) {
+    return element_type == smesh::HEX8 || sfem::is_semistructured_type(element_type);
+}
+
 int linear_elasticity_assemble_value_soa(const smesh::ElemType                element_type,
                                          const ptrdiff_t                    nelements,
                                          const ptrdiff_t                    nnodes,
@@ -47,6 +51,12 @@ int linear_elasticity_apply_soa(const smesh::ElemType                element_typ
                                 const real_t                       lambda,
                                 const real_t **const SFEM_RESTRICT u,
                                 real_t **const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_apply_soa not implemented for semi-structured element type %s (use linear_elasticity_apply_aos)\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
     switch (element_type) {
         case smesh::TRI3: {
             return tri3_linear_elasticity_apply(
@@ -57,15 +67,8 @@ int linear_elasticity_apply_soa(const smesh::ElemType                element_typ
                     nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
         }
         case smesh::HEX8: {
-            int SFEM_HEX8_ASSUME_AFFINE = 1;
-            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
-            if (SFEM_HEX8_ASSUME_AFFINE) {
-                return affine_hex8_linear_elasticity_apply(
-                        nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
-            } else {
-                return hex8_linear_elasticity_apply(
-                        nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
-            }
+            return hex8_linear_elasticity_apply(
+                    nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
         }
         default: {
             SFEM_ERROR("linear_elasticity_apply_soa not implemented for type %s\n", type_to_string(element_type));
@@ -121,6 +124,12 @@ int linear_elasticity_crs_aos(const smesh::ElemType                element_type,
                               const count_t *const SFEM_RESTRICT rowptr,
                               const idx_t *const SFEM_RESTRICT   colidx,
                               real_t *const SFEM_RESTRICT        values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_crs_aos not implemented for semi-structured element type %s\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
     switch (element_type) {
         case smesh::TRI3: {
             return tri3_linear_elasticity_crs_aos(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
@@ -243,41 +252,20 @@ int linear_elasticity_apply_aos(const smesh::ElemType               element_type
                                                 &values[2]);
         }
         case smesh::HEX8: {
-            int SFEM_HEX8_ASSUME_AFFINE = 1;
-            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
-
-            if (SFEM_HEX8_ASSUME_AFFINE) {
-                return affine_hex8_linear_elasticity_apply(nelements,
-                                                           nnodes,
-                                                           elements,
-                                                           points,
-                                                           mu,
-                                                           lambda,
-                                                           3,
-                                                           &u[0],
-                                                           &u[1],
-                                                           &u[2],
-                                                           3,
-                                                           &values[0],
-                                                           &values[1],
-                                                           &values[2]);
-
-            } else {
-                return hex8_linear_elasticity_apply(nelements,
-                                                    nnodes,
-                                                    elements,
-                                                    points,
-                                                    mu,
-                                                    lambda,
-                                                    3,
-                                                    &u[0],
-                                                    &u[1],
-                                                    &u[2],
-                                                    3,
-                                                    &values[0],
-                                                    &values[1],
-                                                    &values[2]);
-            }
+            return hex8_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                3,
+                                                &u[0],
+                                                &u[1],
+                                                &u[2],
+                                                3,
+                                                &values[0],
+                                                &values[1],
+                                                &values[2]);
         }
         case smesh::MACRO_TET4: {
             return macro_tet4_linear_elasticity_apply(nelements,
@@ -330,6 +318,8 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                  
                                          const real_t                          lambda,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values) {
+    // Affine kernels only: HEX8 uses corner adjugate; semistructured hex uses macro-element adjugate at (1/2,1/2,1/2).
+
     if (element_type == smesh::HEX8) {
         return affine_hex8_linear_elasticity_apply_adjugate(nelements,
                                                             nnodes,
@@ -437,6 +427,12 @@ int linear_elasticity_bcrs_sym(const smesh::ElemType                element_type
                                const ptrdiff_t                    block_stride,
                                real_t **const SFEM_RESTRICT       diag_values,
                                real_t **const SFEM_RESTRICT       off_diag_values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_bcrs_sym not implemented for semi-structured element type %s\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_linear_elasticity_crs_sym(

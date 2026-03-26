@@ -81,9 +81,10 @@ namespace sfem {
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          *
          * Sets up the MultiDomainOp for multi-block operations.
-         * For supported element types (HEX8, PROTEUS_HEX8, PROTEUS_HEX27, …), builds
+         * For HEX8 and semistructured (Proteus) hex element types, builds
          * smesh::JacobianAdjugateAndDeterminant (macro corners for semistructured Proteus hex)
-         * to accelerate apply() via linear_elasticity_apply_adjugate_aos.
+         * so apply()/gradient() use the affine optimized path (linear_elasticity_apply_adjugate_aos).
+         * Without cached Jacobians, apply uses isoparametric linear_elasticity_apply_aos from mesh points.
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
@@ -134,7 +135,7 @@ namespace sfem {
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
-        /// @c "ASSUME_AFFINE" toggles macro-adjugate SS apply (default on; same meaning as @c SFEM_HEX8_ASSUME_AFFINE at create).
+        /// @c "ASSUME_AFFINE" is kept for API compatibility (stored; apply path is adjugate iff Jacobian cache exists).
         void set_option(const std::string &name, bool val) override;
 
     private:

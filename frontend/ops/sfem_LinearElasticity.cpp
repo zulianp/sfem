@@ -1,12 +1,12 @@
 #include "sfem_LinearElasticity.hpp"
 
-#include "sfem_defs.hpp"
-#include "sfem_logger.hpp"
 #include "linear_elasticity.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -30,37 +30,18 @@ namespace sfem {
         }
 
         bool domain_supports_adjugate_cache(const smesh::ElemType et) {
-            switch (et) {
-                case smesh::HEX8:
-                case smesh::PROTEUS_HEX8:
-                case smesh::PROTEUS_HEX27:
-                case smesh::PROTEUS_HEX64:
-                case smesh::PROTEUS_HEX125:
-                case smesh::PROTEUS_HEX216:
-                case smesh::PROTEUS_HEX343:
-                case smesh::PROTEUS_HEX512:
-                case smesh::PROTEUS_HEX729:
-                case smesh::PROTEUS_HEX4913:
-                    return true;
-                default:
-                    return false;
-            }
+            return et == smesh::HEX8 || sfem::is_semistructured_type(et);
         }
 
         int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,
                                                      smesh::Mesh        &mesh,
-                                                     bool                assume_affine,
                                                      const real_t        mu,
                                                      const real_t        lambda,
                                                      const real_t *const h,
                                                      real_t *const       out) {
             auto block        = domain.block;
             auto element_type = domain.element_type;
-            const bool use_adjugate =
-                    domain.user_data &&
-                    (element_type == smesh::HEX8 ||
-                     (sfem::is_semistructured_type(element_type) && assume_affine));
-            if (use_adjugate) {
+            if (domain.user_data) {
                 auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
                 SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
                 return linear_elasticity_apply_adjugate_aos(element_type,
@@ -129,8 +110,7 @@ namespace sfem {
             }
 
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
-            auto jac =
-                    smesh::JacobianAdjugateAndDeterminant::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            auto jac = smesh::JacobianAdjugateAndDeterminant::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
             if (!jac) {
                 return SFEM_FAILURE;
             }
@@ -398,8 +378,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
             auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
-            return linear_elasticity_dispatch_domain_vector(
-                    domain, *mesh, impl_->use_affine_approximation, mu, lambda, x, out);
+            return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, x, out);
         });
     }
 
@@ -411,8 +390,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
             auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
-            return linear_elasticity_dispatch_domain_vector(
-                    domain, *mesh, impl_->use_affine_approximation, mu, lambda, h, out);
+            return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, h, out);
         });
     }
 
@@ -460,9 +438,9 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 
+    // TODO: remove these and use the block version where needed
     real_t LinearElasticity::get_mu() const { return impl_->mu; }
     void   LinearElasticity::set_mu(real_t val) { impl_->mu = val; }
     real_t LinearElasticity::get_lambda() const { return impl_->lambda; }
     void   LinearElasticity::set_lambda(real_t val) { impl_->lambda = val; }
 }  // namespace sfem
-

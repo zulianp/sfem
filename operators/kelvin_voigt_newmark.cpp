@@ -46,7 +46,7 @@ int kelvin_voigt_newmark_apply_adjugate_soa(const smesh::ElemType               
                                                               &values[2]);
         }
         default: {
-            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("kelvin_voigt_newmark_apply_adjugate_soa not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -99,7 +99,7 @@ int kelvin_voigt_newmark_gradient_soa(const smesh::ElemType                   el
                                                              &values[2]);
         }
         default: {
-            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("kelvin_voigt_newmark_gradient_soa not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -147,7 +147,7 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const smesh::ElemType               
                                                               &values[2]);
         }
         default: {
-            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("kelvin_voigt_newmark_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 

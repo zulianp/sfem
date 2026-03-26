@@ -98,6 +98,7 @@ int linear_elasticity_crs_aos(const smesh::ElemType              element_type,
                               const idx_t *const SFEM_RESTRICT   colidx,
                               real_t *const SFEM_RESTRICT        values);
 
+/// Isoparametric apply using explicit mesh coordinates @c xyz (full quadrature / geometry from points).
 int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                 const ptrdiff_t                   nelements,
                                 const ptrdiff_t                   nnodes,
@@ -108,6 +109,7 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT       values);
 
+/// Affine optimized apply: uses cached per-element (HEX8) or per-macro (semistructured hex) adjugate and det J.
 int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 element_type,
                                          const ptrdiff_t                       nelements,
                                          const ptrdiff_t                       nnodes,
@@ -119,6 +121,9 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
                                          const real_t                          lambda,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values);
+
+/// Element types that support linear_elasticity_apply_adjugate_aos (HEX8 and Proteus semistructured hex).
+int linear_elasticity_is_opt(smesh::ElemType element_type);
 
 int linear_elasticity_block_diag_sym_aos(const smesh::ElemType        element_type,
                                          const ptrdiff_t              nelements,
