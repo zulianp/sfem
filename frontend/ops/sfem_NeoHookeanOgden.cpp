@@ -6,10 +6,8 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-
 #include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "smesh_mesh.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -18,6 +16,7 @@
 
 // FIXME
 #include "hex8_neohookean_ogden.hpp"
+#include "hex8_partial_assembly_neohookean_inline.hpp"
 #include "tet4_neohookean_ogden.hpp"
 #include "tet4_partial_assembly_neohookean_inline.hpp"
 
@@ -28,11 +27,49 @@
 
 namespace sfem {
 
+    namespace {
+
+        void neo_seed_material(MultiDomainOp &m, const real_t mu, const real_t lambda) {
+            for (auto &d : m.domains()) {
+                d.second.parameters->set_value("mu", mu);
+                d.second.parameters->set_value("lambda", lambda);
+            }
+        }
+
+        void neo_copy_material(const MultiDomainOp &from, MultiDomainOp &to) {
+            for (const auto &kv : from.domains()) {
+                auto it = to.domains().find(kv.first);
+                if (it == to.domains().end()) {
+                    continue;
+                }
+                it->second.parameters->set_value("mu", kv.second.parameters->require_real_value("mu"));
+                it->second.parameters->set_value("lambda", kv.second.parameters->require_real_value("lambda"));
+            }
+        }
+
+        int neohookean_partial_assembly_metric_cols(const smesh::ElemType element_type) {
+            if (is_semistructured_type(element_type)) {
+                return HEX8_S_IKMN_SIZE;
+            }
+            switch (element_type) {
+                case smesh::TET4:
+                    return TET4_S_IKMN_SIZE;
+                case smesh::TET10:
+                case smesh::HEX8:
+                    return HEX8_S_IKMN_SIZE;
+                default:
+                    return TET4_S_IKMN_SIZE;
+            }
+        }
+
+    }  // namespace
+
     class NeoHookeanOgden::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
         real_t                         mu{1}, lambda{1};
+        bool                           use_affine_approximation{true};
 
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
@@ -49,6 +86,12 @@ namespace sfem {
         auto ret           = std::make_unique<NeoHookeanOgden>(space);
         ret->impl_->mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
         ret->impl_->lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
+
+        int SFEM_HEX8_ASSUME_AFFINE = ret->impl_->use_affine_approximation ? 1 : 0;
+        SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+        ret->impl_->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
+
+        ret->initialize({});
         return ret;
     }
 
@@ -83,13 +126,13 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_diag_aos(domain.element_type,
-                                             mesh->n_elements(),
+                                             domain.block->n_elements(),
                                              1,
                                              mesh->n_nodes(),
                                              domain.block->elements()->data(),
                                              mesh->points()->data(),
-                                             this->impl_->mu,
-                                             this->impl_->lambda,
+                                             domain.parameters->get_real_value("mu", impl_->mu),
+                                             domain.parameters->get_real_value("lambda", impl_->lambda),
                                              x,
                                              out);
 
@@ -186,6 +229,8 @@ namespace sfem {
     int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
+        neo_seed_material(*impl_->domains, impl_->mu, impl_->lambda);
+
         bool use_partial_assembly = smesh::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
         bool use_compression      = smesh::Env::read("SFEM_USE_COMPRESSION", false);
         bool use_AoS              = smesh::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
@@ -193,7 +238,8 @@ namespace sfem {
         for (auto &domain : impl_->domains->domains()) {
             auto ua = std::make_shared<struct ElasticityAssemblyData>();
             ua->use_partial_assembly =
-                    use_partial_assembly || domain.second.element_type == smesh::HEX8 || domain.second.element_type == smesh::TET10;
+                    use_partial_assembly || domain.second.element_type == smesh::HEX8 ||
+                    domain.second.element_type == smesh::TET10 || is_semistructured_type(domain.second.element_type);
             ua->use_compression     = use_compression;
             ua->use_AoS             = use_AoS;
             ua->elements            = domain.second.block->elements();
@@ -223,10 +269,10 @@ namespace sfem {
             auto mu           = domain.second.parameters->get_real_value("mu", impl_->mu);
             auto element_type = domain.second.element_type;
 
-            // FIXME: Add support for other element types
+            const int pa_cols = neohookean_partial_assembly_metric_cols(element_type);
             if (!assembly_data->partial_assembly_buffer) {
-                assembly_data->partial_assembly_buffer =
-                        sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
+                assembly_data->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(
+                        domain.second.block->n_elements() * (ptrdiff_t)pa_cols);
             }
 
             int ok = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
@@ -279,7 +325,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
             return neohookean_ogden_objective_steps_aos(domain.element_type,
-                                                        mesh->n_elements(),
+                                                        domain.block->n_elements(),
                                                         ua->elements_stride,
                                                         mesh->n_nodes(),
                                                         ua->elements->data(),
@@ -299,22 +345,52 @@ namespace sfem {
     std::shared_ptr<Op> NeoHookeanOgden::lor_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::lor_op");
 
-        // FIXME: Must work for all element types and multi-block
+        if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
+            SMESH_ERROR("NeoHookeanOgden::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            return nullptr;
+        }
+
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
         ret->impl_->domains = impl_->domains->lor_op(space, {});
-        ret->impl_->mu      = impl_->mu;
-        ret->impl_->lambda  = impl_->lambda;
+        neo_copy_material(*impl_->domains, *ret->impl_->domains);
+        ret->impl_->mu                        = impl_->mu;
+        ret->impl_->lambda                    = impl_->lambda;
+        ret->impl_->use_affine_approximation  = impl_->use_affine_approximation;
         return ret;
     }
 
     std::shared_ptr<Op> NeoHookeanOgden::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine_op");
 
-        // FIXME: Must work for all element types and multi-block
+        if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
+            auto ret = std::make_shared<NeoHookeanOgden>(space);
+            ret->initialize({});
+            neo_copy_material(*impl_->domains, *ret->impl_->domains);
+            ret->impl_->mu                       = impl_->mu;
+            ret->impl_->lambda                   = impl_->lambda;
+            ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
+            return ret;
+        }
+
+        if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type()) &&
+            !is_semistructured_type(space->element_type())) {
+            auto ret = std::make_shared<NeoHookeanOgden>(space);
+            ret->initialize({});
+            neo_copy_material(*impl_->domains, *ret->impl_->domains);
+            ret->impl_->mu                       = impl_->mu;
+            ret->impl_->lambda                   = impl_->lambda;
+            ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
+            assert(space->n_blocks() == 1);
+            ret->override_element_types({space->element_type()});
+            return ret;
+        }
+
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
         ret->impl_->domains = impl_->domains->derefine_op(space, {});
-        ret->impl_->mu      = impl_->mu;
-        ret->impl_->lambda  = impl_->lambda;
+        neo_copy_material(*impl_->domains, *ret->impl_->domains);
+        ret->impl_->mu                       = impl_->mu;
+        ret->impl_->lambda                   = impl_->lambda;
+        ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
 
@@ -334,8 +410,29 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 
-    void NeoHookeanOgden::set_mu(const real_t mu) { impl_->mu = mu; }
-    void NeoHookeanOgden::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
+    void NeoHookeanOgden::set_mu(const real_t mu) {
+        impl_->mu = mu;
+        if (impl_->domains) {
+            for (auto &d : impl_->domains->domains()) {
+                d.second.parameters->set_value("mu", mu);
+            }
+        }
+    }
+
+    void NeoHookeanOgden::set_lambda(const real_t lambda) {
+        impl_->lambda = lambda;
+        if (impl_->domains) {
+            for (auto &d : impl_->domains->domains()) {
+                d.second.parameters->set_value("lambda", lambda);
+            }
+        }
+    }
+
+    void NeoHookeanOgden::set_option(const std::string &name, const bool val) {
+        if (name == "ASSUME_AFFINE") {
+            impl_->use_affine_approximation = val;
+        }
+    }
 
     int NeoHookeanOgden::hessian_bsr(const real_t *const  x,
                                      const count_t *const rowptr,
@@ -393,3 +490,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

@@ -1,6 +1,8 @@
 #include "neohookean_ogden.hpp"
 
 #include "hex8_neohookean_ogden.hpp"
+#include "sfem_defs.hpp"
+#include "sshex8_neohookean_ogden.hpp"
 #include "tet10_neohookean_ogden.hpp"
 #include "tet4_neohookean_ogden.hpp"
 
@@ -125,6 +127,12 @@ int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
                                const real_t *const SFEM_RESTRICT u,
                                const real_t *const SFEM_RESTRICT h,
                                real_t *const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        (void)u;
+        SFEM_ERROR(
+                "neohookean_ogden_apply_aos: semi-structured Neo-Hookean Ogden uses partial assembly; use "
+                "neohookean_ogden_partial_assembly_apply with a cached metric buffer (see NeoHookeanOgden::apply).\n");
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_apply(nelements,
@@ -163,6 +171,25 @@ int neohookean_ogden_gradient_aos(const smesh::ElemType               element_ty
                                   const real_t                      lambda,
                                   const real_t *const SFEM_RESTRICT u,
                                   real_t *const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_gradient(level,
+                                                nelements,
+                                                1,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                3,
+                                                &u[0],
+                                                &u[1],
+                                                &u[2],
+                                                3,
+                                                &values[0],
+                                                &values[1],
+                                                &values[2]);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_gradient(nelements,
@@ -286,8 +313,11 @@ int neohookean_ogden_partial_assembly_diag(const smesh::ElemType               e
                                            real_t *const SFEM_RESTRICT       outx,
                                            real_t *const SFEM_RESTRICT       outy,
                                            real_t *const SFEM_RESTRICT       outz) {
-
-                                            
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("neohookean_ogden_partial_assembly_diag not implemented for semi-structured type %s\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
     switch (element_type) {
         case smesh::HEX8: {
             return hex8_neohookean_ogden_partial_assembly_diag(
@@ -312,6 +342,21 @@ int neohookean_ogden_hessian_partial_assembly(const smesh::ElemType             
                                               const real_t *const SFEM_RESTRICT    uy,
                                               const real_t *const SFEM_RESTRICT    uz,
                                               metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_hessian_partial_assembly(level,
+                                                                nelements,
+                                                                stride,
+                                                                elements,
+                                                                points,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                partial_assembly);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_hessian_partial_assembly(
@@ -345,6 +390,22 @@ int neohookean_ogden_partial_assembly_apply(const smesh::ElemType               
                                             real_t *const                              outx,
                                             real_t *const                              outy,
                                             real_t *const                              outz) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_partial_assembly_apply(level,
+                                                              nelements,
+                                                              stride,
+                                                              elements,
+                                                              partial_assembly,
+                                                              h_stride,
+                                                              hx,
+                                                              hy,
+                                                              hz,
+                                                              out_stride,
+                                                              outx,
+                                                              outy,
+                                                              outz);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_partial_assembly_apply(
@@ -379,6 +440,23 @@ int neohookean_ogden_compressed_partial_assembly_apply(const smesh::ElemType    
                                                        real_t *const                           outx,
                                                        real_t *const                           outy,
                                                        real_t *const                           outz) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_compressed_partial_assembly_apply(level,
+                                                                         nelements,
+                                                                         stride,
+                                                                         elements,
+                                                                         partial_assembly,
+                                                                         scaling,
+                                                                         h_stride,
+                                                                         hx,
+                                                                         hy,
+                                                                         hz,
+                                                                         out_stride,
+                                                                         outx,
+                                                                         outy,
+                                                                         outz);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_compressed_partial_assembly_apply(
@@ -411,6 +489,23 @@ int neohookean_ogden_objective_aos(const smesh::ElemType               element_t
                                    const real_t *const SFEM_RESTRICT u,
                                    const int                         is_element_wise,
                                    real_t *const SFEM_RESTRICT       out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_objective(level,
+                                                 nelements,
+                                                 stride,
+                                                 nnodes,
+                                                 elements,
+                                                 points,
+                                                 mu,
+                                                 lambda,
+                                                 3,
+                                                 &u[0],
+                                                 &u[1],
+                                                 &u[2],
+                                                 is_element_wise,
+                                                 out);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_objective(
@@ -444,6 +539,28 @@ int neohookean_ogden_objective_steps_aos(const smesh::ElemType               ele
                                          const int                         nsteps,
                                          const real_t *const               steps,
                                          real_t *const SFEM_RESTRICT       out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_objective_steps(level,
+                                                       nelements,
+                                                       stride,
+                                                       nnodes,
+                                                       elements,
+                                                       points,
+                                                       mu,
+                                                       lambda,
+                                                       3,
+                                                       &u[0],
+                                                       &u[1],
+                                                       &u[2],
+                                                       3,
+                                                       &inc[0],
+                                                       &inc[1],
+                                                       &inc[2],
+                                                       nsteps,
+                                                       steps,
+                                                       out);
+    }
     switch (element_type) {
         case smesh::TET4: {
             return tet4_neohookean_ogden_objective_steps(nelements,
@@ -528,7 +645,10 @@ int neohookean_ogden_bsr(const smesh::ElemType                element_type,
                          const idx_t *const SFEM_RESTRICT   colidx,
                          real_t *const SFEM_RESTRICT        values)
 {
- 
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("neohookean_ogden_bsr not implemented for semi-structured type %s\n", type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
     switch (element_type) {
         case smesh::HEX8: {
             return hex8_neohookean_ogden_bsr(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, values);
@@ -563,7 +683,10 @@ int neohookean_ogden_bcrs_sym(const smesh::ElemType                element_type,
                               real_t **const SFEM_RESTRICT       diag_values,
                               real_t **const SFEM_RESTRICT       off_diag_values)
 {
-    
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("neohookean_ogden_bcrs_sym not implemented for semi-structured type %s\n", type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
     switch (element_type) {
         case smesh::HEX8: {
             return hex8_neohookean_ogden_bcrs_sym(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, block_stride, diag_values, off_diag_values);
@@ -574,3 +697,4 @@ int neohookean_ogden_bcrs_sym(const smesh::ElemType                element_type,
     }
     return SFEM_FAILURE;
 }
+

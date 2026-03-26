@@ -7,8 +7,8 @@
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearElasticity.hpp"
-#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_VectorLaplacian.hpp"
 #include "smesh_glob.hpp"
@@ -20,7 +20,7 @@ namespace sfem {
 
         assert(space->has_semi_structured_mesh());
         if (!space->has_semi_structured_mesh()) {
-            fprintf(stderr,
+            SMESH_ERROR(
                     "[Error] SemiStructuredVectorLaplacian::create requires space with "
                     "semi_structured_mesh!\n");
             return nullptr;
@@ -32,13 +32,13 @@ namespace sfem {
         ret->element_type = (smesh::ElemType)space->element_type();
 
         // FIXME
-        auto macro_mesh = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+        auto macro_mesh =
+                space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
         ret->fff = create_host_buffer<jacobian_t>(macro_mesh->n_elements() * 6);
 
-        if (SFEM_SUCCESS != hex8_fff_fill(macro_mesh->n_elements(),
-                                          macro_mesh->elements(0)->data(),
-                                          macro_mesh->points()->data(),
-                                          ret->fff->data())) {
+        if (SFEM_SUCCESS !=
+            hex8_fff_fill(
+                    macro_mesh->n_elements(), macro_mesh->elements(0)->data(), macro_mesh->points()->data(), ret->fff->data())) {
             SFEM_ERROR("Unable to create fff");
         }
 
