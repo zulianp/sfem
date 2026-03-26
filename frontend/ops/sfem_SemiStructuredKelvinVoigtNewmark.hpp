@@ -1,11 +1,6 @@
 /**
- * @file sfem_SemiStructuredLinearElasticity.hpp
- * @brief Semi-structured linear elasticity operator for finite element analysis
- *
- * This file defines the SemiStructuredLinearElasticity operator, which implements
- * the discrete linear elasticity equations optimized for semi-structured meshes.
- * Semi-structured meshes are regular Cartesian grids with local refinements,
- * allowing for efficient matrix-free implementations.
+ * @file sfem_SemiStructuredKelvinVoigtNewmark.hpp
+ * @brief Semi-structured Kelvin–Voigt Newmark operator
  */
 
 #pragma once
