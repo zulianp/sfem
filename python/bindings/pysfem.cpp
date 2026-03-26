@@ -1,6 +1,8 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 #include <mpi.h>
 #include <memory>
@@ -22,10 +24,12 @@
 
 // Add missing includes
 #include "openmp/sfem_openmp_blas.hpp"
-#include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
 #include "sfem_ssmgc.hpp"
 #include "sfem_tpl_blas.hpp"
+#include "smesh_grid.hpp"
+#include "smesh_path.hpp"
+#include "smesh_semistructured.hpp"
 
 namespace nb = nanobind;
 
@@ -45,6 +49,7 @@ void SFEM_finalize() { MPI_Finalize(); }
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
+    using Grid_t                    = smesh::Grid<geom_t>;
     using LambdaOperator_t          = sfem::LambdaOperator<real_t>;
     using MatrixFreeLinearSolver_t  = sfem::MatrixFreeLinearSolver<real_t>;
     using Operator_t                = sfem::Operator<real_t>;
@@ -74,27 +79,31 @@ NB_MODULE(pysfem, m) {
             .value("MEMORY_SPACE_INVALID", MEMORY_SPACE_INVALID);
 
     // Add Grid class bindings with wrapper functions
-    nb::class_<Grid<geom_t>>(m, "Grid")
-            .def("create_from_file", [](const std::string &path) { return Grid<geom_t>::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), path); })
-            .def("create",
-                 [](const ptrdiff_t nx,
-                    const ptrdiff_t ny,
-                    const ptrdiff_t nz,
-                    const geom_t    xmin,
-                    const geom_t    ymin,
-                    const geom_t    zmin,
-                    const geom_t    xmax,
-                    const geom_t    ymax,
-                    const geom_t    zmax) {
-                     return Grid<geom_t>::create(sfem::Communicator::wrap(MPI_COMM_WORLD), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+    nb::class_<Grid_t>(m, "Grid")
+            .def_static("create_from_file",
+                        [](const std::string &path) {
+                            return Grid_t::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), path);
+                        })
+            .def_static("create",
+                        [](const ptrdiff_t nx,
+                           const ptrdiff_t ny,
+                           const ptrdiff_t nz,
+                           const geom_t    xmin,
+                           const geom_t    ymin,
+                           const geom_t    zmin,
+                           const geom_t    xmax,
+                           const geom_t    ymax,
+                           const geom_t    zmax) {
+                            return Grid_t::create(
+                                    sfem::Communicator::wrap(MPI_COMM_WORLD), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
                  })
-            .def("to_file", &Grid<geom_t>::to_file)
-            .def("extent", &Grid<geom_t>::extent)
-            .def("size", &Grid<geom_t>::size)
-            .def("spatial_dimension", &Grid<geom_t>::spatial_dimension)
-            .def("block_size", &Grid<geom_t>::block_size)
-            .def("buffer", &Grid<geom_t>::buffer)
-            .def("data", &Grid<geom_t>::data);
+            .def("to_file", &Grid_t::to_file)
+            .def("extent", &Grid_t::extent)
+            .def("size", &Grid_t::size)
+            .def("spatial_dimension", &Grid_t::spatial_dimension)
+            .def("block_size", &Grid_t::block_size)
+            .def("buffer", &Grid_t::buffer)
+            .def("data", &Grid_t::data);
 
     // Add Sideset class bindings with wrapper functions
     nb::class_<Buffer<int16_t>>(m, "Int16Buffer").def("size", &Buffer<int16_t>::size).def("data", [](const Buffer<int16_t> &buf) {
@@ -102,12 +111,14 @@ NB_MODULE(pysfem, m) {
     });
 
     nb::class_<Sideset>(m, "Sideset")
-            .def("create_from_file",
-                 [](const std::string &path) { return Sideset::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), path.c_str()); })
-            .def("create",
-                 [](const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi) {
-                     return Sideset::create(sfem::Communicator::wrap(MPI_COMM_WORLD), parent, lfi);
-                 })
+            .def_static("create_from_file",
+                        [](const std::string &path) {
+                            return Sideset::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), smesh::Path(path));
+                        })
+            .def_static("create",
+                        [](const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi) {
+                            return Sideset::create(sfem::Communicator::wrap(MPI_COMM_WORLD), parent, lfi);
+                        })
             .def_static("create_from_selector",
                         [](const std::shared_ptr<Mesh> &mesh, nb::callable selector) {
                             auto cpp_selector = [selector](geom_t x, geom_t y, geom_t z) -> bool {
@@ -118,7 +129,7 @@ NB_MODULE(pysfem, m) {
             .def("size", &Sideset::size)
             .def("node_indices",
                  [](const std::shared_ptr<Sideset> &sideset, const std::shared_ptr<FunctionSpace> &fs) {
-                     return create_nodeset_from_sideset(fs, sideset);
+                     return create_nodeset_from_sideset(fs->mesh_ptr(), sideset);
                  })
             .def("parent", &Sideset::parent)
             .def("lfi", &Sideset::lfi);
@@ -205,25 +216,22 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<Mesh>(m, "Mesh")  //
             .def(nb::init<>())
-            .def("read", &Mesh::read)
-            .def("write", &Mesh::write)
+            .def("read", [](Mesh &self, const std::string &path) { return self.read(smesh::Path(path)); })
+            .def_static("read",
+                        [](const std::string &path) {
+                            auto mesh = std::make_shared<Mesh>(sfem::Communicator::wrap(MPI_COMM_WORLD));
+                            mesh->read(smesh::Path(path));
+                            return mesh;
+                        })
+            .def("write", [](const Mesh &self, const std::string &path) { return self.write(smesh::Path(path)); })
             .def("n_nodes", &Mesh::n_nodes)
-            .def("n_elements", &Mesh::n_elements)
+            .def("n_elements", [](const Mesh &self) { return self.n_elements(); })
             .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
             .def("spatial_dimension", &Mesh::spatial_dimension);
 
     m.def("mesh_connectivity_from_file", [](const char *folder) -> std::shared_ptr<IdxBuffer2D> {
         return sfem::mesh_connectivity_from_file(sfem::Communicator::world(), folder);
     });
-    
-    // Add vector<Sideset> binding  
-    nb::class_<std::vector<std::shared_ptr<Sideset>>>(m, "vector<Sideset>")
-            .def("__getitem__", [](const std::vector<std::shared_ptr<Sideset>> &self, size_t index) -> std::shared_ptr<Sideset> {
-                return self[index];
-            })
-            .def("size", [](const std::vector<std::shared_ptr<Sideset>> &self) -> size_t {
-                return self.size();
-            });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
     nb::class_<sfem::Buffer<int>>(m, "Buffer<int>")
@@ -286,7 +294,7 @@ NB_MODULE(pysfem, m) {
           [](const char                           *elem_type_name,
              std::shared_ptr<sfem::Buffer<idx_t>>  idx,
              std::shared_ptr<sfem::Buffer<geom_t>> p) -> std::shared_ptr<Mesh> {
-              size_t        n            = idx->size();
+              size_t          n            = idx->size();
               smesh::ElemType element_type = type_from_string(elem_type_name);
 
               int       nnxe              = p->size() / n;  // Assuming p is a flattened array
@@ -326,8 +334,7 @@ NB_MODULE(pysfem, m) {
             .def("derefine", &FunctionSpace::derefine)
             .def("mesh", &FunctionSpace::mesh_ptr)
             .def("n_dofs", &FunctionSpace::n_dofs)
-            .def("block_size", &FunctionSpace::block_size)
-            .def("promote_to_semi_structured", &FunctionSpace::promote_to_semi_structured);
+            .def("block_size", &FunctionSpace::block_size);
 
     m.def("create_derefined_crs_graph", [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
         return sfem::create_derefined_crs_graph(*space);
@@ -341,9 +348,9 @@ NB_MODULE(pysfem, m) {
     m.def("create_hierarchical_prolongation", &sfem::create_hierarchical_prolongation);
 
     nb::class_<Constraint>(m, "Constraint");
-    nb::class_<Op>(m, "Op")
-        .def("initialize", &Op::initialize)
-        .def("initialize", [](Op& self) { return self.initialize(std::vector<std::string>{}); });
+    nb::class_<Op>(m, "Op").def("initialize", &Op::initialize).def("initialize", [](Op &self) {
+        return self.initialize(std::vector<std::string>{});
+    });
     m.def("create_op", [](const std::shared_ptr<FunctionSpace> &space, const char *name, nb::handle es_handle = nb::handle()) {
         if (!es_handle.is_valid()) {
             return Factory::create_op(space, name);
@@ -546,10 +553,17 @@ NB_MODULE(pysfem, m) {
                     std::shared_ptr<sfem::Buffer<real_t>> x,
                     std::shared_ptr<sfem::Buffer<real_t>> y) { cc->full_apply_boundary_mass_inverse(x->data(), y->data()); })
             .def_static("create",
-                        [](const std::shared_ptr<FunctionSpace> &fs,
-                           const std::shared_ptr<Grid<geom_t>>  &sdf,
+                        [](const std::shared_ptr<FunctionSpace>        &fs,
+                           const std::shared_ptr<Grid_t>               &sdf,
                            const std::vector<std::shared_ptr<Sideset>> &sidesets,
-                           const enum ExecutionSpace             es) { return ContactConditions::create(fs, sdf, sidesets, es); });
+                           const enum ExecutionSpace es) { return ContactConditions::create(fs, sdf, sidesets, es); })
+            .def_static("create",
+                        [](const std::shared_ptr<FunctionSpace> &fs,
+                           const std::shared_ptr<Grid_t>        &sdf,
+                           const std::shared_ptr<Sideset>       &sideset,
+                           const enum ExecutionSpace             es) {
+                            return ContactConditions::create(fs, sdf, {sideset}, es);
+                        });
 
     m.def("signed_distance_for_mesh_viz",
           [](const std::shared_ptr<ContactConditions> &cc,
@@ -735,11 +749,22 @@ NB_MODULE(pysfem, m) {
             .def("set_lower_bound", &ShiftedPenaltyMultigrid_t::set_lower_bound)
             .def("set_constraints_op", &ShiftedPenaltyMultigrid_t::set_constraints_op);
 
-    m.def(
-            "create_spmg", [](const std::shared_ptr<Function> &f, const enum ExecutionSpace es) -> auto{
-                auto spmg = sfem::create_ssmg<ShiftedPenaltyMultigrid_t>(f, es);
-                return spmg;
-            });
+    m.def("create_spmg", [](const std::shared_ptr<Function> &f, const enum ExecutionSpace es) -> auto {
+        auto spmg = sfem::create_ssmg<ShiftedPenaltyMultigrid_t>(f, es);
+        return spmg;
+    });
+
+    m.def("to_semistructured",
+          [](const int                    level,
+             const std::shared_ptr<Mesh> &mesh,
+             const bool                   hierarchical_ordering,
+             const bool                   use_gll) {
+              return smesh::to_semistructured(level, mesh, hierarchical_ordering, use_gll);
+          },
+          nb::arg("level"),
+          nb::arg("mesh"),
+          nb::arg("hierarchical_ordering") = true,
+          nb::arg("use_gll")               = false);
 
     m.def("set_upper_bound", [](std::shared_ptr<ShiftedPenaltyMultigrid_t> &op, std::shared_ptr<sfem::Buffer<real_t>> &x) {
         op->set_upper_bound(sfem::Buffer<real_t>::wrap(x->size(), x->data()));
@@ -774,15 +799,17 @@ NB_MODULE(pysfem, m) {
               auto cpp_sdf_func = [sdf_func](geom_t x, geom_t y, geom_t z) -> geom_t {
                   return nb::cast<geom_t>(sdf_func(x, y, z));
               };
-              return sfem::create_sdf(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
+              return smesh::create_sdf(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
           });
 
-    m.def("semi_structured_export_as_standard",
-          [](const std::shared_ptr<Mesh> &mesh, const std::string &path) {
-              return sfem::semi_structured_export_as_standard(mesh, path.c_str());
-          });
+    m.def("semi_structured_export_as_standard", [](const std::shared_ptr<Mesh> &mesh, const std::string &path) {
+        return sfem::semi_structured_export_as_standard(mesh, path.c_str());
+    });
     m.def("semi_structured_apply_hierarchical_renumbering",
-          [](const std::shared_ptr<Mesh> &mesh) { return sfem::semi_structured_apply_hierarchical_renumbering(*mesh); });
+          [](const std::shared_ptr<Mesh> &mesh) {
+              return smesh::semistructured_hierarchical_renumbering(
+                      mesh->element_type(0), smesh::semistructured_level(*mesh), mesh->n_nodes(), mesh->elements(0), mesh->points());
+          });
     m.def("semi_structured_level", [](const std::shared_ptr<Mesh> &mesh) { return smesh::semistructured_level(*mesh); });
 
     // Expose the C++ types as Python dtypes
