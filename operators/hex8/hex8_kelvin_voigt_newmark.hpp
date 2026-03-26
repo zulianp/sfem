@@ -13,7 +13,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t             nelem
                                                idx_t **const SFEM_RESTRICT elements,
 
                                                const jacobian_t *const g_jacobian_adjugate,
-                                               const jacobian_t *const g_jacobian_determinant,
+                                               const geom_t *const     g_jacobian_determinant,
 
                                                const real_t dt,
                                                const real_t gamma,
@@ -66,7 +66,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t             neleme
                                               idx_t **const SFEM_RESTRICT elements,
 
                                               const jacobian_t *const g_jacobian_adjugate,
-                                              const jacobian_t *const g_jacobian_determinant,
+                                              const geom_t *const     g_jacobian_determinant,
 
                                               const real_t k,
                                               const real_t K,

@@ -52,6 +52,8 @@ namespace sfem {
     std::shared_ptr<Op> LumpedMass::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LumpedMass::derefine_op");
 
+        // TODO: can the following code be simplified?
+
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LumpedMass>(space);
             ret->initialize({});
@@ -180,4 +182,3 @@ namespace sfem {
     void LumpedMass::set_option(const std::string & /*name*/, bool /*val*/) {}
 
 }  // namespace sfem
-

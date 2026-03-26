@@ -7,6 +7,11 @@ namespace sfem {
 
     /**
      * @brief Kelvin-Voigt viscoelastic operator with Newmark time integration
+     *
+     * Multi-block: @c initialize builds @c MultiDomainOp; material scalars are seeded from env
+     * and stored per block ( @c k , @c K , @c eta , @c dt , @c gamma , @c beta , @c rho ).
+     * Semi-structured macro HEX is dispatched in @c operators/kelvin_voigt_newmark.cpp .
+     * Register both @c KelvinVoigtNewmark and @c ss:KelvinVoigtNewmark with @c KelvinVoigtNewmark::create .
      */
     class KelvinVoigtNewmark final : public Op {
     public:
@@ -52,10 +57,12 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;
         int report(const real_t *const) override;
-        std::shared_ptr<Op> clone() const override { return nullptr; }
+        std::shared_ptr<Op> clone() const override;
 
         void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override;
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void set_option(const std::string &name, bool val) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
         // Accessors for stability/debug control
         real_t get_k() const;

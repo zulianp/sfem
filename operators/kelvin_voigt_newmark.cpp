@@ -1,6 +1,7 @@
 #include "kelvin_voigt_newmark.hpp"
 
 #include "hex8_kelvin_voigt_newmark.hpp"
+#include "sshex8_kelvin_voigt_newmark.hpp"
 
 #include <assert.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@ int kelvin_voigt_newmark_apply_adjugate_soa(const smesh::ElemType               
                                             const ptrdiff_t                       nnodes,
                                             idx_t **const SFEM_RESTRICT           elements,
                                             const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                            const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                            const geom_t *const SFEM_RESTRICT     jacobian_determinant,
                                             const real_t                          dt,
                                             const real_t                          gamma,
                                             const real_t                          beta,
@@ -58,7 +59,7 @@ int kelvin_voigt_newmark_gradient_soa(const smesh::ElemType                   el
                                       const ptrdiff_t                       nnodes,
                                       idx_t **const SFEM_RESTRICT           elements,
                                       const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                      const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                      const geom_t *const SFEM_RESTRICT     jacobian_determinant,
                                       const real_t                          k,
                                       const real_t                          K,
                                       const real_t                          eta,
@@ -113,7 +114,7 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const smesh::ElemType               
                                             const ptrdiff_t                       nnodes,
                                             idx_t **const SFEM_RESTRICT           elements,
                                             const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                            const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                            const geom_t *const SFEM_RESTRICT     jacobian_determinant,
                                             const real_t                          dt,
                                             const real_t                          gamma,
                                             const real_t                          beta,
@@ -123,6 +124,31 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const smesh::ElemType               
                                             const real_t                          rho,
                                             const real_t *const SFEM_RESTRICT     u,
                                             real_t *const SFEM_RESTRICT           values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_kelvin_voigt_newmark_apply_adjugate(level,
+                                                                  nelements,
+                                                                  nnodes,
+                                                                  elements,
+                                                                  jacobian_adjugate,
+                                                                  jacobian_determinant,
+                                                                  k,
+                                                                  K,
+                                                                  eta,
+                                                                  rho,
+                                                                  dt,
+                                                                  gamma,
+                                                                  beta,
+                                                                  3,
+                                                                  &u[0],
+                                                                  &u[1],
+                                                                  &u[2],
+                                                                  3,
+                                                                  &values[0],
+                                                                  &values[1],
+                                                                  &values[2]);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_kelvin_voigt_newmark_lhs_apply(nelements,
@@ -159,7 +185,7 @@ int kelvin_voigt_newmark_gradient_aos(const smesh::ElemType                   el
                                       const ptrdiff_t                       nnodes,
                                       idx_t **const SFEM_RESTRICT           elements,
                                       const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                      const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                      const geom_t *const SFEM_RESTRICT     jacobian_determinant,
                                       const real_t                          k,
                                       const real_t                          K,
                                       const real_t                          eta,
@@ -172,6 +198,34 @@ int kelvin_voigt_newmark_gradient_aos(const smesh::ElemType                   el
                                       const real_t *const SFEM_RESTRICT     ay,
                                       const real_t *const SFEM_RESTRICT     az,
                                       real_t *const SFEM_RESTRICT           values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_kelvin_voigt_newmark_gradient_adjugate(level,
+                                                                    nelements,
+                                                                    nnodes,
+                                                                    elements,
+                                                                    jacobian_adjugate,
+                                                                    jacobian_determinant,
+                                                                    k,
+                                                                    K,
+                                                                    eta,
+                                                                    rho,
+                                                                    3,
+                                                                    &u[0],
+                                                                    &u[1],
+                                                                    &u[2],
+                                                                    vx,
+                                                                    vy,
+                                                                    vz,
+                                                                    ax,
+                                                                    ay,
+                                                                    az,
+                                                                    3,
+                                                                    &values[0],
+                                                                    &values[1],
+                                                                    &values[2]);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_kelvin_voigt_newmark_gradient(nelements,
@@ -219,6 +273,26 @@ int kelvin_voigt_newmark_assemble_diag_aos(const smesh::ElemType          elemen
                                            const real_t                 eta,
                                            const real_t                 rho,
                                            real_t *const SFEM_RESTRICT  values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_kelvin_voigt_newmark_diag(level,
+                                                       nelements,
+                                                       nnodes,
+                                                       elems,
+                                                       xyz,
+                                                       beta,
+                                                       gamma,
+                                                       dt,
+                                                       k,
+                                                       K,
+                                                       eta,
+                                                       rho,
+                                                       3,
+                                                       &values[0],
+                                                       &values[1],
+                                                       &values[2]);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_kelvin_voigt_newmark_diag(
@@ -295,6 +369,29 @@ int kelvin_voigt_newmark_block_diag_sym(const smesh::ElemType          element_t
                                         real_t *const                out3,
                                         real_t *const                out4,
                                         real_t *const                out5) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_kelvin_voigt_newmark_block_diag_sym(level,
+                                                                 nelements,
+                                                                 nnodes,
+                                                                 elements,
+                                                                 points,
+                                                                 beta,
+                                                                 gamma,
+                                                                 dt,
+                                                                 k,
+                                                                 K,
+                                                                 eta,
+                                                                 rho,
+                                                                 out_stride,
+                                                                 out0,
+                                                                 out1,
+                                                                 out2,
+                                                                 out3,
+                                                                 out4,
+                                                                 out5);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_kelvin_voigt_newmark_block_diag_sym(nelements,
