@@ -161,8 +161,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("LinearElasticity::lor_op");
 
         if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type())) {
-            fprintf(stderr, "[Error] LinearElasticity::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
-            assert(false);
+            SMESH_ERROR("LinearElasticity::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
 

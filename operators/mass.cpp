@@ -21,6 +21,7 @@
 #include "tri3_mass.hpp"
 #include "tri6_mass.hpp"
 #include "trishell3_mass.hpp"
+#include "sshex8_mass.hpp"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
@@ -68,6 +69,13 @@ void assemble_lumped_mass(const int element_type,
                           geom_t **const SFEM_RESTRICT xyz,
                           real_t *const SFEM_RESTRICT values) {
     if (!nelements) return;
+
+    const smesh::ElemType et = (smesh::ElemType)element_type;
+    if (sfem::is_semistructured_type(et)) {
+        const int level = smesh::semistructured_level(et);
+        affine_sshex8_mass_lumped(level, nelements, 0, elems, xyz, values);
+        return;
+    }
 
     switch (element_type) {
         case smesh::TRI3: {

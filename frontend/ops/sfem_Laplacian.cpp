@@ -106,8 +106,7 @@ namespace sfem {
 
     std::shared_ptr<Op> Laplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            fprintf(stderr, "[Error] Laplacian::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
-            assert(false);
+            SMESH_ERROR("Laplacian::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
         auto ret            = std::make_shared<Laplacian>(space);

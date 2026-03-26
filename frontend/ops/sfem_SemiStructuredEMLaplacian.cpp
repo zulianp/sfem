@@ -45,8 +45,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        fprintf(stderr, "[Error] SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
-        assert(false);
+        SMESH_ERROR("SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 

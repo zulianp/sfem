@@ -306,8 +306,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SemiStructuredKelvinVoigtNewmark::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        assert(false);
-        fprintf(stderr, "[Error] ss:KelvinVoigtNewmark::lor_op NOT IMPLEMENTED!\n");
+        SMESH_ERROR("ss:KelvinVoigtNewmark::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
