@@ -6,7 +6,7 @@ int hex8_adjugate_and_det_fill(const ptrdiff_t                 nelements,
                                idx_t **const SFEM_RESTRICT     elements,
                                geom_t **const SFEM_RESTRICT    points,
                                jacobian_t *const SFEM_RESTRICT adjugate,
-                               jacobian_t *const SFEM_RESTRICT determinant) {
+                               geom_t *const SFEM_RESTRICT     determinant) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
@@ -32,7 +32,7 @@ int hex8_adjugate_and_det_fill(const ptrdiff_t                 nelements,
             adjugate[i * 9 + d] = l_adjugate[d];
         }
 
-        determinant[i] = l_determinant;
+        determinant[i] = (geom_t)l_determinant;
     }
 
     return SFEM_SUCCESS;

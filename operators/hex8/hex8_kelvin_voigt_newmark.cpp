@@ -13,7 +13,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t             nelem
                                                idx_t **const SFEM_RESTRICT elements,
 
                                                const jacobian_t *const g_jacobian_adjugate,
-                                               const jacobian_t *const g_jacobian_determinant,
+                                               const geom_t *const     g_jacobian_determinant,
 
                                                const real_t dt,
                                                const real_t gamma,
@@ -50,7 +50,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t             nelem
         accumulator_t element_outz[8];
 
         scalar_t jacobian_adjugate[9];
-        scalar_t jacobian_determinant = g_jacobian_determinant[i];
+        scalar_t jacobian_determinant = (scalar_t)g_jacobian_determinant[i];
 
         for (int d = 0; d < 9; d++) {
             jacobian_adjugate[d] = g_jacobian_adjugate[i * 9 + d];
@@ -123,7 +123,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t             neleme
                                               idx_t **const SFEM_RESTRICT elements,
 
                                               const jacobian_t *const g_jacobian_adjugate,
-                                              const jacobian_t *const g_jacobian_determinant,
+                                              const geom_t *const     g_jacobian_determinant,
 
                                               const real_t k,
                                               const real_t K,
@@ -174,7 +174,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t             neleme
         accumulator_t element_outz[8];
 
         scalar_t jacobian_adjugate[9];
-        scalar_t jacobian_determinant = g_jacobian_determinant[i];
+        scalar_t jacobian_determinant = (scalar_t)g_jacobian_determinant[i];
 
         for (int d = 0; d < 9; d++) {
             jacobian_adjugate[d] = g_jacobian_adjugate[i * 9 + d];

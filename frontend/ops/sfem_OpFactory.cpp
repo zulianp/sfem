@@ -20,14 +20,9 @@
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
 #include "sfem_Gradient.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
 #include <map>
-
-// Forward declarations for other operators that will be moved
-namespace sfem {
-    std::unique_ptr<Op> create_kelvin_voigt_newmark(const std::shared_ptr<FunctionSpace> &space);
-}
 
 namespace sfem {
 
@@ -45,8 +40,8 @@ namespace sfem {
         static Factory instance_;
 
         if (instance_.impl_->name_to_create.empty()) {
-            instance_.private_register_op("KelvinVoigtNewmark", create_kelvin_voigt_newmark);
-            instance_.private_register_op("ss:KelvinVoigtNewmark", SemiStructuredKelvinVoigtNewmark::create);
+            instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
+            instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
