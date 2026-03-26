@@ -12,7 +12,6 @@
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_SemiStructuredNeoHookeanOgden.hpp"
 #include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
 #include "sfem_PackedLaplacian.hpp"
@@ -63,7 +62,7 @@ namespace sfem {
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
-            instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
+            instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
