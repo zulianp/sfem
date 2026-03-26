@@ -33,8 +33,11 @@ namespace sfem {
      * - Multiple matrix formats (CRS, BSR, diagonal)
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
-     * - Multi-domain operations via MultiDomainOp
-     */
+         * - Multi-domain operations via MultiDomainOp
+         * - Semi-structured Proteus hex (same paths as former @c ss:LinearElasticity): @c apply /
+         *   @c gradient / @c hessian_bsr / @c hessian_diag / @c hessian_block_diag_sym when
+         *   @c has_semi_structured_mesh() and @c is_semistructured_type(element_type).
+         */
     class LinearElasticity final : public Op {
     public:
         const char *name() const override { return "LinearElasticity"; }
@@ -42,7 +45,6 @@ namespace sfem {
         ptrdiff_t  n_dofs_domain() const override;
         ptrdiff_t  n_dofs_image() const override;
 
-        // Accessors for compatibility with semi-structured wrappers
         real_t get_mu() const;
         void   set_mu(real_t val);
         real_t get_lambda() const;
@@ -131,6 +133,9 @@ namespace sfem {
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
+
+        /// @c "ASSUME_AFFINE" toggles macro-adjugate SS apply (default on; same meaning as @c SFEM_HEX8_ASSUME_AFFINE at create).
+        void set_option(const std::string &name, bool val) override;
 
     private:
         class Impl;

@@ -12,6 +12,7 @@
 #include "smesh_mesh.hpp"
 #include "smesh_spaces.hpp"
 
+#include <assert.h>
 #include <functional>
 
 namespace sfem {
@@ -46,6 +47,45 @@ namespace sfem {
             }
         }
 
+        int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,
+                                                     smesh::Mesh        &mesh,
+                                                     bool                assume_affine,
+                                                     const real_t        mu,
+                                                     const real_t        lambda,
+                                                     const real_t *const h,
+                                                     real_t *const       out) {
+            auto block        = domain.block;
+            auto element_type = domain.element_type;
+            const bool use_adjugate =
+                    domain.user_data &&
+                    (element_type == smesh::HEX8 ||
+                     (sfem::is_semistructured_type(element_type) && assume_affine));
+            if (use_adjugate) {
+                auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
+                SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
+                return linear_elasticity_apply_adjugate_aos(element_type,
+                                                            block->n_elements(),
+                                                            mesh.n_nodes(),
+                                                            block->elements()->data(),
+                                                            mesh.points()->data(),
+                                                            jac->jacobian_adjugate_AoS()->data(),
+                                                            jac->jacobian_determinant()->data(),
+                                                            mu,
+                                                            lambda,
+                                                            h,
+                                                            out);
+            }
+            return linear_elasticity_apply_aos(element_type,
+                                               block->n_elements(),
+                                               mesh.n_nodes(),
+                                               block->elements()->data(),
+                                               mesh.points()->data(),
+                                               mu,
+                                               lambda,
+                                               h,
+                                               out);
+        }
+
     }  // namespace
 
     class LinearElasticity::Impl {
@@ -55,6 +95,7 @@ namespace sfem {
 
         real_t mu{1};      ///< Shear modulus (second Lamé parameter)
         real_t lambda{1};  ///< First Lamé parameter
+        bool   use_affine_approximation{true};
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -105,14 +146,17 @@ namespace sfem {
 
         auto ret = std::make_unique<LinearElasticity>(space);
 
-        real_t SFEM_SHEAR_MODULUS        = 1;
-        real_t SFEM_FIRST_LAME_PARAMETER = 1;
+        real_t SFEM_SHEAR_MODULUS          = 1;
+        real_t SFEM_FIRST_LAME_PARAMETER   = 1;
+        int    SFEM_HEX8_ASSUME_AFFINE     = ret->impl_->use_affine_approximation ? 1 : 0;
 
         SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
         SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+        SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
 
-        ret->impl_->mu     = SFEM_SHEAR_MODULUS;
-        ret->impl_->lambda = SFEM_FIRST_LAME_PARAMETER;
+        ret->impl_->mu                       = SFEM_SHEAR_MODULUS;
+        ret->impl_->lambda                   = SFEM_FIRST_LAME_PARAMETER;
+        ret->impl_->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
 
         return ret;
     }
@@ -120,17 +164,43 @@ namespace sfem {
     std::shared_ptr<Op> LinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LinearElasticity::lor_op");
 
+        if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type())) {
+            fprintf(stderr, "[Error] LinearElasticity::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            assert(false);
+            return nullptr;
+        }
+
         // FIXME: Must work for all element types and multi-block
 
         auto ret            = std::make_shared<LinearElasticity>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
-        ret->impl_->mu      = impl_->mu;
-        ret->impl_->lambda  = impl_->lambda;
+        ret->impl_->domains                  = impl_->domains->lor_op(space, {});
+        ret->impl_->mu                       = impl_->mu;
+        ret->impl_->lambda                   = impl_->lambda;
+        ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
 
     std::shared_ptr<Op> LinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LinearElasticity::derefine_op");
+
+        if (space->has_semi_structured_mesh() && sfem::is_semistructured_type(space->element_type())) {
+            auto ret = std::make_shared<LinearElasticity>(space);
+            ret->set_mu(impl_->mu);
+            ret->set_lambda(impl_->lambda);
+            ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
+            return ret;
+        }
+
+        if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type()) &&
+            !sfem::is_semistructured_type(space->element_type())) {
+            auto ret = std::make_shared<LinearElasticity>(space);
+            ret->set_mu(impl_->mu);
+            ret->set_lambda(impl_->lambda);
+            ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
+            assert(space->n_blocks() == 1);
+            ret->override_element_types({space->element_type()});
+            return ret;
+        }
 
         // FIXME: Must work for all element types and multi-block
 
@@ -138,6 +208,7 @@ namespace sfem {
         ret->impl_->domains = impl_->domains->derefine_op(space, {});
         ret->impl_->mu      = impl_->mu;
         ret->impl_->lambda  = impl_->lambda;
+        ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
 
@@ -312,8 +383,8 @@ namespace sfem {
                                                        mesh->n_nodes(),
                                                        block->elements()->data(),
                                                        mesh->points()->data(),
-                                                       impl_->mu,
-                                                       impl_->lambda,
+                                                       mu,
+                                                       lambda,
                                                        out);
         });
 
@@ -325,20 +396,10 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
-            auto element_type = domain.element_type;
-
-            return linear_elasticity_assemble_gradient_aos(element_type,
-                                                           block->n_elements(),
-                                                           mesh->n_nodes(),
-                                                           block->elements()->data(),
-                                                           mesh->points()->data(),
-                                                           mu,
-                                                           lambda,
-                                                           x,
-                                                           out);
+            auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
+            auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
+            return linear_elasticity_dispatch_domain_vector(
+                    domain, *mesh, impl_->use_affine_approximation, mu, lambda, x, out);
         });
     }
 
@@ -348,36 +409,10 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
-            auto element_type = domain.element_type;
-
-            if (domain.user_data) {
-                auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
-                SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
-                return linear_elasticity_apply_adjugate_aos(element_type,
-                                                            block->n_elements(),
-                                                            mesh->n_nodes(),
-                                                            block->elements()->data(),
-                                                            mesh->points()->data(),
-                                                            jac->jacobian_adjugate_AoS()->data(),
-                                                            jac->jacobian_determinant()->data(),
-                                                            mu,
-                                                            lambda,
-                                                            h,
-                                                            out);
-            } else {
-                return linear_elasticity_apply_aos(element_type,
-                                                   block->n_elements(),
-                                                   mesh->n_nodes(),
-                                                   block->elements()->data(),
-                                                   mesh->points()->data(),
-                                                   mu,
-                                                   lambda,
-                                                   h,
-                                                   out);
-            }
+            auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
+            auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
+            return linear_elasticity_dispatch_domain_vector(
+                    domain, *mesh, impl_->use_affine_approximation, mu, lambda, h, out);
         });
     }
 
@@ -403,8 +438,18 @@ namespace sfem {
     int LinearElasticity::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> LinearElasticity::clone() const {
-        SFEM_ERROR("Not implemented");
-        return nullptr;
+        auto ret = std::make_shared<LinearElasticity>(impl_->space);
+        ret->impl_->domains                  = impl_->domains;
+        ret->impl_->mu                       = impl_->mu;
+        ret->impl_->lambda                   = impl_->lambda;
+        ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
+        return ret;
+    }
+
+    void LinearElasticity::set_option(const std::string &name, bool val) {
+        if (name == "ASSUME_AFFINE") {
+            impl_->use_affine_approximation = val;
+        }
     }
 
     void LinearElasticity::set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) {
@@ -415,7 +460,6 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 
-    // Accessors for compatibility with semi-structured wrappers
     real_t LinearElasticity::get_mu() const { return impl_->mu; }
     void   LinearElasticity::set_mu(real_t val) { impl_->mu = val; }
     real_t LinearElasticity::get_lambda() const { return impl_->lambda; }

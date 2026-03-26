@@ -1,6 +1,7 @@
 #include "linear_elasticity.hpp"
 
 #include "hex8_linear_elasticity.hpp"
+#include "sfem_defs.hpp"
 #include "sshex8_linear_elasticity.hpp"
 
 #include "macro_tet4_linear_elasticity.hpp"
@@ -149,6 +150,21 @@ int linear_elasticity_assemble_diag_aos(const smesh::ElemType          element_t
                                         const real_t                 mu,
                                         const real_t                 lambda,
                                         real_t *const SFEM_RESTRICT  values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_diag(level,
+                                                    nelements,
+                                                    nnodes,
+                                                    elements,
+                                                    points,
+                                                    mu,
+                                                    lambda,
+                                                    3,
+                                                    &values[0],
+                                                    &values[1],
+                                                    &values[2]);
+    }
+
     switch (element_type) {
         case smesh::TRI3: {
             return tri3_linear_elasticity_diag(nelements, nnodes, elements, points, mu, lambda, 2, &values[0], &values[1]);
@@ -186,6 +202,25 @@ int linear_elasticity_apply_aos(const smesh::ElemType               element_type
                                 const real_t                      lambda,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_linear_elasticity_apply(level,
+                                              nelements,
+                                              nnodes,
+                                              elements,
+                                              points,
+                                              mu,
+                                              lambda,
+                                              3,
+                                              &u[0],
+                                              &u[1],
+                                              &u[2],
+                                              3,
+                                              &values[0],
+                                              &values[1],
+                                              &values[2]);
+    }
+
     switch (element_type) {
         case smesh::TRI3: {
             return tri3_linear_elasticity_apply(
@@ -370,6 +405,12 @@ int linear_elasticity_bsr(const smesh::ElemType                element_type,
                           const count_t *const SFEM_RESTRICT rowptr,
                           const idx_t *const SFEM_RESTRICT   colidx,
                           real_t *const SFEM_RESTRICT        values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_elasticity_bsr(
+                level, nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+    }
+
     switch (element_type) {
         case smesh::TET4: {
             return tet4_linear_elasticity_bsr(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
@@ -416,6 +457,24 @@ int linear_elasticity_block_diag_sym_aos(const smesh::ElemType          element_
                                          const real_t                 mu,
                                          const real_t                 lambda,
                                          real_t *const                out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_block_diag_sym(level,
+                                                              nelements,
+                                                              nnodes,
+                                                              elements,
+                                                              points,
+                                                              mu,
+                                                              lambda,
+                                                              6,
+                                                              &out[0],
+                                                              &out[1],
+                                                              &out[2],
+                                                              &out[3],
+                                                              &out[4],
+                                                              &out[5]);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_linear_elasticity_block_diag_sym(
@@ -436,6 +495,24 @@ int linear_elasticity_block_diag_sym_soa(const smesh::ElemType          element_
                                          const real_t                 mu,
                                          const real_t                 lambda,
                                          real_t **const SFEM_RESTRICT out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_block_diag_sym(level,
+                                                              nelements,
+                                                              nnodes,
+                                                              elements,
+                                                              points,
+                                                              mu,
+                                                              lambda,
+                                                              1,
+                                                              out[0],
+                                                              out[1],
+                                                              out[2],
+                                                              out[3],
+                                                              out[4],
+                                                              out[5]);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return affine_hex8_linear_elasticity_block_diag_sym(
@@ -447,3 +524,4 @@ int linear_elasticity_block_diag_sym_soa(const smesh::ElemType          element_
         }
     }
 }
+

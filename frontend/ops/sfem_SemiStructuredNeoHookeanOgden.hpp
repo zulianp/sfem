@@ -15,7 +15,7 @@
          ~SemiStructuredNeoHookeanOgden();
  
          /**
-          * @brief Create a SemiStructuredLinearElasticity operator
+          * @brief Create a SemiStructuredNeoHookeanOgden operator
           * @param space Function space
           * @return Unique pointer to the operator
           */
