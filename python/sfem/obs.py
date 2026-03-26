@@ -11,6 +11,12 @@ import os
 import numpy as np
 import pysfem as sfem
 
+def create_function_space(mesh, block_size, refine_level=1):
+    working_mesh = mesh
+    if refine_level > 1:
+        working_mesh = sfem.to_semistructured(refine_level, mesh)
+    return working_mesh, sfem.FunctionSpace(working_mesh, block_size)
+
 def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary_path, output_path):
     """
     Solve obstacle problem using SFEM Python bindings.
@@ -44,14 +50,11 @@ def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary
         
         print(f"Creating mesh from: {mesh_path}")
         # Create mesh and function space
-        mesh = sfem.Mesh.read(mesh_path)
-        block_size = mesh.spatial_dimension()
-        fs = sfem.FunctionSpace(mesh, block_size)
-        
-        print(f"Promoting to semi-structured with level {element_refine_level}")
-        # Promote to semi-structured mesh
-        fs.promote_to_semi_structured(element_refine_level)
-        sfem.semi_structured_apply_hierarchical_renumbering(fs.mesh())
+        macro_mesh = sfem.Mesh.read(mesh_path)
+        block_size = macro_mesh.spatial_dimension()
+
+        print(f"Creating semi-structured mesh with level {element_refine_level}")
+        _, fs = create_function_space(macro_mesh, block_size, element_refine_level)
         
         # Create function and operator
         print(f"Creating {operator_type} operator")
@@ -62,8 +65,8 @@ def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary
         
         print(f"Loading SDF from: {sdf_path}")
         # Load SDF and contact boundary
-        sdf = sfem.Grid.create_from_file(sfem.MPI_COMM_WORLD, sdf_path)
-        contact_boundary = sfem.Sideset.create_from_file(sfem.MPI_COMM_WORLD, contact_boundary_path)
+        sdf = sfem.Grid.create_from_file(sdf_path)
+        contact_boundary = sfem.Sideset.create_from_file(contact_boundary_path)
         contact_conds = sfem.ContactConditions.create(fs, sdf, contact_boundary, es)
         
         # Create solution vectors
@@ -154,9 +157,7 @@ def build_cuboid_sphere_contact(base_resolution=2, element_refine_level=2, es=No
         0, 0, 0, 1, y_top, 1)
     
     block_size = m.spatial_dimension()
-    fs = sfem.FunctionSpace(m, block_size)
-    fs.promote_to_semi_structured(element_refine_level)
-    sfem.semi_structured_apply_hierarchical_renumbering(fs.mesh())
+    _, fs = create_function_space(m, block_size, element_refine_level)
     f = sfem.Function(fs)
     op = sfem.create_op(fs, "LinearElasticity", es)
     op.initialize()
@@ -208,9 +209,7 @@ def build_cuboid_highfreq_contact(base_resolution=2, element_refine_level=2, es=
         base_resolution * resolution_ratio,
         0, 0, 0, 1, y_top, 1)
     block_size = m.spatial_dimension()
-    fs = sfem.FunctionSpace(m, block_size)
-    fs.promote_to_semi_structured(element_refine_level)
-    sfem.semi_structured_apply_hierarchical_renumbering(fs.mesh())
+    _, fs = create_function_space(m, block_size, element_refine_level)
     f = sfem.Function(fs)
     op = sfem.create_op(fs, "LinearElasticity", es)
     op.initialize()
@@ -272,9 +271,7 @@ def build_cuboid_multisphere_contact(base_resolution=2, element_refine_level=2, 
         base_resolution * resolution_ratio,
         0, 0, 0, 1, y_top, 1)
     block_size = m.spatial_dimension()
-    fs = sfem.FunctionSpace(m, block_size)
-    fs.promote_to_semi_structured(element_refine_level)
-    sfem.semi_structured_apply_hierarchical_renumbering(fs.mesh())
+    _, fs = create_function_space(m, block_size, element_refine_level)
     f = sfem.Function(fs)
     op = sfem.create_op(fs, "LinearElasticity", es)
     op.initialize()

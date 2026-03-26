@@ -23,8 +23,6 @@ namespace sfem {
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const smesh::ElemType element_type = smesh::INVALID);
         ~FunctionSpace();
 
-        // int promote_to_semi_structured(const int level);
-
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
                                                      const int                    block_size   = 1,
                                                      const smesh::ElemType          element_type = smesh::INVALID) {

@@ -189,36 +189,6 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
         // Initialize element types for multi-block support
     }
-
-    // int FunctionSpace::promote_to_semi_structured(const int level) {
-    //     // Check if we have a multi-block mesh
-    //     if (impl_->mesh->n_blocks() > 1) {
-    //         // For multi-block meshes, we need to check if all blocks are compatible
-    //         // For now, we'll only promote if the default element type is smesh::HEX8
-    //         if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
-    //             impl_->mesh = smesh::to_semistructured(level, impl_->mesh, true, false);
-    //             impl_->override_element_types(impl_->mesh->element_type(0));
-    //             impl_->nlocal  = impl_->mesh->n_nodes() * impl_->block_size;
-    //             impl_->nglobal = impl_->nlocal;
-
-    //             return SFEM_SUCCESS;
-    //         }
-    //         return SFEM_FAILURE;
-    //     } else {
-    //         // Single block mesh - original behavior
-    //         if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
-    //             impl_->mesh = smesh::to_semistructured(level, impl_->mesh, true, false);
-    //             impl_->override_element_types(impl_->mesh->element_type(0));
-    //             impl_->nlocal  = impl_->mesh->n_nodes() * impl_->block_size;
-    //             impl_->nglobal = impl_->nlocal;
-
-    //             return SFEM_SUCCESS;
-    //         }
-    //     }
-
-    //     return SFEM_FAILURE;
-    // }
-
     FunctionSpace::~FunctionSpace() = default;
 
     bool FunctionSpace::has_semi_structured_mesh() const {
