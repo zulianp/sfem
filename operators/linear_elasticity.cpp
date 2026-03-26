@@ -1,6 +1,8 @@
 #include "linear_elasticity.hpp"
 
 #include "hex8_linear_elasticity.hpp"
+#include "sshex8_linear_elasticity.hpp"
+
 #include "macro_tet4_linear_elasticity.hpp"
 #include "tet10_linear_elasticity.hpp"
 #include "tet4_linear_elasticity.hpp"
@@ -286,35 +288,53 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                  
                                          const ptrdiff_t                       nelements,
                                          const ptrdiff_t                       nnodes,
                                          idx_t **const SFEM_RESTRICT           elements,
+                                         geom_t **const SFEM_RESTRICT          points,
                                          const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const geom_t *const SFEM_RESTRICT     jacobian_determinant,
                                          const real_t                          mu,
                                          const real_t                          lambda,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values) {
-    switch (element_type) {
-        case smesh::HEX8: {
-            return affine_hex8_linear_elasticity_apply_adjugate(nelements,
-                                                                nnodes,
-                                                                elements,
-                                                                jacobian_adjugate,
-                                                                jacobian_determinant,
-                                                                mu,
-                                                                lambda,
-                                                                3,
-                                                                &u[0],
-                                                                &u[1],
-                                                                &u[2],
-                                                                3,
-                                                                &values[0],
-                                                                &values[1],
-                                                                &values[2]);
-        }
-        default: {
-            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
-        }
+    if (element_type == smesh::HEX8) {
+        return affine_hex8_linear_elasticity_apply_adjugate(nelements,
+                                                            nnodes,
+                                                            elements,
+                                                            jacobian_adjugate,
+                                                            (const jacobian_t *)jacobian_determinant,
+                                                            mu,
+                                                            lambda,
+                                                            3,
+                                                            &u[0],
+                                                            &u[1],
+                                                            &u[2],
+                                                            3,
+                                                            &values[0],
+                                                            &values[1],
+                                                            &values[2]);
     }
 
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_apply_macro_adjugate(level,
+                                                                    nelements,
+                                                                    nnodes,
+                                                                    elements,
+                                                                    points,
+                                                                    jacobian_adjugate,
+                                                                    jacobian_determinant,
+                                                                    mu,
+                                                                    lambda,
+                                                                    3,
+                                                                    &u[0],
+                                                                    &u[1],
+                                                                    &u[2],
+                                                                    3,
+                                                                    &values[0],
+                                                                    &values[1],
+                                                                    &values[2]);
+    }
+
+    SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
     return SFEM_FAILURE;
 }
 
