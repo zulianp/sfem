@@ -1,16 +1,15 @@
 #include "sfem_Laplacian.hpp"
 
-#include "hex8_fff.hpp"
 #include "laplacian.hpp"
-#include "sshex8_laplacian.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_glob.hpp"
+#include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
-#include "tet4_fff.hpp"
+#include "smesh_spaces.hpp"
 
 #include <string>
 
@@ -18,14 +17,28 @@ namespace sfem {
 
     namespace {
 
+        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
+            for (size_t i = 0; i < mesh.n_blocks(); i++) {
+                if (mesh.block(i).get() == &block) {
+                    return static_cast<smesh::block_idx_t>(i);
+                }
+            }
+            SFEM_ERROR("Laplacian: mesh block pointer not found in mesh.blocks()");
+            return 0;
+        }
+
         int laplacian_dispatch_domain_vector(const OpDomain     &domain,
                                              smesh::Mesh        &mesh,
                                              const real_t *const u,
                                              real_t *const       out) {
             if (domain.user_data) {
-                auto fff = std::static_pointer_cast<Buffer<jacobian_t>>(domain.user_data);
-                return laplacian_apply_opt(
-                        domain.element_type, domain.block->n_elements(), domain.block->elements()->data(), fff->data(), u, out);
+                auto fff = std::static_pointer_cast<smesh::FFF>(domain.user_data);
+                return laplacian_apply_opt(domain.element_type,
+                                           domain.block->n_elements(),
+                                           domain.block->elements()->data(),
+                                           fff->fff_AoS()->data(),
+                                           u,
+                                           out);
             }
             return laplacian_apply(domain.element_type,
                                    domain.block->n_elements(),
@@ -47,9 +60,8 @@ namespace sfem {
 #endif
         explicit Impl(const std::shared_ptr<FunctionSpace> &sp) : space(sp) {
 #if SFEM_PRINT_THROUGHPUT
-            const std::string op_name =
-                    std::string("Laplacian[") + sfem::type_to_string(sp->element_type()) + "]::apply";
-            op_profiler = std::make_unique<OpTracer>(space, op_name);
+            const std::string op_name = std::string("Laplacian[") + sfem::type_to_string(sp->element_type()) + "]::apply";
+            op_profiler               = std::make_unique<OpTracer>(space, op_name);
 #endif
         }
 
@@ -69,20 +81,13 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
 
         for (auto &n2d : impl_->domains->domains()) {
-            auto &domain       = n2d.second;
-            auto  element_type = domain.element_type;
-            auto  block        = domain.block;
+            OpDomain &domain = n2d.second;
+            auto      block  = domain.block;
 
-            auto fff = create_host_buffer<jacobian_t>(block->n_elements() * 6);
-
-            if (is_semistructured_type(element_type)) {
-                const int level = smesh::semistructured_level(element_type);
-                sshex8_macro_fff_fill(
-                        level, block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
-            } else if (element_type == smesh::HEX8) {
-                hex8_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
-            } else {
-                tet4_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
+            const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *block);
+            auto                     fff      = smesh::FFF::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            if (!fff) {
+                return SFEM_FAILURE;
             }
 
             domain.user_data = std::static_pointer_cast<void>(fff);
@@ -147,9 +152,8 @@ namespace sfem {
 
         auto mesh  = impl_->space->mesh_ptr();
         auto graph = impl_->space->dof_to_dof_graph();
-        int  err   = SFEM_SUCCESS;
 
-        impl_->iterate([&](const OpDomain &domain) {
+        return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_crs(domain.element_type,
                                  domain.block->n_elements(),
                                  mesh->n_nodes(),
@@ -159,8 +163,6 @@ namespace sfem {
                                  graph->colidx()->data(),
                                  values);
         });
-
-        return err;
     }
 
     int Laplacian::hessian_crs_sym(const real_t *const  x,
@@ -171,9 +173,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
         auto mesh = impl_->space->mesh_ptr();
-        int  err  = SFEM_SUCCESS;
 
-        impl_->iterate([&](const OpDomain &domain) {
+        return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_crs_sym(domain.element_type,
                                      domain.block->n_elements(),
                                      mesh->n_nodes(),
@@ -184,17 +185,14 @@ namespace sfem {
                                      diag_values,
                                      off_diag_values);
         });
-
-        return err;
     }
 
     int Laplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
         auto mesh = impl_->space->mesh_ptr();
-        int  err  = SFEM_SUCCESS;
 
-        impl_->iterate([&](const OpDomain &domain) {
+        return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_diag(domain.element_type,
                                   domain.block->n_elements(),
                                   mesh->n_nodes(),
@@ -202,8 +200,6 @@ namespace sfem {
                                   mesh->points()->data(),
                                   values);
         });
-
-        return err;
     }
 
     int Laplacian::gradient(const real_t *const x, real_t *const out) {

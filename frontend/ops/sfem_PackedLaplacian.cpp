@@ -7,7 +7,6 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-#include "hex8_fff.hpp"
 #include "hex8_laplacian_inline_cpu.hpp"
 #include "laplacian.hpp"
 #include "tet10_laplacian_inline_cpu.hpp"
@@ -19,9 +18,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace {
+    smesh::block_idx_t block_id_for_packed(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
+        for (size_t i = 0; i < mesh.n_blocks(); i++) {
+            if (mesh.block(i).get() == &block) {
+                return static_cast<smesh::block_idx_t>(i);
+            }
+        }
+        SFEM_ERROR("PackedLaplacian: mesh block not found");
+        return 0;
+    }
+}  // namespace
 
 #include "sfem_FunctionSpace.hpp"
+#include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_spaces.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -576,17 +588,13 @@ namespace sfem {
             domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
 
-            if (domain->second.element_type == smesh::HEX8 || is_semistructured_type(domain->second.element_type)) {
-                hex8_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
-            } else {
-                tet4_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
+            auto mesh_ptr = impl_->space->mesh_ptr();
+            auto fff_src  = smesh::FFF::create_AoS(mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
+            if (!fff_src) {
+                return SFEM_FAILURE;
             }
+            const size_t nbytes = (size_t)domain->second.block->n_elements() * 6u * sizeof(jacobian_t);
+            memcpy(impl_->fff[b]->data(), fff_src->fff_AoS()->data(), nbytes);
         }
 
         return SFEM_SUCCESS;
