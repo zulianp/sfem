@@ -1,45 +1,52 @@
 #include "sfem_LinearElasticity.hpp"
 
-
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
-#include "smesh_mesh.hpp"
-
-#include "hex8_jacobian.hpp"
 #include "linear_elasticity.hpp"
-
-
 #include "sfem_FunctionSpace.hpp"
-#include "smesh_mesh.hpp"
-
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_kernel_data.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_spaces.hpp"
 
 #include <functional>
 
 namespace sfem {
 
-    /**
-     * @brief Jacobian storage for performance optimization
-     *
-     * Precomputed Jacobian determinants and adjugates for smesh::HEX8 elements
-     * to avoid repeated computation during matrix-vector products.
-     */
-    class Jacobians {
-    public:
-        std::shared_ptr<Buffer<jacobian_t>> adjugate;     ///< Adjugate matrices
-        std::shared_ptr<Buffer<jacobian_t>> determinant;  ///< Determinants
+    namespace {
 
-        /**
-         * @brief Constructor
-         * @param n_elements Number of elements
-         * @param size_adjugate Size of adjugate storage per element
-         */
-        Jacobians(const ptrdiff_t n_elements, const int size_adjugate)
-            : adjugate(sfem::create_host_buffer<jacobian_t>(n_elements * size_adjugate)),
-              determinant(sfem::create_host_buffer<jacobian_t>(n_elements)) {}
-    };
+        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
+            for (size_t i = 0; i < mesh.n_blocks(); i++) {
+                if (mesh.block(i).get() == &block) {
+                    return static_cast<smesh::block_idx_t>(i);
+                }
+            }
+            SFEM_ERROR("LinearElasticity: mesh block pointer not found in mesh.blocks()");
+            return 0;
+        }
+
+        bool domain_supports_adjugate_cache(const smesh::ElemType et) {
+            switch (et) {
+                case smesh::HEX8:
+                case smesh::PROTEUS_HEX8:
+                case smesh::PROTEUS_HEX27:
+                case smesh::PROTEUS_HEX64:
+                case smesh::PROTEUS_HEX125:
+                case smesh::PROTEUS_HEX216:
+                case smesh::PROTEUS_HEX343:
+                case smesh::PROTEUS_HEX512:
+                case smesh::PROTEUS_HEX729:
+                case smesh::PROTEUS_HEX4913:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+    }  // namespace
 
     class LinearElasticity::Impl {
     public:
@@ -72,22 +79,22 @@ namespace sfem {
         SFEM_TRACE_SCOPE("LinearElasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
-        // FIXME: Must work for all element types
-        if (impl_->space->element_type() == smesh::HEX8) {
-            auto mesh = impl_->space->mesh_ptr();
-            int  dim  = mesh->spatial_dimension();
+        auto mesh = impl_->space->mesh_ptr();
 
-            for (auto &domain : impl_->domains->domains()) {
-                auto block     = domain.second.block;
-                auto jacobians = std::make_shared<Jacobians>(block->n_elements(), dim * dim);
-                hex8_adjugate_and_det_fill(block->n_elements(),
-                                           block->elements()->data(),
-                                           mesh->points()->data(),
-                                           jacobians->adjugate->data(),
-                                           jacobians->determinant->data());
-
-                domain.second.user_data = std::static_pointer_cast<void>(jacobians);
+        for (auto &n2d : impl_->domains->domains()) {
+            OpDomain &domain = n2d.second;
+            if (!domain_supports_adjugate_cache(domain.element_type)) {
+                continue;
             }
+
+            const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
+            auto jac =
+                    smesh::JacobianAdjugateAndDeterminant::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            if (!jac) {
+                return SFEM_FAILURE;
+            }
+
+            domain.user_data = std::static_pointer_cast<void>(jac);
         }
 
         return SFEM_SUCCESS;
@@ -347,14 +354,15 @@ namespace sfem {
             auto element_type = domain.element_type;
 
             if (domain.user_data) {
-                auto jacobians = std::static_pointer_cast<Jacobians>(domain.user_data);
+                auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
                 SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
                 return linear_elasticity_apply_adjugate_aos(element_type,
                                                             block->n_elements(),
                                                             mesh->n_nodes(),
                                                             block->elements()->data(),
-                                                            jacobians->adjugate->data(),
-                                                            jacobians->determinant->data(),
+                                                            mesh->points()->data(),
+                                                            jac->jacobian_adjugate_AoS()->data(),
+                                                            jac->jacobian_determinant()->data(),
                                                             mu,
                                                             lambda,
                                                             h,

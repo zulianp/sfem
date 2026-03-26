@@ -79,8 +79,9 @@ namespace sfem {
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          *
          * Sets up the MultiDomainOp for multi-block operations.
-         * For smesh::HEX8 elements, this precomputes Jacobian determinants and adjugates
-         * to optimize matrix-vector products.
+         * For supported element types (HEX8, PROTEUS_HEX8, PROTEUS_HEX27, …), builds
+         * smesh::JacobianAdjugateAndDeterminant (macro corners for semistructured Proteus hex)
+         * to accelerate apply() via linear_elasticity_apply_adjugate_aos.
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
 

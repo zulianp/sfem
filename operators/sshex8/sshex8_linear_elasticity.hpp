@@ -40,6 +40,25 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           real_t *const                outy,
                                           real_t *const                outz);
 
+/// Affine SS apply using per-macro-element adjugate / det J at (1/2,1/2,1/2) (e.g. from smesh::JacobianAdjugateAndDeterminant).
+int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                         level,
+                                                           const ptrdiff_t                   nelements,
+                                                           const ptrdiff_t                   nnodes,
+                                                           idx_t **const SFEM_RESTRICT       elements,
+                                                           geom_t **const SFEM_RESTRICT      points,
+                                                           const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                           const geom_t *const SFEM_RESTRICT macro_determinant,
+                                                           const real_t                      mu,
+                                                           const real_t                      lambda,
+                                                           const ptrdiff_t                   u_stride,
+                                                           const real_t *const               ux,
+                                                           const real_t *const               uy,
+                                                           const real_t *const               uz,
+                                                           const ptrdiff_t                   out_stride,
+                                                           real_t *const                     outx,
+                                                           real_t *const                     outy,
+                                                           real_t *const                     outz);
+
 int affine_sshex8_linear_elasticity_diag(const int                    level,
                                          const ptrdiff_t              nelements,
                                          const ptrdiff_t              nnodes,

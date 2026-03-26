@@ -270,6 +270,157 @@ int sshex8_linear_elasticity_apply(const int                    level,
 
 #ifndef SFEM_ENABLE_BLAS
 
+int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                         level,
+                                                         const ptrdiff_t                   nelements,
+                                                         const ptrdiff_t                   nnodes,
+                                                         idx_t **const SFEM_RESTRICT       elements,
+                                                         geom_t **const SFEM_RESTRICT      points,
+                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT macro_determinant,
+                                                         const real_t                      mu,
+                                                         const real_t                      lambda,
+                                                         const ptrdiff_t                   u_stride,
+                                                         const real_t *const               ux,
+                                                         const real_t *const               uy,
+                                                         const real_t *const               uz,
+                                                         const ptrdiff_t                   out_stride,
+                                                         real_t *const                     outx,
+                                                         real_t *const                     outy,
+                                                         real_t *const                     outz) {
+    SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(points);
+
+    const int nxe = sshex8_nxe(level);
+
+#pragma omp parallel
+    {
+        scalar_t      *eu[3];
+        accumulator_t *v[3];
+
+        for (int d = 0; d < 3; d++) {
+            eu[d] = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+            v[d]  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
+        }
+
+        idx_t *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
+
+        scalar_t      element_u[3 * 8];
+        accumulator_t element_out[3 * 8];
+        scalar_t      element_matrix[(3 * 8) * (3 * 8)];
+
+        scalar_t *element_ux = &element_u[0 * 8];
+        scalar_t *element_uy = &element_u[1 * 8];
+        scalar_t *element_uz = &element_u[2 * 8];
+
+        scalar_t *element_outx = &element_out[0 * 8];
+        scalar_t *element_outy = &element_out[1 * 8];
+        scalar_t *element_outz = &element_out[2 * 8];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[0][d] = ux[ev[d] * u_stride];
+                    eu[1][d] = uy[ev[d] * u_stride];
+                    eu[2][d] = uz[ev[d] * u_stride];
+
+                    assert(eu[0][d] == eu[0][d]);
+                    assert(eu[1][d] == eu[1][d]);
+                    assert(eu[2][d] == eu[2][d]);
+                }
+
+                for (int d = 0; d < 3; d++) {
+                    memset(v[d], 0, nxe * sizeof(accumulator_t));
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            scalar_t adjugate[9];
+            scalar_t jacobian_determinant;
+            for (int d = 0; d < 9; d++) {
+                adjugate[d] = (scalar_t)macro_adjugate[e * 9 + d];
+            }
+            jacobian_determinant = (scalar_t)macro_determinant[e];
+
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+            hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        int lev[8] = {// Bottom
+                                      sshex8_lidx(level, xi, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                      sshex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      sshex8_lidx(level, xi, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        for (int d = 0; d < 8; d++) {
+                            const int lidx = lev[d];
+                            element_ux[d]  = eu[0][lidx];
+                            element_uy[d]  = eu[1][lidx];
+                            element_uz[d]  = eu[2][lidx];
+                        }
+
+                        for (int d = 0; d < 3 * 8; d++) {
+                            element_out[d] = 0;
+                        }
+
+                        for (int i = 0; i < 3 * 8; i++) {
+                            const scalar_t *const col = &element_matrix[i * 3 * 8];
+                            const scalar_t        ui  = element_u[i];
+                            for (int j = 0; j < 3 * 8; j++) {
+                                element_out[j] += ui * col[j];
+                            }
+                        }
+
+                        for (int d = 0; d < 8; d++) {
+                            const int lidx = lev[d];
+                            v[0][lidx] += element_outx[d];
+                            v[1][lidx] += element_outy[d];
+                            v[2][lidx] += element_outz[d];
+                        }
+                    }
+                }
+            }
+
+            {
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
+#pragma omp atomic update
+                    outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                    outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                    outz[idx] += v[2][d];
+                }
+            }
+        }
+
+        free(ev);
+
+        for (int d = 0; d < 3; d++) {
+            free(eu[d]);
+            free(v[d]);
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
                                           const ptrdiff_t              nnodes,
@@ -567,6 +718,125 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
         }
 
         // Clean-up
+        free(ev);
+
+        for (int d = 0; d < 3; d++) {
+            free(eu[d]);
+            free(v[d]);
+        }
+
+        free(X);
+        free(Y);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                         level,
+                                                         const ptrdiff_t                   nelements,
+                                                         const ptrdiff_t                   nnodes,
+                                                         idx_t **const SFEM_RESTRICT       elements,
+                                                         geom_t **const SFEM_RESTRICT      points,
+                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT macro_determinant,
+                                                         const real_t                      mu,
+                                                         const real_t                      lambda,
+                                                         const ptrdiff_t                   u_stride,
+                                                         const real_t *const               ux,
+                                                         const real_t *const               uy,
+                                                         const real_t *const               uz,
+                                                         const ptrdiff_t                   out_stride,
+                                                         real_t *const                     outx,
+                                                         real_t *const                     outy,
+                                                         real_t *const                     outz) {
+    SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(points);
+
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+#pragma omp parallel
+    {
+        scalar_t      *eu[3];
+        accumulator_t *v[3];
+
+        for (int d = 0; d < 3; d++) {
+            eu[d] = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+            v[d]  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
+        }
+
+        idx_t *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
+
+        scalar_t      element_u[3 * 8];
+        accumulator_t element_out[3 * 8];
+        scalar_t      element_matrix[(3 * 8) * (3 * 8)];
+
+        scalar_t *element_ux = &element_u[0 * 8];
+        scalar_t *element_uy = &element_u[1 * 8];
+        scalar_t *element_uz = &element_u[2 * 8];
+
+        scalar_t *element_outx = &element_out[0 * 8];
+        scalar_t *element_outy = &element_out[1 * 8];
+        scalar_t *element_outz = &element_out[2 * 8];
+
+        scalar_t *X = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
+        scalar_t *Y = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    ptrdiff_t idx = ev[d] * u_stride;
+                    eu[0][d]      = ux[idx];
+                    eu[1][d]      = uy[idx];
+                    eu[2][d]      = uz[idx];
+
+                    assert(eu[0][d] == eu[0][d]);
+                    assert(eu[1][d] == eu[1][d]);
+                    assert(eu[2][d] == eu[2][d]);
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            scalar_t adjugate[9];
+            scalar_t jacobian_determinant;
+            for (int d = 0; d < 9; d++) {
+                adjugate[d] = (scalar_t)macro_adjugate[e * 9 + d];
+            }
+            jacobian_determinant = (scalar_t)macro_determinant[e];
+
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+            hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+            sshex8_SoA_pack_elements(level, eu, X);
+            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            for (int d = 0; d < 3; d++) {
+                memset(v[d], 0, nxe * sizeof(accumulator_t));
+            }
+            sshex8_SoA_unpack_add_elements(level, Y, v);
+
+            {
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
+#pragma omp atomic update
+                    outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                    outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                    outz[idx] += v[2][d];
+                }
+            }
+        }
+
         free(ev);
 
         for (int d = 0; d < 3; d++) {
