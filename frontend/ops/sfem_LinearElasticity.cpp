@@ -19,6 +19,26 @@ namespace sfem {
 
     namespace {
 
+        static void linear_elasticity_seed_material(MultiDomainOp &m, const real_t mu, const real_t lambda) {
+            for (auto &kv : m.domains()) {
+                kv.second.parameters->set_value("mu", mu);
+                kv.second.parameters->set_value("lambda", lambda);
+            }
+        }
+
+        static void linear_elasticity_copy_material(const MultiDomainOp &from, MultiDomainOp &to) {
+            for (const auto &kv : from.domains()) {
+                auto it = to.domains().find(kv.first);
+                if (it == to.domains().end()) {
+                    continue;
+                }
+                const real_t mu     = kv.second.parameters->require_real_value("mu");
+                const real_t lambda = kv.second.parameters->require_real_value("lambda");
+                it->second.parameters->set_value("mu", mu);
+                it->second.parameters->set_value("lambda", lambda);
+            }
+        }
+
         smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
             for (size_t i = 0; i < mesh.n_blocks(); i++) {
                 if (mesh.block(i).get() == &block) {
@@ -74,9 +94,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp> domains;
 
-        real_t mu{1};      ///< Shear modulus (second Lamé parameter)
-        real_t lambda{1};  ///< First Lamé parameter
-        bool   use_affine_approximation{true};
+        bool use_affine_approximation{true};
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -100,6 +118,12 @@ namespace sfem {
     int LinearElasticity::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("LinearElasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+
+        real_t SFEM_SHEAR_MODULUS        = 1;
+        real_t SFEM_FIRST_LAME_PARAMETER = 1;
+        SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
+        SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+        linear_elasticity_seed_material(*impl_->domains, SFEM_SHEAR_MODULUS, SFEM_FIRST_LAME_PARAMETER);
 
         auto mesh = impl_->space->mesh_ptr();
 
@@ -126,16 +150,8 @@ namespace sfem {
 
         auto ret = std::make_unique<LinearElasticity>(space);
 
-        real_t SFEM_SHEAR_MODULUS          = 1;
-        real_t SFEM_FIRST_LAME_PARAMETER   = 1;
-        int    SFEM_HEX8_ASSUME_AFFINE     = ret->impl_->use_affine_approximation ? 1 : 0;
-
-        SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
-        SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+        int SFEM_HEX8_ASSUME_AFFINE = ret->impl_->use_affine_approximation ? 1 : 0;
         SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
-
-        ret->impl_->mu                       = SFEM_SHEAR_MODULUS;
-        ret->impl_->lambda                   = SFEM_FIRST_LAME_PARAMETER;
         ret->impl_->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
 
         return ret;
@@ -153,9 +169,8 @@ namespace sfem {
         // FIXME: Must work for all element types and multi-block
 
         auto ret            = std::make_shared<LinearElasticity>(space);
-        ret->impl_->domains                  = impl_->domains->lor_op(space, {});
-        ret->impl_->mu                       = impl_->mu;
-        ret->impl_->lambda                   = impl_->lambda;
+        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
@@ -165,8 +180,7 @@ namespace sfem {
 
         if (space->has_semi_structured_mesh() && sfem::is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LinearElasticity>(space);
-            ret->set_mu(impl_->mu);
-            ret->set_lambda(impl_->lambda);
+            linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
             ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
             return ret;
         }
@@ -174,8 +188,7 @@ namespace sfem {
         if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type()) &&
             !sfem::is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LinearElasticity>(space);
-            ret->set_mu(impl_->mu);
-            ret->set_lambda(impl_->lambda);
+            linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
             ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
             assert(space->n_blocks() == 1);
             ret->override_element_types({space->element_type()});
@@ -186,8 +199,7 @@ namespace sfem {
 
         auto ret            = std::make_shared<LinearElasticity>(space);
         ret->impl_->domains = impl_->domains->derefine_op(space, {});
-        ret->impl_->mu      = impl_->mu;
-        ret->impl_->lambda  = impl_->lambda;
+        linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
@@ -211,8 +223,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_crs_aos(element_type,
@@ -242,8 +254,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_bsr(element_type,
@@ -275,8 +287,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_bcrs_sym(element_type,
@@ -304,8 +316,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_block_diag_sym_aos(element_type,
@@ -329,8 +341,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_block_diag_sym_soa(element_type,
@@ -354,8 +366,8 @@ namespace sfem {
 
         impl_->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
-            auto lambda       = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda       = domain.parameters->require_real_value("lambda");
+            auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
             return linear_elasticity_assemble_diag_aos(element_type,
@@ -376,8 +388,8 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda = domain.parameters->require_real_value("lambda");
+            auto mu     = domain.parameters->require_real_value("mu");
             return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, x, out);
         });
     }
@@ -388,8 +400,8 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            auto lambda = domain.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu     = domain.parameters->get_real_value("mu", impl_->mu);
+            auto lambda = domain.parameters->require_real_value("lambda");
+            auto mu     = domain.parameters->require_real_value("mu");
             return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, h, out);
         });
     }
@@ -416,10 +428,8 @@ namespace sfem {
     int LinearElasticity::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> LinearElasticity::clone() const {
-        auto ret = std::make_shared<LinearElasticity>(impl_->space);
+        auto ret                             = std::make_shared<LinearElasticity>(impl_->space);
         ret->impl_->domains                  = impl_->domains;
-        ret->impl_->mu                       = impl_->mu;
-        ret->impl_->lambda                   = impl_->lambda;
         ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
@@ -438,9 +448,4 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 
-    // TODO: remove these and use the block version where needed
-    real_t LinearElasticity::get_mu() const { return impl_->mu; }
-    void   LinearElasticity::set_mu(real_t val) { impl_->mu = val; }
-    real_t LinearElasticity::get_lambda() const { return impl_->lambda; }
-    void   LinearElasticity::set_lambda(real_t val) { impl_->lambda = val; }
 }  // namespace sfem

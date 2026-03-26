@@ -35,6 +35,8 @@ namespace sfem {
         void set_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value);
         std::shared_ptr<Value> find_value(const std::string &var_name) const;
         real_t get_real_value(const std::string &var_name, const real_t default_value) const;
+        /// @return Stored scalar; aborts via SFEM_ERROR if @a var_name is missing or not a real scalar.
+        real_t require_real_value(const std::string &var_name) const;
 
     private:
         class Impl;
