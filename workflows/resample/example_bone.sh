@@ -26,6 +26,7 @@ export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
+# mesh=on_raw
 mesh=bone
 
 export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -40,7 +41,7 @@ export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd 
 echo "Using mesh: $mesh"
 
 out=resampled
-skinned=skinned
+# skinned=skinned
 sdf=sdf.float32.raw
 
 # Use HEX_SIZE environment variable if defined, otherwise use default

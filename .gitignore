@@ -258,3 +258,4 @@ workflows/resample/alpha_data.dat
 workflows/resample/side_length_histograms/x_histogram.csv
 *.csv
 workflows/resample/side_length_histograms/*.csv
+workflows/resample/eye_c/meta.txt
