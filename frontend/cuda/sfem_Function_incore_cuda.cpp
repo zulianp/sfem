@@ -29,7 +29,7 @@
 // C++ includes
 #include "sfem_API.hpp"
 #include "sfem_MultiDomainOp.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "smesh_device_buffer.hpp"
 #include "smesh_device_sideset.hpp"

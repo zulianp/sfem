@@ -36,7 +36,7 @@
 #include "hex8_jacobian.hpp"
 // 
 
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "smesh_sshex8.hpp"
 #include "smesh_glob.hpp"

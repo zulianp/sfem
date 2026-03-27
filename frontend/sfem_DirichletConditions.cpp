@@ -39,7 +39,7 @@
 // C++ includes
 // 
 // #include "sfem_Communicator.hpp"
-// #include "sfem_SemiStructuredMesh.hpp"
+// #include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
 

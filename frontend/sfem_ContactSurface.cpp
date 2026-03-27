@@ -16,7 +16,7 @@
 // C++
 #include "sfem_Function.hpp"
 #include "sfem_Input.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
@@ -185,6 +185,7 @@ namespace sfem {
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 // FIXME: maybe this could be optimized by avoiding deallocating and allocating the buffer
                 surface_points_rest_device = smesh::to_device(surface_points);
+                surface_points_device      = smesh::to_device(surface_points);
             }
 #endif
         }

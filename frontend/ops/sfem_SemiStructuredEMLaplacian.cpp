@@ -6,7 +6,7 @@
 
 // C++ includes
 #include "sfem_Laplacian.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 #include "smesh_mesh.hpp"
 
 #include "smesh_glob.hpp"
