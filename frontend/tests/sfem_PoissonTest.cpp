@@ -82,7 +82,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     solver->set_preconditioner_op(preconditioner);
 
     int max_it      = 4000;
-    solver->verbose = smesh::Env::read<bool>("SFEM_VERBOSE", false);
+    solver->verbose = smesh::Env::read<bool>("SFEM_SOLVER_VERBOSE", false);
     solver->set_max_it(max_it);
     solver->set_rtol(0);
     solver->set_atol(1e-8);
@@ -132,7 +132,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto m         = fs->mesh_ptr();
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose    = smesh::Env::read<bool>("SFEM_VERBOSE", false);
+    cg->verbose    = smesh::Env::read<bool>("SFEM_SOLVER_VERBOSE", false);
 
     int  SFEM_MAX_IT             = smesh::Env::read<int>("SFEM_MAX_IT", 200000);
     bool SFEM_USE_PRECONDITIONER = smesh::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
