@@ -160,13 +160,13 @@ update_hex_field_shm_il(const cell_list_split_3d_2d_map_t *split_map,      // Ce
                 z_coords[local_k] = phys_z_base + (real_t)global_k * delta_z;
 
                 // Query of the tet. for GPU CUDA with interleaved boxes ...
-                tet_indices[local_k] =                                                   //
-                        query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu(split_map,  //
-                                                                             boxes,      //
-                                                                             mesh_geom,  //
-                                                                             x_q,        //
-                                                                             y_q,        //
-                                                                             z_coords[local_k]);
+                tet_indices[local_k] =                                                            //
+                        query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu(split_map,           //
+                                                                             boxes,               //
+                                                                             mesh_geom,           //
+                                                                             x_q,                 //
+                                                                             y_q,                 //
+                                                                             z_coords[local_k]);  //
             }  // END if (global_k < n2)
 
             __syncthreads();
