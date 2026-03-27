@@ -46,9 +46,6 @@
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
-#include "smesh_tet4_prolongation_restriction.cuh"
-#include "smesh_sshex8_prolongation.cuh"
-#include "smesh_sshex8_restriction.cuh"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftableJacobi.hpp"
@@ -56,6 +53,9 @@
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_solver.hpp"
+#include "smesh_sshex8_prolongation.cuh"
+#include "smesh_sshex8_restriction.cuh"
+#include "smesh_tet4_prolongation_restriction.cuh"
 #else
 namespace sfem {
     static void device_synchronize() {}
@@ -427,20 +427,20 @@ namespace sfem {
                                 int from_level = smesh::semistructured_level(from_ssm);
 
                                 smesh::cu_sshex8_prolongate(from_ssm.n_elements(),
-                                                     from_level,
-                                                     1,
-                                                     from_elements->data(),
-                                                     to_level,
-                                                     1,
-                                                     elements->data(),
-                                                     from_space->block_size(),
-                                                     smesh::SMESH_DEFAULT,
-                                                     1,
-                                                     from,
-                                                     smesh::SMESH_DEFAULT,
-                                                     1,
-                                                     to,
-                                                     SFEM_DEFAULT_STREAM);
+                                                            from_level,
+                                                            1,
+                                                            from_elements->data(),
+                                                            to_level,
+                                                            1,
+                                                            elements->data(),
+                                                            from_space->block_size(),
+                                                            smesh::SMESH_DEFAULT,
+                                                            1,
+                                                            from,
+                                                            smesh::SMESH_DEFAULT,
+                                                            1,
+                                                            to,
+                                                            SFEM_DEFAULT_STREAM);
                             },
                             es);
 
@@ -502,7 +502,7 @@ namespace sfem {
                                 auto &ssm = to_space->mesh();
                                 smesh::sshex8_hierarchical_prolongation(smesh::semistructured_level(ssm),
                                                                         ssm.n_elements(),
-                                                                        sfem::semi_structured_element_data(ssm),
+                                                                        ssm.elements(0)->data(),
                                                                         from_space->block_size(),
                                                                         from,
                                                                         to);
@@ -520,14 +520,14 @@ namespace sfem {
                                 auto &from_ssm = from_space->mesh();
                                 auto &to_ssm   = to_space->mesh();
 
-                                smesh::sshex8_prolongate(from_ssm.n_elements(),                         // nelements,
-                                                         smesh::semistructured_level(from_ssm),         // from_level
-                                                         1,                                             // from_level_stride
-                                                         sfem::semi_structured_element_data(from_ssm),  // from_elements
-                                                         smesh::semistructured_level(to_ssm),           // to_level
-                                                         1,                                             // to_level_stride
-                                                         sfem::semi_structured_element_data(to_ssm),    // to_elements
-                                                         from_space->block_size(),                      // vec_size
+                                smesh::sshex8_prolongate(from_ssm.n_elements(),                  // nelements,
+                                                         smesh::semistructured_level(from_ssm),  // from_level
+                                                         1,                                      // from_level_stride
+                                                         from_ssm.elements(0)->data(),           // from_elements
+                                                         smesh::semistructured_level(to_ssm),    // to_level
+                                                         1,                                      // to_level_stride
+                                                         to_ssm.elements(0)->data(),             // to_elements
+                                                         from_space->block_size(),               // vec_size
                                                          from,
                                                          to);
                             },
@@ -594,15 +594,15 @@ namespace sfem {
                     [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
                         smesh::cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
-                                                         d_crs_graph->rowptr()->data(),
-                                                         d_crs_graph->colidx()->data(),
-                                                         d_edges->data(),
-                                                         block_size,
-                                                         smesh::SMESH_DEFAULT,
-                                                         from,
-                                                         smesh::SMESH_DEFAULT,
-                                                         to,
-                                                         SFEM_DEFAULT_STREAM);
+                                                                d_crs_graph->rowptr()->data(),
+                                                                d_crs_graph->colidx()->data(),
+                                                                d_edges->data(),
+                                                                block_size,
+                                                                smesh::SMESH_DEFAULT,
+                                                                from,
+                                                                smesh::SMESH_DEFAULT,
+                                                                to,
+                                                                SFEM_DEFAULT_STREAM);
                     },
                     EXECUTION_SPACE_DEVICE);
         }

@@ -34,7 +34,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
         count = sfem::create_buffer<uint16_t>(fs->mesh().n_nodes(), es);
         {
             auto buff     = count->data();
-            auto elements = sfem::semi_structured_element_data(fs->mesh());
+            auto elements = fs->mesh().elements(0)->data();
 
             const int nxe = fs->mesh().n_nodes_per_element(0);
             printf("nxe = %d\n", nxe);
@@ -59,7 +59,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
                     affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(fs->mesh()),
                                                         fs->mesh().n_elements(),
-                                                        sfem::semi_structured_element_data(fs->mesh()),
+                                                        fs->mesh().elements(0)->data(),
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
@@ -105,7 +105,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     if (fs->has_semi_structured_mesh()) {
         SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
+        SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
                          SFEM_SUCCESS);
     } else {
         SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
@@ -176,7 +176,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
 
         if (fs->has_semi_structured_mesh()) {
             SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-            SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
+            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
                              SFEM_SUCCESS);
         } else {
             SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);

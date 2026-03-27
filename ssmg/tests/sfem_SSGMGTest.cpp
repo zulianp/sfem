@@ -44,7 +44,7 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
 
         // SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name + "/mesh").c_str()) == SFEM_SUCCESS);
 
-        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (name + "/mesh").c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), (name + "/mesh").c_str());
 
         sfem::Output out(fs);
         out.enable_AoS_to_SoA(true);

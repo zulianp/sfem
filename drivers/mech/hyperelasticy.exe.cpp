@@ -325,7 +325,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Output to disk
     smesh::create_directory(output_path.c_str());
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     } else {
         fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));

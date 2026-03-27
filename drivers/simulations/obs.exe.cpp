@@ -120,7 +120,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     smesh::create_directory(output_path.c_str());
 
     fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
-    sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
+    smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
 
     auto out = f->output();
 

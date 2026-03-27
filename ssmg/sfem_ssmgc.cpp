@@ -146,7 +146,7 @@ namespace sfem {
             const int       L              = smesh::semistructured_level(ssmesh);
             const ptrdiff_t sym_block_size = (fs->block_size() == 3 ? 6 : 3);
 
-            std::vector<int> levels = sfem::semi_structured_derefinement_levels(ssmesh);
+            std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();
 
             // Order from finest to coarsest!

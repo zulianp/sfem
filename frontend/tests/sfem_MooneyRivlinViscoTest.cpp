@@ -46,7 +46,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }

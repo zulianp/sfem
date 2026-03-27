@@ -13,12 +13,6 @@
 
 #include "sfem_API.hpp"
 
-#ifdef SFEM_ENABLE_CUDA
-#include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
-#endif
-
 #include <vector>
 
 #define OP_HEADERS()                                                            \
@@ -110,15 +104,13 @@ int test_cube() {
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
+    // if (es == sfem::EXECUTION_SPACE_DEVICE) {
+    //     auto elements = fs->device_elements();
+    //     if (!elements) {
+    //         elements = create_device_elements(fs, fs->element_type());
+    //         fs->set_device_elements(elements);
+    //     }
+    // }
 
     auto f  = sfem::Function::create(fs);
     auto x  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -132,7 +124,7 @@ int test_cube() {
     printf("Fine op (%d,%s):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, type_to_string(fs->element_type()), SFEM_FINE_OP_TYPE);
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
-    auto levels    = sfem::semi_structured_derefinement_levels(fs->mesh());
+    auto levels    = smesh::derefinement_levels(fs->mesh());
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
     auto f_coarse  = f->derefine(fs_coarse, true);
 
@@ -174,12 +166,9 @@ int test_cube() {
 
     std::shared_ptr<sfem::Buffer<real_t>> input;
 
-#ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
         input = smesh::to_device(h_input);
-    } else
-#endif
-    {
+    } else {
         input = h_input;
     }
 
@@ -268,7 +257,7 @@ int test_cube() {
                 smesh::create_directory("galerkin/fields");
 
                 {  // COARSE
-                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs_coarse->mesh_ptr(), "galerkin") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs_coarse->mesh_ptr(), "galerkin") == SFEM_SUCCESS);
 
                     sfem::Output out(fs_coarse);
                     out.enable_AoS_to_SoA(SFEM_BLOCK_SIZE > 1);
@@ -283,7 +272,7 @@ int test_cube() {
                 {  // FINE
                     smesh::create_directory("galerkin_fine");
                     smesh::create_directory("galerkin_fine/fields");
-                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
 
                     sfem::Output out(fs);
                     out.set_output_dir("galerkin_fine/fields");

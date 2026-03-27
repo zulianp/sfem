@@ -58,7 +58,7 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
 
         if (fs->has_semi_structured_mesh()) {
             m->write(smesh::Path((output_dir + "/coarse_mesh")));
-            sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str());
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str());
         } else {
             m->write(smesh::Path((output_dir + "/mesh")));
         }
