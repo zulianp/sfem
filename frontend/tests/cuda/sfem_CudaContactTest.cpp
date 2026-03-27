@@ -306,6 +306,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
             fine_sides   = to_device(fine_sides);
             coarse_sides = to_device(coarse_sides);
             count        = to_device(count);
+            auto input_device = to_device(input);
 
             smesh::cu_ssquad4_restrict(fine_sides->extent(1),
                                        level,
@@ -318,7 +319,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                                        1,
                                        smesh::SMESH_DEFAULT,
                                        1,
-                                       input->data(),
+                                       input_device->data(),
                                        smesh::SMESH_DEFAULT,
                                        1,
                                        restricted->data(),

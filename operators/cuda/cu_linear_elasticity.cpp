@@ -218,6 +218,13 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType           elem
                                             const enum smesh::PrimitiveType real_type,
                                             void *const                     out,
                                             void                           *stream) {
+    size_t nbytes = 0;
+    if (real_type == smesh::SMESH_DEFAULT) {
+        nbytes = sizeof(real_t);
+    } else {
+        nbytes = smesh::num_bytes(real_type);
+    }
+
     switch (element_type) {
         case smesh::HEX8: {
             return cu_affine_hex8_linear_elasticity_block_diag_sym(nelements,
@@ -230,12 +237,12 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType           elem
                                                                    6,
                                                                    real_type,
                                                                    // Offset for AoS to SoA style function
-                                                                   (char *)out + 0 * smesh::num_bytes(real_type),
-                                                                   (char *)out + 1 * smesh::num_bytes(real_type),
-                                                                   (char *)out + 2 * smesh::num_bytes(real_type),
-                                                                   (char *)out + 3 * smesh::num_bytes(real_type),
-                                                                   (char *)out + 4 * smesh::num_bytes(real_type),
-                                                                   (char *)out + 5 * smesh::num_bytes(real_type),
+                                                                   (char *)out + 0 * nbytes,
+                                                                   (char *)out + 1 * nbytes,
+                                                                   (char *)out + 2 * nbytes,
+                                                                   (char *)out + 3 * nbytes,
+                                                                   (char *)out + 4 * nbytes,
+                                                                   (char *)out + 5 * nbytes,
                                                                    stream);
         }
         default: {
