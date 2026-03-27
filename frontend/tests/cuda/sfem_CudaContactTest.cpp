@@ -92,6 +92,36 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> lagr_ub;
 
     int compare(const struct TestOutput &other, const real_t tol = 1e-7) const {
+        SFEM_TEST_ASSERT(x != nullptr);
+        SFEM_TEST_ASSERT(other.x != nullptr);
+        SFEM_TEST_ASSERT(rhs != nullptr);
+        SFEM_TEST_ASSERT(other.rhs != nullptr);
+        SFEM_TEST_ASSERT(g != nullptr);
+        SFEM_TEST_ASSERT(other.g != nullptr);
+        SFEM_TEST_ASSERT(diag != nullptr);
+        SFEM_TEST_ASSERT(other.diag != nullptr);
+        SFEM_TEST_ASSERT(mask != nullptr);
+        SFEM_TEST_ASSERT(other.mask != nullptr);
+        SFEM_TEST_ASSERT(normal_prod != nullptr);
+        SFEM_TEST_ASSERT(other.normal_prod != nullptr);
+        SFEM_TEST_ASSERT(cc_op_x != nullptr);
+        SFEM_TEST_ASSERT(other.cc_op_x != nullptr);
+        SFEM_TEST_ASSERT(cc_op_t_r != nullptr);
+        SFEM_TEST_ASSERT(other.cc_op_t_r != nullptr);
+        SFEM_TEST_ASSERT(rpen != nullptr);
+        SFEM_TEST_ASSERT(other.rpen != nullptr);
+        SFEM_TEST_ASSERT(Jpen != nullptr);
+        SFEM_TEST_ASSERT(other.Jpen != nullptr);
+        SFEM_TEST_EQ(x->size(), other.x->size());
+        SFEM_TEST_EQ(rhs->size(), other.rhs->size());
+        SFEM_TEST_EQ(g->size(), other.g->size());
+        SFEM_TEST_EQ(diag->size(), other.diag->size());
+        SFEM_TEST_EQ(mask->size(), other.mask->size());
+        SFEM_TEST_EQ(normal_prod->size(), other.normal_prod->size());
+        SFEM_TEST_EQ(cc_op_x->size(), other.cc_op_x->size());
+        SFEM_TEST_EQ(cc_op_t_r->size(), other.cc_op_t_r->size());
+        SFEM_TEST_EQ(rpen->size(), other.rpen->size());
+        SFEM_TEST_EQ(Jpen->size(), other.Jpen->size());
         SFEM_ASSERT_ARRAY_APPROX_EQ(x->size(), x->data(), other.x->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rhs->size(), rhs->data(), other.rhs->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(g->size(), g->data(), other.g->data(), tol);

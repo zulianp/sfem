@@ -208,13 +208,11 @@ int test_cube() {
         auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
         // Compare two results
-#ifdef SFEM_ENABLE_CUDA
-        auto h_restricted = smesh::to_host(restricted);
-        auto h_Ax_coarse  = smesh::to_host(Ax_coarse);
-#else
-        auto h_restricted = restricted;
-        auto h_Ax_coarse  = Ax_coarse;
-#endif
+
+        auto h_restricted  = smesh::to_host(restricted);
+        auto h_Ax_coarse   = smesh::to_host(Ax_coarse);
+        auto h_prolongated = smesh::to_host(prolongated);
+
         {
             auto      err      = error->data();
             ptrdiff_t n        = fs_coarse->n_dofs();
@@ -249,11 +247,8 @@ int test_cube() {
                 std::cout << "--------------\n";
                 std::cout << "Prolongated\n";
                 std::cout << "--------------\n";
-#ifdef SFEM_ENABLE_CUDA
-                smesh::to_host(prolongated)->print(std::cout);
-#else
-                prolongated->print(std::cout);
-#endif
+
+                h_prolongated->print(std::cout);
 
                 std::cout << "--------------\n";
                 std::cout << "Actual\n";
@@ -281,17 +276,11 @@ int test_cube() {
                     out.set_output_dir("galerkin/fields");
                     SFEM_TEST_ASSERT(out.write("R", h_restricted->data()) == SFEM_SUCCESS);
                     SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
-                    SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(out.write("Ax_coarse", h_Ax_coarse->data()) == SFEM_SUCCESS);
                     SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
                 }
 
                 {  // FINE
-#ifdef SFEM_ENABLE_CUDA
-                    auto h_prolongated = smesh::to_host(prolongated);
-#else
-                    auto h_prolongated = prolongated;
-#endif
-
                     smesh::create_directory("galerkin_fine");
                     smesh::create_directory("galerkin_fine/fields");
                     SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
