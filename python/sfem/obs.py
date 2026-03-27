@@ -102,7 +102,7 @@ def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary
         print(f"Writing results to: {output_path}")
         # Write mesh files
         fs.mesh().write(f"{output_path}/coarse_mesh")
-        sfem.semi_structured_export_as_standard(fs.mesh(), f"{output_path}/mesh")
+        sfem.semistructured_export_as_standard(fs.mesh(), f"{output_path}/mesh")
         
         # Setup output
         out = f.output()
@@ -180,7 +180,7 @@ def build_cuboid_sphere_contact(base_resolution=2, element_refine_level=2, es=No
     f.add_constraint(dirichlet)
 
     # Contact SDF (half-sphere)
-    n = base_resolution * sfem.semi_structured_level(fs.mesh())
+    n = base_resolution * sfem.semistructured_level(fs.mesh())
     def sdf_func(x, y, z):
         cx, cy, cz = 0.5, -0.5, 0.5
         radius = 0.5
@@ -231,7 +231,7 @@ def build_cuboid_highfreq_contact(base_resolution=2, element_refine_level=2, es=
     
     f.add_constraint(dirichlet)
 
-    n = base_resolution * sfem.semi_structured_level(fs.mesh())
+    n = base_resolution * sfem.semistructured_level(fs.mesh())
     def sdf_func(x, y, z):
         cx = 0.6 * (1 - (x - .5) * (x - .5))
         cz = 0.6 * (1 - (z - .5) * (z - .5))
@@ -293,7 +293,7 @@ def build_cuboid_multisphere_contact(base_resolution=2, element_refine_level=2, 
     
     f.add_constraint(dirichlet)
 
-    n = base_resolution * sfem.semi_structured_level(fs.mesh())
+    n = base_resolution * sfem.semistructured_level(fs.mesh())
     def sdf_func(x, y, z):
         dd = 1e6
         hx = 1. / (n_spheres + 1)
@@ -357,7 +357,7 @@ def solve_test_problem(problem="sphere", base_resolution=2, element_refine_level
     solver.apply(rhs, x)
     os.makedirs(output_path, exist_ok=True)
     fs.mesh().write(f"{output_path}/coarse_mesh")
-    sfem.semi_structured_export_as_standard(fs.mesh(), f"{output_path}/mesh")
+    sfem.semistructured_export_as_standard(fs.mesh(), f"{output_path}/mesh")
     out = f.output()
     out.set_output_dir(f"{output_path}/out")
     out.enable_AoS_to_SoA(True)

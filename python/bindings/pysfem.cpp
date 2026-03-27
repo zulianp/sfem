@@ -802,15 +802,15 @@ NB_MODULE(pysfem, m) {
               return smesh::create_sdf(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
           });
 
-    m.def("semi_structured_export_as_standard", [](const std::shared_ptr<Mesh> &mesh, const std::string &path) {
-        return sfem::semi_structured_export_as_standard(mesh, path.c_str());
+    m.def("semistructured_export_as_standard", [](const std::shared_ptr<Mesh> &mesh, const std::string &path) {
+        return smesh::semistructured_export_as_standard(mesh, path.c_str());
     });
     m.def("semi_structured_apply_hierarchical_renumbering",
           [](const std::shared_ptr<Mesh> &mesh) {
               return smesh::semistructured_hierarchical_renumbering(
                       mesh->element_type(0), smesh::semistructured_level(*mesh), mesh->n_nodes(), mesh->elements(0), mesh->points());
           });
-    m.def("semi_structured_level", [](const std::shared_ptr<Mesh> &mesh) { return smesh::semistructured_level(*mesh); });
+    m.def("semistructured_level", [](const std::shared_ptr<Mesh> &mesh) { return smesh::semistructured_level(*mesh); });
 
     // Expose the C++ types as Python dtypes
     try {

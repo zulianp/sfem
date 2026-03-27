@@ -6,8 +6,8 @@
 
 // C++ includes
 #include "sfem_Laplacian.hpp"
-#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "smesh_glob.hpp"
 
@@ -72,8 +72,8 @@ namespace sfem {
     const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm      = space->mesh();
-        auto  mesh     = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+        auto &ssm  = space->mesh();
+        auto  mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
         return sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
                                                mesh->n_elements(),
@@ -95,11 +95,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
         auto &ssm = space->mesh();
-        return affine_sshex8_laplacian_diag(smesh::semistructured_level(ssm),
-                                            ssm.n_elements(),
-                                            sfem::semi_structured_element_data(ssm),
-                                            sfem::semi_structured_point_data(ssm),
-                                            out);
+        return affine_sshex8_laplacian_diag(
+                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), ssm.points()->data(), out);
     }
 
     int SemiStructuredEMLaplacian::gradient(const real_t *const x, real_t *const out) {
@@ -116,12 +113,8 @@ namespace sfem {
 
         double tick = MPI_Wtime();
 
-        int err = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
-                                                      ssm.n_elements(),
-                                                      sfem::semi_structured_element_data(ssm),
-                                                      element_matrix->data(),
-                                                      h,
-                                                      out);
+        int err = sshex8_stencil_element_matrix_apply(
+                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), element_matrix->data(), h, out);
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);

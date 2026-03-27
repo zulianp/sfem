@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
     if (fs->has_semi_structured_mesh()) {
         std::string path = output_path;
         path += "/ssmesh";
-        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), path.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path.c_str());
     }
 
     auto output = f->output();

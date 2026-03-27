@@ -120,7 +120,7 @@ namespace sfem {
 
         // FIXME
         auto coarse_restriction_mesh =
-                (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh()) ? sfem::semi_structured_derefine(mesh, 1) : nullptr;
+                (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh()) ? smesh::derefine(mesh, 1) : nullptr;
 
         ptrdiff_t max_coarse_idx = -1;
         auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);

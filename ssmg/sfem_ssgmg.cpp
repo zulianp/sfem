@@ -20,7 +20,7 @@ namespace sfem {
         auto     &ssmesh = f->space()->mesh();
         const int L      = smesh::semistructured_level(ssmesh);
 
-        std::vector<int> levels = sfem::semi_structured_derefinement_levels(ssmesh);
+        std::vector<int> levels = smesh::derefinement_levels(ssmesh);
 
         // Order from finest to coarsest!
         std::reverse(levels.begin(), levels.end());
