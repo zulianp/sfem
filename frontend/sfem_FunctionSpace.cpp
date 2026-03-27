@@ -6,7 +6,7 @@
 
 #include "sfem_aliases.hpp"
 // 
-// #include "sfem_SemiStructuredMesh.hpp"
+// #include "smesh_semistructured.hpp"
 // 
 #include "smesh_packed_mesh.hpp"
 

@@ -30,7 +30,7 @@
 #include "smesh_env.hpp"
 
 #include "sell.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"

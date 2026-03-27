@@ -7,7 +7,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_semistructured.hpp"
 #include "smesh_mesh.hpp"
 
 #include "smesh_glob.hpp"

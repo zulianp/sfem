@@ -142,7 +142,8 @@ struct TestOutput {
     }
 
     struct TestOutput to_host() {
-        TestOutput to{.x   = smesh::to_host(x),
+        TestOutput to{.is_ml = is_ml,
+                      .x     = smesh::to_host(x),
                       .rhs = smesh::to_host(rhs),
                       .g   = smesh::to_host(g),
                       // .upper_bound = sfem::to_host(upper_bound),
