@@ -508,14 +508,46 @@ namespace sfem {
 
         class GPULinearElasticityOpData {
         public:
-            std::shared_ptr<Buffer<idx_t *>>                       elements;
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_data;
+            std::shared_ptr<Buffer<idx_t *>>    elements;
+            std::shared_ptr<Buffer<jacobian_t>> jacobian_adjugate;
+            std::shared_ptr<Buffer<geom_t>>     jacobian_determinant;
 
             ptrdiff_t nelements() const {
                 assert(elements);
                 return elements->extent(1);
             }
         };
+
+        static std::shared_ptr<Buffer<jacobian_t>> create_gpu_jacobian_adjugate(const std::shared_ptr<FunctionSpace> &space,
+                                                                                const smesh::block_idx_t              block_id) {
+            constexpr ptrdiff_t adjugate_size = 9;
+
+            auto jac_src = smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+            if (!jac_src || !jac_src->jacobian_adjugate_SoA()) {
+                return nullptr;
+            }
+
+            const auto nelements = space->mesh_ptr()->n_elements(block_id);
+            auto       flat_adj  = sfem::create_host_buffer<jacobian_t>(adjugate_size * nelements);
+
+            auto *const       dst = flat_adj->data();
+            const auto *const src = jac_src->jacobian_adjugate_SoA()->data();
+            for (ptrdiff_t d = 0; d < adjugate_size; d++) {
+                memcpy(&dst[d * nelements], src[d], nelements * sizeof(jacobian_t));
+            }
+
+            return smesh::to_device(flat_adj);
+        }
+
+        static std::shared_ptr<Buffer<geom_t>> create_gpu_jacobian_determinant(const std::shared_ptr<FunctionSpace> &space,
+                                                                                const smesh::block_idx_t              block_id) {
+            auto jac_src = smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+            if (!jac_src || !jac_src->jacobian_determinant()) {
+                return nullptr;
+            }
+
+            return smesh::to_device(jac_src->jacobian_determinant());
+        }
 
         static void gpu_linear_elasticity_seed_material(MultiDomainOp &m, const real_t mu, const real_t lambda) {
             for (auto &kv : m.domains()) {
@@ -543,15 +575,16 @@ namespace sfem {
             ret->elements = smesh::to_device(domain.block->elements());
 
             const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
-            ret->jacobian_data =
-                    smesh::JacobianAdjugateAndDeterminant::create_AoS(space->mesh_ptr(), smesh::MEMORY_SPACE_DEVICE, block_id);
+            ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
+            ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
         }
 
         class GPUKelvinVoigtNewmarkOpData {
         public:
-            std::shared_ptr<Buffer<idx_t *>>                       elements;
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_data;
+            std::shared_ptr<Buffer<idx_t *>>    elements;
+            std::shared_ptr<Buffer<jacobian_t>> jacobian_adjugate;
+            std::shared_ptr<Buffer<geom_t>>     jacobian_determinant;
 
             ptrdiff_t nelements() const {
                 assert(elements);
@@ -601,8 +634,8 @@ namespace sfem {
             ret->elements = smesh::to_device(domain.block->elements());
 
             const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
-            ret->jacobian_data =
-                    smesh::JacobianAdjugateAndDeterminant::create_AoS(space->mesh_ptr(), smesh::MEMORY_SPACE_DEVICE, block_id);
+            ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
+            ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
         }
     }  // namespace
@@ -824,7 +857,7 @@ namespace sfem {
             for (auto &n2d : ret->domains->domains()) {
                 OpDomain &domain    = n2d.second;
                 auto      domain_op = create_gpu_linear_elasticity_op_data(derefined_space, domain);
-                if (!domain_op || !domain_op->jacobian_data) {
+                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return nullptr;
                 }
 
@@ -854,7 +887,7 @@ namespace sfem {
             for (auto &n2d : domains->domains()) {
                 OpDomain &domain    = n2d.second;
                 auto      domain_op = create_gpu_linear_elasticity_op_data(space, domain);
-                if (!domain_op || !domain_op->jacobian_data) {
+                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return SFEM_FAILURE;
                 }
 
@@ -911,8 +944,8 @@ namespace sfem {
                                                 domain_op->nelements(),
                                                 domain_op->elements->data(),
                                                 domain_op->nelements(),
-                                                domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                domain_op->jacobian_adjugate->data(),
+                                                domain_op->jacobian_determinant->data(),
                                                 mu,
                                                 lambda,
                                                 real_type,
@@ -937,8 +970,8 @@ namespace sfem {
                                                                    domain_op->nelements(),
                                                                    domain_op->elements->data(),
                                                                    domain_op->nelements(),
-                                                                   domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                   domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                   domain_op->jacobian_adjugate->data(),
+                                                                   domain_op->jacobian_determinant->data(),
                                                                    mu,
                                                                    lambda,
                                                                    real_type,
@@ -953,8 +986,8 @@ namespace sfem {
                                                  domain_op->nelements(),
                                                  domain_op->elements->data(),
                                                  domain_op->nelements(),
-                                                 domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                 domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                 domain_op->jacobian_adjugate->data(),
+                                                 domain_op->jacobian_determinant->data(),
                                                  mu,
                                                  lambda,
                                                  real_type,
@@ -977,8 +1010,8 @@ namespace sfem {
                                                                     domain_op->nelements(),
                                                                     domain_op->elements->data(),
                                                                     domain_op->nelements(),
-                                                                    domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                    domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                    domain_op->jacobian_adjugate->data(),
+                                                                    domain_op->jacobian_determinant->data(),
                                                                     mu,
                                                                     lambda,
                                                                     real_type,
@@ -997,8 +1030,8 @@ namespace sfem {
                                                   domain_op->nelements(),
                                                   domain_op->elements->data(),
                                                   domain_op->nelements(),
-                                                  domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                  domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                  domain_op->jacobian_adjugate->data(),
+                                                  domain_op->jacobian_determinant->data(),
                                                   mu,
                                                   lambda,
                                                   real_type,
@@ -1022,8 +1055,8 @@ namespace sfem {
                                                                     domain_op->nelements(),
                                                                     domain_op->elements->data(),
                                                                     domain_op->nelements(),
-                                                                    domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                    domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                    domain_op->jacobian_adjugate->data(),
+                                                                    domain_op->jacobian_determinant->data(),
                                                                     mu,
                                                                     lambda,
                                                                     real_type,
@@ -1042,8 +1075,8 @@ namespace sfem {
                                                   domain_op->nelements(),
                                                   domain_op->elements->data(),
                                                   domain_op->nelements(),
-                                                  domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                  domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                  domain_op->jacobian_adjugate->data(),
+                                                  domain_op->jacobian_determinant->data(),
                                                   mu,
                                                   lambda,
                                                   real_type,
@@ -1068,8 +1101,8 @@ namespace sfem {
                             domain_op->nelements(),
                             domain_op->elements->data(),
                             domain_op->nelements(),
-                            domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                            domain_op->jacobian_data->jacobian_determinant()->data(),
+                            domain_op->jacobian_adjugate->data(),
+                            domain_op->jacobian_determinant->data(),
                             mu,
                             lambda,
                             6,
@@ -1087,8 +1120,8 @@ namespace sfem {
                                                                domain_op->nelements(),
                                                                domain_op->elements->data(),
                                                                domain_op->nelements(),
-                                                               domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                               domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                               domain_op->jacobian_adjugate->data(),
+                                                               domain_op->jacobian_determinant->data(),
                                                                mu,
                                                                lambda,
                                                                real_type,
@@ -1197,7 +1230,7 @@ namespace sfem {
             for (auto &n2d : ret->domains->domains()) {
                 OpDomain &domain    = n2d.second;
                 auto      domain_op = create_gpu_kv_op_data(derefined_space, domain);
-                if (!domain_op || !domain_op->jacobian_data) {
+                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return nullptr;
                 }
                 domain.user_data = std::static_pointer_cast<void>(domain_op);
@@ -1255,7 +1288,7 @@ namespace sfem {
             for (auto &n2d : domains->domains()) {
                 OpDomain &domain    = n2d.second;
                 auto      domain_op = create_gpu_kv_op_data(space, domain);
-                if (!domain_op || !domain_op->jacobian_data) {
+                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return SFEM_FAILURE;
                 }
                 domain.user_data = std::static_pointer_cast<void>(domain_op);
@@ -1323,8 +1356,8 @@ namespace sfem {
                                                                   domain_op->nelements(),
                                                                   domain_op->elements->data(),
                                                                   domain_op->nelements(),
-                                                                  domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                  domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                  domain_op->jacobian_adjugate->data(),
+                                                                  domain_op->jacobian_determinant->data(),
                                                                   k,
                                                                   K,
                                                                   eta,
@@ -1362,8 +1395,8 @@ namespace sfem {
                                                                        domain_op->nelements(),
                                                                        domain_op->elements->data(),
                                                                        domain_op->nelements(),
-                                                                       domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                       domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                       domain_op->jacobian_adjugate->data(),
+                                                                       domain_op->jacobian_determinant->data(),
                                                                        k,
                                                                        K,
                                                                        eta,
@@ -1394,8 +1427,8 @@ namespace sfem {
                                                      domain_op->nelements(),
                                                      domain_op->elements->data(),
                                                      domain_op->nelements(),
-                                                     domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                     domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                     domain_op->jacobian_adjugate->data(),
+                                                     domain_op->jacobian_determinant->data(),
                                                      k,
                                                      K,
                                                      eta,
@@ -1441,8 +1474,8 @@ namespace sfem {
                                                                        domain_op->nelements(),
                                                                        domain_op->elements->data(),
                                                                        domain_op->nelements(),
-                                                                       domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                                       domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                                       domain_op->jacobian_adjugate->data(),
+                                                                       domain_op->jacobian_determinant->data(),
                                                                        k,
                                                                        K,
                                                                        eta,
@@ -1473,8 +1506,8 @@ namespace sfem {
                                                      domain_op->nelements(),
                                                      domain_op->elements->data(),
                                                      domain_op->nelements(),
-                                                     domain_op->jacobian_data->jacobian_adjugate_AoS()->data(),
-                                                     domain_op->jacobian_data->jacobian_determinant()->data(),
+                                                     domain_op->jacobian_adjugate->data(),
+                                                     domain_op->jacobian_determinant->data(),
                                                      k,
                                                      K,
                                                      eta,

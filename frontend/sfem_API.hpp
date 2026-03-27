@@ -403,7 +403,7 @@ namespace sfem {
             auto elements = to_space->device_elements();
             if (!elements) {
                 elements = create_device_elements(to_space, to_space->element_type());
-                from_space->set_device_elements(elements);
+                to_space->set_device_elements(elements);
             }
 
             if (to_space->has_semi_structured_mesh()) {
@@ -569,7 +569,7 @@ namespace sfem {
                 from_space->n_dofs(),
                 to_space->n_dofs(),
                 [=](const real_t *const from, real_t *const to) { op->apply(from, to); },
-                EXECUTION_SPACE_HOST);
+                op->execution_space());
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
