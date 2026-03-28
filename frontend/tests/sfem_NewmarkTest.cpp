@@ -42,7 +42,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
     auto f = sfem::Function::create(fs);
-    
+
     auto left_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
@@ -82,6 +82,7 @@ std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shar
 
     auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto mass            = sfem::create_op(fs, "LumpedMass", es);
+    assert(mass != nullptr);
     mass->initialize();
     mass->hessian_diag(nullptr, inv_mass_vector->data());
     f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
@@ -97,6 +98,7 @@ std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<s
 
     auto mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto mass        = sfem::create_op(fs, "LumpedMass", es);
+    assert(mass != nullptr);
     mass->initialize();
     mass->hessian_diag(nullptr, mass_vector->data());
     f->set_value_to_constrained_dofs(1, mass_vector->data());

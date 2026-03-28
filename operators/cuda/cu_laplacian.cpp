@@ -2,6 +2,7 @@
 
 #include "cu_hex8_laplacian.hpp"
 #include "cu_macro_tet4_laplacian.hpp"
+#include "cu_sshex8_laplacian.hpp"
 #include "cu_tet10_laplacian.hpp"
 #include "cu_tet4_laplacian.hpp"
 
@@ -17,6 +18,11 @@ int cu_laplacian_apply(const smesh::ElemType             element_type,
                        const void *const SFEM_RESTRICT x,
                        void *const SFEM_RESTRICT       y,
                        void                           *stream) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return cu_affine_sshex8_laplacian_apply(level, nelements, elements, fff_stride, fff, real_type_xy, x, y, stream);
+    }
+
     switch (element_type) {
         case smesh::TET4: {
             return cu_tet4_laplacian_apply(nelements, elements, fff_stride, fff, real_type_xy, x, y, stream);
@@ -45,6 +51,11 @@ int cu_laplacian_diag(const smesh::ElemType             element_type,
                       const enum smesh::PrimitiveType             real_type_xy,
                       void *const SFEM_RESTRICT       diag,
                       void                           *stream) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return cu_affine_sshex8_laplacian_diag(level, nelements, elements, fff_stride, fff, real_type_xy, diag, stream);
+    }
+
     switch (element_type) {
         case smesh::TET4: {
             return cu_tet4_laplacian_diag(nelements, elements, fff_stride, fff, real_type_xy, diag, stream);

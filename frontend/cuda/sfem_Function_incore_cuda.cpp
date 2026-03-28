@@ -1,6 +1,6 @@
 #include "sfem_Function_incore_cuda.hpp"
-#include <memory>
 #include <cstring>
+#include <memory>
 #include "boundary_condition.hpp"
 
 #include <cuda_runtime_api.h>
@@ -20,9 +20,6 @@
 #include "cu_linear_elasticity.hpp"
 #include "cu_mask.hpp"
 #include "cu_sshex8_elemental_matrix.hpp"
-#include "cu_sshex8_kelvin_voigt_newmark.hpp"
-#include "cu_sshex8_laplacian.hpp"
-#include "cu_sshex8_linear_elasticity.hpp"
 #include "cu_tet4_adjugate.hpp"
 #include "cu_tet4_fff.hpp"
 
@@ -79,77 +76,6 @@ namespace sfem {
             return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
         }
     }
-
-    // std::shared_ptr<Sideset> smesh::to_device(const std::shared_ptr<Sideset> &sideset) {
-    //     return std::make_shared<Sideset>(sideset->comm(), smesh::to_device(sideset->parent()),
-    //     smesh::to_device(sideset->lfi()));
-    // }
-
-    // std::vector<std::shared_ptr<Sideset>> smesh::to_device(const std::vector<std::shared_ptr<Sideset>> &ss) {
-    //     std::vector<std::shared_ptr<Sideset>> ret;
-    //     for (const auto &s : ss) {
-    //         ret.push_back(smesh::to_device(s));
-    //     }
-    //     return ret;
-    // }
-
-    template <typename T>
-    std::shared_ptr<Buffer<T>> manage_device_buffer(const ptrdiff_t n, T *data) {
-        return Buffer<T>::own(n, data, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
-    }
-
-    class Adjugate {
-    public:
-        Adjugate(Mesh &mesh, const smesh::ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
-            : element_type_(element_type), elements_(elements) {
-            void *jacobian_adjugate{nullptr};
-            void *jacobian_determinant{nullptr};
-
-            if (element_type == smesh::HEX8 || is_semistructured_type(element_type)) {
-                cu_hex8_adjugate_allocate(mesh.n_elements(), &jacobian_adjugate, &jacobian_determinant);
-                cu_hex8_adjugate_fill(mesh.n_elements(),
-                                      mesh.elements(0)->data(),
-                                      mesh.points()->data(),
-                                      jacobian_adjugate,
-                                      jacobian_determinant);
-
-            } else {
-                cu_tet4_adjugate_allocate(mesh.n_elements(), &jacobian_adjugate, &jacobian_determinant);
-                cu_tet4_adjugate_fill(mesh.n_elements(),
-                                      mesh.elements(0)->data(),
-                                      mesh.points()->data(),
-                                      jacobian_adjugate,
-                                      jacobian_determinant);
-            }
-
-            // FIXME compute size (currently 9)
-            jacobian_adjugate_    = manage_device_buffer<void>(mesh.n_elements() * 9, jacobian_adjugate);
-            jacobian_determinant_ = manage_device_buffer<void>(mesh.n_elements(), jacobian_determinant);
-        }
-
-        Adjugate(smesh::ElemType                         element_type,
-                 const std::shared_ptr<Buffer<idx_t *>> &elements,
-                 const std::shared_ptr<Buffer<void>>    &jacobian_adjugate,
-                 const std::shared_ptr<Buffer<void>>    &jacobian_determinant)
-            : element_type_(element_type),
-              elements_(elements),
-              jacobian_adjugate_(jacobian_adjugate),
-              jacobian_determinant_(jacobian_determinant) {}
-
-        ~Adjugate() {}
-
-        smesh::ElemType                  element_type() const { return element_type_; }
-        ptrdiff_t                        n_elements() const { return elements_->extent(1); }
-        std::shared_ptr<Buffer<idx_t *>> elements() const { return elements_; }
-        std::shared_ptr<Buffer<void>>    jacobian_determinant() const { return jacobian_determinant_; }
-        std::shared_ptr<Buffer<void>>    jacobian_adjugate() const { return jacobian_adjugate_; }
-
-    private:
-        smesh::ElemType                  element_type_;
-        std::shared_ptr<Buffer<idx_t *>> elements_;
-        std::shared_ptr<Buffer<void>>    jacobian_adjugate_;
-        std::shared_ptr<Buffer<void>>    jacobian_determinant_;
-    };
 
     class GPUDirichletConditions final : public Constraint {
     public:
@@ -400,8 +326,8 @@ namespace sfem {
 
         class GPULaplacianOpData {
         public:
-            smesh::ElemType                  element_type{smesh::INVALID};
-            std::shared_ptr<Buffer<idx_t *>> elements;
+            smesh::ElemType                     element_type{smesh::INVALID};
+            std::shared_ptr<Buffer<idx_t *>>    elements;
             std::shared_ptr<Buffer<jacobian_t>> fff;
 
             ptrdiff_t nelements() const {
@@ -447,65 +373,6 @@ namespace sfem {
             return ret;
         }
 
-        static int cu_laplacian_dispatch_apply(const OpDomain            &domain,
-                                               const smesh::PrimitiveType real_type,
-                                               const void                *x,
-                                               void                      *y,
-                                               void                      *stream) {
-            auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
-            assert(op_data);
-            if (is_semistructured_type(domain.element_type)) {
-                const int level = smesh::semistructured_level(domain.element_type);
-                return cu_affine_sshex8_laplacian_apply(level,
-                                                        op_data->nelements(),
-                                                        op_data->elements->data(),
-                                                        op_data->nelements(),
-                                                        op_data->fff_data(),
-                                                        real_type,
-                                                        x,
-                                                        y,
-                                                        stream);
-            }
-
-            return cu_laplacian_apply(domain.element_type,
-                                      op_data->nelements(),
-                                      op_data->elements->data(),
-                                      op_data->nelements(),
-                                      op_data->fff_data(),
-                                      real_type,
-                                      x,
-                                      y,
-                                      stream);
-        }
-
-        static int cu_laplacian_dispatch_diag(const OpDomain            &domain,
-                                              const smesh::PrimitiveType real_type,
-                                              void                      *diag,
-                                              void                      *stream) {
-            auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
-            assert(op_data);
-            if (is_semistructured_type(domain.element_type)) {
-                const int level = smesh::semistructured_level(domain.element_type);
-                return cu_affine_sshex8_laplacian_diag(level,
-                                                       op_data->nelements(),
-                                                       op_data->elements->data(),
-                                                       op_data->nelements(),
-                                                       op_data->fff_data(),
-                                                       real_type,
-                                                       diag,
-                                                       stream);
-            }
-
-            return cu_laplacian_diag(domain.element_type,
-                                     op_data->nelements(),
-                                     op_data->elements->data(),
-                                     op_data->nelements(),
-                                     op_data->fff_data(),
-                                     real_type,
-                                     diag,
-                                     stream);
-        }
-
         class GPULinearElasticityOpData {
         public:
             std::shared_ptr<Buffer<idx_t *>>    elements;
@@ -522,7 +389,8 @@ namespace sfem {
                                                                                 const smesh::block_idx_t              block_id) {
             constexpr ptrdiff_t adjugate_size = 9;
 
-            auto jac_src = smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+            auto jac_src =
+                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
             if (!jac_src || !jac_src->jacobian_adjugate_SoA()) {
                 return nullptr;
             }
@@ -540,8 +408,9 @@ namespace sfem {
         }
 
         static std::shared_ptr<Buffer<geom_t>> create_gpu_jacobian_determinant(const std::shared_ptr<FunctionSpace> &space,
-                                                                                const smesh::block_idx_t              block_id) {
-            auto jac_src = smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+                                                                               const smesh::block_idx_t              block_id) {
+            auto jac_src =
+                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
             if (!jac_src || !jac_src->jacobian_determinant()) {
                 return nullptr;
             }
@@ -574,7 +443,7 @@ namespace sfem {
             auto ret      = std::make_shared<GPULinearElasticityOpData>();
             ret->elements = smesh::to_device(domain.block->elements());
 
-            const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
+            const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
             ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
             ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
@@ -633,7 +502,7 @@ namespace sfem {
             auto ret      = std::make_shared<GPUKelvinVoigtNewmarkOpData>();
             ret->elements = smesh::to_device(domain.block->elements());
 
-            const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
+            const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
             ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
             ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
@@ -750,17 +619,47 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            return iterate([&](const OpDomain &domain) { return cu_laplacian_dispatch_diag(domain, real_type, values, stream); });
+            return iterate([&](const OpDomain &domain) {
+                auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+                return cu_laplacian_diag(domain.element_type,
+                                         op_data->nelements(),
+                                         op_data->elements->data(),
+                                         op_data->nelements(),
+                                         op_data->fff_data(),
+                                         real_type,
+                                         values,
+                                         stream);
+            });
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            return iterate(
-                    [&](const OpDomain &domain) { return cu_laplacian_dispatch_apply(domain, real_type, x, out, stream); });
+            return iterate([&](const OpDomain &domain) {
+                auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+                return cu_laplacian_apply(domain.element_type,
+                                          op_data->nelements(),
+                                          op_data->elements->data(),
+                                          op_data->nelements(),
+                                          op_data->fff_data(),
+                                          real_type,
+                                          x,
+                                          out,
+                                          stream);
+            });
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            return iterate(
-                    [&](const OpDomain &domain) { return cu_laplacian_dispatch_apply(domain, real_type, h, out, stream); });
+            return iterate([&](const OpDomain &domain) {
+                auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+                return cu_laplacian_apply(domain.element_type,
+                                          op_data->nelements(),
+                                          op_data->elements->data(),
+                                          op_data->nelements(),
+                                          op_data->fff_data(),
+                                          real_type,
+                                          h,
+                                          out,
+                                          stream);
+            });
         }
 
         int hessian_crs_sym(const real_t *const /*x*/,
@@ -963,25 +862,6 @@ namespace sfem {
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
 
-                if (is_semistructured_type(domain.element_type)) {
-                    const int level = smesh::semistructured_level(domain.element_type);
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", level);
-                    return cu_affine_sshex8_linear_elasticity_diag(level,
-                                                                   domain_op->nelements(),
-                                                                   domain_op->elements->data(),
-                                                                   domain_op->nelements(),
-                                                                   domain_op->jacobian_adjugate->data(),
-                                                                   domain_op->jacobian_determinant->data(),
-                                                                   mu,
-                                                                   lambda,
-                                                                   real_type,
-                                                                   3,
-                                                                   &values[0],
-                                                                   &values[1],
-                                                                   &values[2],
-                                                                   stream);
-                }
-
                 return cu_linear_elasticity_diag(domain.element_type,
                                                  domain_op->nelements(),
                                                  domain_op->elements->data(),
@@ -1002,29 +882,6 @@ namespace sfem {
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
-
-                if (is_semistructured_type(domain.element_type)) {
-                    const int level = smesh::semistructured_level(domain.element_type);
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
-                    return cu_affine_sshex8_linear_elasticity_apply(level,
-                                                                    domain_op->nelements(),
-                                                                    domain_op->elements->data(),
-                                                                    domain_op->nelements(),
-                                                                    domain_op->jacobian_adjugate->data(),
-                                                                    domain_op->jacobian_determinant->data(),
-                                                                    mu,
-                                                                    lambda,
-                                                                    real_type,
-                                                                    3,
-                                                                    &x[0],
-                                                                    &x[1],
-                                                                    &x[2],
-                                                                    3,
-                                                                    &out[0],
-                                                                    &out[1],
-                                                                    &out[2],
-                                                                    stream);
-                }
 
                 return cu_linear_elasticity_apply(domain.element_type,
                                                   domain_op->nelements(),
@@ -1048,29 +905,6 @@ namespace sfem {
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
 
-                if (is_semistructured_type(domain.element_type)) {
-                    const int level = smesh::semistructured_level(domain.element_type);
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", level);
-                    return cu_affine_sshex8_linear_elasticity_apply(level,
-                                                                    domain_op->nelements(),
-                                                                    domain_op->elements->data(),
-                                                                    domain_op->nelements(),
-                                                                    domain_op->jacobian_adjugate->data(),
-                                                                    domain_op->jacobian_determinant->data(),
-                                                                    mu,
-                                                                    lambda,
-                                                                    real_type,
-                                                                    3,
-                                                                    &h[0],
-                                                                    &h[1],
-                                                                    &h[2],
-                                                                    3,
-                                                                    &out[0],
-                                                                    &out[1],
-                                                                    &out[2],
-                                                                    stream);
-                }
-
                 return cu_linear_elasticity_apply(domain.element_type,
                                                   domain_op->nelements(),
                                                   domain_op->elements->data(),
@@ -1092,29 +926,6 @@ namespace sfem {
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
-
-                if (is_semistructured_type(domain.element_type)) {
-                    const int level = smesh::semistructured_level(domain.element_type);
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", level);
-                    return cu_affine_sshex8_linear_elasticity_block_diag_sym(
-                            level,
-                            domain_op->nelements(),
-                            domain_op->elements->data(),
-                            domain_op->nelements(),
-                            domain_op->jacobian_adjugate->data(),
-                            domain_op->jacobian_determinant->data(),
-                            mu,
-                            lambda,
-                            6,
-                            real_type,
-                            values,
-                            &values[1],
-                            &values[2],
-                            &values[3],
-                            &values[4],
-                            &values[5],
-                            stream);
-                }
 
                 return cu_linear_elasticity_block_diag_sym_aos(domain.element_type,
                                                                domain_op->nelements(),
@@ -1334,11 +1145,6 @@ namespace sfem {
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             return iterate([&](const OpDomain &domain) {
-                if (!is_semistructured_type(domain.element_type)) {
-                    SFEM_IMPLEMENT_ME();
-                    return SFEM_FAILURE;
-                }
-
                 auto         domain_op = std::static_pointer_cast<GPUKelvinVoigtNewmarkOpData>(domain.user_data);
                 const auto   params    = domain.parameters;
                 const real_t k         = params->require_real_value("k");
@@ -1348,29 +1154,22 @@ namespace sfem {
                 const real_t dt_       = params->require_real_value("dt");
                 const real_t gamma_    = params->require_real_value("gamma");
                 const real_t beta_     = params->require_real_value("beta");
-                const int    level     = smesh::semistructured_level(domain.element_type);
-
-                SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_diag[%d]", level);
-
-                return cu_affine_sshex8_kelvin_voigt_newmark_diag(level,
-                                                                  domain_op->nelements(),
-                                                                  domain_op->elements->data(),
-                                                                  domain_op->nelements(),
-                                                                  domain_op->jacobian_adjugate->data(),
-                                                                  domain_op->jacobian_determinant->data(),
-                                                                  k,
-                                                                  K,
-                                                                  eta,
-                                                                  rho,
-                                                                  dt_,
-                                                                  gamma_,
-                                                                  beta_,
-                                                                  real_type,
-                                                                  3,
-                                                                  &values[0],
-                                                                  &values[1],
-                                                                  &values[2],
-                                                                  SFEM_DEFAULT_STREAM);
+                return cu_kelvin_voigt_newmark_diag(domain.element_type,
+                                                    domain_op->nelements(),
+                                                    domain_op->elements->data(),
+                                                    domain_op->nelements(),
+                                                    domain_op->jacobian_adjugate->data(),
+                                                    domain_op->jacobian_determinant->data(),
+                                                    k,
+                                                    K,
+                                                    eta,
+                                                    rho,
+                                                    dt_,
+                                                    gamma_,
+                                                    beta_,
+                                                    real_type,
+                                                    values,
+                                                    stream);
             });
         }
 
@@ -1388,40 +1187,6 @@ namespace sfem {
                 const real_t *v         = vel_[0]->data();
                 const real_t *a         = acc_[0]->data();
 
-                if (is_semistructured_type(domain.element_type)) {
-                    const int level = smesh::semistructured_level(domain.element_type);
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", level);
-                    return cu_affine_sshex8_kelvin_voigt_newmark_apply(level,
-                                                                       domain_op->nelements(),
-                                                                       domain_op->elements->data(),
-                                                                       domain_op->nelements(),
-                                                                       domain_op->jacobian_adjugate->data(),
-                                                                       domain_op->jacobian_determinant->data(),
-                                                                       k,
-                                                                       K,
-                                                                       eta,
-                                                                       rho,
-                                                                       dt_,
-                                                                       gamma_,
-                                                                       beta_,
-                                                                       real_type,
-                                                                       3,
-                                                                       &x[0],
-                                                                       &x[1],
-                                                                       &x[2],
-                                                                       &v[0],
-                                                                       &v[1],
-                                                                       &v[2],
-                                                                       &a[0],
-                                                                       &a[1],
-                                                                       &a[2],
-                                                                       3,
-                                                                       &out[0],
-                                                                       &out[1],
-                                                                       &out[2],
-                                                                       SFEM_DEFAULT_STREAM);
-                }
-
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
                 return cu_kelvin_voigt_newmark_apply(domain.element_type,
                                                      domain_op->nelements(),
@@ -1433,6 +1198,9 @@ namespace sfem {
                                                      K,
                                                      eta,
                                                      rho,
+                                                     dt_,
+                                                     gamma_,
+                                                     beta_,
                                                      real_type,
                                                      x,
                                                      v,
@@ -1465,42 +1233,6 @@ namespace sfem {
                 d_copy(ndofs, h, a_lin_tmp->data());
                 d_scal(ndofs, a_scale, a_lin_tmp->data());
 
-                if (is_semistructured_type(domain.element_type)) {
-                    const int     level = smesh::semistructured_level(domain.element_type);
-                    const real_t *v_lin = v_lin_tmp->data();
-                    const real_t *a_lin = a_lin_tmp->data();
-                    SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", level);
-                    return cu_affine_sshex8_kelvin_voigt_newmark_apply(level,
-                                                                       domain_op->nelements(),
-                                                                       domain_op->elements->data(),
-                                                                       domain_op->nelements(),
-                                                                       domain_op->jacobian_adjugate->data(),
-                                                                       domain_op->jacobian_determinant->data(),
-                                                                       k,
-                                                                       K,
-                                                                       eta,
-                                                                       rho,
-                                                                       dt_,
-                                                                       gamma_,
-                                                                       beta_,
-                                                                       real_type,
-                                                                       3,
-                                                                       &h[0],
-                                                                       &h[1],
-                                                                       &h[2],
-                                                                       &v_lin[0],
-                                                                       &v_lin[1],
-                                                                       &v_lin[2],
-                                                                       &a_lin[0],
-                                                                       &a_lin[1],
-                                                                       &a_lin[2],
-                                                                       3,
-                                                                       &out[0],
-                                                                       &out[1],
-                                                                       &out[2],
-                                                                       SFEM_DEFAULT_STREAM);
-                }
-
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
                 return cu_kelvin_voigt_newmark_apply(domain.element_type,
                                                      domain_op->nelements(),
@@ -1512,6 +1244,9 @@ namespace sfem {
                                                      K,
                                                      eta,
                                                      rho,
+                                                     dt_,
+                                                     gamma_,
+                                                     beta_,
                                                      real_type,
                                                      h,
                                                      v_lin_tmp->data(),

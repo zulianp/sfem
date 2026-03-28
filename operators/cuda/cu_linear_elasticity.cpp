@@ -5,6 +5,7 @@
 
 #include "cu_hex8_linear_elasticity.hpp"
 #include "cu_macro_tet4_linear_elasticity.hpp"
+#include "cu_sshex8_linear_elasticity.hpp"
 #include "cu_tet10_linear_elasticity.hpp"
 #include "cu_tet4_linear_elasticity.hpp"
 
@@ -23,6 +24,28 @@ extern int cu_linear_elasticity_apply(const smesh::ElemType           element_ty
                                       const real_t *const             d_x,
                                       real_t *const                   d_y,
                                       void                           *stream) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return cu_affine_sshex8_linear_elasticity_apply(level,
+                                                        nelements,
+                                                        elements,
+                                                        jacobian_stride,
+                                                        jacobian_adjugate,
+                                                        jacobian_determinant,
+                                                        mu,
+                                                        lambda,
+                                                        real_type,
+                                                        3,
+                                                        d_x,
+                                                        &d_x[1],
+                                                        &d_x[2],
+                                                        3,
+                                                        d_y,
+                                                        &d_y[1],
+                                                        &d_y[2],
+                                                        stream);
+    }
+
     switch (element_type) {
         case smesh::TET4: {
             return cu_tet4_linear_elasticity_apply(nelements,
@@ -119,6 +142,24 @@ extern int cu_linear_elasticity_diag(const smesh::ElemType           element_typ
                                      const enum smesh::PrimitiveType real_type,
                                      real_t *const                   d_t,
                                      void                           *stream) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return cu_affine_sshex8_linear_elasticity_diag(level,
+                                                       nelements,
+                                                       elements,
+                                                       jacobian_stride,
+                                                       jacobian_adjugate,
+                                                       jacobian_determinant,
+                                                       mu,
+                                                       lambda,
+                                                       real_type,
+                                                       3,
+                                                       d_t,
+                                                       &d_t[1],
+                                                       &d_t[2],
+                                                       stream);
+    }
+
     switch (element_type) {
         case smesh::TET4: {
             return cu_tet4_linear_elasticity_diag(nelements,
@@ -223,6 +264,27 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType           elem
         nbytes = sizeof(real_t);
     } else {
         nbytes = smesh::num_bytes(real_type);
+    }
+
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return cu_affine_sshex8_linear_elasticity_block_diag_sym(level,
+                                                                 nelements,
+                                                                 elements,
+                                                                 jacobian_stride,
+                                                                 jacobian_adjugate,
+                                                                 jacobian_determinant,
+                                                                 mu,
+                                                                 lambda,
+                                                                 6,
+                                                                 real_type,
+                                                                 (char *)out + 0 * nbytes,
+                                                                 (char *)out + 1 * nbytes,
+                                                                 (char *)out + 2 * nbytes,
+                                                                 (char *)out + 3 * nbytes,
+                                                                 (char *)out + 4 * nbytes,
+                                                                 (char *)out + 5 * nbytes,
+                                                                 stream);
     }
 
     switch (element_type) {

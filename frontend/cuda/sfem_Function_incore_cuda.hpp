@@ -4,11 +4,8 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-#include "sfem_cuda_blas.hpp"
-
-// #include <cuda_runtime.h>
-
 #include "sfem_aliases.hpp"
+#include "sfem_cuda_blas.hpp"
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
@@ -17,146 +14,11 @@
 #include "smesh_device_buffer.hpp"
 
 namespace sfem {
-    void                                  register_device_ops();
-    std::shared_ptr<Constraint>           to_device(const std::shared_ptr<DirichletConditions> &dc);
-    std::shared_ptr<Op>                   to_device(const std::shared_ptr<NeumannConditions> &nc);
-    // std::shared_ptr<Sideset>              to_device(const std::shared_ptr<Sideset> &ss);
-    // std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss);
+    void                        register_device_ops();
+    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
+    std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
 
     SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const smesh::ElemType element_type);
-
-    // template <typename T>
-    // SharedBuffer<T> create_device_buffer(const std::ptrdiff_t n) {
-    //     auto ret = std::make_shared<Buffer<T>>(n, (T *)d_buffer_alloc(n * sizeof(T)), &d_buffer_destroy, MEMORY_SPACE_DEVICE);
-    //     return ret;
-    // }
-
-    // template <typename T>
-    // SharedBuffer<T *> create_device_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1) {
-    //     T **dev_buff0 = (T **)d_buffer_alloc(n0 * sizeof(T *));
-
-    //     std::vector<T *> host_dev_ptrs(n0);
-    //     for (size_t i0 = 0; i0 < n0; i0++) {
-    //         host_dev_ptrs[i0] = (T *)d_buffer_alloc(n1 * sizeof(T));
-    //         d_memset(host_dev_ptrs[i0], 0, n1 * sizeof(T));
-    //     }
-
-    //     buffer_host_to_device(n0 * sizeof(T *), host_dev_ptrs.data(), dev_buff0);
-
-    //     return std::make_shared<Buffer<T *>>(
-    //             n0,
-    //             n1,
-    //             dev_buff0,
-    //             [n0, host_dev_ptrs](int n, void **ptr) {
-    //                 for (size_t i0 = 0; i0 < n0; i0++) {
-    //                     d_buffer_destroy(host_dev_ptrs[i0]);
-    //                 }
-
-    //                 d_buffer_destroy(ptr);
-    //             },
-    //             MEMORY_SPACE_DEVICE);
-    // }
-
-    // template <typename T>
-    // SharedBuffer<T> to_device(const SharedBuffer<T> &in) {
-    //     if (in->mem_space() == MEMORY_SPACE_DEVICE) {
-    //         return in;
-    //     }
-
-    //     T *buff = (T *)d_buffer_alloc(in->size() * sizeof(T));
-    //     // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyHostToDevice);
-    //     buffer_host_to_device(in->size() * sizeof(T), in->data(), buff);
-
-    //     return std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
-    // }
-
-    // template <typename T>
-    // std::vector<SharedBuffer<T>> to_device(const std::vector<SharedBuffer<T>> &in) {
-    //     std::vector<SharedBuffer<T>> ret;
-    //     for (const auto &b : in) {
-    //         ret.push_back(to_device(b));
-    //     }
-    //     return ret;
-    // }
-
-    // template <typename T>
-    // SharedBuffer<T *> to_device(const SharedBuffer<T *> &in) {
-    //     if (in->mem_space() == MEMORY_SPACE_DEVICE) {
-    //         return in;
-    //     }
-
-    //     size_t n0 = in->extent(0);
-    //     size_t n1 = in->extent(1);
-
-    //     T **dev_buff0 = (T **)d_buffer_alloc(n0 * sizeof(T *));
-
-    //     std::vector<T *> host_dev_ptrs(n0);
-    //     for (size_t i0 = 0; i0 < n0; i0++) {
-    //         host_dev_ptrs[i0] = (T *)d_buffer_alloc(n1 * sizeof(T));
-    //         buffer_host_to_device(n1 * sizeof(T), in->data()[i0], host_dev_ptrs[i0]);
-    //     }
-
-    //     buffer_host_to_device(n0 * sizeof(T *), host_dev_ptrs.data(), dev_buff0);
-
-    //     return std::make_shared<Buffer<T *>>(
-    //             n0,
-    //             n1,
-    //             dev_buff0,
-    //             [n0, host_dev_ptrs](int n, void **ptr) {
-    //                 for (size_t i0 = 0; i0 < n0; i0++) {
-    //                     d_buffer_destroy(host_dev_ptrs[i0]);
-    //                 }
-
-    //                 d_buffer_destroy(ptr);
-    //             },
-    //             MEMORY_SPACE_DEVICE);
-    // }
-
-    // inline std::shared_ptr<CRSGraph> to_device(const std::shared_ptr<CRSGraph> &in) {
-    //     if (in->rowptr()->mem_space() == MEMORY_SPACE_DEVICE) {
-    //         return in;
-    //     }
-
-    //     return std::make_shared<CRSGraph>(to_device(in->rowptr()), to_device(in->colidx()));
-    // }
-
-    // template <typename T>
-    // SharedBuffer<T> to_host(const SharedBuffer<T> &in) {
-    //     if (in->mem_space() == MEMORY_SPACE_HOST) {
-    //         return in;
-    //     }
-
-    //     using NonConstT = typename std::remove_const<T>::type;
-
-    //     NonConstT *buff = static_cast<NonConstT *>(malloc(in->size() * sizeof(T)));
-    //     // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyDeviceToHost);
-    //     buffer_device_to_host(in->size() * sizeof(NonConstT), in->data(), buff);
-    //     return std::make_shared<Buffer<T>>(in->size(), buff, &free, MEMORY_SPACE_HOST);
-    // }
-
-    // template <typename T>
-    // std::shared_ptr<Buffer<T *>> to_host(const std::shared_ptr<Buffer<T *>> &in) {
-    //     if (in->mem_space() == MEMORY_SPACE_HOST) {
-    //         return in;
-    //     }
-
-    //     const ptrdiff_t n0 = in->extent(0);
-    //     const ptrdiff_t n1 = in->extent(1);
-
-    //     auto buffer = create_host_buffer<T>(n0, n1);
-
-    //     T **dev_addr = static_cast<T **>(malloc(n0 * sizeof(T *)));
-
-    //     buffer_device_to_host(n0 * sizeof(T *), in->data(), dev_addr);
-
-    //     for (ptrdiff_t i = 0; i < n0; i++) {
-    //         buffer_device_to_host(n1 * sizeof(T), dev_addr[i], buffer->data()[i]);
-    //     }
-
-    //     free(dev_addr);
-
-    //     return buffer;
-    // }
 
     template <typename T>
     std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
