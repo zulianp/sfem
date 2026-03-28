@@ -369,7 +369,6 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        // mesh->write(smesh::Path("test_contact/coarse_mesh"));
         smesh::semistructured_export_as_standard(fs->mesh_ptr(), "test_contact/mesh");
 
         auto out = f->output();
