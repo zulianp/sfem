@@ -18,11 +18,11 @@
 
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
-#ifdef SFEM_ENABLE_CUDA
-#include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
-#endif
+// #ifdef SFEM_ENABLE_CUDA
+// #include "sfem_Function_incore_cuda.hpp"
+// #include "sfem_cuda_blas.hpp"
+// #include "sfem_cuda_solver.hpp"
+// #endif
 
 #include "sfem_ssmgc.hpp"
 
@@ -240,16 +240,16 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
 
-// FIXME
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
+    // FIXME
+    // #ifdef SFEM_ENABLE_CUDA
+    //     {
+    //         auto elements = fs->device_elements();
+    //         if (!elements) {
+    //             elements = create_device_elements(fs, fs->element_type());
+    //             fs->set_device_elements(elements);
+    //         }
+    //     }
+    // #endif
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);

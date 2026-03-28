@@ -95,21 +95,21 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
     }
 
     const int dim = 3;
-    const int N   = 2;
+    const int N   = 10;
 
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, 0, 0, 0, 1, 1, 1);
     auto fs   = sfem::FunctionSpace::create(mesh, dim);
     fs->initialize_packed_mesh();
 
-    std::cout << "Mesh:" << std::endl;
-    mesh->print(std::cout);
-    std::cout << std::endl;
+    // std::cout << "Mesh:" << std::endl;
+    // mesh->print(std::cout);
+    // std::cout << std::endl;
 
-    mesh->write(smesh::Path("mesh_r"));
+    // mesh->write(smesh::Path("mesh_r"));
 
-    std::cout << "Packed mesh:" << std::endl;
-    fs->packed_mesh()->print(std::cout, 1);
-    std::cout << std::endl;
+    // std::cout << "Packed mesh:" << std::endl;
+    // fs->packed_mesh()->print(std::cout, 1);
+    // std::cout << std::endl;
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, op_name.c_str(), es);
@@ -182,19 +182,16 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
 
 int test_hyperelasticity_partial_assembly_all() {
     return test_hyperelasticity_partial_assembly("NeoHookeanOgden");
-    //  +
-    //    test_hyperelasticity_partial_assembly("MooneyRivlin");
+    +test_hyperelasticity_partial_assembly("MooneyRivlin");
 }
 
 int test_hyperelasticity_active_strain_partial_assembly_all() {
     return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked");
-    // +
-    //    test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
+    +test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
     SFEM_RUN_TEST(test_hyperelasticity_partial_assembly_all);
     SFEM_RUN_TEST(test_hyperelasticity_active_strain_partial_assembly_all);
     SFEM_UNIT_TEST_FINALIZE();
