@@ -28,7 +28,7 @@ then
 	mkdir -p hex8_geometry
 	cd hex8_geometry
 
-	MESH_FACTOR=3
+	MESH_FACTOR=1
 	box_mesh.py box --cell_type=hex8 -x $((120 * MESH_FACTOR)) -y $((30 * MESH_FACTOR)) -z $((30 * MESH_FACTOR)) --width=4
 	surf_type=quad4
 	
@@ -69,6 +69,6 @@ export SFEM_OPERATOR=NeoHookeanOgdenPacked
 
 # xctrace record --template 'Time Profiler'  --launch -- $SFEM_PATH/bin/hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
 $LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
-# raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS
+# raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.*' $EXTRA_OPTIONS
 
-$CODE_DIR/smesh/python/smesh/raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.raw,hex8_output/out/disp.1.*.raw,hex8_output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+$CODE_DIR/smesh/python/smesh/raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.*,hex8_output/out/disp.1.*.*,hex8_output/out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
