@@ -66,6 +66,6 @@ export SFEM_ENABLE_LINE_SEARCH=0
 rm -rf output
 
 $LAUNCH hyperelasticy aorta_geometry/aorta dirichlet.yaml output
-# raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS
+# raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.*' $EXTRA_OPTIONS
 
-raw_to_db.py output/mesh output.xdmf -p "output/out/disp.0.*.raw,output/out/disp.1.*.raw,output/out/disp.2.*.raw" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
+raw_to_db.py output/mesh output.xdmf -p "output/out/disp.0.*.*,output/out/disp.1.*.*,output/out/disp.2.*.*" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
