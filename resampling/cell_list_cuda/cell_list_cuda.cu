@@ -378,14 +378,11 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
 
             // printf("Launching kernel for start_i = %td, start_j = %td\n", start_i, start_j);
 
-            const int shared_mem_size = 2 * threads_per_block_x * (sizeof(int) + sizeof(real_t)) + sizeof(int);
-
             transfer_to_hex_field_cell_split_tet4_shm_il_kernel<index_type>  //
                     <<<grid_size,                                            //
                        block_size,                                           //
-                       shared_mem_size,                                      //
-                       stream_kernel>>>(shared_mem_size,                     //
-                                        split_map_device,                    //
+                       0,                                                    //
+                       stream_kernel>>>(split_map_device,                    //
                                         bounding_boxes_interleaved_device,   //
                                         geom_device,
                                         mesh_device,

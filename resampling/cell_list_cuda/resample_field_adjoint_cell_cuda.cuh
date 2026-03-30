@@ -63,10 +63,10 @@ update_hex_quad_node_cuda(                                           //
                                j * stride1 +  //
                                k * stride2;   //
 
-    const idx_t ev0 = mesh->elems_v0[index_tet];
-    const idx_t ev1 = mesh->elems_v1[index_tet];
-    const idx_t ev2 = mesh->elems_v2[index_tet];
-    const idx_t ev3 = mesh->elems_v3[index_tet];
+    const idx_t ev0 = __ldg(&mesh->elems_v0[index_tet]);
+    const idx_t ev1 = __ldg(&mesh->elems_v1[index_tet]);
+    const idx_t ev2 = __ldg(&mesh->elems_v2[index_tet]);
+    const idx_t ev3 = __ldg(&mesh->elems_v3[index_tet]);
 
     const real_t wf0 = weighted_field[ev0];  // Weighted field at vertex 0
     const real_t wf1 = weighted_field[ev1];  // Weighted field at vertex 1
@@ -81,9 +81,9 @@ update_hex_quad_node_cuda(                                           //
     // real_t xyz_n[3];
     // memcpy(xyz_n, &mesh_geom->vetices_zero[base_vertex_idx], 3 * sizeof(real_t));
 
-    const real_t x0_n = base_vertex[0];  // x coordinate of vertex 0
-    const real_t y0_n = base_vertex[1];  // y coordinate of vertex 0
-    const real_t z0_n = base_vertex[2];  // z coordinate of vertex 0
+    const real_t x0_n = __ldg(&base_vertex[0]);  // x coordinate of vertex 0
+    const real_t y0_n = __ldg(&base_vertex[1]);  // y coordinate of vertex 0
+    const real_t z0_n = __ldg(&base_vertex[2]);  // z coordinate of vertex 0
 
     // Compute the coordinates of the quadrature point in the reference tetrahedron using the inverse Jacobian transformation.
     const real_t x_o = x - x0_n;
@@ -93,15 +93,15 @@ update_hex_quad_node_cuda(                                           //
     // real_t inv_J[9];
     // memcpy(inv_J, inv_J_tet, 9 * sizeof(real_t));
 
-    const real_t inv_J_00 = inv_J_tet[0];
-    const real_t inv_J_01 = inv_J_tet[1];
-    const real_t inv_J_02 = inv_J_tet[2];
-    const real_t inv_J_10 = inv_J_tet[3];
-    const real_t inv_J_11 = inv_J_tet[4];
-    const real_t inv_J_12 = inv_J_tet[5];
-    const real_t inv_J_20 = inv_J_tet[6];
-    const real_t inv_J_21 = inv_J_tet[7];
-    const real_t inv_J_22 = inv_J_tet[8];
+    const real_t inv_J_00 = __ldg(&inv_J_tet[0]);
+    const real_t inv_J_01 = __ldg(&inv_J_tet[1]);
+    const real_t inv_J_02 = __ldg(&inv_J_tet[2]);
+    const real_t inv_J_10 = __ldg(&inv_J_tet[3]);
+    const real_t inv_J_11 = __ldg(&inv_J_tet[4]);
+    const real_t inv_J_12 = __ldg(&inv_J_tet[5]);
+    const real_t inv_J_20 = __ldg(&inv_J_tet[6]);
+    const real_t inv_J_21 = __ldg(&inv_J_tet[7]);
+    const real_t inv_J_22 = __ldg(&inv_J_tet[8]);
 
     const real_t x_ref = fast_fma(inv_J_02, z_o, fast_fma(inv_J_01, y_o, inv_J_00 * x_o));
     const real_t y_ref = fast_fma(inv_J_12, z_o, fast_fma(inv_J_11, y_o, inv_J_10 * x_o));
