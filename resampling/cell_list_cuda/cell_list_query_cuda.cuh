@@ -560,6 +560,118 @@ query_cell_list_3d_2d_map_mesh_given_xy_tet_il_gpu(const cell_list_3d_2d_map_t  
 }  // END Function: query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu
 
 //////////////////////////////////////////////////////////
+// get_cell_range_2d_gpu
+// Compute the [start_index, end_index) range in cell_dict
+// for the 2D cell containing point (x, y).
+// This separates the xy-lookup from the z-search so it can
+// be hoisted out of a z-iteration loop.
+//////////////////////////////////////////////////////////
+__device__ __forceinline__ void                                                   //
+get_cell_range_2d_gpu(const cell_list_3d_2d_map_t *__restrict__ map,             //
+                      const real_t                              x,               //
+                      const real_t                              y,               //
+                      int                                      *start_index,     //
+                      int                                      *end_index) {     //
+
+    int ixiy[2];
+    coord_to_grid_indices_inv_gpu(x, y, map->min_x, map->min_y,
+                                  map->inv_delta_x, map->inv_delta_y, ixiy);
+
+    int ix = ixiy[0];
+    int iy = ixiy[1];
+
+    ix = (ix < 0) ? 0 : (ix >= map->num_cells_x) ? map->num_cells_x - 1 : ix;
+    iy = (iy < 0) ? 0 : (iy >= map->num_cells_y) ? map->num_cells_y - 1 : iy;
+
+    const int cell_index = grid_to_cell_index_gpu(ix, iy, map->num_cells_x);
+
+    *start_index = __ldg(&map->cell_ptr[cell_index]);
+    *end_index   = __ldg(&map->cell_ptr[cell_index + 1]);
+}  // END Function: get_cell_range_2d_gpu
+
+//////////////////////////////////////////////////////////
+// query_cell_list_z_given_range_il_gpu
+// Given a precomputed cell range [start_index, end_index)
+// (from get_cell_range_2d_gpu), search only in z.
+// Avoids repeating the 2D coord-to-cell lookup when
+// (x, y) is fixed across many z values.
+//////////////////////////////////////////////////////////
+__device__ int                                                                                          //
+query_cell_list_z_given_range_il_gpu(const cell_list_3d_2d_map_t  *__restrict__ map,                   //
+                                     const boxes_interleaved_t    *__restrict__ boxes,                 //
+                                     const mesh_tet_geom_device_t *__restrict__ mesh_geom,             //
+                                     const int                                  start_index,           //
+                                     const int                                  end_index,             //
+                                     const real_t                               x,                     //
+                                     const real_t                               y,                     //
+                                     const real_t                               z) {                   //
+
+    const int num_boxes_local = end_index - start_index;
+
+    if (num_boxes_local <= 0) {
+        return -1;
+    }
+
+    // Early reject: z outside the full z-range of all boxes in this cell
+    if (z < __ldg(&map->lower_bounds_z[start_index]) || z > __ldg(&map->upper_bounds_z[end_index - 1])) {
+        return -1;
+    }
+
+    int lower_bound_index = lower_bound_float_gpu<real_t>(&map->upper_bounds_z[start_index], num_boxes_local, z);
+
+    const int start_index_up = (lower_bound_index > 1) ? start_index + lower_bound_index - 2 : start_index;
+    const int size_up        = (lower_bound_index > 1) ? num_boxes_local - (lower_bound_index - 2) : num_boxes_local;
+    const int offset_up      = start_index_up - start_index;
+
+    int upper_bound_index = upper_bound_float_gpu<real_t>(&map->lower_bounds_z[start_index_up], size_up, z);
+    upper_bound_index += offset_up;
+
+    lower_bound_index =
+            lower_bound_index < 0 ? 0 : (lower_bound_index > num_boxes_local ? num_boxes_local : lower_bound_index);
+    upper_bound_index =
+            upper_bound_index < 0 ? 0 : (upper_bound_index > num_boxes_local ? num_boxes_local : upper_bound_index);
+
+    if (lower_bound_index >= upper_bound_index) {
+        return -1;
+    }
+
+    for (int i = lower_bound_index; i < upper_bound_index; i++) {
+        const int     box_index = __ldg(&map->cell_dict[start_index + i]);
+        const real_t *box_bound = &boxes->min_max_xyz[box_index * 6];
+
+        if (check_box_il_contains_pt_bound_gpu(__ldg(&box_bound[0]),  //
+                                               __ldg(&box_bound[1]),
+                                               __ldg(&box_bound[2]),
+                                               __ldg(&box_bound[3]),
+                                               __ldg(&box_bound[4]),
+                                               __ldg(&box_bound[5]),
+                                               x, y, z)) {
+            const real_t *inv_Jacobian  = get_inv_Jacobian_geom_fast_gpu(mesh_geom, box_index);
+            const real_t *vertices_zero = get_vertices_zero_geom_fast_gpu(mesh_geom, box_index);
+
+            const bool is_out = is_point_out_of_tet_cached_gpu(__ldg(&inv_Jacobian[0]),  //
+                                                               __ldg(&inv_Jacobian[1]),
+                                                               __ldg(&inv_Jacobian[2]),
+                                                               __ldg(&inv_Jacobian[3]),
+                                                               __ldg(&inv_Jacobian[4]),
+                                                               __ldg(&inv_Jacobian[5]),
+                                                               __ldg(&inv_Jacobian[6]),
+                                                               __ldg(&inv_Jacobian[7]),
+                                                               __ldg(&inv_Jacobian[8]),
+                                                               __ldg(&vertices_zero[0]),
+                                                               __ldg(&vertices_zero[1]),
+                                                               __ldg(&vertices_zero[2]),
+                                                               x, y, z);
+
+            if (!is_out) {
+                return box_index;
+            }
+        }
+    }
+    return -1;
+}  // END Function: query_cell_list_z_given_range_il_gpu
+
+//////////////////////////////////////////////////////////
 // Query the cell list for a given 3D point (x, y, z)
 // and return the corresponding tetrahedra in tets_array
 //////////////////////////////////////////////////////////
