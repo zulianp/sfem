@@ -82,7 +82,7 @@ typedef int idx_t;
 typedef double real_t;
 #define SFEM_MPI_REAL_T MPI_DOUBLE
 #define SFEM_CUSPARSE_REAL_T CUDA_R_64F
-#define d_REAL_T "g"
+#define d_REAL_T ".17g"
 #define dtype_REAL_T "float64"
 
 typedef geom_t jacobian_t;
