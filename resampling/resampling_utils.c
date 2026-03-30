@@ -44,11 +44,11 @@
  * @param arg_size
  * @return int
  */
-int                                      //
-get_option_argument(int         argc,    //
-                    char*       argv[],  //
-                    const char* option,  //
-                    char**      arg,     //
+int                                          //
+get_option_argument(int         argc,        //
+                    char*       argv[],      //
+                    const char* option,      //
+                    char**      arg,         //
                     size_t*     arg_size) {  //
 
     // check if option start with "--"
@@ -216,11 +216,11 @@ setup_grid_normalization(ptrdiff_t    nnodes,       //
     RETURN_FROM_FUNCTION();
 }  // END Function: setup_grid_normalization
 
-void get_3d_coordinates(int              index,   //
-                        const ptrdiff_t* nlocal,  //
-                        const geom_t*    origin,  //
-                        const geom_t*    delta,   //
-                        int*             coords) {            //
+void get_3d_coordinates(int              index,     //
+                        const ptrdiff_t* nlocal,    //
+                        const geom_t*    origin,    //
+                        const geom_t*    delta,     //
+                        int*             coords) {  //
     // Convert linear index to 3D grid indices
     const ptrdiff_t k = index / (nlocal[0] * nlocal[1]);
     const ptrdiff_t j = (index % (nlocal[0] * nlocal[1])) / nlocal[0];
@@ -289,7 +289,7 @@ print_performance_metrics_cpu(sfem_resample_field_info* info,             //
                               const char*               function,         //
                               const int                 n_points_struct,  //
                               const int                 quad_nodes_cnt,   //
-                              const mesh_t*             mesh) {                       //
+                              const mesh_t*             mesh) {           //
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -369,7 +369,7 @@ handle_print_performance_metrics_cpu(sfem_resample_field_info* info,            
                                      int                       n_points_struct,  //
                                      int                       npq,              //
                                      mesh_t*                   mesh,             //
-                                     int                       print_to_file) {                        //
+                                     int                       print_to_file) {  //
 
     FILE* output_file_print = NULL;
 
@@ -493,7 +493,7 @@ print_rank_info(int              mpi_rank,         //
             const int max_index_1 = (max_field_index / nlocal[0]) % nlocal[1];
             const int max_index_2 = max_field_index / (nlocal[0] * nlocal[1]);
 
-            printf("Rank %d: max_field = %1.14e, max index = %d, (%d, %d, %d)\n",
+            printf("Rank %d: max_field = %" d_REAL_T ", max index = %d, (%d, %d, %d)\n",
                    mpi_rank,
                    max_field,
                    max_field_index,
@@ -501,7 +501,7 @@ print_rank_info(int              mpi_rank,         //
                    max_index_1,
                    max_index_2);
 
-            printf("Rank %d: min_field = %1.14e, min index = %d\n", mpi_rank, min_field, min_field_index);
+            printf("Rank %d: min_field = %" d_REAL_T ", min index = %d\n", mpi_rank, min_field, min_field_index);
             printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
             if (mpi_rank == 0) {
                 printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
@@ -679,7 +679,7 @@ int benchmark_cdf_ratio_scan(const side_length_histograms_t* histograms,        
                              const real_t                    step,                //
                              const int                       num_z,               //
                              const int                       num_queries,         //
-                             const char*                     output_dir) {                            //
+                             const char*                     output_dir) {        //
     PRINT_CURRENT_FUNCTION;
 
     if (histograms == NULL || bounding_boxes_ptr == NULL || geom == NULL) {
