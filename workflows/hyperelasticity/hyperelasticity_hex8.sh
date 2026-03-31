@@ -2,47 +2,40 @@
 
 set -e
 
-# source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
-# export SFEM_PATH=$INSTALL_DIR/sfem
-
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
 	exit 1
 fi
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
 export PATH=$SFEM_PATH/bin:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
-export PATH=$SFEM_PATH/worflows/mech/:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 
-rm -rf hex8_geometry
-if [[ ! -d hex8_geometry ]]
+rm -rf geometry_hex8
+if [[ ! -d geometry_hex8 ]]
 then
-	mkdir -p hex8_geometry
-	cd hex8_geometry
+	mkdir -p geometry_hex8
+	cd geometry_hex8
 
 	MESH_FACTOR=1
-	box_mesh.py box --cell_type=hex8 -x $((120 * MESH_FACTOR)) -y $((30 * MESH_FACTOR)) -z $((30 * MESH_FACTOR)) --width=4
+	cube HEX8 $((120 * MESH_FACTOR)) $((30 * MESH_FACTOR)) $((30 * MESH_FACTOR)) 0 0 0 4 1 1 box
 	surf_type=quad4
 	
 	skin box skin_box
-	raw_to_db.py skin_box skin_box.vtk
+	raw_to_db skin_box skin_box.vtk
 
 	set -x
 
-	SFEM_DEBUG=1 create_sideset box  -0.001 0.5 0.5  0.8 	inlet
-	SFEM_DEBUG=1 create_sideset box   4.001 0.5 0.5  0.8 	outlet
+	create_sideset box  -0.001 0.5 0.5  0.8 	inlet
+	create_sideset box   4.001 0.5 0.5  0.8 	outlet
 
-	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=box --cell_type=$surf_type
-	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=box --cell_type=$surf_type
-	raw_to_db.py box 					box.vtk 
+	surface_from_sideset box inlet  inlet/surf
+	surface_from_sideset box outlet outlet/surf
+
+	raw_to_db inlet/surf 			inlet/surf.vtk 				--coords=box --cell_type=$surf_type
+	raw_to_db outlet/surf 			outlet/surf.vtk 			--coords=box --cell_type=$surf_type
+	raw_to_db box 					box.vtk 
 
 	cd $HERE
 fi
@@ -50,16 +43,14 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-export SFEM_ROTATE_SIDESET=hex8_geometry/outlet
-# export SFEM_ROTATE_ANGLE=3.14
-# export SFEM_ROTATE_STEPS=20
-export SFEM_ROTATE_ANGLE=1
-export SFEM_ROTATE_STEPS=3
+export SFEM_ROTATE_SIDESET=geometry_hex8/outlet
+export SFEM_ROTATE_ANGLE=4
+export SFEM_ROTATE_STEPS=12
 export SFEM_ROTATE_RCENTER_X=0
 export SFEM_ROTATE_RCENTER_Y=0.5
 export SFEM_ROTATE_RCENTER_Z=0.5
 
-rm -rf hex8_output
+rm -rf output_hex8
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 export SFEM_ELEMENTS_PER_PACK=4096 
 export SFEM_USE_PACKED_MESH=1
@@ -67,8 +58,7 @@ export SFEM_USE_PRECONDITIONER=0
 export SFEM_ENABLE_LINE_SEARCH=0
 export SFEM_OPERATOR=NeoHookeanOgdenPacked
 
-# xctrace record --template 'Time Profiler'  --launch -- $SFEM_PATH/bin/hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
-$LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
-# raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.*' $EXTRA_OPTIONS
 
-$CODE_DIR/smesh/python/smesh/raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.*,hex8_output/out/disp.1.*.*,hex8_output/out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+$LAUNCH hyperelasticy geometry_hex8/box dirichlet_hex8.yaml output_hex8
+
+raw_to_db output_hex8/mesh output_hex8.xdmf -p "output_hex8/out/disp.0.*.*,output_hex8/out/disp.1.*.*,output_hex8/out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 

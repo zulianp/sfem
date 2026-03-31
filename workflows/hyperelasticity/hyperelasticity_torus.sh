@@ -2,47 +2,40 @@
 
 set -e
 
-# source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
-# export SFEM_PATH=$INSTALL_DIR/sfem
-export SFEM_PATH=/users/hyang/ws/sfem_github/sfem/build_release
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
 	exit 1
 fi
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
-# export SFEM_PATH=/users/hyang/ws/sfem_github/sfem/build_release
-export PATH=$SFEM_PATH:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
-export PATH=$SCRIPTPATH/../../workflows/mech:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SFEM_PATH/bin:$PATH
 
 HERE=$PWD
 
-rm -rf torus_geometry
-if [[ ! -d torus_geometry ]]
-then
-	mkdir -p torus_geometry
-	cd torus_geometry
 
-	db_to_raw.py ../torus_cut_hex.vtk torus
-	surf_type=quad4
+rm -rf geometry_torus
+if [[ ! -d geometry_torus ]]
+then
+	mkdir -p geometry_torus
+	cd geometry_torus
+
+	torus 5 2.5 torus.vtk --refinements=2 --order=2
+	db_to_raw torus.vtk torus --select_elem_type=tetra10
 	
 	skin torus skin_torus
-	raw_to_db.py skin_torus skin_torus.vtk
+	raw_to_db skin_torus skin_torus.vtk
 
 	set -x
 
-	SFEM_DEBUG=1 create_sideset torus   4.96663 0.0306772 1.18258  0.998 	inlet
-	SFEM_DEBUG=1 create_sideset torus   4.98568 9.98184   1.10985  0.998 	outlet
+	create_sideset torus   -7.5 0 0 0.997 	inlet
+	create_sideset torus    2.5 0 0 0.99	outlet
 
-	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=torus --cell_type=$surf_type
-	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=torus --cell_type=$surf_type
-	raw_to_db.py torus 					torus.vtk 
+	surface_from_sideset torus inlet  inlet/surf
+	surface_from_sideset torus outlet outlet/surf
+
+	raw_to_db inlet/surf  inlet/surf.vtk   --coords=torus
+	raw_to_db outlet/surf outlet/surf.vtk  --coords=torus
+	raw_to_db torus 	  torus.vtk 
 
 	cd $HERE
 fi
@@ -50,8 +43,13 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-rm -rf torus_output
+export SFEM_FIRST_LAME_PARAMETER=2
+export SFEM_SHEAR_MODULUS=2
+
+rm -rf output_torus
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy torus_geometry/torus dirichlet_torus.yaml torus_output
-raw_to_db.py torus_output/mesh torus_output.vtk -p 'torus_output/out/*.raw' $EXTRA_OPTIONS
+$LAUNCH hyperelasticy geometry_torus/torus dirichlet_torus.yaml output_torus
+
+raw_to_db output_torus/mesh output_torus.vtk -p 'output_torus/out/*.*' $EXTRA_OPTIONS
+
 
