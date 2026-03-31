@@ -2,8 +2,6 @@
 
 set -e
 
-source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
-
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
@@ -11,11 +9,6 @@ then
 fi
 
 export PATH=$SFEM_PATH/bin:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
-export PATH=$SFEM_PATH/worflows/mech/:$PATH
-export PATH=$CODE_DIR/merge_git_repos/sfem/data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 
@@ -25,7 +18,7 @@ then
 	mkdir -p geometry
 	cd geometry
 
-	cylinder 0.1 1 mesh.vtk --order=2
+	cylinder 0.1 1 mesh.vtk --order=2 --refinements=1
 	db_to_raw mesh.vtk mesh --select_elem_type=tetra10
 	surf_type=tri6
 
@@ -50,7 +43,7 @@ then
 fi
 
 export SFEM_ROTATE_SIDESET=geometry/outlet
-export SFEM_ROTATE_ANGLE=12
+export SFEM_ROTATE_ANGLE=7.5
 export SFEM_ROTATE_STEPS=24
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 export SFEM_USE_PARTIAL_ASSEMBLY=1
