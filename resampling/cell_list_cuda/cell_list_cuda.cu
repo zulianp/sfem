@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "cell_build_tet_geom.cuh"
 #include "cell_list_cuda.cuh"
 #include "cell_list_resampling_gpu.h"
 #include "resample_field_adjoint_cell_cuda.cuh"
@@ -203,6 +204,14 @@ void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,
 }
 
 /* ── copy to device ── */
+void cuda_allocate_mesh_tet_geom_device_async(mesh_tet_geom_device_t *d_geom,    //
+                                              int                     nelements,  //
+                                              cudaStream_t            stream) {
+    d_geom->nelements = nelements;
+    cudaMallocAsync((void **)&d_geom->inv_Jacobian, (size_t)nelements * 9 * sizeof(real_t), stream);
+    cudaMallocAsync((void **)&d_geom->vetices_zero, (size_t)nelements * 3 * sizeof(real_t), stream);
+}
+
 mesh_tet_geom_device_t copy_mesh_tet_geom_to_device(const mesh_tet_geom_t *h_geom,     //
                                                     int                    nelements,  //
                                                     cudaStream_t           stream) {
@@ -274,33 +283,23 @@ free_boxes_interleaved_device(boxes_interleaved_t *d_boxes, cudaStream_t stream)
     d_boxes->num_boxes   = 0;
 }
 
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-// tet4_resample_field_adjoint_cell_quad_gpu_launch
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-extern "C" int                                                                                                                //
-tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data,        //
-                                                 const mesh_t                                               *mesh,            //
-                                                 const ptrdiff_t *const SFEM_RESTRICT                        n,               //
-                                                 const ptrdiff_t *const SFEM_RESTRICT                        stride,          //
-                                                 const geom_t *const SFEM_RESTRICT                           origin,          //
-                                                 const geom_t *const SFEM_RESTRICT                           delta,           //
-                                                 const real_t *const SFEM_RESTRICT                           weighted_field,  //
-                                                 real_t *const SFEM_RESTRICT                                 data) {          //
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Internal helper – kernel dispatch shared by both launch variants.
+ *
+ * Receives an already device-resident split_map (passed by value so that the
+ * struct copy is cheap — it is a pair of device pointers + two scalars).
+ * The caller is responsible for freeing split_map_device after this returns.
+ * ───────────────────────────────────────────────────────────────────────────── */
+static int resample_adjoint_launch_common(const boxes_interleaved_t       *h_bboxes_interleaved,    //
+                                          cell_list_split_3d_2d_map_t      split_map_device,         //
+                                          const mesh_t                    *mesh,                     //
+                                          const ptrdiff_t *const           n,                        //
+                                          const ptrdiff_t *const           stride,                   //
+                                          const geom_t *const              origin,                   //
+                                          const geom_t *const              delta,                    //
+                                          const real_t *const              weighted_field,            //
+                                          real_t *const                    data) {                   //
     int ret = 0;
-
-    PRINT_CURRENT_FUNCTION;
-
-    if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL ||
-        cpu_data->bounding_boxes_interleaved == NULL || cpu_data->geom == NULL || mesh == NULL || n == NULL || stride == NULL ||
-        origin == NULL || delta == NULL || weighted_field == NULL || data == NULL) {
-        fprintf(stderr, "Error: Invalid input to tet4_resample_field_adjoint_cell_quad_gpu_launch\n");
-        ret = EXIT_FAILURE;
-        RETURN_FROM_FUNCTION(ret);
-    }  // END if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL || cpu_data->geom == NULL |
-       // mesh == NULL || n == NULL || stride == NULL || origin == NULL || delta == NULL || weighted_field == NULL || data ==
-       // NULL)
 
     real_t      *data_device_ptr = NULL;
     cudaStream_t stream_data;
@@ -310,7 +309,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
 
     cudaMemsetAsync(data_device_ptr, 0, sizeof(real_t) * n[0] * n[1] * n[2], stream_data);
 
-    cudaStream_t stream_wf = 0;
+    cudaStream_t stream_wf;
     cudaStreamCreate(&stream_wf);
 
     real_t *weighted_field_device_ptr = NULL;
@@ -322,18 +321,20 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     cudaStreamCreate(&stream);
 
     boxes_interleaved_t bounding_boxes_interleaved_device =
-            copy_boxes_interleaved_to_device(cpu_data->bounding_boxes_interleaved, stream);
+            copy_boxes_interleaved_to_device(h_bboxes_interleaved, stream);
 
-    cell_list_split_3d_2d_map_t split_map_device = copy_cell_list_split_3d_2d_map_to_device(cpu_data->split_map, stream);
-
-    mesh_tet_geom_device_t geom_device = copy_mesh_tet_geom_to_device(cpu_data->geom, mesh->nelements, stream);
+    /* Allocate device geometry arrays — filled by GPU kernel below (no CPU copy) */
+    mesh_tet_geom_device_t geom_device;
+    cuda_allocate_mesh_tet_geom_device_async(&geom_device, mesh->nelements, stream);
 
     elems_tet4_device mesh_device;
-
     cuda_allocate_elems_tet4_device_async(&mesh_device, mesh->nelements, stream);
     cudaStreamSynchronize(stream);
 
     copy_elems_tet4_device_async((const idx_t **)mesh->elements, mesh->nelements, &mesh_device, stream);
+
+    /* Upload node coordinates and compute inverse Jacobians on the GPU */
+    mesh_tet_geometry_build_on_device(mesh, geom_device, mesh_device, stream);
 
     cudaStreamSynchronize(stream);
     cudaStreamSynchronize(stream_data);
@@ -365,25 +366,22 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     printf("Launching kernel with grid size (%d, %d, %d) and block size (%d, %d, %d)\n",
            (i_size + delta_i - 1) / delta_i + delta_i,  // gridDim.x
            (j_size + delta_j - 1) / delta_j + delta_j,  // gridDim.y
-           1,                                           // gridDim.z
-           threads_per_block_x,                         // blockDim.x
-           1,                                           // blockDim.y
-           1);                                          // blockDim.z
+           1,                                            // gridDim.z
+           threads_per_block_x,                          // blockDim.x
+           1,                                            // blockDim.y
+           1);                                           // blockDim.z
 
     for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++) {
         for (ptrdiff_t start_j = 0; start_j < delta_j; start_j++) {
             dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
-
             dim3 block_size(threads_per_block_x, 1, 1);
 
-            // printf("Launching kernel for start_i = %td, start_j = %td\n", start_i, start_j);
-
             transfer_to_hex_field_cell_split_tet4_shm_il_kernel<index_type>  //
-                    <<<grid_size,                                            //
-                       block_size,                                           //
-                       0,                                                    //
-                       stream_kernel>>>(split_map_device,                    //
-                                        bounding_boxes_interleaved_device,   //
+                    <<<grid_size,                                             //
+                       block_size,                                            //
+                       0,                                                     //
+                       stream_kernel>>>(split_map_device,                     //
+                                        bounding_boxes_interleaved_device,    //
                                         geom_device,
                                         mesh_device,
                                         static_cast<index_type>(start_i),
@@ -418,7 +416,6 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
 
     free_elems_tet4_device_async(&mesh_device, stream);
     free_mesh_tet_geom_device(&geom_device, stream);
-    free_cell_list_split_3d_2d_map_device(&split_map_device, stream);
     free_boxes_interleaved_device(&bounding_boxes_interleaved_device, stream);
     cudaFreeAsync(weighted_field_device_ptr, stream_wf);
 
@@ -435,5 +432,173 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoi
     cudaStreamSynchronize(stream_kernel);
     cudaStreamDestroy(stream_kernel);
 
+    return ret;
+}  // END Function: resample_adjoint_launch_common
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_adjoint_cell_quad_gpu_launch
+// CPU cell list path — copies split map from host to device.
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+extern "C" int                                                                                                                //
+tet4_resample_field_adjoint_cell_quad_gpu_launch(const tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t *cpu_data,        //
+                                                 const mesh_t                                               *mesh,            //
+                                                 const ptrdiff_t *const SFEM_RESTRICT                        n,               //
+                                                 const ptrdiff_t *const SFEM_RESTRICT                        stride,          //
+                                                 const geom_t *const SFEM_RESTRICT                           origin,          //
+                                                 const geom_t *const SFEM_RESTRICT                           delta,           //
+                                                 const real_t *const SFEM_RESTRICT                           weighted_field,  //
+                                                 real_t *const SFEM_RESTRICT                                 data) {          //
+    int ret = 0;
+
+    PRINT_CURRENT_FUNCTION;
+
+    if (cpu_data == NULL || cpu_data->split_map == NULL || cpu_data->bounding_boxes == NULL ||
+        cpu_data->bounding_boxes_interleaved == NULL || cpu_data->geom == NULL || mesh == NULL || n == NULL || stride == NULL ||
+        origin == NULL || delta == NULL || weighted_field == NULL || data == NULL) {
+        fprintf(stderr, "Error: Invalid input to tet4_resample_field_adjoint_cell_quad_gpu_launch\n");
+        ret = EXIT_FAILURE;
+        RETURN_FROM_FUNCTION(ret);
+    }  // END if (cpu_data == NULL || cpu_data->split_map == NULL || ...)
+
+    /* Copy the CPU-side split map to device, then dispatch the kernel. */
+    cudaStream_t stream_copy;
+    cudaStreamCreate(&stream_copy);
+    cell_list_split_3d_2d_map_t split_map_device =
+            copy_cell_list_split_3d_2d_map_to_device(cpu_data->split_map, stream_copy);
+    cudaStreamSynchronize(stream_copy);
+    cudaStreamDestroy(stream_copy);
+
+    ret = resample_adjoint_launch_common(cpu_data->bounding_boxes_interleaved,
+                                         split_map_device,
+                                         mesh, n, stride, origin, delta, weighted_field, data);
+
+    /* Free the device copy of the split map — the CPU original in cpu_data is
+     * managed by the caller via destroy_cpu_data. */
+    cudaStream_t stream_free;
+    cudaStreamCreate(&stream_free);
+    free_cell_list_split_3d_2d_map_device(&split_map_device, stream_free);
+    cudaStreamSynchronize(stream_free);
+    cudaStreamDestroy(stream_free);
+
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_launch
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_adjoint_cell_quad_gpu_build_device_data
+// Uploads bounding boxes to GPU and builds the split cell list on the device.
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+extern "C" int                                                                                      //
+tet4_resample_field_adjoint_cell_quad_gpu_build_device_data(                                        //
+        const boxes_t *h_bounding_boxes,                                                            //
+        real_t         split_x,                                                                     //
+        real_t         split_y,                                                                     //
+        real_t         x_min,                                                                       //
+        real_t         x_max,                                                                       //
+        real_t         y_min,                                                                       //
+        real_t         y_max,                                                                       //
+        real_t         z_min,                                                                       //
+        real_t         z_max,                                                                       //
+        tet4_resample_field_adjoint_cell_quad_gpu_device_data_t *gpu_data) {                        //
+
+    if (h_bounding_boxes == NULL || gpu_data == NULL) {
+        fprintf(stderr, "Error: NULL argument in tet4_resample_field_adjoint_cell_quad_gpu_build_device_data\n");
+        return EXIT_FAILURE;
+    }
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    /* Upload bounding boxes — needed only during cell list construction. */
+    boxes_t d_boxes = copy_boxes_to_device(h_bounding_boxes, stream);
+    cudaStreamSynchronize(stream);
+
+    /* Build the split cell list entirely on the GPU. */
+    gpu_data->split_map = build_cell_list_split_map_on_device(d_boxes.min_x,
+                                                              d_boxes.min_y,
+                                                              d_boxes.min_z,
+                                                              d_boxes.max_x,
+                                                              d_boxes.max_y,
+                                                              d_boxes.max_z,
+                                                              h_bounding_boxes->num_boxes,
+                                                              split_x,
+                                                              split_y,
+                                                              x_min, x_max,
+                                                              y_min, y_max,
+                                                              z_min, z_max,
+                                                              stream);
+
+    /* The temporary device copy of the bounding boxes is no longer needed. */
+    free_boxes_device(&d_boxes, stream);
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
+
+    return 0;
+}  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_build_device_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_adjoint_cell_quad_gpu_destroy_device_data
+// Frees all device allocations owned by gpu_data.
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+extern "C" void                                                                                      //
+tet4_resample_field_adjoint_cell_quad_gpu_destroy_device_data(                                       //
+        tet4_resample_field_adjoint_cell_quad_gpu_device_data_t *gpu_data) {                         //
+
+    if (gpu_data == NULL) return;
+
+    if (gpu_data->split_map.map_lower == NULL && gpu_data->split_map.map_upper == NULL) {
+        return;  /* Nothing was allocated — safe no-op. */
+    }
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    free_cell_list_split_3d_2d_map_device(&gpu_data->split_map, stream);
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
+}  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_destroy_device_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map
+// GPU cell list path — uses pre-built device split map directly,
+// skipping the CPU→GPU copy.
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+extern "C" int                                                                                                                        //
+tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map(                                                                          //
+        const tet4_resample_field_adjoint_cell_quad_gpu_cpu_data_t    *cpu_data,                                                      //
+        const tet4_resample_field_adjoint_cell_quad_gpu_device_data_t *gpu_data,                                                      //
+        const mesh_t                        *mesh,                                                                                    //
+        const ptrdiff_t *const SFEM_RESTRICT n,                                                                                       //
+        const ptrdiff_t *const SFEM_RESTRICT stride,                                                                                  //
+        const geom_t *const SFEM_RESTRICT    origin,                                                                                  //
+        const geom_t *const SFEM_RESTRICT    delta,                                                                                   //
+        const real_t *const SFEM_RESTRICT    weighted_field,                                                                          //
+        real_t *const SFEM_RESTRICT          data) {                                                                                  //
+    int ret = 0;
+
+    PRINT_CURRENT_FUNCTION;
+
+    /* cpu_data->split_map may be NULL in the GPU path — that field is not used here. */
+    if (cpu_data == NULL || cpu_data->bounding_boxes_interleaved == NULL ||
+        gpu_data == NULL || gpu_data->split_map.map_lower == NULL ||
+        mesh == NULL || n == NULL || stride == NULL ||
+        origin == NULL || delta == NULL || weighted_field == NULL || data == NULL) {
+        fprintf(stderr, "Error: Invalid input to tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map\n");
+        ret = EXIT_FAILURE;
+        RETURN_FROM_FUNCTION(ret);
+    }
+
+    /* The split map is already on the device — pass it directly to the kernel
+     * dispatcher.  Ownership stays with gpu_data; we do NOT free it here. */
+    ret = resample_adjoint_launch_common(cpu_data->bounding_boxes_interleaved,
+                                         gpu_data->split_map,
+                                         mesh, n, stride, origin, delta, weighted_field, data);
+
+    RETURN_FROM_FUNCTION(ret);
+}  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map

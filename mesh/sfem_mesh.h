@@ -64,6 +64,8 @@ mesh_tet_geom_t mesh_tet_geometry_init(const mesh_t *mesh);
 
 mesh_tet_geom_t *mesh_tet_geometry_alloc(const mesh_t *mesh);
 
+mesh_tet_geom_t *mesh_tet_geometry_alloc_nelements(int nelements);
+
 void mesh_tet_geometry_free(mesh_tet_geom_t *geom);
 
 void mesh_tet_geometry_compute_inv_Jacobian(mesh_tet_geom_t *geom);

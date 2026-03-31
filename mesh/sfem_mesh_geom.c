@@ -38,6 +38,32 @@ mesh_tet_geom_t *mesh_tet_geometry_alloc(const mesh_t *mesh) {
     return geom;
 }
 
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// mesh_tet_geometry_alloc_nelements
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+mesh_tet_geom_t *mesh_tet_geometry_alloc_nelements(int nelements) {
+    mesh_tet_geom_t *geom = malloc(sizeof(mesh_tet_geom_t));
+
+    if (geom == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for mesh_tet_geom_t\n");
+        return NULL;
+    }
+
+    geom->ref_mesh     = NULL;
+    geom->inv_Jacobian = malloc(nelements * 9 * sizeof(real_t));
+    geom->vetices_zero = malloc(nelements * 3 * sizeof(real_t));
+
+    if (geom->inv_Jacobian == NULL || geom->vetices_zero == NULL) {
+        fprintf(stderr, "Error: Failed to allocate mesh_tet_geom_t arrays for %d elements\n", nelements);
+        mesh_tet_geometry_free(geom);
+        return NULL;
+    }
+
+    return geom;
+}
+
 ////////////////////////////////////////////////
 /// mesh_tet_geometry_free
 ////////////////////////////////////////////////
@@ -62,20 +88,20 @@ void mesh_tet_geometry_free(mesh_tet_geom_t *geom) {
 /////////////////////////////////////////////////////////
 // tet4_inv_Jacobian ////////////////////////////
 /////////////////////////////////////////////////////////
-static void                                   //
-tet_inv_Jacobian_mesh_geom(const real_t px0,  //
-                           const real_t px1,  //
-                           const real_t px2,  //
-                           const real_t px3,  //
-                           const real_t py0,  //
-                           const real_t py1,  //
-                           const real_t py2,  //
-                           const real_t py3,  //
-                           const real_t pz0,  //
-                           const real_t pz1,  //
-                           const real_t pz2,  //
-                           const real_t pz3,  //
-                           real_t      *J_inv) {   //
+static void                                       //
+tet_inv_Jacobian_mesh_geom(const real_t px0,      //
+                           const real_t px1,      //
+                           const real_t px2,      //
+                           const real_t px3,      //
+                           const real_t py0,      //
+                           const real_t py1,      //
+                           const real_t py2,      //
+                           const real_t py3,      //
+                           const real_t pz0,      //
+                           const real_t pz1,      //
+                           const real_t pz2,      //
+                           const real_t pz3,      //
+                           real_t      *J_inv) {  //
     //
     //
 
@@ -164,8 +190,6 @@ tet_inv_transform_J_mesh_geom(const real_t               *J_inv,    //
                               real_t *const SFEM_RESTRICT out_x,    //
                               real_t *const SFEM_RESTRICT out_y,    //
                               real_t *const SFEM_RESTRICT out_z) {  //
-    //
-    //
 
     /**
      ****************************************************************************************
@@ -193,7 +217,7 @@ tet_inv_transform_J_mesh_geom(const real_t               *J_inv,    //
     *out_x = J_inv[0] * dx + J_inv[1] * dy + J_inv[2] * dz;
     *out_y = J_inv[3] * dx + J_inv[4] * dy + J_inv[5] * dz;
     *out_z = J_inv[6] * dx + J_inv[7] * dy + J_inv[8] * dz;
-}  // END: sfem_resample_field_adjoint_hex_quad
+}  // END: tet_inv_transform_J_mesh_geom
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
