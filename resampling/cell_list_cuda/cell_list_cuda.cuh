@@ -64,6 +64,52 @@ void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,
                                            cudaStream_t                 stream);                  //
 
 /**
+ * @brief Builds a cell_list_split_3d_2d_map_t entirely on the GPU.
+ * @param d_box_min_x Device pointer to box min_x values.
+ * @param d_box_min_y Device pointer to box min_y values.
+ * @param d_box_min_z Device pointer to box min_z values.
+ * @param d_box_max_x Device pointer to box max_x values.
+ * @param d_box_max_y Device pointer to box max_y values.
+ * @param d_box_max_z Device pointer to box max_z values.
+ * @param num_boxes Number of boxes.
+ * @param split_x X-coordinate split threshold.
+ * @param split_y Y-coordinate split threshold.
+ * @param x_min, x_max X-bounds of the domain.
+ * @param y_min, y_max Y-bounds of the domain.
+ * @param z_min, z_max Z-bounds of the domain.
+ * @param stream CUDA stream to use for operations.
+ * @return A cell_list_split_3d_2d_map_t struct containing device pointers and scalar fields.
+ */
+cell_list_split_3d_2d_map_t                                                 //
+build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
+                                    const real_t *d_box_min_y,              //
+                                    const real_t *d_box_min_z,              //
+                                    const real_t *d_box_max_x,              //
+                                    const real_t *d_box_max_y,              //
+                                    const real_t *d_box_max_z,              //
+                                    const int     num_boxes,                //
+                                    const real_t  split_x,                  //
+                                    const real_t  split_y,                  //
+                                    const real_t  x_min,                    //
+                                    const real_t  x_max,                    //
+                                    const real_t  y_min,                    //
+                                    const real_t  y_max,                    //
+                                    const real_t  z_min,                    //
+                                    const real_t  z_max,                    //
+                                    cudaStream_t  stream);                   //
+
+/**
+ * @brief Allocates device memory for a mesh_tet_geom_device_t without copying data.
+ *        Use this when the geometry will be filled by a GPU kernel rather than copied from the host.
+ * @param d_geom Pointer to the struct to initialise.
+ * @param nelements Number of tetrahedral elements.
+ * @param stream CUDA stream used for async allocation.
+ */
+void cuda_allocate_mesh_tet_geom_device_async(mesh_tet_geom_device_t *d_geom,    //
+                                              int                     nelements,  //
+                                              cudaStream_t            stream);    //
+
+/**
  * @brief Copies a mesh_tet_geom_t from host to device.
  * @param h_geom Pointer to the host mesh tet geometry to copy.
  * @param nelements Number of elements in the mesh.
