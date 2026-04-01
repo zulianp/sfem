@@ -85,61 +85,8 @@
 #define SFEM_OK 0
 
 
-#define ON 1
-#define OFF 0
-
-#ifndef SFEM_ENABLE_CUSTOM_NUMBERS
-
-typedef float geom_t;
-#define SFEM_MPI_GEOM_T MPI_FLOAT
-#define d_GEOM_T "f"
-#define dtype_GEOM_T "float32"
-
-typedef int idx_t;
-#define SFEM_MPI_IDX_T MPI_INT
-#define SFEM_CUSPARSE_IDX_T CUSPARSE_INDEX_32I
-#define d_IDX_T "d"
-#define dtype_IDX_T "int32"
-
-typedef double real_t;
-#define SFEM_MPI_REAL_T MPI_DOUBLE
-#define SFEM_CUSPARSE_REAL_T CUDA_R_64F
-#define d_REAL_T "g"
-#define dtype_REAL_T "float64"
-
-typedef geom_t jacobian_t;
-
-typedef long count_t;
-#define SFEM_MPI_COUNT_T MPI_LONG
-#define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_64I
-#define d_COUNT_T "ld"
-#define dtype_COUNT_T "int64"
-
-typedef int element_idx_t;
-#define SFEM_MPI_ELEMENT_IDX_T MPI_INT
-#define d_ELEMENT_IDX_T "d"
-#define dtype_ELEMENT_IDX_T "int32"
-
-typedef int16_t local_idx_t;
-#define d_LOCAL_IDX_T "hd"
-
-#define SFEM_MAX_PATH_LENGTH 2056
-#define SFEM_OK 0
-
-// typedef  __half2 jacobian_t;
-// typedef __fp16 jacobian_t;
-typedef geom_t jacobian_t;
-// typedef geom_t jacobian_t;
-
-typedef int16_t lidx_t;
-#define d_ELEMENT_LIDX_T "hd"
-typedef real_t scalar_t;
-typedef real_t accumulator_t;
-#define SFEM_VEC_SIZE 4
-typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
-
-#endif
-
+// #define ON 1
+// #define OFF 0
 
 #ifdef __cplusplus
 extern "C" {
