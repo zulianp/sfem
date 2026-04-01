@@ -1,14 +1,6 @@
 # SFEMDependencies.cmake
 
-set(SFEM_SMESH_PATH "")
-foreach(_candidate_path
-        "${CMAKE_CURRENT_LIST_DIR}/../external/smesh"
-        "${CMAKE_CURRENT_LIST_DIR}/../externals/smesh")
-    if(EXISTS "${_candidate_path}/CMakeLists.txt")
-        set(SFEM_SMESH_PATH "${_candidate_path}")
-        break()
-    endif()
-endforeach()
+set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
 
 # CUDA must be enabled before add_subdirectory(smesh): otherwise CMake does not
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
@@ -21,26 +13,45 @@ if(SFEM_ENABLE_CUDA)
     endif()
 endif()
 
-if(SFEM_SMESH_PATH)
+if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
     set(SMESH_ENABLE_AVX2 ${SFEM_ENABLE_AVX2} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_AVX512 ${SFEM_ENABLE_AVX512} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_AVX512_SORT ${SFEM_ENABLE_AVX512_SORT} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_BLAS ${SFEM_ENABLE_BLAS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_CUDA_LINEINFO ${SFEM_ENABLE_CUDA_LINEINFO} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_RYAML ${SFEM_ENABLE_RYAML} CACHE BOOL "" FORCE)
+    set(SMESH_USE_OCCUPANCY_MAX_POTENTIAL ${SFEM_USE_OCCUPANCY_MAX_POTENTIAL} CACHE BOOL "" FORCE)
+
+    foreach(_type_name
+            REAL_TYPE
+            SCALAR_TYPE
+            GEOM_TYPE
+            JACOBIAN_CPU_TYPE
+            JACOBIAN_GPU_TYPE
+            ACCUMULATOR_TYPE
+            IDX_TYPE
+            COUNT_TYPE
+            ELEMENT_IDX_TYPE
+            LOCAL_IDX_TYPE)
+        set(SMESH_${_type_name} ${SFEM_${_type_name}} CACHE STRING "" FORCE)
+    endforeach()
 
     add_subdirectory("${SFEM_SMESH_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/smesh")
+
+    set(SFEM_ENABLE_CUBLAS ${SMESH_ENABLE_CUBLAS} CACHE BOOL "" FORCE)
+    set(SFEM_ENABLE_CUSPARSE ${SMESH_ENABLE_CUSPARSE} CACHE BOOL "" FORCE)
 
     if(TARGET smesh::smesh)
         list(APPEND SFEM_SUBMODULES smesh::smesh)
     endif()
 else()
-    message(FATAL_ERROR "Could not find SMESH in ../external/smesh or ../externals/smesh.")
+    message(FATAL_ERROR "Missing mandatory submodule external/smesh. Run: git submodule update --init --recursive")
 endif()
 
 if(SFEM_ENABLE_OPENMP)
@@ -161,8 +172,6 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
 
     set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
-    set(SFEM_ENABLE_CUBLAS TRUE)
-    set(SFEM_ENABLE_CUSPARSE TRUE)
 
     set(SFEM_CUDA_MATH_LIBS_FOUND FALSE)
 
