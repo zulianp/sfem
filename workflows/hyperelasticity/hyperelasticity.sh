@@ -20,21 +20,18 @@ then
 
 	cylinder 0.1 1 mesh.vtk --order=2 --refinements=1
 	db_to_raw mesh.vtk mesh --select_elem_type=tetra10
-	surf_type=tri6
 
 	sfc mesh mesh
-	
-	skin mesh mesh_surface
-	raw_to_db mesh_surface mesh_surface.vtk
-
-	set -x
 
 	create_sideset mesh -0.51 0 0  0.5 	inlet
 	create_sideset mesh  0.51 0 0  0.5 	outlet
 
+	# Just for viz
+	skin mesh mesh_surface
 	surface_from_sideset mesh inlet  inlet/surf
 	surface_from_sideset mesh outlet outlet/surf
-
+	
+	raw_to_db mesh_surface mesh_surface.vtk
 	raw_to_db inlet/surf   inlet/surf.vtk 	--coords=mesh
 	raw_to_db outlet/surf  outlet/surf.vtk  --coords=mesh
 	raw_to_db mesh 		   mesh.vtk 
