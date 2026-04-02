@@ -2,9 +2,6 @@
 
 set -e
 
-# source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
-# export SFEM_PATH=$INSTALL_DIR/sfem
-
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
@@ -12,11 +9,6 @@ then
 fi
 
 export PATH=$SFEM_PATH/bin:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
-export PATH=$SFEM_PATH/worflows/mech/:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 
@@ -34,19 +26,10 @@ rm -f bench_*.csv
 for e in ${elements_per_pack[@]}
 do
 	echo "Running with SFEM_ELEMENTS_PER_PACK=$e"
-	SFEM_ELEMENTS_PER_PACK=$e SFEM_OPERATOR="PackedLaplacian" SFEM_TRACE_FILE=bench_packed_$e.csv   poisson
+	SFEM_ELEMENTS_PER_PACK=$e SFEM_OPERATOR="PackedLaplacian" SMESH_TRACE_FILE=bench_packed_$e.csv poisson
 done
 
-SFEM_OPERATOR="PackedLaplacian" SFEM_TRACE_FILE=bench_packed_max.csv   poisson
-SFEM_OPERATOR="Laplacian"       SFEM_TRACE_FILE=bench_standard.csv poisson
+SFEM_OPERATOR="PackedLaplacian" SMESH_TRACE_FILE=bench_packed_max.csv poisson
+SFEM_OPERATOR="Laplacian"       SMESH_TRACE_FILE=bench_standard.csv   poisson
 
 grep "Laplacian::apply" bench_*.csv | tr ',' ' ' | awk '{print $1,$3}'
-
-# Apple M1
-# SFEM_ELEMENTS_PER_PACK=2048 good for P1 and P2
-# SFEM_ELEMENTS_PER_PACK=1024 good for P1
-# SFEM_ELEMENTS_PER_PACK=4096 good for Q1
-
-
-# NVIDIA Grace
-# Similar numbers
