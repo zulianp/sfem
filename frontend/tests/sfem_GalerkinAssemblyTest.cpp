@@ -253,16 +253,17 @@ int test_cube() {
             }
 
             if (SFEM_DEBUG_EXPORT) {
-                smesh::create_directory("galerkin");
-                smesh::create_directory("galerkin/fields");
+                smesh::create_directory(smesh::Path("galerkin"));
+                smesh::create_directory(smesh::Path("galerkin/fields"));
 
                 {  // COARSE
-                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs_coarse->mesh_ptr(), "galerkin") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs_coarse->mesh_ptr(), smesh::Path("galerkin")) ==
+                                     SFEM_SUCCESS);
 
                     sfem::Output out(fs_coarse);
                     out.enable_AoS_to_SoA(SFEM_BLOCK_SIZE > 1);
 
-                    out.set_output_dir("galerkin/fields");
+                    out.set_output_dir(smesh::Path("galerkin/fields"));
                     SFEM_TEST_ASSERT(out.write("R", h_restricted->data()) == SFEM_SUCCESS);
                     SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
                     SFEM_TEST_ASSERT(out.write("Ax_coarse", h_Ax_coarse->data()) == SFEM_SUCCESS);
@@ -272,10 +273,11 @@ int test_cube() {
                 {  // FINE
                     smesh::create_directory("galerkin_fine");
                     smesh::create_directory("galerkin_fine/fields");
-                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("galerkin_fine")) ==
+                                     SFEM_SUCCESS);
 
                     sfem::Output out(fs);
-                    out.set_output_dir("galerkin_fine/fields");
+                    out.set_output_dir(smesh::Path("galerkin_fine/fields"));
 
                     SFEM_TEST_ASSERT(out.write("P", h_prolongated->data()) == SFEM_SUCCESS);
                 }

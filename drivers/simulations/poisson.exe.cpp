@@ -7,7 +7,7 @@
 #include "smesh_env.hpp"
 #include "smesh_mesh_reorder.hpp"
 
-int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
@@ -54,18 +54,18 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        smesh::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir);
 
         if (fs->has_semi_structured_mesh()) {
-            m->write(smesh::Path((output_dir + "/coarse_mesh")));
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str());
+            m->write(output_dir / "coarse_mesh");
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh");
         } else {
-            m->write(smesh::Path((output_dir + "/mesh")));
+            m->write(output_dir / "mesh");
         }
 
         auto output = f->output();
         output->enable_AoS_to_SoA(fs->block_size() > 1);
-        output->set_output_dir(output_dir.c_str());
+        output->set_output_dir(output_dir);
 
 #ifdef SFEM_ENABLE_CUDA
         if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
@@ -133,7 +133,7 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     f->add_constraint(conds);
     f->add_operator(op);
 
-    return lsolve(f, "output_poisson");
+    return lsolve(f, smesh::Path("output_poisson"));
 }
 
 int main(int argc, char *argv[]) {

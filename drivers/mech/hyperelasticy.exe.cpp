@@ -187,9 +187,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         SFEM_ERROR("MPI runtimes are not supported!\n");
     }
 
-    const char *mesh_path      = argv[1];
-    const char *dirichlet_path = argv[2];
-    std::string output_path    = argv[3];
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path dirichlet_path{argv[2]};
+    smesh::Path output_path{argv[3]};
 
     int         SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
     const char *SFEM_OPERATOR             = "NeoHookeanOgden";
@@ -211,19 +211,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         }
     }
 
-    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
 
     if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
         mesh = smesh::promote_to(smesh::TET10, mesh);
     } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }
-
-    // FIXME SFC should also sort the BCs
-    // if (smesh::Env::read("SFEM_USE_SFC", false)) {
-    //     auto sfc = sfem::SFC::create_from_env();
-    //     sfc->reorder(*mesh);
-    // }
 
     std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
     if (smesh::Env::read("SFEM_USE_PACKED_MESH", false)) {
@@ -239,17 +233,6 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     }
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-
-    // FIXME
-    // #ifdef SFEM_ENABLE_CUDA
-    //     {
-    //         auto elements = fs->device_elements();
-    //         if (!elements) {
-    //             elements = create_device_elements(fs, fs->element_type());
-    //             fs->set_device_elements(elements);
-    //         }
-    //     }
-    // #endif
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -323,17 +306,17 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
 
     // Output to disk
-    smesh::create_directory(output_path.c_str());
+    smesh::create_directory(output_path);
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
-        fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
+        fs->mesh_ptr()->write(output_path / "coarse_mesh");
     } else {
-        fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));
+        fs->mesh_ptr()->write(output_path / "mesh");
     }
 
     auto out = f->output();
-    smesh::create_directory((output_path + "/out").c_str());
-    out->set_output_dir((output_path + "/out").c_str());
+    smesh::create_directory(output_path / "out");
+    out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
 
     if (smesh::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {

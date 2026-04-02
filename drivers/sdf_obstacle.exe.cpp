@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     // Read inputs
     // -------------------------------
 
-    const char *output_path = argv[2];
+    smesh::Path output_path{argv[2]};
 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    const char *folder     = argv[1];
+    smesh::Path folder{argv[1]};
     auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const int   block_size = 3;
 
@@ -252,9 +252,8 @@ int main(int argc, char *argv[]) {
     contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data());
 
     if (fs->has_semi_structured_mesh()) {
-        std::string path = output_path;
-        path += "/ssmesh";
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path.c_str());
+        smesh::Path path = output_path / "ssmesh";
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path);
     }
 
     auto output = f->output();

@@ -88,8 +88,8 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    const char *folder      = argv[1];
-    const char *output_path = argv[2];
+    smesh::Path folder{argv[1]};
+    smesh::Path output_path{argv[2]};
 
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {

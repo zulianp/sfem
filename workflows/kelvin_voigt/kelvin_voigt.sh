@@ -41,7 +41,7 @@ export SFEM_EXECUTION_SPACE=device
 export SFEM_USE_SSGMG=0
 export SFEM_DT=0.01
 export SFEM_T_END=2
-export SFEM_VERBOSE=1
+export SFEM_VERBOSE=0
 
 export SFEM_NEUMANN_SIDESET=geometry/mesh/sidesets/top
 export SFEM_NEUMANN_COMPONENT=1
@@ -49,7 +49,7 @@ export SFEM_NEUMANN_VALUE=-1
 export SMESH_TRACE_FILE=output/kv.trace.csv
 
 rm -rf output
-$LAUNCH kelvin_voigt_newmark geometry/mesh dirichlet.yaml output neumann.yaml
+$LAUNCH kelvin_voigt_newmark geometry/mesh dirichlet.yaml neumann.yaml output 
 
 cd output
 raw_to_db ../geometry/mesh output.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient  --time_whole_txt=out/time.txt

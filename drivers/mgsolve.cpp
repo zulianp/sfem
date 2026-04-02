@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *output_path = argv[2];
+    smesh::Path output_path{argv[2]};
 
     double tick = MPI_Wtime();
 

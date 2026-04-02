@@ -29,11 +29,11 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         return SFEM_FAILURE;
     }
 
-    const char *mesh_path             = argv[1];
-    const char *sdf_path              = argv[2];
-    const char *dirichlet_path        = argv[3];
-    const char *contact_boundary_path = argv[4];
-    std::string output_path           = argv[5];
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path sdf_path{argv[2]};
+    smesh::Path dirichlet_path{argv[3]};
+    smesh::Path contact_boundary_path{argv[4]};
+    smesh::Path output_path{argv[5]};
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
 
@@ -86,7 +86,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
 
     auto sdf              = smesh::Grid<geom_t>::create_from_file(comm, sdf_path);
-    auto contact_boundary = smesh::Sideset::create_from_file(comm, smesh::Path(contact_boundary_path));
+    auto contact_boundary = smesh::Sideset::create_from_file(comm, contact_boundary_path);
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -117,14 +117,14 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
 
     // Output to disk
-    smesh::create_directory(output_path.c_str());
+    smesh::create_directory(output_path);
 
-    fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
-    smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
+    fs->mesh_ptr()->write(output_path / "coarse_mesh");
+    smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
 
     auto out = f->output();
 
-    out->set_output_dir((output_path + "/out").c_str());
+    out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
 
     out->write("rhs", smesh::to_host(rhs)->data());

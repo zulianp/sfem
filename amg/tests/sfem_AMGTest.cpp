@@ -16,9 +16,8 @@
 #include "smesh_sideset.hpp"
 
 namespace smesh {
-    SharedBuffer<idx_t> create_nodeset_from_sidesets(
-        const std::shared_ptr<Mesh> &mesh,
-        const std::vector<std::shared_ptr<Sideset>> &sidesets);
+    SharedBuffer<idx_t> create_nodeset_from_sidesets(const std::shared_ptr<Mesh>                 &mesh,
+                                                     const std::vector<std::shared_ptr<Sideset>> &sidesets);
 }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -35,8 +34,16 @@ int test_amg_poisson() {
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          1,
+                                          1);
 
     const int block_size = 1;
     auto      fs         = sfem::FunctionSpace::create(m, block_size);
@@ -78,7 +85,7 @@ int test_amg_poisson() {
     SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_poisson/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();
-    out->set_output_dir("test_amg_poisson/out");
+    out->set_output_dir(smesh::Path("test_amg_poisson/out"));
     if (block_size > 1) out->enable_AoS_to_SoA(true);  // Needed only for vector problem
     SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);
@@ -94,8 +101,16 @@ int test_amg_sqp() {
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          SFEM_MESH_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          1,
+                                          1);
 
     const int block_size = 1;
     auto      fs         = sfem::FunctionSpace::create(m, block_size);
@@ -122,7 +137,7 @@ int test_amg_sqp() {
 
     // Indices of potential contact boundary nodes
     auto mesh_for_sidesets = fs->mesh_ptr();
-    auto bottom = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, {bottom_ss});
+    auto bottom            = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, {bottom_ss});
 
     // FIXME not GPU ready
     {
@@ -177,7 +192,7 @@ int test_amg_sqp() {
     SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_sqp/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();
-    out->set_output_dir("test_amg_sqp/out");
+    out->set_output_dir(smesh::Path("test_amg_sqp/out"));
     if (block_size > 1) out->enable_AoS_to_SoA(true);
     SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);

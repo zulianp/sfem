@@ -16,15 +16,15 @@
 
 // #include "isolver_function.h"
 
-#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
+#include "sfem_aliases.hpp"
 
-#include "sfem_ForwardDeclarations.hpp"
-#include "smesh_mesh.hpp"
-#include "sfem_FunctionSpace.hpp"
-#include "smesh_glob.hpp"
-#include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_NeumannConditions.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
 #include "smesh_output.hpp"
 
 // Operator includes
@@ -40,7 +40,7 @@ namespace sfem {
     public:
         Output(const std::shared_ptr<FunctionSpace> &space);
         ~Output();
-        void set_output_dir(const char *path);
+        void set_output_dir(const smesh::Path &path);
         int  write(const char *name, const real_t *const x);
         int  write_time_step(const char *name, const real_t t, const real_t *const x);
         void enable_AoS_to_SoA(const bool val);
@@ -115,7 +115,7 @@ namespace sfem {
         int initial_guess(real_t *const x);
         int constraints_mask(mask_t *mask);
 
-        int set_output_dir(const char *path);
+        int set_output_dir(const smesh::Path &path);
 
         std::shared_ptr<Output> output();
         ExecutionSpace          execution_space() const;
@@ -133,8 +133,8 @@ namespace sfem {
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset);
 
-    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder);
+    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator> &comm, const char *folder);
 
-} // namespace sfem
+}  // namespace sfem
 
-#endif //SFEM_FUNCTION_HPP
+#endif  // SFEM_FUNCTION_HPP

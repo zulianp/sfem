@@ -26,7 +26,7 @@
 
 #include <vector>
 
-int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::string &name) {
+int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const smesh::Path &name) {
     auto fs  = f->space();
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
@@ -39,17 +39,14 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     int SFEM_ENABLE_OUTPUT = 0;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) {
-        smesh::create_directory(name.c_str());
-        smesh::create_directory((name + "/fields").c_str());
-
-        // SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name + "/mesh").c_str()) == SFEM_SUCCESS);
-
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), (name + "/mesh").c_str());
+        smesh::create_directory(name);
+        smesh::create_directory(name / "fields");
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), name / "mesh");
 
         sfem::Output out(fs);
         out.enable_AoS_to_SoA(true);
 
-        out.set_output_dir((name + "/fields").c_str());
+        out.set_output_dir(name / "fields");
         SFEM_TEST_ASSERT(out.write("u", smesh::to_host(x)->data()) == SFEM_SUCCESS);
     }
     return SFEM_TEST_SUCCESS;
@@ -111,7 +108,7 @@ int test_ssgmg_poisson_cube() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
 
-    return test_linear_problem(f, "test_ssgmg_poisson_cube");
+    return test_linear_problem(f, smesh::Path("test_ssgmg_poisson_cube"));
 }
 
 int test_ssgmg_linear_elasticity_cube() {
@@ -174,7 +171,7 @@ int test_ssgmg_linear_elasticity_cube() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right0, right1, right2}, es);
     f->add_constraint(conds);
 
-    return test_linear_problem(f, "test_ssgmg_linear_elasticity_cube");
+    return test_linear_problem(f, smesh::Path("test_ssgmg_linear_elasticity_cube"));
 }
 
 int main(int argc, char *argv[]) {

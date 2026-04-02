@@ -369,10 +369,10 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), "test_contact/mesh");
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("test_contact/mesh"));
 
         auto out = f->output();
-        out->set_output_dir("test_contact/out");
+        out->set_output_dir(smesh::Path("test_contact/out"));
         out->enable_AoS_to_SoA(true);
 
         if (es != sfem::EXECUTION_SPACE_DEVICE) {

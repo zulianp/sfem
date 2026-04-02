@@ -5,7 +5,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
-int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
+int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
     int L = 8;
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
@@ -27,14 +27,13 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
     // Recursive way
     auto l1_mesh_from_l2 = smesh::derefine(l2_mesh, levels[1]);
 
-    smesh::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
 
-    SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l2_mesh, (output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh, (output_dir + "/l1_mesh").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh_from_l2, (output_dir + "/l1_mesh_from_l2").c_str()) ==
-                     SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/og_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l2_mesh, output_dir / "l2_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh, output_dir / "l1_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh_from_l2, output_dir / "l1_mesh_from_l2") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "og_mesh") == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -57,16 +56,16 @@ int test_derefine_cube() {
                                           1,
                                           1);
 
-    return test_derefine(m, "test_derefine_cube");
+    return test_derefine(m, smesh::Path("test_derefine_cube"));
 }
 
 int test_derefine_mesh() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path("impeller"));
-    return test_derefine(m, "test_derefine_mesh");
+    return test_derefine(m, smesh::Path("test_derefine_mesh"));
 }
 
-int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
+int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
     int L = 8;
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
@@ -123,7 +122,7 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &o
     return SFEM_TEST_SUCCESS;
 }
 
-int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
+int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
     const char *SFEM_EXECUTION_SPACE{nullptr};
     SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
 
@@ -163,14 +162,13 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     restriction->apply(fine_field->data(), coarse_field->data());
     // coarse_field->print(std::cout);
 
-    smesh::create_directory(output_dir.c_str());
-    SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(coarse_fs->mesh_ptr(), (output_dir + "/coarse").c_str()) ==
-                     SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/fine").c_str()) == SFEM_SUCCESS);
+    smesh::create_directory(output_dir);
+    SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(coarse_fs->mesh_ptr(), output_dir / "coarse") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "fine") == SFEM_SUCCESS);
 
     sfem::Output out(coarse_fs);
-    out.set_output_dir((output_dir + "/coarse/fields").c_str());
+    out.set_output_dir(output_dir / "coarse/fields");
     SFEM_TEST_ASSERT(out.write("u", coarse_field->data()) == SFEM_SUCCESS);
     return SFEM_TEST_SUCCESS;
 }
@@ -192,7 +190,7 @@ int test_prolongation_cube() {
                                           1,
                                           1);
 
-    return test_prolongation(m, "test_derefine_cube");
+    return test_prolongation(m, smesh::Path("test_derefine_cube"));
 }
 
 int test_restrict_cube() {
@@ -212,7 +210,7 @@ int test_restrict_cube() {
                                           1,
                                           1);
 
-    return test_restriction(m, "test_restrict_cube");
+    return test_restriction(m, smesh::Path("test_restrict_cube"));
 }
 
 int main(int argc, char *argv[]) {

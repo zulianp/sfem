@@ -105,18 +105,18 @@ std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<s
     return mass_vector;
 }
 
-std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto fs = f->space();
 
-    smesh::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+    output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
     } else {
-        fs->mesh_ptr()->write(smesh::Path(output_dir));
+        fs->mesh_ptr()->write(output_dir);
     }
     return output;
 }
@@ -124,7 +124,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
 int test_explicit_euler() {
     auto f               = create_elasticity_function();
     auto inv_mass_vector = create_inverse_mass_vector(f);
-    auto output          = create_output(f, "explicit_euler");
+    auto output          = create_output(f, smesh::Path("explicit_euler"));
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();
@@ -181,7 +181,7 @@ int test_explicit_euler() {
 int test_newmark() {
     auto f           = create_elasticity_function();
     auto mass_vector = create_mass_vector(f);
-    auto output      = create_output(f, "test_newmark");
+    auto output      = create_output(f, smesh::Path("test_newmark"));
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();
