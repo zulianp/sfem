@@ -50,6 +50,6 @@ rm -rf output_torus
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 $LAUNCH hyperelasticy geometry_torus/torus dirichlet_torus.yaml output_torus
 
-raw_to_db output_torus/mesh output_torus.vtk -p 'output_torus/out/*.*' $EXTRA_OPTIONS
+raw_to_db output_torus/mesh output_torus/output_torus.vtk -p 'output_torus/out/*.*' $EXTRA_OPTIONS
 
 

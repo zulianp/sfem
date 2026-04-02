@@ -55,8 +55,10 @@ export SFEM_USE_PACKED_MESH=1
 export SFEM_USE_PRECONDITIONER=0
 export SFEM_ENABLE_LINE_SEARCH=0
 export SFEM_OPERATOR=NeoHookeanOgdenPacked
-
+export SMESH_TRACE_FILE=output_hex8/hyperelasticity.trace.csv
 
 $LAUNCH hyperelasticy geometry_hex8/box dirichlet_hex8.yaml output_hex8
 
-raw_to_db output_hex8/mesh output_hex8.xdmf -p "output_hex8/out/disp.0.*.*,output_hex8/out/disp.1.*.*,output_hex8/out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+cd output_hex8
+raw_to_db mesh output_hex8.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+cd $HERE

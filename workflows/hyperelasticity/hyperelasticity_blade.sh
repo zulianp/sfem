@@ -39,6 +39,7 @@ fi
 
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
+export SMESH_TRACE_FILE=output_blade/hyperelasticity.trace.csv
 
 rm -rf output_blade
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
