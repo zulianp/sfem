@@ -2,28 +2,17 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+if [[ -z "$SFEM_PATH" ]]
+then
+	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
+	exit 1
+fi
 
-source $SCRIPTPATH/../sfem_config.sh
-export PATH=$SCRIPTPATH/../../:$PATH
-export PATH=$SCRIPTPATH/../../build/:$PATH
-export PATH=$SCRIPTPATH/../../bin/:$PATH
-
-PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python/sfem:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
-
-LAUNCH="mpiexec -np 8"
-# LAUNCH=""
+export PATH=$SFEM_PATH/bin:$PATH
 
 if [[ $# -le "1" ]]
 then
-	printf "usage: $0 <db.e> <out_raw>\n" 1>&2
+	printf "usage: $0 <mesh> <out_folder>\n" 1>&2
 	exit -1
 fi
 
@@ -32,23 +21,21 @@ set -x
 db_in=$1
 db_out=$2
 
-workspace=workspace
-mesh_raw=workspace/mesh
-skinned=workspace/skinned
+workspace=$db_out/workspace
+skinned=$workspace/skinned
+
+rm -rf $workspace
 
 mkdir -p $workspace
 mkdir -p $skinned
-mkdir -p $mesh_raw
+mkdir -p $db_out
 
-db_to_raw.py $db_in $mesh_raw
-skin $mesh_raw $skinned
+skin $db_in $skinned
+raw_to_db $skinned $db_out/skinned.e
 
-extract_sharp_edges $skinned 0.15 sharp_features
-cp $skinned/{x,y,z}.raw sharp_features
-raw_to_db.py sharp_features sharp_edges.vtk
+extract_sharp_features $skinned $db_out
+select_submesh $skinned $db_out/disconnected_faces/i0.int32 $db_out/disconnected
 
-cp $skinned/{x,y,z}.raw sharp_features/corners
-raw_to_db.py sharp_features/corners corners.vtk
-
-cp $skinned/{x,y,z}.raw sharp_features/disconnected
-raw_to_db.py sharp_features/disconnected disconnected.vtk
+raw_to_db $db_out/edges        $db_out/sharp_edges.e  --coords=$skinned
+raw_to_db $db_out/corners      $db_out/corners.e      --coords=$skinned
+raw_to_db $db_out/disconnected $db_out/disconnected.e
