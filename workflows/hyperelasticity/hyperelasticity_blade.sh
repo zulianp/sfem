@@ -2,46 +2,37 @@
 
 set -e
 
-# source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
-# export SFEM_PATH=$INSTALL_DIR/sfem
-
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
 	exit 1
 fi
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
 export PATH=$SFEM_PATH/bin:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
-export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
-export PATH=$SFEM_PATH/worflows/mech/:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 
-rm -rf blade_geometry
-if [[ ! -d blade_geometry ]]
+rm -rf geometry_blade
+if [[ ! -d geometry_blade ]]
 then
-	mkdir -p blade_geometry
-	cd blade_geometry
+	mkdir -p geometry_blade
+	cd geometry_blade
 
-	db_to_raw.py ../Blade_hex.vtk blade
+	db_to_raw ../Blade_hex.vtk blade
 	surf_type=quad4
 	
+	create_sideset blade   0.19 -0.5 -0.036   0.99 	inlet
+	create_sideset blade  -0.20  -0.5  0.0115  0.99 outlet
+
+	# Just for viz
 	skin blade skin_blade
-	raw_to_db.py skin_blade skin_blade.vtk
+	surface_from_sideset blade inlet  inlet/surf
+	surface_from_sideset blade outlet outlet/surf
 
-	set -x
-
-	SFEM_DEBUG=1 create_sideset blade   0.19 -0.5 -0.036   0.99 	inlet
-	SFEM_DEBUG=1 create_sideset blade  -0.20  -0.5  0.0115  0.99 	outlet
-
-	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=blade --cell_type=$surf_type
-	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=blade --cell_type=$surf_type
-	raw_to_db.py blade 					blade.vtk 
+	raw_to_db skin_blade 	skin_blade.vtk 	--cell_type=$surf_type
+	raw_to_db inlet/surf 	inlet/surf.vtk  --cell_type=$surf_type  --coords=blade 
+	raw_to_db outlet/surf 	outlet/surf.vtk --cell_type=$surf_type  --coords=blade 
+	raw_to_db blade 		blade.vtk 		--cell_type=$surf_type
 
 	cd $HERE
 fi
@@ -49,7 +40,7 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-rm -rf blade_output
+rm -rf output_blade
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy blade_geometry/blade dirichlet_blade.yaml blade_output
-raw_to_db.py blade_output/mesh blade_output.vtk -p 'blade_output/out/*.raw' $EXTRA_OPTIONS
+$LAUNCH hyperelasticy geometry_blade/blade dirichlet_blade.yaml output_blade
+raw_to_db output_blade/mesh output_blade.vtk -p 'output_blade/out/*.*' $EXTRA_OPTIONS

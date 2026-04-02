@@ -21,18 +21,16 @@ then
 	MESH_FACTOR=1
 	cube HEX8 $((120 * MESH_FACTOR)) $((30 * MESH_FACTOR)) $((30 * MESH_FACTOR)) 0 0 0 4 1 1 box
 	surf_type=quad4
-	
-	skin box skin_box
-	raw_to_db skin_box skin_box.vtk
-
-	set -x
 
 	create_sideset box  -0.001 0.5 0.5  0.8 	inlet
 	create_sideset box   4.001 0.5 0.5  0.8 	outlet
 
+	# Just for viz
+	skin box skin_box
 	surface_from_sideset box inlet  inlet/surf
 	surface_from_sideset box outlet outlet/surf
 
+	raw_to_db skin_box skin_box.vtk
 	raw_to_db inlet/surf 			inlet/surf.vtk 				--coords=box --cell_type=$surf_type
 	raw_to_db outlet/surf 			outlet/surf.vtk 			--coords=box --cell_type=$surf_type
 	raw_to_db box 					box.vtk 
