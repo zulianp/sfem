@@ -18,7 +18,7 @@ then
 	mkdir -p bone_geometry
 	cd bone_geometry
 
-	exodusII_to_raw ../bone.e bone #--select_elem_type=tetra
+	exodusII_to_raw ../bone.e bone
 	surf_type=tri3
 	
 	create_sideset bone 386 614 0      0.99 	inlet
