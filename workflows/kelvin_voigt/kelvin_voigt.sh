@@ -21,7 +21,6 @@ then
 	cube HEX8 10 10 10 0 0 0 1 1 1 mesh
 	surf_type=quad4
 
-	sfc mesh mesh
 	raw_to_db mesh mesh.vtk
 	
 	set -x
@@ -37,17 +36,16 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-
 export SFEM_EXECUTION_SPACE=device
 # export SFEM_ELEMENT_REFINE_LEVEL=2
 export SFEM_USE_SSGMG=0
-export SFEM_DT=1
+export SFEM_DT=0.01
 export SFEM_T_END=2
 export SFEM_VERBOSE=1
 
 export SFEM_NEUMANN_SIDESET=geometry/mesh/sidesets/top
 export SFEM_NEUMANN_COMPONENT=1
-export SFEM_NEUMANN_VALUE=-5
+export SFEM_NEUMANN_VALUE=-1
 export SMESH_TRACE_FILE=output/kv.trace.csv
 
 rm -rf output
