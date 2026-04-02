@@ -48,7 +48,12 @@ export SFEM_ELEMENTS_PER_PACK=2048
 export SFEM_USE_PACKED_MESH=1
 export SFEM_USE_PRECONDITIONER=0
 export SFEM_ENABLE_LINE_SEARCH=0
+export SMESH_TRACE_FILE=output/hyperelasticity.trace.csv
+
 rm -rf output
 
 $LAUNCH hyperelasticy geometry/mesh dirichlet.yaml output
-raw_to_db output/mesh output.xdmf -p "output/out/disp.0.*.*,output/out/disp.1.*.*,output/out/disp.2.*.*" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
+
+cd output
+raw_to_db mesh output.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
+cd $HERE
