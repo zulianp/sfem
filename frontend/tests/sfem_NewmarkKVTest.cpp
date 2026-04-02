@@ -109,35 +109,6 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
     return KVFunctionBundle{f, kelvin_voigt_newmark, m, left_sideset, right_sideset};
 }
 
-// std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
-//     auto fs = f->space();
-//     auto es = f->execution_space();
-
-//     auto blas = sfem::blas<real_t>(es);
-
-//     auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-//     auto mass            = sfem::create_op(fs, "LumpedMass", es);
-//     mass->initialize();
-//     mass->hessian_diag(nullptr, inv_mass_vector->data());
-//     f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
-//     blas->reciprocal(inv_mass_vector->size(), 1, inv_mass_vector->data());
-//     return inv_mass_vector;
-// }
-
-// std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<sfem::Function> &f) {
-//     auto fs = f->space();
-//     auto es = f->execution_space();
-
-//     auto blas = sfem::blas<real_t>(es);
-
-//     auto mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-//     auto mass        = sfem::create_op(fs, "LumpedMass", es);
-//     mass->initialize();
-//     mass->hessian_diag(nullptr, mass_vector->data());
-//     f->set_value_to_constrained_dofs(1, mass_vector->data());
-//     return mass_vector;
-// }
-
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto fs = f->space();
 

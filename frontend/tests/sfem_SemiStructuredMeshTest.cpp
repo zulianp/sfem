@@ -95,20 +95,16 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &o
         }
     }
 
-#ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
         coarse_field = smesh::to_device(coarse_field);
     }
-#endif
 
     auto fine_field = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     prolongation->apply(coarse_field->data(), fine_field->data());
 
-#ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
         fine_field = smesh::to_host(fine_field);
     }
-#endif
 
     {
         auto            data  = fine_field->data();
@@ -142,9 +138,6 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
     auto coarse_field = sfem::create_host_buffer<real_t>(coarse_fs->n_dofs());
     auto fine_field   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-    std::cout << "fine: #dofs " << fs->n_dofs() << "\n";
-    std::cout << "coarse: #dofs " << coarse_fs->n_dofs() << "\n";
-
     {
         auto            data  = fine_field->data();
         const ptrdiff_t ndofs = fs->n_dofs();
@@ -153,14 +146,11 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
         }
     }
 
-#ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
         fine_field = smesh::to_device(fine_field);
     }
-#endif
 
     restriction->apply(fine_field->data(), coarse_field->data());
-    // coarse_field->print(std::cout);
 
     smesh::create_directory(output_dir);
     SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
