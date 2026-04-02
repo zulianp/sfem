@@ -5,11 +5,10 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
-#include "smesh_mesh.hpp"
 #include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
 
 #include "boundary_condition.hpp"
 #include "boundary_condition_io.hpp"
@@ -34,14 +33,14 @@
 
 #include "hex8_fff.hpp"
 #include "hex8_jacobian.hpp"
-// 
+//
 
 #include "smesh_semistructured.hpp"
 
-#include "smesh_sshex8.hpp"
+#include "smesh_common.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_restriction.hpp"
-#include "smesh_common.hpp"
+#include "smesh_sshex8.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -74,7 +73,7 @@ namespace sfem {
         std::shared_ptr<smesh::Output> smesh_output;
         std::shared_ptr<FunctionSpace> space;
         bool                           AoS_to_SoA{false};
-        std::string                    output_dir{"."};
+        smesh::Path                    output_dir{smesh::Path(".")};
         std::string                    file_format{"%s/%s.%s"};
         std::string                    time_dependent_file_format{"%s/%s.%09d.%s"};
         size_t                         export_counter{0};
@@ -90,7 +89,7 @@ namespace sfem {
 
         const char *SFEM_OUTPUT_DIR = ".";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
-        impl_->output_dir = SFEM_OUTPUT_DIR;
+        impl_->output_dir = smesh::Path(SFEM_OUTPUT_DIR);
 
         impl_->smesh_output = smesh::Output::create(space->mesh_ptr(), smesh::Path(impl_->output_dir));
     }
@@ -99,9 +98,10 @@ namespace sfem {
 
     void Output::clear() { impl_->export_counter = 0; }
 
-    void Output::set_output_dir(const char *path) { 
+    void Output::set_output_dir(const smesh::Path &path) {
         impl_->smesh_output = smesh::Output::create(impl_->space->mesh_ptr(), smesh::Path(path));
-        impl_->output_dir = path; }
+        impl_->output_dir   = path;
+    }
 
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
@@ -174,9 +174,9 @@ namespace sfem {
                          impl_->output_dir.c_str(),
                          b_name,
                          impl_->export_counter++,
-                        smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
+                         smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
-                        //  TODO
+                //  TODO
                 if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
@@ -520,7 +520,7 @@ namespace sfem {
 
     int Function::initial_guess(real_t *const x) { return SFEM_SUCCESS; }
 
-    int Function::set_output_dir(const char *path) {
+    int Function::set_output_dir(const smesh::Path &path) {
         impl_->output->set_output_dir(path);
         return SFEM_SUCCESS;
     }

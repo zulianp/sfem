@@ -7,7 +7,7 @@
 #include "smesh_env.hpp"
 #include "smesh_mesh_reorder.hpp"
 
-int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
@@ -54,18 +54,18 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        smesh::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir);
 
         if (fs->has_semi_structured_mesh()) {
-            m->write(smesh::Path((output_dir + "/coarse_mesh")));
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str());
+            m->write(output_dir / "coarse_mesh");
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh");
         } else {
-            m->write(smesh::Path((output_dir + "/mesh")));
+            m->write(output_dir / "mesh");
         }
 
         auto output = f->output();
         output->enable_AoS_to_SoA(fs->block_size() > 1);
-        output->set_output_dir(output_dir.c_str());
+        output->set_output_dir(output_dir);
 
 #ifdef SFEM_ENABLE_CUDA
         if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
@@ -86,7 +86,7 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     SFEM_TRACE_SCOPE("solve_linear_elasticity");
 
     if (argc != 4) {
-        fprintf(stderr, "usage %s <mesh> <dirichlet.yaml> <output>\n", argv[0]);
+        fprintf(stderr, "usage %s <mesh> <dirichlet.yaml> <output_dir>\n", argv[0]);
         return SFEM_FAILURE;
     }
 
@@ -94,7 +94,11 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     auto SFEM_OPERATOR             = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity");
     int  SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
 
-    auto m = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path dirichlet_path{argv[2]};
+    smesh::Path output_dir{argv[3]};
+
+    auto m = sfem::Mesh::create_from_file(comm, mesh_path);
 
     // Important for packed elements
     auto sfc = smesh::SFC::create_from_env();
@@ -113,11 +117,11 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     op->initialize();
 
     auto f     = sfem::Function::create(fs);
-    auto conds = sfem::DirichletConditions::create_from_file(fs, argv[2]);
+    auto conds = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
     f->add_constraint(conds);
     f->add_operator(op);
 
-    return lsolve(f, argv[3]);
+    return lsolve(f, output_dir);
 }
 
 int main(int argc, char *argv[]) {

@@ -10,45 +10,41 @@
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_bsr_SpMV.hpp"
-#include "smesh_sideset.hpp"
 #include "sfem_test.hpp"
+#include "smesh_sideset.hpp"
 
-
-static void compute_contact_lower_bound(
-    real_t* lower_bound,
-    const real_t* displacement,
-    const ptrdiff_t* contact_nodes,
-    const ptrdiff_t n_contact_nodes,
-    const real_t contact_plane,
-    const int contact_dir,
-    const int block_size,
-    const ptrdiff_t ndofs,
-    const real_t default_lb = -1000.0)
-{
+static void compute_contact_lower_bound(real_t          *lower_bound,
+                                        const real_t    *displacement,
+                                        const ptrdiff_t *contact_nodes,
+                                        const ptrdiff_t  n_contact_nodes,
+                                        const real_t     contact_plane,
+                                        const int        contact_dir,
+                                        const int        block_size,
+                                        const ptrdiff_t  ndofs,
+                                        const real_t     default_lb = -1000.0) {
     for (ptrdiff_t i = 0; i < ndofs; i++) {
         lower_bound[i] = default_lb;
     }
     for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
-        const ptrdiff_t node_idx = contact_nodes[i];
-        const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
-        const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx] = contact_plane - current_disp;
+        const ptrdiff_t node_idx     = contact_nodes[i];
+        const ptrdiff_t dof_idx      = node_idx * block_size + contact_dir;
+        const real_t    current_disp = displacement[dof_idx];
+        lower_bound[dof_idx]         = contact_plane - current_disp;
     }
 }
 
-
-std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto fs = f->space();
 
-    smesh::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+    output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
     } else {
-        fs->mesh_ptr()->write(smesh::Path(output_dir));
+        fs->mesh_ptr()->write(output_dir);
     }
     return output;
 }
@@ -61,21 +57,21 @@ int test_mooney_rivlin_visco_relaxation() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     std::shared_ptr<sfem::Mesh> mesh;
-    const char *mesh_path = getenv("SFEM_MESH");
+    const char                 *mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
         mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
     } else {
         mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
-                                             SFEM_BASE_RESOLUTION,
-                                             SFEM_BASE_RESOLUTION,
-                                             SFEM_BASE_RESOLUTION,  // Grid
-                                             0,
-                                             0,
-                                             0,  // Origin
-                                             2,
-                                             1,
-                                             1  // Dimensions (cube)
+                                            SFEM_BASE_RESOLUTION,
+                                            SFEM_BASE_RESOLUTION,
+                                            SFEM_BASE_RESOLUTION,  // Grid
+                                            0,
+                                            0,
+                                            0,  // Origin
+                                            2,
+                                            1,
+                                            1  // Dimensions (cube)
         );
     }
 
@@ -106,29 +102,27 @@ int test_mooney_rivlin_visco_relaxation() {
     real_t dt = SFEM_DT;
     op->set_dt(dt);
 
-
     int SFEM_ENABLE_CONTACT = false;
     SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
 
     // WLF temperature shift parameters (set BEFORE Prony terms to avoid redundant calculations)
-    int SFEM_USE_WLF = 1;
-    real_t SFEM_WLF_C1 = 16.6253;
-    real_t SFEM_WLF_C2 = 47.4781;
-    real_t SFEM_WLF_T_REF = -54.29;
+    int    SFEM_USE_WLF     = 1;
+    real_t SFEM_WLF_C1      = 16.6253;
+    real_t SFEM_WLF_C2      = 47.4781;
+    real_t SFEM_WLF_T_REF   = -54.29;
     real_t SFEM_TEMPERATURE = 20.0;
     SFEM_READ_ENV(SFEM_USE_WLF, atoi);
     SFEM_READ_ENV(SFEM_WLF_C1, atof);
     SFEM_READ_ENV(SFEM_WLF_C2, atof);
     SFEM_READ_ENV(SFEM_WLF_T_REF, atof);
     SFEM_READ_ENV(SFEM_TEMPERATURE, atof);
-    
+
     if (SFEM_USE_WLF) {
         // Set WLF params and enable BEFORE setting Prony terms
         op->set_wlf_params(SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF);
         op->set_temperature(SFEM_TEMPERATURE);
         op->enable_wlf(true);
-        printf("WLF enabled: C1=%.4f, C2=%.4f, T_ref=%.2f, T=%.2f\n",
-               SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF, SFEM_TEMPERATURE);
+        printf("WLF enabled: C1=%.4f, C2=%.4f, T_ref=%.2f, T=%.2f\n", SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF, SFEM_TEMPERATURE);
         fflush(stdout);
     }
 
@@ -137,41 +131,41 @@ int test_mooney_rivlin_visco_relaxation() {
     // Default: 4 terms with sum(g) = 0.45, g_inf = 0.55
     std::vector<real_t> g_prony   = {0.15, 0.15, 0.10, 0.05};
     std::vector<real_t> tau_prony = {0.1, 1.0, 10.0, 100.0};
-    
+
     // Read from environment if provided
-    const char* env_g   = getenv("SFEM_PRONY_G");
-    const char* env_tau = getenv("SFEM_PRONY_TAU");
-    
+    const char *env_g   = getenv("SFEM_PRONY_G");
+    const char *env_tau = getenv("SFEM_PRONY_TAU");
+
     if (env_g && env_tau) {
         g_prony.clear();
         tau_prony.clear();
-        
+
         // Parse comma-separated g values
-        std::string g_str(env_g);
+        std::string       g_str(env_g);
         std::stringstream g_ss(g_str);
-        std::string token;
+        std::string       token;
         while (std::getline(g_ss, token, ',')) {
             g_prony.push_back(std::stod(token));
         }
-        
+
         // Parse comma-separated tau values
-        std::string tau_str(env_tau);
+        std::string       tau_str(env_tau);
         std::stringstream tau_ss(tau_str);
         while (std::getline(tau_ss, token, ',')) {
             tau_prony.push_back(std::stod(token));
         }
-        
+
         if (g_prony.size() != tau_prony.size()) {
             printf("Error: SFEM_PRONY_G and SFEM_PRONY_TAU must have the same number of terms!\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
-        
+
         printf("Prony series from environment: %zu terms\n", g_prony.size());
         for (size_t i = 0; i < g_prony.size(); ++i) {
-            printf("  term %zu: g=%.6f, tau=%.6f\n", i+1, g_prony[i], tau_prony[i]);
+            printf("  term %zu: g=%.6f, tau=%.6f\n", i + 1, g_prony[i], tau_prony[i]);
         }
     }
-    
+
     // set_prony_terms will call compute_prony_coefficients() with WLF already enabled
     op->set_prony_terms((int)g_prony.size(), g_prony.data(), tau_prony.data());
 
@@ -180,17 +174,17 @@ int test_mooney_rivlin_visco_relaxation() {
     f->add_operator(op);
 
     // BC: use mesh bounds in x-direction
-    geom_t x_min = 1e30;
-    geom_t x_max = -1e30;
-    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
-    const geom_t *x_coords = fs->mesh_ptr()->points()->data()[0];
+    geom_t          x_min    = 1e30;
+    geom_t          x_max    = -1e30;
+    const ptrdiff_t n_nodes  = fs->mesh_ptr()->n_nodes();
+    const geom_t   *x_coords = fs->mesh_ptr()->points()->data()[0];
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         const geom_t x = x_coords[i];
         if (x < x_min) x_min = x;
         if (x > x_max) x_max = x;
     }
     const geom_t span = x_max - x_min;
-    const geom_t tol = (span > 0 ? span : 1.0) * 1e-6;
+    const geom_t tol  = (span > 0 ? span : 1.0) * 1e-6;
 
     auto left_sideset = sfem::Sideset::create_from_selector(
             mesh, [=](const geom_t x, const geom_t, const geom_t) -> bool { return x < x_min + tol; });
@@ -232,7 +226,7 @@ int test_mooney_rivlin_visco_relaxation() {
     // Output setup
     bool SFEM_ENABLE_OUTPUT = false;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    auto output = create_output(f, "test_mooney_rivlin_visco");
+    auto output = create_output(f, smesh::Path("test_mooney_rivlin_visco"));
 
     // Newmark state
     auto v      = sfem::create_buffer<real_t>(ndofs, es);
@@ -250,9 +244,9 @@ int test_mooney_rivlin_visco_relaxation() {
     real_t c0       = 1.0 / (beta_nm * dt * dt);  // Coefficient for M in effective stiffness
 
     // Matrix assembly buffers (BSR format: 3x3 blocks)
-    auto            graph      = fs->node_to_node_graph();
-    const int       block_size = 3;
-    auto            values     = sfem::create_buffer<real_t>(graph->nnz() * block_size * block_size, es);
+    auto      graph      = fs->node_to_node_graph();
+    const int block_size = 3;
+    auto      values     = sfem::create_buffer<real_t>(graph->nnz() * block_size * block_size, es);
 
     // Linear Solver Wrapper (BSR SpMV)
     auto linear_op_apply = sfem::make_op<real_t>(
@@ -277,7 +271,7 @@ int test_mooney_rivlin_visco_relaxation() {
 
     // Contact parameters
     real_t SFEM_CONTACT_PLANE = -0.1;  // Position of contact plane
-    int SFEM_CONTACT_DIR = 0;          // Contact direction: 0=x, 1=y, 2=z
+    int    SFEM_CONTACT_DIR   = 0;     // Contact direction: 0=x, 1=y, 2=z
     SFEM_READ_ENV(SFEM_CONTACT_PLANE, atof);
     SFEM_READ_ENV(SFEM_CONTACT_DIR, atoi);
 
@@ -298,28 +292,27 @@ int test_mooney_rivlin_visco_relaxation() {
         solver = cg;
 
     } else {
-        auto mprgp = sfem::create_mprgp(linear_op_apply, es);
+        auto mprgp  = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
         // Get contact boundary nodes
-        auto mesh_for_sideset = fs->mesh_ptr();
-        auto lnodes = smesh::create_nodeset_from_sideset(mesh_for_sideset, left_sideset[0]);
-        const ptrdiff_t nbnodes = lnodes->size();
+        auto            mesh_for_sideset = fs->mesh_ptr();
+        auto            lnodes           = smesh::create_nodeset_from_sideset(mesh_for_sideset, left_sideset[0]);
+        const ptrdiff_t nbnodes          = lnodes->size();
         contact_node_indices.resize(nbnodes);
         for (ptrdiff_t i = 0; i < nbnodes; i++) {
             contact_node_indices[i] = lnodes->data()[i];
         }
 
         // Initial lower bound computation (displacement = 0 at start)
-        compute_contact_lower_bound(
-            lower_bound->data(),
-            x->data(),  // Initial displacement
-            contact_node_indices.data(),
-            (ptrdiff_t)contact_node_indices.size(),
-            SFEM_CONTACT_PLANE,
-            SFEM_CONTACT_DIR,
-            block_size,
-            ndofs);
+        compute_contact_lower_bound(lower_bound->data(),
+                                    x->data(),  // Initial displacement
+                                    contact_node_indices.data(),
+                                    (ptrdiff_t)contact_node_indices.size(),
+                                    SFEM_CONTACT_PLANE,
+                                    SFEM_CONTACT_DIR,
+                                    block_size,
+                                    ndofs);
 
         mprgp->verbose = false;
         mprgp->set_lower_bound(lower_bound);
@@ -377,15 +370,14 @@ int test_mooney_rivlin_visco_relaxation() {
 
         // Compute lower_bound based on current displacement (before solve)
         if (SFEM_ENABLE_CONTACT && !contact_node_indices.empty()) {
-            compute_contact_lower_bound(
-                lower_bound->data(),
-                x->data(),
-                contact_node_indices.data(),
-                (ptrdiff_t)contact_node_indices.size(),
-                SFEM_CONTACT_PLANE,
-                SFEM_CONTACT_DIR,
-                block_size,
-                ndofs);
+            compute_contact_lower_bound(lower_bound->data(),
+                                        x->data(),
+                                        contact_node_indices.data(),
+                                        (ptrdiff_t)contact_node_indices.size(),
+                                        SFEM_CONTACT_PLANE,
+                                        SFEM_CONTACT_DIR,
+                                        block_size,
+                                        ndofs);
         }
 
         // Newton Loop with Inertia

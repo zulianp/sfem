@@ -14,9 +14,9 @@
 #include "smesh_device_buffer.hpp"
 
 namespace sfem {
-    void                        register_device_ops();
-    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
-    std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
+    void register_device_ops();
+    // std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
+    // std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
 
     SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const smesh::ElemType element_type);
 

@@ -33,57 +33,42 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     // Parse command line arguments
     if (argc != 5) {
         if (!comm->rank()) {
-            fprintf(stderr, "usage: %s <mesh> <dirichlet_conditions> <output> <neumann_conditions>\n", argv[0]);
+            fprintf(stderr, "usage: %s <mesh> <dirichlet_conditions> <neumann_conditions> <output> \n", argv[0]);
         }
         return 1;
     }
 
-    const char *mesh_path      = argv[1];
-    const char *dirichlet_path = argv[2];
-    std::string output_path    = argv[3];
-    const char *neumann_path   = argv[4];
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path dirichlet_path{argv[2]};
+    smesh::Path neumann_path{argv[3]};
+    smesh::Path output_path{argv[4]};
 
-    auto m = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    auto m = sfem::Mesh::create_from_file(comm, mesh_path);
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
-    // Create function space
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
+    auto f  = sfem::Function::create(fs);
 
-// FIXME
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
+    if (dirichlet_path.to_string() != "NONE") {
+        auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            f->add_constraint(sfem::to_device(dirichlet_conditions));
+        } else {
+            f->add_constraint(dirichlet_conditions);
         }
     }
-#endif
 
-    auto f = sfem::Function::create(fs);
-
-    // Load boundary conditions
-    auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-
-    auto dirichlet_conditions_gpu = sfem::create_dirichlet_conditions(fs, dirichlet_conditions->conditions(), es);
-
-    f->add_constraint(dirichlet_conditions_gpu);
-
-    // Create Neumann conditions from environment variables (returns empty if unset)
-    auto neumann_conditions = sfem::NeumannConditions::create_from_env(fs);
-
-    auto neumann_conditions_gpu = sfem::create_neumann_conditions(fs, neumann_conditions->conditions(), es);
-
-    f->add_operator(neumann_conditions_gpu);
-
-    if (!comm->rank() && verbose) {
-        printf("Loaded boundary conditions from: %s\n", dirichlet_path);
-        printf("Loaded Neumann conditions from: %s\n", neumann_path);
+    if (neumann_path.to_string() != "NONE") {
+        auto neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            f->add_operator(sfem::to_device(neumann_conditions));
+        } else {
+            f->add_operator(neumann_conditions);
+        }
     }
 
-    // Create Kelvin-Voigt-Newmark operator
     auto kv_op = sfem::create_op(fs, "KelvinVoigtNewmark", es);
     kv_op->initialize();
     f->add_operator(kv_op);
@@ -132,17 +117,17 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     // Setup output
     auto out = f->output();
-    out->set_output_dir((output_path + "/out").c_str());
+    out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
 
-    // Write mesh
-    smesh::create_directory(output_path.c_str());
-    smesh::create_directory((output_path + "/out").c_str());
+    smesh::create_directory(output_path);
+    smesh::create_directory(output_path / "out");
+
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
-        fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
+        fs->mesh_ptr()->write(output_path / "coarse_mesh");
     } else {
-        fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));
+        fs->mesh_ptr()->write(output_path / "mesh");
     }
 
     // Time variables
@@ -278,6 +263,6 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 }
 
 int main(int argc, char *argv[]) {
-    auto ctx = sfem::initialize(argc, argv);
+    auto ctx = sfem::initialize_serial(argc, argv);
     return solve_kelvin_voigt_newmark(ctx->communicator(), argc, argv);
 }

@@ -1,5 +1,7 @@
 #include "sfem_NeumannConditions.hpp"
 
+#include "sfem_config.h"
+
 #include <stddef.h>
 
 #include "matrixio_array.h"
@@ -29,15 +31,34 @@
 
 #include "hex8_fff.hpp"
 #include "hex8_jacobian.hpp"
-// 
+//
 #include "sshex8.hpp"
 
-
 // C++ includes
-// 
+//
 // #include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+
+#if defined(RYML_SINGLE_HEADER)
+#define RYML_SINGLE_HDR_DEFINE_NOW
+#include <ryml_all.hpp>
+#elif defined(RYML_SINGLE_HEADER_LIB)
+#include <ryml_all.hpp>
+#else
+#include <c4/format.hpp>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+#endif
+
+#include <sstream>
+#endif
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 
 namespace sfem {
 
@@ -82,7 +103,7 @@ namespace sfem {
         if (!SFEM_NEUMANN_SURFACE && !SFEM_NEUMANN_SIDESET) return neumann_conditions;
 
         auto comm = space->mesh_ptr()->comm();
-        int      rank = comm->rank();
+        int  rank = comm->rank();
 
         auto &conds = neumann_conditions->impl_->conditions;
 
@@ -149,7 +170,7 @@ namespace sfem {
                     cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
-                    auto sideset                = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(pch));
+                    auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(pch));
                     cneumann_conditions.sidesets.push_back(sideset);
 
                     auto mesh_for_surface            = space->mesh_ptr();
@@ -191,7 +212,8 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(
+                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -218,6 +240,109 @@ namespace sfem {
         }
 
         return neumann_conditions;
+    }
+
+    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                           std::string                           yaml) {
+        SFEM_TRACE_SCOPE("NeumannConditions::create_from_yaml");
+
+#ifdef SFEM_ENABLE_RYAML
+        std::vector<struct Condition> conditions;
+
+        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       conds = tree["neumann_conditions"];
+
+        for (auto c : conds.children()) {
+            std::shared_ptr<Sideset> sideset;
+
+            const bool is_sideset = c["type"].readable() && c["type"].val() == "sideset";
+            const bool is_file    = c["format"].readable() && c["format"].val() == "file";
+            const bool is_expr    = c["format"].readable() && c["format"].val() == "expr";
+
+            assert(is_sideset);
+            assert(is_file || is_expr);
+
+            if (is_file) {
+                std::string path;
+                c["path"] >> path;
+                sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
+            } else if (is_expr) {
+                assert(c["parent"].is_seq());
+                assert(c["lfi"].is_seq());
+
+                ptrdiff_t size   = c["parent"].num_children();
+                auto      parent = create_host_buffer<element_idx_t>(size);
+                auto      lfi    = create_host_buffer<int16_t>(size);
+
+                ptrdiff_t parent_count = 0;
+                for (auto p : c["parent"]) {
+                    p >> parent->data()[parent_count++];
+                }
+
+                ptrdiff_t lfi_count = 0;
+                for (auto p : c["lfi"]) {
+                    p >> lfi->data()[lfi_count++];
+                }
+
+                assert(lfi_count == parent_count);
+                sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
+            }
+
+            std::vector<int>    component;
+            std::vector<real_t> value;
+            auto                node_value     = c["value"];
+            auto                node_component = c["component"];
+
+            assert(node_value.readable());
+            assert(node_component.readable());
+
+            if (node_value.is_seq()) {
+                node_value >> value;
+            } else {
+                value.resize(1);
+                node_value >> value[0];
+            }
+
+            if (node_component.is_seq()) {
+                node_component >> component;
+            } else {
+                component.resize(1);
+                node_component >> component[0];
+            }
+
+            if (component.size() != value.size()) {
+                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+            }
+
+            for (size_t i = 0; i < component.size(); i++) {
+                struct Condition nc;
+                nc.sidesets.push_back(sideset);
+                nc.value     = value[i];
+                nc.component = component[i];
+                conditions.push_back(nc);
+            }
+        }
+
+        return create(space, conditions);
+#else
+        SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
+        return nullptr;
+#endif
+    }
+
+    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                           const smesh::Path                    &path) {
+        std::ifstream is(path);
+        if (!is.good()) {
+            SFEM_ERROR("Unable to read file %s\n", path.c_str());
+        }
+
+        std::ostringstream contents;
+        contents << is.rdbuf();
+        auto yaml = contents.str();
+        is.close();
+
+        return create_from_yaml(space, std::move(yaml));
     }
 
     NeumannConditions::~NeumannConditions() = default;
@@ -295,10 +420,10 @@ namespace sfem {
             if (!c.surface) {
                 auto it = sideset_to_surface.find(c.sidesets[0]);
                 if (it == sideset_to_surface.end()) {
-                    auto mesh_for_surface         = space->mesh_ptr();
-                    auto surface                  = smesh::create_surface_from_sidesets(mesh_for_surface, c.sidesets);
-                    c.element_type                = surface.first;
-                    c.surface                     = surface.second;
+                    auto mesh_for_surface             = space->mesh_ptr();
+                    auto surface                      = smesh::create_surface_from_sidesets(mesh_for_surface, c.sidesets);
+                    c.element_type                    = surface.first;
+                    c.surface                         = surface.second;
                     sideset_to_surface[c.sidesets[0]] = surface;
                 } else {
                     c.element_type = it->second.first;
@@ -355,4 +480,12 @@ namespace sfem {
         return no_op();
     }
 
-}  // namespace sfem 
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
+#ifdef SFEM_ENABLE_CUDA
+        return std::make_shared<GPUNeumannConditions>(nc);
+#else
+        return nc;
+#endif
+    }
+
+}  // namespace sfem

@@ -138,18 +138,18 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
 //     return mass_vector;
 // }
 
-std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto fs = f->space();
 
-    smesh::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+    output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
     } else {
-        fs->mesh_ptr()->write(smesh::Path(output_dir));
+        fs->mesh_ptr()->write(output_dir);
     }
     return output;
 }
@@ -163,7 +163,7 @@ int test_newmark_kv() {
         auto f                    = bundle.f;
         auto kelvin_voigt_newmark = bundle.kelvin_voigt_newmark;
 
-        auto output = create_output(f, "test_newmark_kv");
+        auto output = create_output(f, smesh::Path("test_newmark_kv"));
 
         auto fs = f->space();
         auto m  = fs->mesh_ptr();
@@ -207,16 +207,10 @@ int test_newmark_kv() {
         SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
         if (SFEM_NEWMARK_ENABLE_OUTPUT) {
-            auto u = displacement;
-            auto v = velocity;
-            auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                u = smesh::to_host(u);
-                v = smesh::to_host(v);
-                a = smesh::to_host(a);
-            }
-#endif
+            auto u = smesh::to_host(displacement);
+            auto v = smesh::to_host(velocity);
+            auto a = smesh::to_host(acceleration);
+
             output->write_time_step("disp", t, u->data());
             output->write_time_step("velocity", t, v->data());
             output->write_time_step("acceleration", t, a->data());
@@ -291,16 +285,10 @@ int test_newmark_kv() {
             if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
                 printf("%g/%g\n", double(t), double(T));
 
-                auto u = displacement;
-                auto v = velocity;
-                auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-                if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                    u = smesh::to_host(u);
-                    v = smesh::to_host(v);
-                    a = smesh::to_host(a);
-                }
-#endif
+                auto u = smesh::to_host(displacement);
+                auto v = smesh::to_host(velocity);
+                auto a = smesh::to_host(acceleration);
+
                 // Write to disk
                 output->write_time_step("disp", t, u->data());
                 output->write_time_step("velocity", t, v->data());
@@ -321,7 +309,7 @@ int test_newmark_kv() {
         auto kelvin_voigt_newmark = bundle.kelvin_voigt_newmark;
         auto left_sideset         = bundle.left_sideset;
 
-        auto output = create_output(f, "test_newmark_kv");
+        auto output = create_output(f, smesh::Path("test_newmark_kv"));
 
         auto fs = f->space();
         auto m  = fs->mesh_ptr();
@@ -357,16 +345,10 @@ int test_newmark_kv() {
         SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
         if (SFEM_NEWMARK_ENABLE_OUTPUT) {
-            auto u = displacement;
-            auto v = velocity;
-            auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                u = smesh::to_host(u);
-                v = smesh::to_host(v);
-                a = smesh::to_host(a);
-            }
-#endif
+            auto u = smesh::to_host(displacement);
+            auto v = smesh::to_host(velocity);
+            auto a = smesh::to_host(acceleration);
+
             output->write_time_step("disp", t, u->data());
             output->write_time_step("velocity", t, v->data());
             output->write_time_step("acceleration", t, a->data());
@@ -535,16 +517,10 @@ int test_newmark_kv() {
                 printf("%g/%g\n", double(t), double(T));
 
                 // Write to disk
-                auto u = displacement;
-                auto v = velocity;
-                auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-                if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                    u = smesh::to_host(u);
-                    v = smesh::to_host(v);
-                    a = smesh::to_host(a);
-                }
-#endif
+                auto u = smesh::to_host(displacement);
+                auto v = smesh::to_host(velocity);
+                auto a = smesh::to_host(acceleration);
+
                 output->write_time_step("disp", t, u->data());
                 output->write_time_step("velocity", t, v->data());
                 output->write_time_step("acceleration", t, a->data());

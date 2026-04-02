@@ -5,35 +5,40 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
-#include "sfem_aliases.hpp"
-#include "sfem_ForwardDeclarations.hpp"
 #include "smesh_mesh.hpp"
 
 // Operator includes
 #include "sfem_Op.hpp"
-
 
 namespace sfem {
 
     class NeumannConditions final : public Op {
     public:
         struct Condition {
-            smesh::ElemType            element_type { smesh::INVALID };
+            smesh::ElemType                       element_type{smesh::INVALID};
             std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe empty in certain cases
-            SharedBuffer<idx_t *>    surface;
-            SharedBuffer<real_t>     values;
-            real_t                   value{0};
-            int                      component{0};
+            SharedBuffer<idx_t *>                 surface;
+            SharedBuffer<real_t>                  values;
+            real_t                                value{0};
+            int                                   component{0};
         };
 
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
 
         static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::vector<struct Condition>  &conditions);
+
+        static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space, std::string yaml);
+
+        static std::shared_ptr<NeumannConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const smesh::Path                    &path);
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override;
 
@@ -57,8 +62,8 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
 
         inline bool is_linear() const override { return true; }
-        ptrdiff_t  n_dofs_domain() const override;
-        ptrdiff_t  n_dofs_image() const override;
+        ptrdiff_t   n_dofs_domain() const override;
+        ptrdiff_t   n_dofs_image() const override;
 
         int                            n_conditions() const;
         std::shared_ptr<FunctionSpace> space();
@@ -69,6 +74,8 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-} // namespace sfem
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
 
-#endif // SFEM_NEUMANN_CONDITIONS_HPP 
+}  // namespace sfem
+
+#endif  // SFEM_NEUMANN_CONDITIONS_HPP

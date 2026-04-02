@@ -21,7 +21,7 @@ then
 	exodusII_to_raw ../bone.e bone
 	surf_type=tri3
 	
-	create_sideset bone 386 614 0      0.99 	inlet
+	create_sideset bone 386 614 0      0.99 inlet
 	create_sideset bone 340 424 373.92 0.99	outlet
 
 	# Just for viz

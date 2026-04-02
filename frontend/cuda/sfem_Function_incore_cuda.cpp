@@ -168,9 +168,9 @@ namespace sfem {
         ~GPUDirichletConditions() {}
     };
 
-    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
-        return std::make_shared<GPUDirichletConditions>(dc);
-    }
+    // std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
+    //     return std::make_shared<GPUDirichletConditions>(dc);
+    // }
 
     class GPUNeumannConditions final : public Op {
     public:
@@ -308,9 +308,9 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
     };
 
-    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
-        return std::make_shared<GPUNeumannConditions>(nc);
-    }
+    // std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
+    //     return std::make_shared<GPUNeumannConditions>(nc);
+    // }
 
     namespace {
         smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {

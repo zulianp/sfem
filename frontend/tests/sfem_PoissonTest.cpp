@@ -10,7 +10,7 @@
 #include "hex8_fff.hpp"
 #include "sshex8_laplacian.hpp"
 
-int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
@@ -101,19 +101,18 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
         printf("---------------------\n");
     }
 
-    smesh::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
-                         SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(m->write(output_dir / "coarse_mesh") == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh") == SFEM_SUCCESS);
     } else {
-        SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(m->write(output_dir / "mesh") == SFEM_SUCCESS);
     }
 
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+    output->set_output_dir(output_dir);
 
     SFEM_TEST_ASSERT(output->write("x", smesh::to_host(x)->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(output->write("rhs", smesh::to_host(rhs)->data()) == SFEM_SUCCESS);
@@ -126,7 +125,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     return SFEM_TEST_SUCCESS;
 }
 
-int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int test_linear_function(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
@@ -172,19 +171,18 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        smesh::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir);
 
         if (fs->has_semi_structured_mesh()) {
-            SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), (output_dir + "/mesh").c_str()) ==
-                             SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(m->write(output_dir / "coarse_mesh") == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh") == SFEM_SUCCESS);
         } else {
-            SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(m->write(output_dir / "mesh") == SFEM_SUCCESS);
         }
 
         auto output = f->output();
         output->enable_AoS_to_SoA(fs->block_size() > 1);
-        output->set_output_dir(output_dir.c_str());
+        output->set_output_dir(output_dir);
 
         SFEM_TEST_ASSERT(output->write("x", smesh::to_host(x)->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(output->write("rhs", smesh::to_host(rhs)->data()) == SFEM_SUCCESS);
@@ -232,7 +230,7 @@ int test_poisson() {
     auto op = sfem::create_op(fs, "Laplacian", es);
     op->initialize();
     f->add_operator(op);
-    return test_linear_function(f, "test_poisson");
+    return test_linear_function(f, smesh::Path("test_poisson"));
 }
 
 int test_poisson_and_boundary_selector_aux(const char                        *test_name,
@@ -314,7 +312,7 @@ int test_poisson_and_boundary_selector_aux(const char                        *te
     auto op = sfem::create_op(fs, operator_name, es);
     op->initialize(block_names);
     f->add_operator(op);
-    return test_linear_function(f, test_name);
+    return test_linear_function(f, smesh::Path(test_name));
 }
 
 int test_poisson_and_boundary_selector() {
@@ -416,7 +414,7 @@ int test_generic_operator_with_boundary_conditions(const std::string            
 
     f->add_operator(op);
 
-    return test_linear_function(f, test_name);
+    return test_linear_function(f, smesh::Path(test_name));
 }
 
 int test_linear_elasticity() {
@@ -453,7 +451,7 @@ int test_linear_elasticity() {
     op->initialize();
 
     return test_generic_operator_with_boundary_conditions(
-            "test_linear_elasticity", fs, op, boundary_conditions, SFEM_ELEMENT_REFINE_LEVEL);
+            smesh::Path("test_linear_elasticity"), fs, op, boundary_conditions, SFEM_ELEMENT_REFINE_LEVEL);
 }
 
 // Example of how to create additional tests using the generic function
@@ -487,7 +485,7 @@ int test_poisson_simple() {
     auto op = sfem::create_op(fs, "Laplacian", es);
     op->initialize();
 
-    return test_generic_operator_with_boundary_conditions("test_poisson_simple",
+    return test_generic_operator_with_boundary_conditions(smesh::Path("test_poisson_simple"),
                                                           fs,
                                                           op,
                                                           boundary_conditions,
@@ -541,7 +539,7 @@ int test_bidomain_elasticity() {
             {.sidesets = right_sideset, .value = 0, .component = 2},
     };
 
-    return test_generic_operator_with_boundary_conditions("test_bidomain_elasticity",
+    return test_generic_operator_with_boundary_conditions(smesh::Path("test_bidomain_elasticity"),
                                                           fs,
                                                           op,
                                                           boundary_conditions,
@@ -651,7 +649,7 @@ int test_poisson_yaml() {
     auto op = sfem::create_op(fs, "Laplacian", es);
     op->initialize();
     f->add_operator(op);
-    return test_linear_function(f, "test_poisson_yaml");
+    return test_linear_function(f, smesh::Path("test_poisson_yaml"));
 }
 
 #endif

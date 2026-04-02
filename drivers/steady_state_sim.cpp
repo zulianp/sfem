@@ -51,8 +51,8 @@ int main(int argc, char *argv[]) {
     // Read inputs
     // -------------------------------
 
-    const char *folder                    = argv[1];
-    const char *output_path               = argv[2];
+    smesh::Path folder{argv[1]};
+    smesh::Path output_path{argv[2]};
     const char *SFEM_OPERATOR             = "Laplacian";
     int         SFEM_BLOCK_SIZE           = 1;
     int         SFEM_USE_PRECONDITIONER   = 0;
