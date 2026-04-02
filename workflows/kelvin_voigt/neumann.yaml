@@ -5,7 +5,7 @@ neumann_conditions:
   # This just defines the sideset where force is applied
   - type: sideset
     format: file
-    path: torus_geometry/outlet
+    path: geometry/mesh/sidesets/top 
     value: [0, -2, 0]  # Initial force magnitude (Y direction, downward)
     component: [0, 1, 2]
 

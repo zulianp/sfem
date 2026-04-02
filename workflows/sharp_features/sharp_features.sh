@@ -21,14 +21,14 @@ set -x
 db_in=$1
 db_out=$2
 
-workspace=$db_out/workspace
+workspace=$db_out/__workspace
 skinned=$workspace/skinned
 
 rm -rf $workspace
 
+mkdir -p $db_out
 mkdir -p $workspace
 mkdir -p $skinned
-mkdir -p $db_out
 
 skin $db_in $skinned
 raw_to_db $skinned $db_out/skinned.e
