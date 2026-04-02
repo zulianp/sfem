@@ -22,12 +22,17 @@ then
 	surf_type=quad4
 
 	sfc mesh mesh
+	raw_to_db mesh mesh.vtk
 	
-	skin mesh mesh_surface
-	raw_to_db mesh_surface mesh_surface.vtk
+	set -x
+
+	surface_from_sideset mesh mesh/sidesets/top    mesh/sidesets/top/surf
+	surface_from_sideset mesh mesh/sidesets/bottom mesh/sidesets/bottom/surf
+
+	raw_to_db mesh/sidesets/top/surf    top.vtk    --coords=mesh --cell_type=$surf_type
+	raw_to_db mesh/sidesets/bottom/surf bottom.vtk --coords=mesh --cell_type=$surf_type
 	cd $HERE
 fi
-
 
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
@@ -40,12 +45,14 @@ export SFEM_DT=1
 export SFEM_T_END=2
 export SFEM_VERBOSE=1
 
-# Use SIDESET-based Neumann input (expects parent.* in the given directory)
 export SFEM_NEUMANN_SIDESET=geometry/mesh/sidesets/top
 export SFEM_NEUMANN_COMPONENT=1
 export SFEM_NEUMANN_VALUE=-5
+export SMESH_TRACE_FILE=output/kv.trace.csv
 
 rm -rf output
 $LAUNCH kelvin_voigt_newmark geometry/mesh dirichlet.yaml output neumann.yaml
-raw_to_db geometry/mesh output.xdmf -p "output/out/disp.0.*.*,output/out/disp.1.*.*,output/out/disp.2.*.*" --transient  --time_whole_txt=output/out/time.txt
 
+cd output
+raw_to_db ../geometry/mesh output.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient  --time_whole_txt=out/time.txt
+cd $HERE
