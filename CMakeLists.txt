@@ -373,8 +373,14 @@ if(SFEM_ENABLE_TESTING)
         list(APPEND SFEM_UNIT_TESTS
             frontend/tests/cuda
         )
-
     endif()
+
+    if(SFEM_ENABLE_SCCD)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/collisions/tests
+        )
+    endif()
+    
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
         file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
