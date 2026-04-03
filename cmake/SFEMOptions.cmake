@@ -24,6 +24,7 @@ option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
 option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
+option(SFEM_ENABLE_SCCD "Enable SCCD library" ON)
 
 
 if(WIN32)        

@@ -7,3 +7,6 @@
 [submodule "external/smesh"]
 	path = external/smesh
 	url = https://github.com/zulianp/smesh
+[submodule "external/sccd"]
+	path = external/sccd
+	url = https://github.com/zulianp/sccd.git

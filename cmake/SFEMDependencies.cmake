@@ -256,3 +256,18 @@ endif()
 if(SFEM_ENABLE_AVX512_SORT)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
 endif()
+
+
+if(SFEM_ENABLE_SCCD)
+    set(SCCD_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SFEM_SCCD_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sccd")
+    add_subdirectory("${SFEM_SCCD_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sccd")
+
+    if(TARGET SCCD::sccd)
+        list(APPEND SFEM_SUBMODULES SCCD::sccd)
+    elseif(TARGET sccd::sccd)
+        list(APPEND SFEM_SUBMODULES sccd::sccd)
+    else()
+        message(FATAL_ERROR "Failed to build SCCD library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
