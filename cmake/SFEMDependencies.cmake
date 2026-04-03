@@ -275,6 +275,10 @@ if(SFEM_ENABLE_SCCD)
 endif()
 
 if(SFEM_ENABLE_SSDF)
+    if(NOT SFEM_ENABLE_SCCD)
+        message(FATAL_ERROR "SSDF usage requires SCCD to be enabled")
+    endif()
+
     set(SSDF_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     
