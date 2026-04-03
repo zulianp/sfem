@@ -6,6 +6,8 @@
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
 
+#include <algorithm>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -61,6 +63,16 @@ std::vector<smesh::SharedBuffer<real_t>> make_displacement(const ptrdiff_t n_nod
     return disp;
 }
 
+std::vector<std::pair<smesh::idx_t, smesh::idx_t>> collect_pairs(const sfem::CollisionPairs& pairs) {
+    std::vector<std::pair<smesh::idx_t, smesh::idx_t>> ret(pairs.first->size());
+    for (size_t i = 0; i < ret.size(); ++i) {
+        ret[i] = {pairs.first->data()[i], pairs.second->data()[i]};
+    }
+
+    std::sort(ret.begin(), ret.end());
+    return ret;
+}
+
 }  // namespace
 
 int test_self_collisions_find_candidates() {
@@ -88,12 +100,20 @@ int test_self_collisions_find_candidates() {
 
     self_collisions->find(1, disp0, disp1);
 
-    const size_t n_vertex_face = self_collisions->vertex_to_face().first->size();
-    const size_t n_edge_edge   = self_collisions->edge_to_edge().first->size();
+    const auto vertex_face_pairs = collect_pairs(self_collisions->vertex_to_face());
+    const auto edge_edge_pairs   = collect_pairs(self_collisions->edge_to_edge());
 
-    SFEM_TEST_ASSERT(n_vertex_face + n_edge_edge > baseline_vertex_face + baseline_edge_edge);
-    SFEM_TEST_EQ(self_collisions->vertex_to_face().second->size(), n_vertex_face);
-    SFEM_TEST_EQ(self_collisions->edge_to_edge().second->size(), n_edge_edge);
+    const std::vector<std::pair<smesh::idx_t, smesh::idx_t>> expected_edge_edge = {
+            {0, 5}, {0, 7}, {5, 11}, {5, 14}, {5, 15}, {5, 16},
+            {7, 11}, {7, 14}, {7, 15}, {7, 16}, {9, 14}, {9, 16}};
+
+    SFEM_TEST_EQ(vertex_face_pairs.size(), (size_t)0);
+    SFEM_TEST_EQ(edge_edge_pairs.size(), expected_edge_edge.size());
+    SFEM_TEST_ASSERT(edge_edge_pairs.size() + vertex_face_pairs.size() > baseline_vertex_face + baseline_edge_edge);
+    for (size_t i = 0; i < expected_edge_edge.size(); ++i) {
+        SFEM_TEST_EQ(edge_edge_pairs[i].first, expected_edge_edge[i].first);
+        SFEM_TEST_EQ(edge_edge_pairs[i].second, expected_edge_edge[i].second);
+    }
 
     return SFEM_TEST_SUCCESS;
 }

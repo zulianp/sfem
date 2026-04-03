@@ -9,6 +9,11 @@
 
 namespace sfem {
 
+    struct Edges {
+        smesh::SharedBuffer<smesh::idx_t> v0;
+        smesh::SharedBuffer<smesh::idx_t> v1;
+    };
+
     struct CollisionPairs {
         smesh::SharedBuffer<smesh::idx_t> first;
         smesh::SharedBuffer<smesh::idx_t> second;
@@ -21,12 +26,15 @@ namespace sfem {
 
         static std::shared_ptr<SelfCollisions> create(const std::shared_ptr<smesh::Mesh>& surface);
 
-        void find(const ptrdiff_t                          stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+        void find(const ptrdiff_t                          stride_displacement,  // 3 for AoS layout, 1 for SoA layout
                   std::vector<smesh::SharedBuffer<real_t>> displacement0,
                   std::vector<smesh::SharedBuffer<real_t>> displacement1);
 
         const CollisionPairs& vertex_to_face() const;
         const CollisionPairs& edge_to_edge() const;
+        const Edges&          edges() const;
+
+        std::shared_ptr<smesh::Mesh> surface() const;
 
     private:
         class Impl;

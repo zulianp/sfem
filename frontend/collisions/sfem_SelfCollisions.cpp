@@ -36,11 +36,6 @@ namespace sfem {
         }
     };
 
-    struct Edges {
-        smesh::SharedBuffer<smesh::idx_t> v0;
-        smesh::SharedBuffer<smesh::idx_t> v1;
-    };
-
     class SelfCollisions::Impl {
     public:
         Impl()  = default;
@@ -274,5 +269,8 @@ namespace sfem {
 
     const CollisionPairs& SelfCollisions::vertex_to_face() const { return impl_->vertex_to_face; }
     const CollisionPairs& SelfCollisions::edge_to_edge() const { return impl_->edge_to_edge; }
+    const Edges&          SelfCollisions::edges() const { return impl_->edges; }
+
+    std::shared_ptr<smesh::Mesh> SelfCollisions::surface() const { return impl_->surface; }
 
 }  // namespace sfem

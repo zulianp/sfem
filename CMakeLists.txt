@@ -134,6 +134,10 @@ if(SFEM_ENABLE_SCCD)
     list(APPEND SFEM_MODULES frontend/collisions)
 endif()
 
+if(SFEM_ENABLE_SSDF)
+    list(APPEND SFEM_MODULES frontend/distances)
+endif()
+
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda
@@ -380,7 +384,14 @@ if(SFEM_ENABLE_TESTING)
             frontend/collisions/tests
         )
     endif()
-    
+
+
+    if(SFEM_ENABLE_SSDF)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/distances/tests
+        )
+    endif()
+
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
         file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
