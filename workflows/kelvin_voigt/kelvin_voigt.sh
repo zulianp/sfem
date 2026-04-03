@@ -43,9 +43,6 @@ export SFEM_DT=0.01
 export SFEM_T_END=2
 export SFEM_VERBOSE=0
 
-export SFEM_NEUMANN_SIDESET=geometry/mesh/sidesets/top
-export SFEM_NEUMANN_COMPONENT=1
-export SFEM_NEUMANN_VALUE=-1
 export SMESH_TRACE_FILE=output/kv.trace.csv
 
 rm -rf output
