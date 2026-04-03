@@ -130,6 +130,10 @@ if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
+if(SFEM_ENABLE_SCCD)
+    list(APPEND SFEM_MODULES frontend/collisions)
+endif()
+
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda

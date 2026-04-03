@@ -19,6 +19,8 @@
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 #cmakedefine SFEM_ENABLE_MPI
 #cmakedefine SFEM_ENABLE_AVX512_SORT
+#cmakedefine SFEM_ENABLE_SCCD
+
 
 #cmakedefine01 SFEM_PRINT_THROUGHPUT
 
