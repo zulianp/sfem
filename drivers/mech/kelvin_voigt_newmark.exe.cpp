@@ -138,16 +138,10 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
     // Write initial condition
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
-        auto u = displacement;
-        auto v = velocity;
-        auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-        if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            u = smesh::to_host(u);
-            v = smesh::to_host(v);
-            a = smesh::to_host(a);
-        }
-#endif
+        auto u = smesh::to_host(displacement);
+        auto v = smesh::to_host(velocity);
+        auto a = smesh::to_host(acceleration);
+
         out->write_time_step("disp", t, u->data());
         out->write_time_step("velocity", t, v->data());
         out->write_time_step("acceleration", t, a->data());
@@ -235,16 +229,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
                 printf("%g/%g\n", double(t), double(T));
             }
 
-            auto u = displacement;
-            auto v = velocity;
-            auto a = acceleration;
-#ifdef SFEM_ENABLE_CUDA
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                u = smesh::to_host(u);
-                v = smesh::to_host(v);
-                a = smesh::to_host(a);
-            }
-#endif
+            auto u = smesh::to_host(displacement);
+            auto v = smesh::to_host(velocity);
+            auto a = smesh::to_host(acceleration);
             // Write to disk
             out->write_time_step("disp", t, u->data());
             out->write_time_step("velocity", t, v->data());
