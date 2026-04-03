@@ -260,6 +260,8 @@ endif()
 
 if(SFEM_ENABLE_SCCD)
     set(SCCD_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SCCD_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+
     set(SFEM_SCCD_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sccd")
     add_subdirectory("${SFEM_SCCD_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sccd")
 
@@ -269,5 +271,23 @@ if(SFEM_ENABLE_SCCD)
         list(APPEND SFEM_SUBMODULES sccd::sccd)
     else()
         message(FATAL_ERROR "Failed to build SCCD library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
+if(SFEM_ENABLE_SSDF)
+    set(SSDF_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    
+    set(SSDF_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/ssdf")
+    add_subdirectory("${SSDF_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/ssdf")
+
+    if(TARGET ssdf)
+        list(APPEND SFEM_SUBMODULES ssdf)
+    elseif(TARGET SSDF::ssdf)
+        list(APPEND SFEM_SUBMODULES SSDF::ssdf)
+    elseif(TARGET ssdf::ssdf)
+        list(APPEND SFEM_SUBMODULES ssdf::ssdf)
+    else()
+        message(FATAL_ERROR "Failed to build SSDF library, make sure to run: git submodule update --init --recursive")
     endif()
 endif()

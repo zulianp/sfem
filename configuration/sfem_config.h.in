@@ -20,6 +20,8 @@
 #cmakedefine SFEM_ENABLE_MPI
 #cmakedefine SFEM_ENABLE_AVX512_SORT
 #cmakedefine SFEM_ENABLE_SCCD
+#cmakedefine SFEM_ENABLE_SSDF
+#cmakedefine SFEM_ENABLE_SRESAMPLE
 
 
 #cmakedefine01 SFEM_PRINT_THROUGHPUT
