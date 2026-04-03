@@ -25,7 +25,8 @@ option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
 option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" ON)
-
+option(SFEM_ENABLE_SSDF "Enable SSDF library" ON)
+option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
