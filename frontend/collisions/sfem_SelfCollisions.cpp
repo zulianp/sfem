@@ -4,6 +4,7 @@
 
 #include "smesh_graph.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_tracer.hpp"
 
 namespace sfem {
 
@@ -30,30 +31,14 @@ namespace sfem {
             ccdptr  = smesh::create_host_buffer<ptrdiff_t>(std::max(n_faces, n_edges) + 1);
 
             vidx = smesh::create_host_buffer<smesh::idx_t>(n_nodes);
-            for (int i = 0; i < n_nodes; i++) {
-                vidx->data()[i] = i;
-            }
-
             fidx = smesh::create_host_buffer<smesh::idx_t>(n_faces);
-            for (int i = 0; i < n_faces; i++) {
-                fidx->data()[i] = i;
-            }
-
             eidx = smesh::create_host_buffer<smesh::idx_t>(n_edges);
-            for (int i = 0; i < n_edges; i++) {
-                eidx->data()[i] = i;
-            }
         }
     };
 
     struct Edges {
         smesh::SharedBuffer<smesh::idx_t> v0;
         smesh::SharedBuffer<smesh::idx_t> v1;
-    };
-
-    struct CollisionPairs {
-        smesh::SharedBuffer<smesh::idx_t> i0;
-        smesh::SharedBuffer<smesh::idx_t> i1;
     };
 
     class SelfCollisions::Impl {
@@ -63,6 +48,7 @@ namespace sfem {
 
         std::shared_ptr<smesh::Mesh> surface;
 
+        // Search data-structures
         AABB aabb_nodes;
         AABB aabb_faces;
         AABB aabb_edges;
@@ -70,10 +56,13 @@ namespace sfem {
         Edges             edges;
         SweepAndPruneData sweep_and_prune_data;
 
-        CollisionPairs vf;
-        CollisionPairs ee;
+        // Collisions
+        CollisionPairs vertex_to_face;
+        CollisionPairs edge_to_edge;
 
+        // To be called at the beginning of the simulation
         void init(const std::shared_ptr<smesh::Mesh>& surface) {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::init");
             this->surface           = surface;
             const int       dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
@@ -97,9 +86,12 @@ namespace sfem {
             sweep_and_prune_data.init(surface);
         }
 
+        // To be called before finding collisions
         void compute_aabbs(const ptrdiff_t                          stride_displacement,  // 2 or 3 for AoS, 1 for SoA
                            std::vector<smesh::SharedBuffer<real_t>> displacement0,
                            std::vector<smesh::SharedBuffer<real_t>> displacement1) {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::compute_aabbs");
+
             const int       dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
 
@@ -153,11 +145,134 @@ namespace sfem {
                                 aabb_edges.max->data());
         }
 
-        void find_collisions() {}
+        void find_collisions() {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::find_collisions");
+
+            smesh::geom_t* vaabb[6] = {aabb_nodes.min->data()[0],
+                                       aabb_nodes.min->data()[1],
+                                       aabb_nodes.min->data()[2],
+                                       aabb_nodes.max->data()[0],
+                                       aabb_nodes.max->data()[1],
+                                       aabb_nodes.max->data()[2]};
+
+            smesh::geom_t* faabb[6] = {aabb_faces.min->data()[0],
+                                       aabb_faces.min->data()[1],
+                                       aabb_faces.min->data()[2],
+                                       aabb_faces.max->data()[0],
+                                       aabb_faces.max->data()[1],
+                                       aabb_faces.max->data()[2]};
+
+            smesh::geom_t* eaabb[6] = {aabb_edges.min->data()[0],
+                                       aabb_edges.min->data()[1],
+                                       aabb_edges.min->data()[2],
+                                       aabb_edges.max->data()[0],
+                                       aabb_edges.max->data()[1],
+                                       aabb_edges.max->data()[2]};
+
+            const ptrdiff_t n_nodes = surface->n_nodes();
+            const ptrdiff_t n_faces = surface->n_elements();
+            const ptrdiff_t n_edges = edges.v0->size();
+
+            int sort_axis = sccd::choose_axis(n_nodes, vaabb);
+
+            auto vidx    = sweep_and_prune_data.vidx;
+            auto fidx    = sweep_and_prune_data.fidx;
+            auto eidx    = sweep_and_prune_data.eidx;
+            auto scratch = sweep_and_prune_data.scratch;
+            auto ccdptr  = sweep_and_prune_data.ccdptr;
+
+            for (int i = 0; i < n_nodes; i++) {
+                vidx->data()[i] = i;
+            }
+
+            for (int i = 0; i < n_faces; i++) {
+                fidx->data()[i] = i;
+            }
+
+            for (int i = 0; i < n_edges; i++) {
+                eidx->data()[i] = i;
+            }
+
+            sccd::sort_along_axis(n_nodes, sort_axis, vaabb, vidx->data(), scratch->data());
+            sccd::sort_along_axis(n_faces, sort_axis, faabb, fidx->data(), scratch->data());
+            sccd::sort_along_axis(n_edges, sort_axis, eaabb, eidx->data(), scratch->data());
+
+            {
+                SMESH_TRACE_SCOPE("Broadphase: E2E");
+
+                smesh::idx_t* edges_raw[2] = {edges.v0->data(), edges.v1->data()};
+                sccd::count_self_overlaps<2>(sort_axis, n_edges, eaabb, eidx->data(), 1, edges_raw, ccdptr->data());
+
+                // FIXME: Mandatory allocation, see if buffer could be reused
+                edge_to_edge.first  = smesh::create_host_buffer<smesh::idx_t>(ccdptr->data()[n_edges]);
+                edge_to_edge.second = smesh::create_host_buffer<smesh::idx_t>(ccdptr->data()[n_edges]);
+
+                sccd::collect_self_overlaps<2>(sort_axis,
+                                               n_edges,
+                                               eaabb,
+                                               eidx->data(),
+                                               1,
+                                               edges_raw,
+                                               ccdptr->data(),
+                                               edge_to_edge.first->data(),
+                                               edge_to_edge.second->data());
+            }
+
+            {
+                SMESH_TRACE_SCOPE("Broadphase: F2V");
+
+                sccd::count_overlaps<3, 1, smesh::geom_t, smesh::idx_t>(sort_axis,
+                                                                        n_faces,
+                                                                        faabb,
+                                                                        fidx->data(),
+                                                                        1,
+                                                                        surface->elements(0)->data(),
+                                                                        n_nodes,
+                                                                        vaabb,
+                                                                        vidx->data(),
+                                                                        0,
+                                                                        nullptr,
+                                                                        ccdptr->data());
+
+                vertex_to_face.first  = smesh::create_host_buffer<smesh::idx_t>(ccdptr->data()[n_faces]);
+                vertex_to_face.second = smesh::create_host_buffer<smesh::idx_t>(ccdptr->data()[n_faces]);
+
+                sccd::collect_overlaps<3, 1, smesh::geom_t, smesh::idx_t>(sort_axis,
+                                                                          n_faces,
+                                                                          faabb,
+                                                                          fidx->data(),
+                                                                          1,
+                                                                          surface->elements(0)->data(),
+                                                                          n_nodes,
+                                                                          vaabb,
+                                                                          vidx->data(),
+                                                                          0,
+                                                                          nullptr,
+                                                                          ccdptr->data(),
+                                                                          vertex_to_face.second->data(),
+                                                                          vertex_to_face.first->data());
+            }
+        }
     };
 
     SelfCollisions::SelfCollisions() : impl_(std::make_unique<Impl>()) {}
 
     SelfCollisions::~SelfCollisions() = default;
+
+    std::shared_ptr<SelfCollisions> SelfCollisions::create(const std::shared_ptr<smesh::Mesh>& surface) {
+        auto self_collisions = std::make_shared<SelfCollisions>();
+        self_collisions->impl_->init(surface);
+        return self_collisions;
+    }
+
+    void SelfCollisions::find(const ptrdiff_t                          stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+                              std::vector<smesh::SharedBuffer<real_t>> displacement0,
+                              std::vector<smesh::SharedBuffer<real_t>> displacement1) {
+        impl_->compute_aabbs(stride_displacement, displacement0, displacement1);
+        impl_->find_collisions();
+    }
+
+    const CollisionPairs& SelfCollisions::vertex_to_face() const { return impl_->vertex_to_face; }
+    const CollisionPairs& SelfCollisions::edge_to_edge() const { return impl_->edge_to_edge; }
 
 }  // namespace sfem
