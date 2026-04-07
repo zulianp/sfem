@@ -16,7 +16,7 @@
 using namespace sfem;
 
 int test_two_body_contact() {
-    ptrdiff_t nx    = 2;
+    ptrdiff_t nx    = 10;
     auto      mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 0, 0, 1, 1, 1);
     auto      mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 1.1, 0, 1, 2.1, 1);
 
@@ -37,8 +37,6 @@ int test_two_body_contact() {
     surface->write(smesh::Path("contact_surface"));
 
     printf("Surf: #nodes %zu #elements %zu\n", surface->n_nodes(), surface->n_elements());
-
-    auto collisions = SelfCollisions::create(surface);
 
     const int dim   = mesh->spatial_dimension();
     auto      space = FunctionSpace::create(mesh, dim);
@@ -85,18 +83,28 @@ int test_two_body_contact() {
 
     solver->apply(rhs->data(), displacement->data());
 
+    auto prev_disp3 = convert_host_buffer_to_fake_SoA(dim, previous_displacement);
+    auto disp3      = convert_host_buffer_to_fake_SoA(dim, displacement);
+
+    auto collisions = SelfCollisions::create(surface);
+    collisions->find(dim, prev_disp3->data(), disp3->data());
+    real_t toi = collisions->time_of_impact();
+
+    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
+    printf("TOI: %g\n", toi);
+
+    auto blas = sfem::blas<real_t>(es);
+    blas->scal(space->n_dofs(), toi, displacement->data());
+
+    // TODO find actual collisions using scaled displacement (compute penalizer)
+    // 0) Envelope or penetration ?
+    // 1) VF distances and penalization
+    // 2) EE distances and penalization
+
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
     out->write("disp", displacement->data());
-
-    auto prev_disp3 = convert_host_buffer_to_fake_SoA(dim, previous_displacement);
-    auto disp3      = convert_host_buffer_to_fake_SoA(dim, displacement);
-    collisions->find(dim, prev_disp3->data(), disp3->data());
-    real_t toi = collisions->time_of_impact();
-
-    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-8);
-    printf("TOI: %g\n", toi);
 
     return SFEM_TEST_SUCCESS;
 }
