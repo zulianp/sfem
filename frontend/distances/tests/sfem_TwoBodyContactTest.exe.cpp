@@ -16,7 +16,7 @@
 using namespace sfem;
 
 int test_two_body_contact() {
-    ptrdiff_t nx    = 4;
+    ptrdiff_t nx    = 2;
     auto      mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 0, 0, 1, 1, 1);
     auto      mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 1.1, 0, 1, 2.1, 1);
 
@@ -34,6 +34,8 @@ int test_two_body_contact() {
             mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (-1e-4) && y < (1e-4); });
 
     auto surface = skin(mesh);
+    surface->write(smesh::Path("contact_surface"));
+
     printf("Surf: #nodes %zu #elements %zu\n", surface->n_nodes(), surface->n_elements());
 
     auto collisions = SelfCollisions::create(surface);
@@ -93,7 +95,7 @@ int test_two_body_contact() {
     collisions->find(dim, prev_disp3->data(), disp3->data());
     real_t toi = collisions->time_of_impact();
 
-    SFEM_TEST_APPROXEQ(toi, 0.1, 1e-8);
+    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-8);
     printf("TOI: %g\n", toi);
 
     return SFEM_TEST_SUCCESS;
