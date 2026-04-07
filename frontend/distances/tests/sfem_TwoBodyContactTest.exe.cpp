@@ -91,7 +91,7 @@ int test_two_body_contact() {
     auto prev_disp3 = convert_host_buffer_to_fake_SoA(dim, previous_displacement);
     auto disp3      = convert_host_buffer_to_fake_SoA(dim, displacement);
     collisions->find(dim, prev_disp3->data(), disp3->data());
-    real_t toi = collisions->time_of_impact(dim, prev_disp3->data(), disp3->data());
+    real_t toi = collisions->time_of_impact();
 
     SFEM_TEST_APPROXEQ(toi, 0.1, 1e-8);
     printf("TOI: %g\n", toi);

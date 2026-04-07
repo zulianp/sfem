@@ -119,27 +119,6 @@ namespace sfem {
             }
         }
 
-        void gather_disp(const ptrdiff_t                                        stride_displacement,  // 2 or 3 for AoS, 1 for SoA
-                         const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement,
-                         real_t* const SFEM_RESTRICT* const SFEM_RESTRICT       points) {
-            SMESH_TRACE_SCOPE("SelfCollisions::Impl::gather_disp");
-
-            const int       dim     = surface->spatial_dimension();
-            const ptrdiff_t n_nodes = surface->n_nodes();
-
-            auto node_mapping = surface->node_mapping()->data();
-
-            for (int d = 0; d < dim; d++) {
-                smesh::real_t* const x_s = points[d];
-
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-                    const ptrdiff_t idx = node_mapping[i];
-                    x_s[i]              = displacement[d][idx * stride_displacement];
-                }
-            }
-        }
-
         // To be called before finding collisions
         void compute_aabbs(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
                            const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
