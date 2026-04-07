@@ -30,9 +30,7 @@ namespace sfem {
                   const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
                   const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1);
 
-        real_t time_of_impact(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
-                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
-                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1);
+        real_t time_of_impact();
 
         const CollisionPairs& vertex_to_face() const;
         const CollisionPairs& edge_to_edge() const;
