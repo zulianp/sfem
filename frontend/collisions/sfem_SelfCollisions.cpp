@@ -94,13 +94,16 @@ namespace sfem {
             const int       dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
 
+            auto node_mapping = surface->node_mapping()->data();
+
             for (int d = 0; d < dim; d++) {
                 const auto* const    x   = surface->points()->data()[d];
                 smesh::real_t* const x_s = p0->data()[d];
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-                    x_s[i] = x[i] + displacement0[d][i * stride_displacement];
+                    const ptrdiff_t idx = node_mapping[i];
+                    x_s[i]              = x[i] + displacement0[d][idx * stride_displacement];
                 }
             }
 
@@ -110,7 +113,29 @@ namespace sfem {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-                    x_s[i] = x[i] + displacement1[d][i * stride_displacement];
+                    const ptrdiff_t idx = node_mapping[i];
+                    x_s[i]              = x[i] + displacement1[d][idx * stride_displacement];
+                }
+            }
+        }
+
+        void gather_disp(const ptrdiff_t                                        stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+                         const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement,
+                         real_t* const SFEM_RESTRICT* const SFEM_RESTRICT       points) {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::gather_disp");
+
+            const int       dim     = surface->spatial_dimension();
+            const ptrdiff_t n_nodes = surface->n_nodes();
+
+            auto node_mapping = surface->node_mapping()->data();
+
+            for (int d = 0; d < dim; d++) {
+                smesh::real_t* const x_s = points[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+                    const ptrdiff_t idx = node_mapping[i];
+                    x_s[i]              = displacement[d][idx * stride_displacement];
                 }
             }
         }
@@ -124,12 +149,14 @@ namespace sfem {
             const int       dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
 
+            compute_displaced_points(stride_displacement, displacement0, displacement1);
+
             sccd::compute_aabbs(dim,
                                 n_nodes,
                                 surface->points()->data(),
-                                stride_displacement,
-                                displacement0,
-                                displacement1,
+                                1,
+                                p0->data(),
+                                p1->data(),
                                 aabb_nodes.min->data(),
                                 aabb_nodes.max->data());
 
@@ -146,9 +173,9 @@ namespace sfem {
                                     b->elements()->data(),
                                     dim,
                                     surface->points()->data(),
-                                    stride_displacement,
-                                    displacement0,
-                                    displacement1,
+                                    1,
+                                    p0->data(),
+                                    p1->data(),
                                     amin->data(),
                                     amax->data());
 
@@ -161,9 +188,9 @@ namespace sfem {
                                 edges_raw,
                                 dim,
                                 surface->points()->data(),
-                                stride_displacement,
-                                displacement0,
-                                displacement1,
+                                1,
+                                p0->data(),
+                                p1->data(),
                                 aabb_edges.min->data(),
                                 aabb_edges.max->data());
         }
@@ -277,16 +304,12 @@ namespace sfem {
             }
         }
 
-        real_t time_of_impact(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
-                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
-                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1) {
+        real_t time_of_impact() {
             SMESH_TRACE_SCOPE("SelfCollisions::Impl::time_of_impact");
 
             // Narrow phase
             smesh::real_t toi = std::numeric_limits<smesh::real_t>::max();
             smesh::real_t toi_vf, toi_ee;
-
-            compute_displaced_points(stride_displacement, displacement0, displacement1);
 
             printf("V2F %zu %zu\n", vertex_to_face.first->size(), vertex_to_face.second->size());
             printf("E2E %zu %zu\n", edge_to_edge.first->size(), edge_to_edge.second->size());
@@ -346,10 +369,6 @@ namespace sfem {
 
     std::shared_ptr<smesh::Mesh> SelfCollisions::surface() const { return impl_->surface; }
 
-    real_t SelfCollisions::time_of_impact(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
-                                          const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
-                                          const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1) {
-        return impl_->time_of_impact(stride_displacement, displacement0, displacement1);
-    }
+    real_t SelfCollisions::time_of_impact() { return impl_->time_of_impact(); }
 
 }  // namespace sfem
