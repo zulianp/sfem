@@ -26,9 +26,13 @@ namespace sfem {
 
         static std::shared_ptr<SelfCollisions> create(const std::shared_ptr<smesh::Mesh>& surface);
 
-        void find(const ptrdiff_t                          stride_displacement,  // 3 for AoS layout, 1 for SoA layout
-                  std::vector<smesh::SharedBuffer<real_t>> displacement0,
-                  std::vector<smesh::SharedBuffer<real_t>> displacement1);
+        void find(const ptrdiff_t stride_displacement,  // 3 for AoS layout, 1 for SoA layout
+                  const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
+                  const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1);
+
+        real_t time_of_impact(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
+                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1);
 
         const CollisionPairs& vertex_to_face() const;
         const CollisionPairs& edge_to_edge() const;
