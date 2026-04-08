@@ -160,6 +160,11 @@ namespace sfem {
         void find_collisions() {
             SMESH_TRACE_SCOPE("SelfCollisions::Impl::find_collisions");
 
+            if (surface->n_blocks() > 1) {
+                SFEM_ERROR("Not implemented");
+                return;
+            }
+
             smesh::geom_t* vaabb[6] = {aabb_nodes.min->data()[0],
                                        aabb_nodes.min->data()[1],
                                        aabb_nodes.min->data()[2],
@@ -335,7 +340,7 @@ namespace sfem {
 
                     points0[d][i] = (1 - toi) * p0 + toi * p1;
 
-                    const real_t offset = toi + 1e-8;
+                    const real_t offset = toi + 1e-1;
                     points1[d][i]       = (1 - offset) * p0 + offset * p1;
                 }
             }
@@ -361,16 +366,23 @@ namespace sfem {
 
             find_collisions();
 
+            real_t infty = 10000;
+
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                d[i] = 100;
+                d[i] = infty;
             }
 
             // VF
 
-            auto x = surface->points()->data()[0];
-            auto y = surface->points()->data()[1];
-            auto z = surface->points()->data()[2];
+            auto x = points0[0];
+            auto y = points0[1];
+            auto z = points0[2];
+
+            if (surface->n_blocks() > 1) {
+                SFEM_ERROR("Not implemented");
+                return;
+            }
 
             const ptrdiff_t n_vf_collisions = vertex_to_face.first->size();
             for (ptrdiff_t i = 0; i < n_vf_collisions; i++) {
@@ -394,20 +406,29 @@ namespace sfem {
                 const real_t dy = y[vidx] - cy;
                 const real_t dz = z[vidx] - cz;
 
-                const real_t d2 = dx * dx + dy * dy + dz * dz;
-
+                const real_t d2  = dx * dx + dy * dy + dz * dz;
                 const real_t dot = dx * nx + dy * ny + dz * nz;
 
-                if (std::abs(dot) < 1e-6 && d2 > 1e-6) {
+                // Remove points past the face, unless they are on the face (this works only if the simulation is penetration
+                // free)
+                if (dot < 1e-8 && d2 > 1e-6 || d[vidx] < d2) {
                     continue;
                 }
 
-                d[vidx] = std::min(d[vidx], d2);
+                // printf("%d -> %d %d %d (%g, %g)\n", vidx, i0, i1, i2, dot, d2);
+
+                d[vidx]    = std::min(d[vidx], d2);
+                n[0][vidx] = -dx;
+                n[1][vidx] = -dy;
+                n[2][vidx] = -dz;
             }
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                d[i] = std::sqrt(d[i]);
+                d[i]    = std::sqrt(d[i]);
+                n[0][i] = n[0][i] / d[i];
+                n[1][i] = n[1][i] / d[i];
+                n[2][i] = n[2][i] / d[i];
             }
         }
     };
