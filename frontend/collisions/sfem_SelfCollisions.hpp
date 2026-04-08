@@ -32,6 +32,11 @@ namespace sfem {
 
         real_t time_of_impact();
 
+        void distance_and_normal(const real_t                                     toi,
+                                 real_t* const SFEM_RESTRICT                      d,
+                                 const ptrdiff_t                                  stride_normal,
+                                 real_t* const SFEM_RESTRICT* const SFEM_RESTRICT n);
+
         const CollisionPairs& vertex_to_face() const;
         const CollisionPairs& edge_to_edge() const;
         const Edges&          edges() const;
