@@ -16,9 +16,9 @@
 using namespace sfem;
 
 int test_two_body_contact() {
-    ptrdiff_t nx    = 10;
+    ptrdiff_t nx    = 2;
     auto      mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 0, 0, 1, 1, 1);
-    auto      mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 1.1, 0, 1, 2.1, 1);
+    auto      mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0.1, 1.1, 0.1, 0.9, 1.9, 0.9);
 
     auto mesh = smesh::concatenate(mesh1, mesh2);
 
@@ -27,7 +27,7 @@ int test_two_body_contact() {
     mesh->write(smesh::Path("contact_mesh"));
 
     auto top_ss = sfem::Sideset::create_from_selector(mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
-        return y > (2.1 - 1e-4) && y < (2.1 + 1e-4);
+        return y > (1.9 - 1e-4) && y < (1.9 + 1e-4);
     });
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
@@ -95,6 +95,17 @@ int test_two_body_contact() {
 
     auto blas = sfem::blas<real_t>(es);
     blas->scal(space->n_dofs(), toi, displacement->data());
+
+    auto d       = sfem::create_host_buffer<real_t>(surface->n_nodes());
+    auto normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
+    collisions->distance_and_normal(toi, d->data(), dim, normals->data());
+
+    {
+        Output out(FunctionSpace::create(surface, 1));
+        out.enable_AoS_to_SoA(true);
+        out.set_output_dir(smesh::Path("contac_surface_output"));
+        out.write("d", d->data());
+    }
 
     // TODO find actual collisions using scaled displacement (compute penalizer)
     // 0) Envelope or penetration ?

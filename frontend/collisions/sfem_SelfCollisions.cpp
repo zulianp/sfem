@@ -7,6 +7,8 @@
 #include "smesh_mesh.hpp"
 #include "smesh_tracer.hpp"
 
+#include "ssdf.hpp"
+
 namespace sfem {
 
     struct AABB {
@@ -86,11 +88,9 @@ namespace sfem {
             p1 = smesh::create_host_buffer<smesh::real_t>(dim, n_nodes);
         }
 
-        void compute_displaced_points(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
-                                      const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
-                                      const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1) {
-            SMESH_TRACE_SCOPE("SelfCollisions::Impl::compute_displaced_points");
-
+        void displace_points(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+                             const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement,
+                             real_t* const SFEM_RESTRICT* const SFEM_RESTRICT       points) {
             const int       dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
 
@@ -98,25 +98,23 @@ namespace sfem {
 
             for (int d = 0; d < dim; d++) {
                 const auto* const    x   = surface->points()->data()[d];
-                smesh::real_t* const x_s = p0->data()[d];
+                smesh::real_t* const x_s = points[d];
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_nodes; ++i) {
                     const ptrdiff_t idx = node_mapping[i];
-                    x_s[i]              = x[i] + displacement0[d][idx * stride_displacement];
+                    x_s[i]              = x[i] + displacement[d][idx * stride_displacement];
                 }
             }
+        }
 
-            for (int d = 0; d < dim; d++) {
-                const auto* const    x   = surface->points()->data()[d];
-                smesh::real_t* const x_s = p1->data()[d];
+        void compute_displaced_points(const ptrdiff_t stride_displacement,  // 2 or 3 for AoS, 1 for SoA
+                                      const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement0,
+                                      const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT displacement1) {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::compute_displaced_points");
 
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-                    const ptrdiff_t idx = node_mapping[i];
-                    x_s[i]              = x[i] + displacement1[d][idx * stride_displacement];
-                }
-            }
+            displace_points(stride_displacement, displacement0, p0->data());
+            displace_points(stride_displacement, displacement1, p1->data());
         }
 
         // To be called before finding collisions
@@ -130,14 +128,7 @@ namespace sfem {
 
             compute_displaced_points(stride_displacement, displacement0, displacement1);
 
-            sccd::compute_aabbs(dim,
-                                n_nodes,
-                                surface->points()->data(),
-                                1,
-                                p0->data(),
-                                p1->data(),
-                                aabb_nodes.min->data(),
-                                aabb_nodes.max->data());
+            sccd::compute_aabbs(dim, n_nodes, p0->data(), p1->data(), aabb_nodes.min->data(), aabb_nodes.max->data());
 
             ptrdiff_t element_offset = 0;
             for (auto b : surface->blocks()) {
@@ -147,16 +138,8 @@ namespace sfem {
                 auto amin = smesh::view(aabb_faces.min, 0, dim, element_offset, element_offset + n_elements);
                 auto amax = smesh::view(aabb_faces.max, 0, dim, element_offset, element_offset + n_elements);
 
-                sccd::compute_aabbs(nxe,
-                                    n_elements,
-                                    b->elements()->data(),
-                                    dim,
-                                    surface->points()->data(),
-                                    1,
-                                    p0->data(),
-                                    p1->data(),
-                                    amin->data(),
-                                    amax->data());
+                sccd::compute_aabbs(
+                        nxe, n_elements, b->elements()->data(), dim, p0->data(), p1->data(), amin->data(), amax->data());
 
                 element_offset += n_elements;
             }
@@ -281,6 +264,9 @@ namespace sfem {
                                                                           vertex_to_face.second->data(),
                                                                           vertex_to_face.first->data());
             }
+
+            printf("V2F %zu %zu\n", vertex_to_face.first->size(), vertex_to_face.second->size());
+            printf("E2E %zu %zu\n", edge_to_edge.first->size(), edge_to_edge.second->size());
         }
 
         real_t time_of_impact() {
@@ -289,9 +275,6 @@ namespace sfem {
             // Narrow phase
             smesh::real_t toi = std::numeric_limits<smesh::real_t>::max();
             smesh::real_t toi_vf, toi_ee;
-
-            printf("V2F %zu %zu\n", vertex_to_face.first->size(), vertex_to_face.second->size());
-            printf("E2E %zu %zu\n", edge_to_edge.first->size(), edge_to_edge.second->size());
 
             {
                 SMESH_TRACE_SCOPE("Narrow phase: F2V");
@@ -323,6 +306,110 @@ namespace sfem {
 
             return toi;
         }
+
+        void distance_and_normal(const real_t                                     toi,
+                                 real_t* const SFEM_RESTRICT                      d,
+                                 const ptrdiff_t                                  stride_normal,
+                                 real_t* const SFEM_RESTRICT* const SFEM_RESTRICT n) {
+            SMESH_TRACE_SCOPE("SelfCollisions::Impl::distance_and_normal");
+
+            int             dim     = surface->spatial_dimension();
+            const ptrdiff_t n_nodes = surface->n_nodes();
+
+            // FIXME: Implement this
+            // Weight vector
+            // Weighted distance and normal
+            // If weight == 0 then use infty as distance
+            // VF: For each vertex find closest face not connected to the vertex, use normal of the face to discard (if vertex is
+            // orthogonal). Weight to node with 1
+            // EE: For each edge find closests edge, if edge is orthogonal to the edge then discard?
+            // Weight contribution to node with basis function
+
+            auto points0 = p0->data();
+            auto points1 = p1->data();
+
+            for (int d = 0; d < dim; d++) {
+                for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                    const geom_t p0 = points0[d][i];
+                    const geom_t p1 = points1[d][i];
+
+                    points0[d][i] = (1 - toi) * p0 + toi * p1;
+
+                    const real_t offset = toi + 1e-8;
+                    points1[d][i]       = (1 - offset) * p0 + offset * p1;
+                }
+            }
+
+            sccd::compute_aabbs(dim, n_nodes, points0, points1, aabb_nodes.min->data(), aabb_nodes.max->data());
+
+            ptrdiff_t element_offset = 0;
+            for (auto b : surface->blocks()) {
+                int             nxe        = b->n_nodes_per_element();
+                const ptrdiff_t n_elements = b->n_elements();
+
+                auto amin = smesh::view(aabb_faces.min, 0, dim, element_offset, element_offset + n_elements);
+                auto amax = smesh::view(aabb_faces.max, 0, dim, element_offset, element_offset + n_elements);
+
+                sccd::compute_aabbs(nxe, n_elements, b->elements()->data(), dim, points0, points1, amin->data(), amax->data());
+
+                element_offset += n_elements;
+            }
+
+            smesh::idx_t* edges_raw[2] = {edges.v0->data(), edges.v1->data()};
+            sccd::compute_aabbs(
+                    2, edges.v0->size(), edges_raw, dim, points0, points1, aabb_edges.min->data(), aabb_edges.max->data());
+
+            find_collisions();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                d[i] = 100;
+            }
+
+            // VF
+
+            auto x = surface->points()->data()[0];
+            auto y = surface->points()->data()[1];
+            auto z = surface->points()->data()[2];
+
+            const ptrdiff_t n_vf_collisions = vertex_to_face.first->size();
+            for (ptrdiff_t i = 0; i < n_vf_collisions; i++) {
+                const ptrdiff_t vidx = vertex_to_face.first->data()[i];
+                const ptrdiff_t fidx = vertex_to_face.second->data()[i];
+
+                const auto i0 = surface->elements(0)->data()[0][fidx];
+                const auto i1 = surface->elements(0)->data()[1][fidx];
+                const auto i2 = surface->elements(0)->data()[2][fidx];
+
+                real_t nx, ny, nz;
+                // Compute normal of the face
+                ssdf::triangle_area_weighted_normal<smesh::real_t>(
+                        x[i0], y[i0], z[i0], x[i1], y[i1], z[i1], x[i2], y[i2], z[i2], &nx, &ny, &nz);
+
+                real_t cx, cy, cz;
+                ssdf::point_triangle_closest_point<smesh::real_t>(
+                        x[vidx], y[vidx], z[vidx], x[i0], y[i0], z[i0], x[i1], y[i1], z[i1], x[i2], y[i2], z[i2], &cx, &cy, &cz);
+
+                const real_t dx = x[vidx] - cx;
+                const real_t dy = y[vidx] - cy;
+                const real_t dz = z[vidx] - cz;
+
+                const real_t d2 = dx * dx + dy * dy + dz * dz;
+
+                const real_t dot = dx * nx + dy * ny + dz * nz;
+
+                if (std::abs(dot) < 1e-6 && d2 > 1e-6) {
+                    continue;
+                }
+
+                d[vidx] = std::min(d[vidx], d2);
+            }
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                d[i] = std::sqrt(d[i]);
+            }
+        }
     };
 
     SelfCollisions::SelfCollisions() : impl_(std::make_unique<Impl>()) {}
@@ -349,5 +436,12 @@ namespace sfem {
     std::shared_ptr<smesh::Mesh> SelfCollisions::surface() const { return impl_->surface; }
 
     real_t SelfCollisions::time_of_impact() { return impl_->time_of_impact(); }
+
+    void SelfCollisions::distance_and_normal(const real_t                                     toi,
+                                             real_t* const SFEM_RESTRICT                      d,
+                                             const ptrdiff_t                                  stride_normal,
+                                             real_t* const SFEM_RESTRICT* const SFEM_RESTRICT n) {
+        impl_->distance_and_normal(toi, d, stride_normal, n);
+    }
 
 }  // namespace sfem
