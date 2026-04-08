@@ -16,7 +16,7 @@
 using namespace sfem;
 
 int test_two_body_contact() {
-    ptrdiff_t nx    = 2;
+    ptrdiff_t nx    = 10;
     auto      mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 0, 0, 1, 1, 1);
     auto      mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0.1, 1.1, 0.1, 0.9, 1.9, 0.9);
 
@@ -105,6 +105,9 @@ int test_two_body_contact() {
         out.enable_AoS_to_SoA(true);
         out.set_output_dir(smesh::Path("contac_surface_output"));
         out.write("d", d->data());
+        out.write("nx", normals->data()[0]);
+        out.write("ny", normals->data()[1]);
+        out.write("nz", normals->data()[2]);
     }
 
     // TODO find actual collisions using scaled displacement (compute penalizer)
