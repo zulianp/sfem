@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_glob.hpp"
 
@@ -58,6 +58,9 @@ namespace sfem {
         virtual int initialize(const std::vector<std::string> &block_names = {}) { return SFEM_SUCCESS; }
 
         virtual int update(const real_t *const x) { return SFEM_SUCCESS; }
+        virtual int update(const real_t *const SFEM_RESTRICT x_prev, const real_t *const SFEM_RESTRICT x_curr) {
+            return SFEM_SUCCESS;
+        }
 
         /**
          * @brief Assemble the Hessian matrix in CRS format
