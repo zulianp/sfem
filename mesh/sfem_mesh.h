@@ -57,6 +57,13 @@ typedef struct {
     real_t *vetices_zero;
 } mesh_tet_geom_t;
 
+typedef struct {
+    mesh_t *ref_mesh;
+
+    // An array of size (ref_mesh->nelements x 3) in row-major ordering storing the coordinates of the first vertex of each tet.
+    real_t *vertices_zero;
+} mesh_tri3_geom_t;
+
 /**
  * @brief Initialize mesh_tet_geom_t structure for a given mesh
  */
