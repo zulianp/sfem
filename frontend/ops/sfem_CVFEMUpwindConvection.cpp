@@ -1,9 +1,11 @@
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include <mpi.h>
-#include "cvfem_operators.h"
-#include "sfem_Mesh.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+#include "cvfem_operators.hpp"
+#include "smesh_mesh.hpp"
+
+#include "smesh_glob.hpp"
+
+#include "matrixio_array.h"
 
 namespace sfem {
 
@@ -28,7 +30,7 @@ namespace sfem {
             //         SFEM_VELX,
             //         SFEM_VELY,
             //         SFEM_VELZ);
-            ret->element_type = (enum ElemType)space->element_type();
+            ret->element_type = (smesh::ElemType)space->element_type();
             return ret;
         }
 
@@ -102,7 +104,7 @@ namespace sfem {
         cvfem_convection_apply(element_type,
                                mesh->n_elements(),
                                mesh->n_nodes(),
-                               mesh->elements()->data(),
+                               mesh->elements(0)->data(),
                                mesh->points()->data(),
                                vel_,
                                h,

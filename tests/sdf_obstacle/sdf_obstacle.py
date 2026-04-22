@@ -45,10 +45,10 @@ def run(config):
 	dim = m.spatial_dimension()
 	block_size = config['block_size']
 
-	fs = sfem.FunctionSpace(m, block_size)
+	if 'refine_level' in config and config['refine_level'] > 1:
+		m = sfem.to_semistructured(config['refine_level'], m)
 
-	if 'refine_level' in config:
-		fs.promote_to_semi_structured(config['refine_level']) 
+	fs = sfem.FunctionSpace(m, block_size)
 
 	fun = sfem.Function(fs)
 	op = sfem.create_op(fs, config["operator"])

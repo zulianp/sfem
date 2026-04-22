@@ -4,17 +4,13 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
-
-#include "sfem_Buffer.hpp"
 
 #include "sfem_openmp_ShiftableJacobi.hpp"
 
 namespace sfem {
-    template <typename T>
-    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
 
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {

@@ -586,7 +586,7 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
         content = []
         content.append(f"#ifndef {guard}")
         content.append(f"#define {guard}")
-        content.append("\n#include \"sfem_macros.h\"\n")
+        content.append("\n#include \"sfem_macros.hpp\"\n")
         if not self.metric_tensor_only:
             content.append("")
             content.append(sigF)
@@ -726,6 +726,10 @@ def compressible_mooney_rivlin(fe):
     gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
                     guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
 
+    op.emit_objective()
+    op.emit_gradient()
+    op.emit_hessian()
+    op.emit_hessian_diag()
 
 
 if __name__ == "__main__":

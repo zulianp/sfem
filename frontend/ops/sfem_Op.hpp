@@ -9,14 +9,10 @@
 
 #pragma once
 
-#include "sfem_Buffer.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_defs.h"
-// #include "sfem_Function.hpp"
-#include "sfem_glob.hpp"
-
-#include <vector>
-#include <string>
+#include "sfem_aliases.hpp"
+#include "sfem_defs.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -62,6 +58,9 @@ namespace sfem {
         virtual int initialize(const std::vector<std::string> &block_names = {}) { return SFEM_SUCCESS; }
 
         virtual int update(const real_t *const x) { return SFEM_SUCCESS; }
+        virtual int update(const real_t *const SFEM_RESTRICT x_prev, const real_t *const SFEM_RESTRICT x_curr) {
+            return SFEM_SUCCESS;
+        }
 
         /**
          * @brief Assemble the Hessian matrix in CRS format
@@ -208,8 +207,11 @@ namespace sfem {
          * @param out Energy values per step (output)
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          */
-        virtual int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out)
-        {
+        virtual int value_steps(const real_t       *x,
+                                const real_t       *h,
+                                const int           nsteps,
+                                const real_t *const steps,
+                                real_t *const       out) {
             SFEM_ERROR("value_steps not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -272,7 +274,10 @@ namespace sfem {
 
         virtual bool is_no_op() const { return false; }
 
-        virtual void override_element_types(const std::vector<enum ElemType> &element_types) {}
+        virtual void override_element_types(const std::vector<smesh::ElemType> &element_types) {}
+
+        virtual ptrdiff_t n_dofs_domain() const = 0;
+        virtual ptrdiff_t n_dofs_image() const  = 0;
     };
 
     /**
@@ -296,7 +301,9 @@ namespace sfem {
         int value(const real_t * /*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override { return std::make_shared<NoOp>(); }
-        bool is_no_op() const override { return true; }
+        bool                is_no_op() const override { return true; }
+        ptrdiff_t           n_dofs_domain() const override { return -1; };
+        ptrdiff_t           n_dofs_image() const override { return -1; };
     };
 
     /**

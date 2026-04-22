@@ -1,0 +1,636 @@
+#ifndef TET4_PARTIAL_ASSEMBLY_S_IKQM_INLINE_H
+#define TET4_PARTIAL_ASSEMBLY_S_IKQM_INLINE_H
+
+static SFEM_INLINE void tet4_F(
+    const scalar_t *const SFEM_RESTRICT adjugate,
+    const scalar_t                      jacobian_determinant,
+    const scalar_t *const SFEM_RESTRICT ux,
+    const scalar_t *const SFEM_RESTRICT uy,
+    const scalar_t *const SFEM_RESTRICT uz,
+    scalar_t *const SFEM_RESTRICT       F) {
+
+const scalar_t x0 = 1.0/jacobian_determinant;
+const scalar_t x1 = ux[0] - ux[1];
+const scalar_t x2 = ux[0] - ux[2];
+const scalar_t x3 = ux[0] - ux[3];
+const scalar_t x4 = uy[0] - uy[1];
+const scalar_t x5 = uy[0] - uy[2];
+const scalar_t x6 = uy[0] - uy[3];
+const scalar_t x7 = uz[0] - uz[1];
+const scalar_t x8 = uz[0] - uz[2];
+const scalar_t x9 = uz[0] - uz[3];
+F[0] = -adjugate[0]*x0*x1 - adjugate[3]*x0*x2 - adjugate[6]*x0*x3 + 1;
+F[1] = -x0*(adjugate[1]*x1 + adjugate[4]*x2 + adjugate[7]*x3);
+F[2] = -x0*(adjugate[2]*x1 + adjugate[5]*x2 + adjugate[8]*x3);
+F[3] = -x0*(adjugate[0]*x4 + adjugate[3]*x5 + adjugate[6]*x6);
+F[4] = -adjugate[1]*x0*x4 - adjugate[4]*x0*x5 - adjugate[7]*x0*x6 + 1;
+F[5] = -x0*(adjugate[2]*x4 + adjugate[5]*x5 + adjugate[8]*x6);
+F[6] = -x0*(adjugate[0]*x7 + adjugate[3]*x8 + adjugate[6]*x9);
+F[7] = -x0*(adjugate[1]*x7 + adjugate[4]*x8 + adjugate[7]*x9);
+F[8] = -adjugate[2]*x0*x7 - adjugate[5]*x0*x8 - adjugate[8]*x0*x9 + 1;
+}
+
+
+static SFEM_INLINE void tet4_ref_inc_grad(
+    const scalar_t *const SFEM_RESTRICT ux,
+    const scalar_t *const SFEM_RESTRICT uy,
+    const scalar_t *const SFEM_RESTRICT uz,
+    scalar_t *const SFEM_RESTRICT       inc_grad) {
+
+inc_grad[0] = -ux[0] + ux[1];
+inc_grad[1] = -ux[0] + ux[2];
+inc_grad[2] = -ux[0] + ux[3];
+inc_grad[3] = -uy[0] + uy[1];
+inc_grad[4] = -uy[0] + uy[2];
+inc_grad[5] = -uy[0] + uy[3];
+inc_grad[6] = -uz[0] + uz[1];
+inc_grad[7] = -uz[0] + uz[2];
+inc_grad[8] = -uz[0] + uz[3];
+}
+
+
+static SFEM_INLINE void tet4_S_ikqm(
+    const scalar_t *const SFEM_RESTRICT adjugate,
+    const scalar_t                      jacobian_determinant,
+    const scalar_t *const SFEM_RESTRICT F,
+    const scalar_t                      mu,
+    const scalar_t                      lmbda,
+    const scalar_t                      qw,
+    scalar_t *const SFEM_RESTRICT       S_ikqm) {
+
+const scalar_t x0 = F[4]*F[8];
+const scalar_t x1 = F[5]*F[7];
+const scalar_t x2 = x0 - x1;
+const scalar_t x3 = F[3]*F[8];
+const scalar_t x4 = F[5]*F[6];
+const scalar_t x5 = x3 - x4;
+const scalar_t x6 = F[3]*F[7];
+const scalar_t x7 = F[4]*F[6];
+const scalar_t x8 = F[0]*x0 - F[0]*x1 - F[1]*x3 + F[1]*x4 + F[2]*x6 - F[2]*x7;
+const scalar_t x9 = 9*lmbda;
+const scalar_t x10 = x9/POW2(x8);
+const scalar_t x11 = x10*x5;
+const scalar_t x12 = x11*x2;
+const scalar_t x13 = log(x8);
+const scalar_t x14 = x12*x13;
+const scalar_t x15 = 3*F[1];
+const scalar_t x16 = pow(x8, -5.0/3.0);
+const scalar_t x17 = POW2(F[0]) + POW2(F[1]) + POW2(F[2]);
+const scalar_t x18 = POW2(F[3]) + POW2(F[4]) + POW2(F[5]);
+const scalar_t x19 = POW2(F[6]) + POW2(F[7]) + POW2(F[8]);
+const scalar_t x20 = x17 + x18 + x19;
+const scalar_t x21 = x16*x20;
+const scalar_t x22 = x15 + x21*x5;
+const scalar_t x23 = x16*x2;
+const scalar_t x24 = 2*mu;
+const scalar_t x25 = x23*x24;
+const scalar_t x26 = -x5;
+const scalar_t x27 = 1.0/x8;
+const scalar_t x28 = -x2;
+const scalar_t x29 = x27*x28;
+const scalar_t x30 = x17*x29;
+const scalar_t x31 = x18*x29;
+const scalar_t x32 = x19*x29;
+const scalar_t x33 = 3*x20;
+const scalar_t x34 = x29*x33;
+const scalar_t x35 = mu/pow(x8, 7.0/3.0);
+const scalar_t x36 = x35*(6*F[0] + 2*x30 + 2*x31 + 2*x32 + x34);
+const scalar_t x37 = x12 - x14 + x22*x25 + x26*x36;
+const scalar_t x38 = x6 - x7;
+const scalar_t x39 = 3*F[2];
+const scalar_t x40 = -x21*x38 + x39;
+const scalar_t x41 = x10*x2;
+const scalar_t x42 = x38*x41;
+const scalar_t x43 = x13*x42 - x42;
+const scalar_t x44 = x25*x40 + x36*x38 + x43;
+const scalar_t x45 = x10*POW2(x2);
+const scalar_t x46 = 3*F[0];
+const scalar_t x47 = x24*(-x2*x21 + x46);
+const scalar_t x48 = x33/pow(x8, 8.0/3.0);
+const scalar_t x49 = 2*x30 + 2*x31 + 2*x32 + 2*x46;
+const scalar_t x50 = mu/pow(x8, 2.0/3.0);
+const scalar_t x51 = x13*x45 + x23*x47 - x45 + x50*(x2*x28*x48 + x23*x49 - 9);
+const scalar_t x52 = adjugate[0]*x51 + adjugate[3]*x37 + adjugate[6]*x44;
+const scalar_t x53 = x11*x38;
+const scalar_t x54 = x13*x53;
+const scalar_t x55 = x16*x38;
+const scalar_t x56 = x24*x55;
+const scalar_t x57 = -x38;
+const scalar_t x58 = x27*x57;
+const scalar_t x59 = x17*x58;
+const scalar_t x60 = x18*x58;
+const scalar_t x61 = x19*x58;
+const scalar_t x62 = x33*x58;
+const scalar_t x63 = x35*(6*F[2] + 2*x59 + 2*x60 + 2*x61 + x62);
+const scalar_t x64 = x22*x56 + x26*x63 + x53 - x54;
+const scalar_t x65 = x2*x63 + x43 + x47*x55;
+const scalar_t x66 = x10*POW2(x38);
+const scalar_t x67 = 2*x39 + 2*x59 + 2*x60 + 2*x61;
+const scalar_t x68 = x13*x66 + x40*x56 + x50*(x38*x48*x57 + x55*x67 - 9) - x66;
+const scalar_t x69 = adjugate[0]*x65 + adjugate[3]*x64 + adjugate[6]*x68;
+const scalar_t x70 = x16*x5;
+const scalar_t x71 = x27*x5;
+const scalar_t x72 = x17*x71;
+const scalar_t x73 = x18*x71;
+const scalar_t x74 = x19*x71;
+const scalar_t x75 = x33*x71;
+const scalar_t x76 = x35*(6*F[1] + 2*x72 + 2*x73 + 2*x74 + x75);
+const scalar_t x77 = -x12 + x14 - x2*x76 + x47*x70;
+const scalar_t x78 = x24*x70;
+const scalar_t x79 = -x38*x76 + x40*x78 - x53 + x54;
+const scalar_t x80 = x10*POW2(x5);
+const scalar_t x81 = 2*x15 + 2*x72 + 2*x73 + 2*x74;
+const scalar_t x82 = x13*x80 - x22*x78 + x50*(x16*x26*x81 + x26*x48*x5 - 9) - x80;
+const scalar_t x83 = adjugate[0]*x77 - adjugate[3]*x82 + adjugate[6]*x79;
+const scalar_t x84 = (1.0/54.0)*qw/jacobian_determinant;
+const scalar_t x85 = adjugate[1]*x51 + adjugate[4]*x37 + adjugate[7]*x44;
+const scalar_t x86 = adjugate[1]*x65 + adjugate[4]*x64 + adjugate[7]*x68;
+const scalar_t x87 = adjugate[1]*x77 - adjugate[4]*x82 + adjugate[7]*x79;
+const scalar_t x88 = adjugate[2]*x51 + adjugate[5]*x37 + adjugate[8]*x44;
+const scalar_t x89 = adjugate[2]*x65 + adjugate[5]*x64 + adjugate[8]*x68;
+const scalar_t x90 = adjugate[2]*x77 - adjugate[5]*x82 + adjugate[8]*x79;
+const scalar_t x91 = F[0]*F[8] - F[2]*F[6];
+const scalar_t x92 = x11*x91;
+const scalar_t x93 = x13*x92;
+const scalar_t x94 = x16*x91;
+const scalar_t x95 = x22*x24;
+const scalar_t x96 = -x91;
+const scalar_t x97 = x27*x96;
+const scalar_t x98 = x17*x97;
+const scalar_t x99 = x18*x97;
+const scalar_t x100 = x19*x97;
+const scalar_t x101 = x33*x97;
+const scalar_t x102 = 6*F[4] + 2*x100 + x101 + 2*x98 + 2*x99;
+const scalar_t x103 = x26*x35;
+const scalar_t x104 = x102*x103 + x92 - x93 + x94*x95;
+const scalar_t x105 = 3*F[8];
+const scalar_t x106 = x105*x20;
+const scalar_t x107 = 3*F[4];
+const scalar_t x108 = 2*x100 + 2*x107 + 2*x98 + 2*x99;
+const scalar_t x109 = x13*x27*x9;
+const scalar_t x110 = F[8]*x109;
+const scalar_t x111 = x41*x91;
+const scalar_t x112 = -x110 + x111*x13 - x111;
+const scalar_t x113 = x112 + x35*(x101*x2 + x106 + x108*x2) + x47*x94;
+const scalar_t x114 = 3*F[6];
+const scalar_t x115 = -x114*x20;
+const scalar_t x116 = x24*x40;
+const scalar_t x117 = F[6]*x109;
+const scalar_t x118 = x10*x38;
+const scalar_t x119 = x118*x91;
+const scalar_t x120 = x117 + x119*x13 - x119;
+const scalar_t x121 = x116*x94 + x120 + x35*(x101*x38 + x108*x38 + x115);
+const scalar_t x122 = adjugate[0]*x113 + adjugate[3]*x104 + adjugate[6]*x121;
+const scalar_t x123 = F[1]*F[8] - F[2]*F[7];
+const scalar_t x124 = x123*x41;
+const scalar_t x125 = x124*x13;
+const scalar_t x126 = x123*x16;
+const scalar_t x127 = x123*x27;
+const scalar_t x128 = x127*x17;
+const scalar_t x129 = x127*x18;
+const scalar_t x130 = x127*x19;
+const scalar_t x131 = x127*x33;
+const scalar_t x132 = 6*F[3] + 2*x128 + 2*x129 + 2*x130 + x131;
+const scalar_t x133 = x2*x35;
+const scalar_t x134 = -x124 + x125 + x126*x47 - x132*x133;
+const scalar_t x135 = -x106;
+const scalar_t x136 = 3*F[3];
+const scalar_t x137 = 2*x128 + 2*x129 + 2*x130 + 2*x136;
+const scalar_t x138 = x126*x24;
+const scalar_t x139 = x11*x123;
+const scalar_t x140 = x110 + x13*x139 - x139;
+const scalar_t x141 = -x138*x22 + x140 + x35*(x131*x26 + x135 + x137*x26);
+const scalar_t x142 = x118*x123;
+const scalar_t x143 = F[7]*x109;
+const scalar_t x144 = x13*x142;
+const scalar_t x145 = 3*F[7];
+const scalar_t x146 = x145*x20;
+const scalar_t x147 = x138*x40 - x142 + x143 + x144 - x35*(x131*x38 + x137*x38 + x146);
+const scalar_t x148 = adjugate[0]*x134 - adjugate[3]*x141 + adjugate[6]*x147;
+const scalar_t x149 = F[0]*F[7] - F[1]*F[6];
+const scalar_t x150 = x118*x149;
+const scalar_t x151 = x13*x150;
+const scalar_t x152 = x149*x16;
+const scalar_t x153 = x149*x27;
+const scalar_t x154 = x153*x17;
+const scalar_t x155 = x153*x18;
+const scalar_t x156 = x153*x19;
+const scalar_t x157 = x153*x33;
+const scalar_t x158 = 6*F[5] + 2*x154 + 2*x155 + 2*x156 + x157;
+const scalar_t x159 = x35*x38;
+const scalar_t x160 = x116*x152 - x150 + x151 - x158*x159;
+const scalar_t x161 = 3*F[5];
+const scalar_t x162 = 2*x154 + 2*x155 + 2*x156 + 2*x161;
+const scalar_t x163 = x115 + x149*x75;
+const scalar_t x164 = x11*x149;
+const scalar_t x165 = x117 - x13*x164 + x164;
+const scalar_t x166 = x152*x95 + x165 - x35*(-x162*x5 - x163);
+const scalar_t x167 = -x146;
+const scalar_t x168 = x149*x41;
+const scalar_t x169 = -x13*x168 + x143 + x168;
+const scalar_t x170 = -x152*x47 + x169 + x35*(x157*x2 + x162*x2 + x167);
+const scalar_t x171 = -adjugate[0]*x170 + adjugate[3]*x166 + adjugate[6]*x160;
+const scalar_t x172 = adjugate[1]*x113 + adjugate[4]*x104 + adjugate[7]*x121;
+const scalar_t x173 = adjugate[1]*x134 - adjugate[4]*x141 + adjugate[7]*x147;
+const scalar_t x174 = -adjugate[1]*x170 + adjugate[4]*x166 + adjugate[7]*x160;
+const scalar_t x175 = adjugate[2]*x113 + adjugate[5]*x104 + adjugate[8]*x121;
+const scalar_t x176 = adjugate[2]*x134 - adjugate[5]*x141 + adjugate[8]*x147;
+const scalar_t x177 = -adjugate[2]*x170 + adjugate[5]*x166 + adjugate[8]*x160;
+const scalar_t x178 = F[1]*F[5] - F[2]*F[4];
+const scalar_t x179 = -x178;
+const scalar_t x180 = x179*x27;
+const scalar_t x181 = x17*x180;
+const scalar_t x182 = x18*x180;
+const scalar_t x183 = x180*x19;
+const scalar_t x184 = x180*x33;
+const scalar_t x185 = 6*F[6] + 2*x181 + 2*x182 + 2*x183 + x184;
+const scalar_t x186 = x16*x178;
+const scalar_t x187 = x178*x41;
+const scalar_t x188 = x13*x187 - x187;
+const scalar_t x189 = x133*x185 + x186*x47 + x188;
+const scalar_t x190 = x11*x178;
+const scalar_t x191 = F[5]*x109;
+const scalar_t x192 = x13*x190;
+const scalar_t x193 = x161*x20;
+const scalar_t x194 = 2*x114 + 2*x181 + 2*x182 + 2*x183;
+const scalar_t x195 = x186*x95 + x190 - x191 - x192 + x35*(x184*x26 + x193 + x194*x26);
+const scalar_t x196 = x107*x20;
+const scalar_t x197 = -x196;
+const scalar_t x198 = x118*x178;
+const scalar_t x199 = F[4]*x109;
+const scalar_t x200 = x13*x198 - x198 + x199;
+const scalar_t x201 = x116*x186 + x200 + x35*(x184*x38 + x194*x38 + x197);
+const scalar_t x202 = adjugate[0]*x189 + adjugate[3]*x195 + adjugate[6]*x201;
+const scalar_t x203 = F[0]*F[4] - F[1]*F[3];
+const scalar_t x204 = -x203;
+const scalar_t x205 = x204*x27;
+const scalar_t x206 = x17*x205;
+const scalar_t x207 = x18*x205;
+const scalar_t x208 = x19*x205;
+const scalar_t x209 = x205*x33;
+const scalar_t x210 = 6*F[8] + 2*x206 + 2*x207 + 2*x208 + x209;
+const scalar_t x211 = x16*x203;
+const scalar_t x212 = x118*x203;
+const scalar_t x213 = x13*x212 - x212;
+const scalar_t x214 = x116*x211 + x159*x210 + x213;
+const scalar_t x215 = x136*x20;
+const scalar_t x216 = -x215;
+const scalar_t x217 = 2*x105 + 2*x206 + 2*x207 + 2*x208;
+const scalar_t x218 = F[3]*x109;
+const scalar_t x219 = x11*x203;
+const scalar_t x220 = -x13*x219 + x218 + x219;
+const scalar_t x221 = x211*x95 + x220 + x35*(x209*x26 + x216 + x217*x26);
+const scalar_t x222 = x203*x41;
+const scalar_t x223 = x13*x222 - x199 - x222;
+const scalar_t x224 = x211*x47 + x223 + x35*(x196 + x2*x209 + x2*x217);
+const scalar_t x225 = adjugate[0]*x224 + adjugate[3]*x221 + adjugate[6]*x214;
+const scalar_t x226 = F[0]*F[5] - F[2]*F[3];
+const scalar_t x227 = x226*x27;
+const scalar_t x228 = x17*x227;
+const scalar_t x229 = x18*x227;
+const scalar_t x230 = x19*x227;
+const scalar_t x231 = x227*x33;
+const scalar_t x232 = 6*F[7] + 2*x228 + 2*x229 + 2*x230 + x231;
+const scalar_t x233 = x16*x226;
+const scalar_t x234 = x11*x226;
+const scalar_t x235 = x13*x234 - x234;
+const scalar_t x236 = x103*x232 - x233*x95 + x235;
+const scalar_t x237 = -x193;
+const scalar_t x238 = 2*x145 + 2*x228 + 2*x229 + 2*x230;
+const scalar_t x239 = x226*x41;
+const scalar_t x240 = -x13*x239 + x191 + x239;
+const scalar_t x241 = -x233*x47 + x240 + x35*(x2*x231 + x2*x238 + x237);
+const scalar_t x242 = x118*x226;
+const scalar_t x243 = x13*x242;
+const scalar_t x244 = x116*x233 + x218 - x242 + x243 - x35*(x215 + x231*x38 + x238*x38);
+const scalar_t x245 = -adjugate[0]*x241 - adjugate[3]*x236 + adjugate[6]*x244;
+const scalar_t x246 = adjugate[1]*x189 + adjugate[4]*x195 + adjugate[7]*x201;
+const scalar_t x247 = adjugate[1]*x224 + adjugate[4]*x221 + adjugate[7]*x214;
+const scalar_t x248 = -adjugate[1]*x241 - adjugate[4]*x236 + adjugate[7]*x244;
+const scalar_t x249 = adjugate[2]*x189 + adjugate[5]*x195 + adjugate[8]*x201;
+const scalar_t x250 = adjugate[2]*x224 + adjugate[5]*x221 + adjugate[8]*x214;
+const scalar_t x251 = -adjugate[2]*x241 - adjugate[5]*x236 + adjugate[8]*x244;
+const scalar_t x252 = x123*x21 + x136;
+const scalar_t x253 = -x123;
+const scalar_t x254 = x124 - x125 + x25*x252 + x253*x36;
+const scalar_t x255 = -x149;
+const scalar_t x256 = x149*x21 + x161;
+const scalar_t x257 = x169 + x25*x256 + x35*(x167 + x255*x34 + x255*x49);
+const scalar_t x258 = x107 - x21*x91;
+const scalar_t x259 = x112 + x25*x258 + x35*(x106 + x34*x91 + x49*x91);
+const scalar_t x260 = adjugate[0]*x254 + adjugate[3]*x259 + adjugate[6]*x257;
+const scalar_t x261 = x150 - x151 + x255*x63 + x256*x56;
+const scalar_t x262 = x142 - x143 - x144 + x252*x56 + x35*(x146 + x253*x62 + x253*x67);
+const scalar_t x263 = x120 + x258*x56 + x35*(x115 + x62*x91 + x67*x91);
+const scalar_t x264 = adjugate[0]*x262 + adjugate[3]*x263 + adjugate[6]*x261;
+const scalar_t x265 = x258*x78 - x76*x91 - x92 + x93;
+const scalar_t x266 = x140 - x252*x78 + x35*(x135 + x253*x75 + x253*x81);
+const scalar_t x267 = x165 + x256*x78 - x35*(-x149*x81 - x163);
+const scalar_t x268 = -adjugate[0]*x266 + adjugate[3]*x265 + adjugate[6]*x267;
+const scalar_t x269 = adjugate[1]*x254 + adjugate[4]*x259 + adjugate[7]*x257;
+const scalar_t x270 = adjugate[1]*x262 + adjugate[4]*x263 + adjugate[7]*x261;
+const scalar_t x271 = -adjugate[1]*x266 + adjugate[4]*x265 + adjugate[7]*x267;
+const scalar_t x272 = adjugate[2]*x254 + adjugate[5]*x259 + adjugate[8]*x257;
+const scalar_t x273 = adjugate[2]*x262 + adjugate[5]*x263 + adjugate[8]*x261;
+const scalar_t x274 = -adjugate[2]*x266 + adjugate[5]*x265 + adjugate[8]*x267;
+const scalar_t x275 = x10*x123;
+const scalar_t x276 = x275*x91;
+const scalar_t x277 = x13*x276;
+const scalar_t x278 = x24*x94;
+const scalar_t x279 = x102*x35;
+const scalar_t x280 = x252*x278 + x253*x279 + x276 - x277;
+const scalar_t x281 = x10*x91;
+const scalar_t x282 = x149*x281;
+const scalar_t x283 = x13*x282;
+const scalar_t x284 = x255*x279 + x256*x278 + x282 - x283;
+const scalar_t x285 = x10*POW2(x91);
+const scalar_t x286 = x13*x285 + x258*x278 - x285 + x50*(x108*x94 + x48*x91*x96 - 9);
+const scalar_t x287 = adjugate[0]*x280 + adjugate[3]*x286 + adjugate[6]*x284;
+const scalar_t x288 = x132*x35;
+const scalar_t x289 = x149*x275;
+const scalar_t x290 = x13*x289 - x289;
+const scalar_t x291 = -x138*x256 + x255*x288 + x290;
+const scalar_t x292 = x138*x258 - x276 + x277 - x288*x91;
+const scalar_t x293 = x10*POW2(x123);
+const scalar_t x294 = x13*x293 - x138*x252 - x293 + x50*(x123*x253*x48 + x137*x16*x253 - 9);
+const scalar_t x295 = -adjugate[0]*x294 + adjugate[3]*x292 - adjugate[6]*x291;
+const scalar_t x296 = x158*x35;
+const scalar_t x297 = x152*x24;
+const scalar_t x298 = -x252*x297 + x253*x296 + x290;
+const scalar_t x299 = x258*x297 - x282 + x283 - x296*x91;
+const scalar_t x300 = x10*POW2(x149);
+const scalar_t x301 = x13*x300 - x256*x297 - x300 + x50*(x149*x255*x48 + x16*x162*x255 - 9);
+const scalar_t x302 = -adjugate[0]*x298 + adjugate[3]*x299 - adjugate[6]*x301;
+const scalar_t x303 = adjugate[1]*x280 + adjugate[4]*x286 + adjugate[7]*x284;
+const scalar_t x304 = -adjugate[1]*x294 + adjugate[4]*x292 - adjugate[7]*x291;
+const scalar_t x305 = -adjugate[1]*x298 + adjugate[4]*x299 - adjugate[7]*x301;
+const scalar_t x306 = adjugate[2]*x280 + adjugate[5]*x286 + adjugate[8]*x284;
+const scalar_t x307 = -adjugate[2]*x294 + adjugate[5]*x292 - adjugate[8]*x291;
+const scalar_t x308 = -adjugate[2]*x298 + adjugate[5]*x299 - adjugate[8]*x301;
+const scalar_t x309 = x178*x275;
+const scalar_t x310 = x13*x309;
+const scalar_t x311 = x186*x24;
+const scalar_t x312 = x185*x35;
+const scalar_t x313 = x252*x311 + x253*x312 + x309 - x310;
+const scalar_t x314 = x10*x149;
+const scalar_t x315 = x178*x314;
+const scalar_t x316 = F[1]*x109;
+const scalar_t x317 = x13*x315;
+const scalar_t x318 = x15*x20;
+const scalar_t x319 = x256*x311 + x315 - x316 - x317 + x35*(x184*x255 + x194*x255 + x318);
+const scalar_t x320 = -x20*x39;
+const scalar_t x321 = F[2]*x109;
+const scalar_t x322 = x178*x281;
+const scalar_t x323 = x13*x322 + x321 - x322;
+const scalar_t x324 = x258*x311 + x323 + x35*(x184*x91 + x194*x91 + x320);
+const scalar_t x325 = adjugate[0]*x313 + adjugate[3]*x324 + adjugate[6]*x319;
+const scalar_t x326 = x203*x314;
+const scalar_t x327 = x13*x326;
+const scalar_t x328 = x211*x24;
+const scalar_t x329 = x210*x35;
+const scalar_t x330 = x255*x329 + x256*x328 + x326 - x327;
+const scalar_t x331 = -x318;
+const scalar_t x332 = x203*x275;
+const scalar_t x333 = -x13*x332 + x316 + x332;
+const scalar_t x334 = x252*x328 + x333 + x35*(x209*x253 + x217*x253 + x331);
+const scalar_t x335 = x20*x46;
+const scalar_t x336 = F[0]*x109;
+const scalar_t x337 = x203*x281;
+const scalar_t x338 = x13*x337 - x336 - x337;
+const scalar_t x339 = x258*x328 + x338 + x35*(x209*x91 + x217*x91 + x335);
+const scalar_t x340 = adjugate[0]*x334 + adjugate[3]*x339 + adjugate[6]*x330;
+const scalar_t x341 = x226*x281;
+const scalar_t x342 = x13*x341;
+const scalar_t x343 = x233*x24;
+const scalar_t x344 = x232*x35;
+const scalar_t x345 = x258*x343 - x341 + x342 - x344*x91;
+const scalar_t x346 = x131*x226 + x320;
+const scalar_t x347 = x226*x275;
+const scalar_t x348 = -x13*x347 + x321 + x347;
+const scalar_t x349 = x252*x343 + x348 - x35*(-x123*x238 - x346);
+const scalar_t x350 = -x335;
+const scalar_t x351 = x226*x314;
+const scalar_t x352 = x13*x351 + x336 - x351;
+const scalar_t x353 = -x256*x343 + x35*(x231*x255 + x238*x255 + x350) + x352;
+const scalar_t x354 = adjugate[0]*x349 + adjugate[3]*x345 - adjugate[6]*x353;
+const scalar_t x355 = adjugate[1]*x313 + adjugate[4]*x324 + adjugate[7]*x319;
+const scalar_t x356 = adjugate[1]*x334 + adjugate[4]*x339 + adjugate[7]*x330;
+const scalar_t x357 = adjugate[1]*x349 + adjugate[4]*x345 - adjugate[7]*x353;
+const scalar_t x358 = adjugate[2]*x313 + adjugate[5]*x324 + adjugate[8]*x319;
+const scalar_t x359 = adjugate[2]*x334 + adjugate[5]*x339 + adjugate[8]*x330;
+const scalar_t x360 = adjugate[2]*x349 + adjugate[5]*x345 - adjugate[8]*x353;
+const scalar_t x361 = x114 - x178*x21;
+const scalar_t x362 = x178*x36 + x188 + x25*x361;
+const scalar_t x363 = -x226;
+const scalar_t x364 = x145 + x21*x226;
+const scalar_t x365 = x240 + x25*x364 + x35*(x237 + x34*x363 + x363*x49);
+const scalar_t x366 = x105 - x203*x21;
+const scalar_t x367 = x223 + x25*x366 + x35*(x196 + x203*x34 + x203*x49);
+const scalar_t x368 = adjugate[0]*x362 + adjugate[3]*x365 + adjugate[6]*x367;
+const scalar_t x369 = x203*x63 + x213 + x366*x56;
+const scalar_t x370 = -x218 + x242 - x243 + x35*(x215 + x363*x62 + x363*x67) + x364*x56;
+const scalar_t x371 = x200 + x35*(x178*x62 + x178*x67 + x197) + x361*x56;
+const scalar_t x372 = adjugate[0]*x371 + adjugate[3]*x370 + adjugate[6]*x369;
+const scalar_t x373 = x235 + x363*x76 - x364*x78;
+const scalar_t x374 = x220 + x35*(x203*x75 + x203*x81 + x216) - x366*x78;
+const scalar_t x375 = -x190 + x191 + x192 - x35*(x178*x75 + x178*x81 + x193) + x361*x78;
+const scalar_t x376 = adjugate[0]*x375 - adjugate[3]*x373 - adjugate[6]*x374;
+const scalar_t x377 = adjugate[1]*x362 + adjugate[4]*x365 + adjugate[7]*x367;
+const scalar_t x378 = adjugate[1]*x371 + adjugate[4]*x370 + adjugate[7]*x369;
+const scalar_t x379 = adjugate[1]*x375 - adjugate[4]*x373 - adjugate[7]*x374;
+const scalar_t x380 = adjugate[2]*x362 + adjugate[5]*x365 + adjugate[8]*x367;
+const scalar_t x381 = adjugate[2]*x371 + adjugate[5]*x370 + adjugate[8]*x369;
+const scalar_t x382 = adjugate[2]*x375 - adjugate[5]*x373 - adjugate[8]*x374;
+const scalar_t x383 = x278*x364 + x279*x363 + x341 - x342;
+const scalar_t x384 = x278*x361 + x323 + x35*(x101*x178 + x108*x178 + x320);
+const scalar_t x385 = x278*x366 + x338 + x35*(x101*x203 + x108*x203 + x335);
+const scalar_t x386 = adjugate[0]*x384 + adjugate[3]*x383 + adjugate[6]*x385;
+const scalar_t x387 = x138*x361 - x178*x288 - x309 + x310;
+const scalar_t x388 = x138*x364 + x348 - x35*(-x137*x226 - x346);
+const scalar_t x389 = -x138*x366 + x333 + x35*(x131*x203 + x137*x203 + x331);
+const scalar_t x390 = adjugate[0]*x387 + adjugate[3]*x388 - adjugate[6]*x389;
+const scalar_t x391 = -x203*x296 + x297*x366 - x326 + x327;
+const scalar_t x392 = -x297*x364 + x35*(x157*x363 + x162*x363 + x350) + x352;
+const scalar_t x393 = x297*x361 - x315 + x316 + x317 - x35*(x157*x178 + x162*x178 + x318);
+const scalar_t x394 = adjugate[0]*x393 - adjugate[3]*x392 + adjugate[6]*x391;
+const scalar_t x395 = adjugate[1]*x384 + adjugate[4]*x383 + adjugate[7]*x385;
+const scalar_t x396 = adjugate[1]*x387 + adjugate[4]*x388 - adjugate[7]*x389;
+const scalar_t x397 = adjugate[1]*x393 - adjugate[4]*x392 + adjugate[7]*x391;
+const scalar_t x398 = adjugate[2]*x384 + adjugate[5]*x383 + adjugate[8]*x385;
+const scalar_t x399 = adjugate[2]*x387 + adjugate[5]*x388 - adjugate[8]*x389;
+const scalar_t x400 = adjugate[2]*x393 - adjugate[5]*x392 + adjugate[8]*x391;
+const scalar_t x401 = x10*x226;
+const scalar_t x402 = x178*x401;
+const scalar_t x403 = x13*x402;
+const scalar_t x404 = x311*x364 + x312*x363 + x402 - x403;
+const scalar_t x405 = x10*x178*x203;
+const scalar_t x406 = x13*x405 - x405;
+const scalar_t x407 = x203*x312 + x311*x366 + x406;
+const scalar_t x408 = x10*POW2(x178);
+const scalar_t x409 = x13*x408 + x311*x361 - x408 + x50*(x178*x179*x48 + x186*x194 - 9);
+const scalar_t x410 = adjugate[0]*x409 + adjugate[3]*x404 + adjugate[6]*x407;
+const scalar_t x411 = x203*x401;
+const scalar_t x412 = x13*x411;
+const scalar_t x413 = x328*x364 + x329*x363 + x411 - x412;
+const scalar_t x414 = x178*x329 + x328*x361 + x406;
+const scalar_t x415 = x10*POW2(x203);
+const scalar_t x416 = x13*x415 + x328*x366 - x415 + x50*(x203*x204*x48 + x211*x217 - 9);
+const scalar_t x417 = adjugate[0]*x414 + adjugate[3]*x413 + adjugate[6]*x416;
+const scalar_t x418 = -x178*x344 + x343*x361 - x402 + x403;
+const scalar_t x419 = -x203*x344 + x343*x366 - x411 + x412;
+const scalar_t x420 = x10*POW2(x226);
+const scalar_t x421 = x13*x420 - x343*x364 - x420 + x50*(x16*x238*x363 + x226*x363*x48 - 9);
+const scalar_t x422 = adjugate[0]*x418 - adjugate[3]*x421 + adjugate[6]*x419;
+const scalar_t x423 = adjugate[1]*x409 + adjugate[4]*x404 + adjugate[7]*x407;
+const scalar_t x424 = adjugate[1]*x414 + adjugate[4]*x413 + adjugate[7]*x416;
+const scalar_t x425 = adjugate[1]*x418 - adjugate[4]*x421 + adjugate[7]*x419;
+const scalar_t x426 = adjugate[2]*x409 + adjugate[5]*x404 + adjugate[8]*x407;
+const scalar_t x427 = adjugate[2]*x414 + adjugate[5]*x413 + adjugate[8]*x416;
+const scalar_t x428 = adjugate[2]*x418 - adjugate[5]*x421 + adjugate[8]*x419;
+S_ikqm[0] = x84*(-adjugate[0]*x52 + adjugate[3]*x83 - adjugate[6]*x69);
+S_ikqm[1] = x84*(-adjugate[0]*x85 + adjugate[3]*x87 - adjugate[6]*x86);
+S_ikqm[2] = x84*(-adjugate[0]*x88 + adjugate[3]*x90 - adjugate[6]*x89);
+S_ikqm[3] = x84*(-adjugate[1]*x52 + adjugate[4]*x83 - adjugate[7]*x69);
+S_ikqm[4] = x84*(-adjugate[1]*x85 + adjugate[4]*x87 - adjugate[7]*x86);
+S_ikqm[5] = x84*(-adjugate[1]*x88 + adjugate[4]*x90 - adjugate[7]*x89);
+S_ikqm[6] = x84*(-adjugate[2]*x52 + adjugate[5]*x83 - adjugate[8]*x69);
+S_ikqm[7] = x84*(-adjugate[2]*x85 + adjugate[5]*x87 - adjugate[8]*x86);
+S_ikqm[8] = x84*(-adjugate[2]*x88 + adjugate[5]*x90 - adjugate[8]*x89);
+S_ikqm[9] = x84*(adjugate[0]*x148 - adjugate[3]*x122 + adjugate[6]*x171);
+S_ikqm[10] = x84*(adjugate[0]*x173 - adjugate[3]*x172 + adjugate[6]*x174);
+S_ikqm[11] = x84*(adjugate[0]*x176 - adjugate[3]*x175 + adjugate[6]*x177);
+S_ikqm[12] = x84*(adjugate[1]*x148 - adjugate[4]*x122 + adjugate[7]*x171);
+S_ikqm[13] = x84*(adjugate[1]*x173 - adjugate[4]*x172 + adjugate[7]*x174);
+S_ikqm[14] = x84*(adjugate[1]*x176 - adjugate[4]*x175 + adjugate[7]*x177);
+S_ikqm[15] = x84*(adjugate[2]*x148 - adjugate[5]*x122 + adjugate[8]*x171);
+S_ikqm[16] = x84*(adjugate[2]*x173 - adjugate[5]*x172 + adjugate[8]*x174);
+S_ikqm[17] = x84*(adjugate[2]*x176 - adjugate[5]*x175 + adjugate[8]*x177);
+S_ikqm[18] = x84*(-adjugate[0]*x202 + adjugate[3]*x245 - adjugate[6]*x225);
+S_ikqm[19] = x84*(-adjugate[0]*x246 + adjugate[3]*x248 - adjugate[6]*x247);
+S_ikqm[20] = x84*(-adjugate[0]*x249 + adjugate[3]*x251 - adjugate[6]*x250);
+S_ikqm[21] = x84*(-adjugate[1]*x202 + adjugate[4]*x245 - adjugate[7]*x225);
+S_ikqm[22] = x84*(-adjugate[1]*x246 + adjugate[4]*x248 - adjugate[7]*x247);
+S_ikqm[23] = x84*(-adjugate[1]*x249 + adjugate[4]*x251 - adjugate[7]*x250);
+S_ikqm[24] = x84*(-adjugate[2]*x202 + adjugate[5]*x245 - adjugate[8]*x225);
+S_ikqm[25] = x84*(-adjugate[2]*x246 + adjugate[5]*x248 - adjugate[8]*x247);
+S_ikqm[26] = x84*(-adjugate[2]*x249 + adjugate[5]*x251 - adjugate[8]*x250);
+S_ikqm[27] = x84*(-adjugate[0]*x260 + adjugate[3]*x268 - adjugate[6]*x264);
+S_ikqm[28] = x84*(-adjugate[0]*x269 + adjugate[3]*x271 - adjugate[6]*x270);
+S_ikqm[29] = x84*(-adjugate[0]*x272 + adjugate[3]*x274 - adjugate[6]*x273);
+S_ikqm[30] = x84*(-adjugate[1]*x260 + adjugate[4]*x268 - adjugate[7]*x264);
+S_ikqm[31] = x84*(-adjugate[1]*x269 + adjugate[4]*x271 - adjugate[7]*x270);
+S_ikqm[32] = x84*(-adjugate[1]*x272 + adjugate[4]*x274 - adjugate[7]*x273);
+S_ikqm[33] = x84*(-adjugate[2]*x260 + adjugate[5]*x268 - adjugate[8]*x264);
+S_ikqm[34] = x84*(-adjugate[2]*x269 + adjugate[5]*x271 - adjugate[8]*x270);
+S_ikqm[35] = x84*(-adjugate[2]*x272 + adjugate[5]*x274 - adjugate[8]*x273);
+S_ikqm[36] = x84*(adjugate[0]*x295 - adjugate[3]*x287 + adjugate[6]*x302);
+S_ikqm[37] = x84*(adjugate[0]*x304 - adjugate[3]*x303 + adjugate[6]*x305);
+S_ikqm[38] = x84*(adjugate[0]*x307 - adjugate[3]*x306 + adjugate[6]*x308);
+S_ikqm[39] = x84*(adjugate[1]*x295 - adjugate[4]*x287 + adjugate[7]*x302);
+S_ikqm[40] = x84*(adjugate[1]*x304 - adjugate[4]*x303 + adjugate[7]*x305);
+S_ikqm[41] = x84*(adjugate[1]*x307 - adjugate[4]*x306 + adjugate[7]*x308);
+S_ikqm[42] = x84*(adjugate[2]*x295 - adjugate[5]*x287 + adjugate[8]*x302);
+S_ikqm[43] = x84*(adjugate[2]*x304 - adjugate[5]*x303 + adjugate[8]*x305);
+S_ikqm[44] = x84*(adjugate[2]*x307 - adjugate[5]*x306 + adjugate[8]*x308);
+S_ikqm[45] = x84*(-adjugate[0]*x325 + adjugate[3]*x354 - adjugate[6]*x340);
+S_ikqm[46] = x84*(-adjugate[0]*x355 + adjugate[3]*x357 - adjugate[6]*x356);
+S_ikqm[47] = x84*(-adjugate[0]*x358 + adjugate[3]*x360 - adjugate[6]*x359);
+S_ikqm[48] = x84*(-adjugate[1]*x325 + adjugate[4]*x354 - adjugate[7]*x340);
+S_ikqm[49] = x84*(-adjugate[1]*x355 + adjugate[4]*x357 - adjugate[7]*x356);
+S_ikqm[50] = x84*(-adjugate[1]*x358 + adjugate[4]*x360 - adjugate[7]*x359);
+S_ikqm[51] = x84*(-adjugate[2]*x325 + adjugate[5]*x354 - adjugate[8]*x340);
+S_ikqm[52] = x84*(-adjugate[2]*x355 + adjugate[5]*x357 - adjugate[8]*x356);
+S_ikqm[53] = x84*(-adjugate[2]*x358 + adjugate[5]*x360 - adjugate[8]*x359);
+S_ikqm[54] = x84*(-adjugate[0]*x368 + adjugate[3]*x376 - adjugate[6]*x372);
+S_ikqm[55] = x84*(-adjugate[0]*x377 + adjugate[3]*x379 - adjugate[6]*x378);
+S_ikqm[56] = x84*(-adjugate[0]*x380 + adjugate[3]*x382 - adjugate[6]*x381);
+S_ikqm[57] = x84*(-adjugate[1]*x368 + adjugate[4]*x376 - adjugate[7]*x372);
+S_ikqm[58] = x84*(-adjugate[1]*x377 + adjugate[4]*x379 - adjugate[7]*x378);
+S_ikqm[59] = x84*(-adjugate[1]*x380 + adjugate[4]*x382 - adjugate[7]*x381);
+S_ikqm[60] = x84*(-adjugate[2]*x368 + adjugate[5]*x376 - adjugate[8]*x372);
+S_ikqm[61] = x84*(-adjugate[2]*x377 + adjugate[5]*x379 - adjugate[8]*x378);
+S_ikqm[62] = x84*(-adjugate[2]*x380 + adjugate[5]*x382 - adjugate[8]*x381);
+S_ikqm[63] = x84*(adjugate[0]*x390 - adjugate[3]*x386 + adjugate[6]*x394);
+S_ikqm[64] = x84*(adjugate[0]*x396 - adjugate[3]*x395 + adjugate[6]*x397);
+S_ikqm[65] = x84*(adjugate[0]*x399 - adjugate[3]*x398 + adjugate[6]*x400);
+S_ikqm[66] = x84*(adjugate[1]*x390 - adjugate[4]*x386 + adjugate[7]*x394);
+S_ikqm[67] = x84*(adjugate[1]*x396 - adjugate[4]*x395 + adjugate[7]*x397);
+S_ikqm[68] = x84*(adjugate[1]*x399 - adjugate[4]*x398 + adjugate[7]*x400);
+S_ikqm[69] = x84*(adjugate[2]*x390 - adjugate[5]*x386 + adjugate[8]*x394);
+S_ikqm[70] = x84*(adjugate[2]*x396 - adjugate[5]*x395 + adjugate[8]*x397);
+S_ikqm[71] = x84*(adjugate[2]*x399 - adjugate[5]*x398 + adjugate[8]*x400);
+S_ikqm[72] = x84*(-adjugate[0]*x410 + adjugate[3]*x422 - adjugate[6]*x417);
+S_ikqm[73] = x84*(-adjugate[0]*x423 + adjugate[3]*x425 - adjugate[6]*x424);
+S_ikqm[74] = x84*(-adjugate[0]*x426 + adjugate[3]*x428 - adjugate[6]*x427);
+S_ikqm[75] = x84*(-adjugate[1]*x410 + adjugate[4]*x422 - adjugate[7]*x417);
+S_ikqm[76] = x84*(-adjugate[1]*x423 + adjugate[4]*x425 - adjugate[7]*x424);
+S_ikqm[77] = x84*(-adjugate[1]*x426 + adjugate[4]*x428 - adjugate[7]*x427);
+S_ikqm[78] = x84*(-adjugate[2]*x410 + adjugate[5]*x422 - adjugate[8]*x417);
+S_ikqm[79] = x84*(-adjugate[2]*x423 + adjugate[5]*x425 - adjugate[8]*x424);
+S_ikqm[80] = x84*(-adjugate[2]*x426 + adjugate[5]*x428 - adjugate[8]*x427);
+}
+
+
+
+static SFEM_INLINE void tet4_apply_S_ikqm(
+    const scalar_t *const SFEM_RESTRICT S_ikqm,    // 3x3x3x3, includes dV
+    const scalar_t *const SFEM_RESTRICT inc_grad,  // 3x3 reference trial gradient R
+    scalar_t *const SFEM_RESTRICT       element_outx,
+    scalar_t *const SFEM_RESTRICT       element_outy,
+    scalar_t *const SFEM_RESTRICT       element_outz)
+{
+    #define D 3
+    #define IDX(i,k,q,m) ((((i) * D + (k)) * D + (q)) * D + (m))
+
+    scalar_t grad_x[4];
+scalar_t grad_y[4];
+scalar_t grad_z[4];
+
+    grad_x[0] = -1;
+grad_y[0] = -1;
+grad_z[0] = -1;
+grad_x[1] = 1;
+grad_y[1] = 0;
+grad_z[1] = 0;
+grad_x[2] = 0;
+grad_y[2] = 1;
+grad_z[2] = 0;
+grad_x[3] = 0;
+grad_y[3] = 0;
+grad_z[3] = 1;
+
+    // M[i][m] = sum{k,q} S_ikqm[i,k,q,m] * inc_grad[k,q]
+    scalar_t M[D][D];
+    for (int i = 0; i < D; ++i) {
+        for (int m = 0; m < D; ++m) {
+            scalar_t acc = 0;
+            for (int k = 0; k < D; ++k) {
+                for (int q = 0; q < D; ++q) {
+                    acc += S_ikqm[IDX(i, k, q, m)] * inc_grad[k * D + q];
+                }
+            }
+            M[i][m] = acc;
+        }
+    }
+
+    // Write SoA outputs: x,y,z components into separate arrays
+    for (int node = 0; node < 4; ++node) {
+        const scalar_t gx = grad_x[node];
+        const scalar_t gy = grad_y[node];
+        const scalar_t gz = grad_z[node];
+
+        const scalar_t valx = M[0][0] * gx + M[0][1] * gy + M[0][2] * gz;
+        const scalar_t valy = M[1][0] * gx + M[1][1] * gy + M[1][2] * gz;
+        const scalar_t valz = M[2][0] * gx + M[2][1] * gy + M[2][2] * gz;
+
+        element_outx[node] = valx;
+        element_outy[node] = valy;
+        element_outz[node] = valz;
+    }
+
+    #undef IDX
+    #undef D
+}
+
+
+#endif /* TET4_PARTIAL_ASSEMBLY_S_IKQM_INLINE_H */

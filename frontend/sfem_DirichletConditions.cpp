@@ -4,16 +4,19 @@
 
 #include <stddef.h>
 
-#include "boundary_condition.h"
+#include "boundary_condition.hpp"
 #include "matrixio_array.h"
-#include "operators/boundary_conditions/dirichlet.h"
-#include "operators/hierarchical/sfem_prolongation_restriction.h"
+#include "operators/boundary_conditions/dirichlet.hpp"
 #include "sfem_Function.hpp"
+#include "smesh_prolongation.hpp"
+#include "smesh_restriction.hpp"
 #include "utils.h"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_path.hpp"
+#include "smesh_sideset.hpp"
 
 #include <sys/stat.h>
 #include <cstddef>
@@ -26,19 +29,21 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.h"
-#include "hex8_fff.h"
-#include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
-#include "sshex8.h"
-#include "sshex8_mesh.h"
+
+#include "hex8_fff.hpp"
+#include "hex8_jacobian.hpp"
+//
+#include "sshex8.hpp"
 
 // C++ includes
-#include "sfem_CRSGraph.hpp"
-#include "sfem_Communicator.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+//
+// #include "sfem_Communicator.hpp"
+// #include "smesh_semistructured.hpp"
+
+#include "smesh_glob.hpp"
+
+#include "smesh_path.hpp"
+#include "smesh_sideset.hpp"
 
 #ifdef SFEM_ENABLE_MPI
 #include <mpi.h>
@@ -65,6 +70,15 @@
 
 #include <map>
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
+
+namespace smesh {
+    SharedBuffer<idx_t> create_nodeset_from_sidesets(const std::shared_ptr<Mesh>                 &mesh,
+                                                     const std::vector<std::shared_ptr<Sideset>> &sidesets);
+}
+
 namespace sfem {
 
     class DirichletConditions::Impl {
@@ -80,7 +94,8 @@ namespace sfem {
 
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
-                c.nodeset = create_nodeset_from_sidesets(space, c.sidesets);
+                auto mesh_for_sidesets = space->mesh_ptr();
+                c.nodeset              = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, c.sidesets);
             }
         }
 
@@ -102,7 +117,12 @@ namespace sfem {
 
         auto space = impl_->space;
         auto mesh  = space->mesh_ptr();
-        auto et    = (enum ElemType)space->element_type();
+        auto et    = (smesh::ElemType)space->element_type();
+
+        // FIXME
+        auto coarse_restriction_mesh = (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh())
+                                               ? smesh::derefine(mesh, 1)
+                                               : nullptr;
 
         ptrdiff_t max_coarse_idx = -1;
         auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
@@ -118,34 +138,60 @@ namespace sfem {
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
-            if (cdc.sidesets.empty()) {
-                if (max_coarse_idx == -1)
-                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements()->data());
+            // FIXME
 
-                hierarchical_create_coarse_indices(
+            if (cdc.sidesets.empty()) {
+                if (max_coarse_idx == -1) {
+                    if (coarse_restriction_mesh) {
+                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
+                                                            coarse_restriction_mesh->n_elements(),
+                                                            coarse_restriction_mesh->elements(0)->data());
+                    } else {
+                        max_coarse_idx =
+                                smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
+                    }
+                }
+
+                smesh::hierarchical_create_coarse_indices<idx_t>(
                         max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
                 cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
 
                 if (!as_zero && conds[i].values) {
                     cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
-                    hierarchical_collect_coarse_values(max_coarse_idx,
-                                                       conds[i].nodeset->size(),
-                                                       conds[i].nodeset->data(),
-                                                       conds[i].values->data(),
-                                                       cdc.values->data());
+                    smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
+                                                                     conds[i].nodeset->size(),
+                                                                     conds[i].nodeset->data(),
+                                                                     conds[i].values->data(),
+                                                                     cdc.values->data());
                 }
 
             } else {
                 assert(as_zero);
-                // Use first sideset to find nodeset
-                auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
-                if (it == sideset_to_nodeset.end()) {
-                    auto nodeset                             = create_nodeset_from_sidesets(coarse_space, cdc.sidesets);
-                    cdc.nodeset                              = nodeset;
-                    sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
+                if (!coarse_space->has_semi_structured_mesh()) {
+                    if (max_coarse_idx == -1) {
+                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
+                                                            coarse_restriction_mesh->n_elements(),
+                                                            coarse_restriction_mesh->elements(0)->data());
+                    }
 
+                    smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
+                                                                     conds[i].nodeset->size(),
+                                                                     conds[i].nodeset->data(),
+                                                                     &coarse_num_nodes,
+                                                                     &coarse_nodeset);
+                    cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
                 } else {
-                    cdc.nodeset = it->second;
+                    // Use first sideset to find nodeset
+                    auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
+                    if (it == sideset_to_nodeset.end()) {
+                        auto mesh_for_sidesets = coarse_space->mesh_ptr();
+                        auto nodeset           = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
+                        cdc.nodeset            = nodeset;
+                        sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
+
+                    } else {
+                        cdc.nodeset = it->second;
+                    }
                 }
             }
 
@@ -244,8 +290,9 @@ namespace sfem {
 
                     cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
-                    cdc.sidesets.push_back(Sideset::create_from_file(comm, pch));
-                    cdc.nodeset = create_nodeset_from_sidesets(space, cdc.sidesets);
+                    cdc.sidesets.push_back(Sideset::create_from_file(comm, smesh::Path(pch)));
+                    auto mesh_for_sidesets = space->mesh_ptr();
+                    cdc.nodeset            = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
                 }
 
                 conds.push_back(cdc);
@@ -335,7 +382,7 @@ namespace sfem {
                 if (is_file) {
                     std::string path;
                     c["path"] >> path;
-                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path.c_str());
+                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
                 } else if (is_expr) {
                     assert(c["parent"].is_seq());
                     assert(c["lfi"].is_seq());
@@ -358,33 +405,7 @@ namespace sfem {
                     sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
                 }
 
-                ptrdiff_t n_nodes{0};
-                idx_t    *nodes{nullptr};
-                if (space->has_semi_structured_mesh()) {
-                    auto &&ss = space->semi_structured_mesh();
-                    SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                    if (sshex8_extract_nodeset_from_sideset(ss.level(),
-                                                            ss.element_data(),
-                                                            sideset->parent()->size(),
-                                                            sideset->parent()->data(),
-                                                            sideset->lfi()->data(),
-                                                            &n_nodes,
-                                                            &nodes) != SFEM_SUCCESS) {
-                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                    }
-                } else {
-                    if (extract_nodeset_from_sideset(space->element_type(),
-                                                     space->mesh_ptr()->elements()->data(),
-                                                     sideset->parent()->size(),
-                                                     sideset->parent()->data(),
-                                                     sideset->lfi()->data(),
-                                                     &n_nodes,
-                                                     &nodes) != SFEM_SUCCESS) {
-                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                    }
-                }
-
-                nodeset = sfem::manage_host_buffer(n_nodes, nodes);
+                nodeset = smesh::create_nodeset_from_sideset(space->mesh_ptr(), sideset);
             } else {
                 if (is_file) {
                     std::string path;
@@ -610,6 +631,14 @@ namespace sfem {
         }
 
         return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
+#ifdef SFEM_ENABLE_CUDA
+        return std::make_shared<GPUDirichletConditions>(dc);
+#else
+        return dc;
+#endif
     }
 
 }  // namespace sfem

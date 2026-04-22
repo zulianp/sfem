@@ -1,7 +1,7 @@
 #ifndef SFEM_LAGRANGE_LEGENDRE_GAUSS_LOBATTO_HPP
 #define SFEM_LAGRANGE_LEGENDRE_GAUSS_LOBATTO_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <typename scalar_t>
 int lagrange_GLL_eval(const int order, const int Q, const scalar_t *const SFEM_RESTRICT qx, scalar_t *const SFEM_RESTRICT S) {

@@ -12,7 +12,7 @@
 #include <valarray>
 #include <vector>
 
-#include "test_grid_new.h"
+#include "test_grid_new.hpp"
 
 /**
  * @brief Calculates the number of bytes required to store a global grid.

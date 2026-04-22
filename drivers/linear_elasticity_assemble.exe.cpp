@@ -9,12 +9,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "linear_elasticity.h"
+#include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "linear_elasticity.hpp"
+
+
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

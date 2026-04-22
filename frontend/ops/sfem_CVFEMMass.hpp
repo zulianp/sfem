@@ -5,9 +5,11 @@ namespace sfem {
     class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
         const char                    *name() const override { return "CVFEMMass"; }
         inline bool                    is_linear() const override { return true; }
+        inline ptrdiff_t                      n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t                      n_dofs_image() const override { return space->n_dofs(); }
         static std::unique_ptr<Op>     create(const std::shared_ptr<FunctionSpace> &space);
         int                            initialize(const std::vector<std::string> &block_names = {}) override;
         CVFEMMass(const std::shared_ptr<FunctionSpace> &space);

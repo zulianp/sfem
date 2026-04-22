@@ -5,7 +5,7 @@ namespace sfem {
     class SemiStructuredEMLaplacian : public Op {
     public:
         std::shared_ptr<FunctionSpace>    space;
-        enum ElemType                     element_type { INVALID };
+        smesh::ElemType                     element_type { smesh::INVALID };
         std::shared_ptr<Buffer<scalar_t>> element_matrix;
         long                              calls{0};
         double                            total_time{0};
@@ -15,6 +15,8 @@ namespace sfem {
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override;
         inline bool                is_linear() const override { return true; }
+        inline ptrdiff_t                  n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t                  n_dofs_image() const override { return space->n_dofs(); }
         int                        initialize(const std::vector<std::string> &block_names = {}) override;
         SemiStructuredEMLaplacian(const std::shared_ptr<FunctionSpace> &space);
         int                 hessian_crs(const real_t *const  x,

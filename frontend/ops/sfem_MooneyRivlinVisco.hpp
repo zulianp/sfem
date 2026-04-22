@@ -8,6 +8,8 @@ namespace sfem {
         
         const char *name() const override { return "MooneyRivlinVisco"; }
         inline bool is_linear() const override { return false; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
         int initialize(const std::vector<std::string> &block_names = {}) override;
         MooneyRivlinVisco(const std::shared_ptr<FunctionSpace> &space);
         ~MooneyRivlinVisco();

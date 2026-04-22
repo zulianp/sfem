@@ -1,7 +1,7 @@
 #ifndef __QUADRATURES_RULE_H__
 #define __QUADRATURES_RULE_H__
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // TRI3 6th order quadrature rule
 #define TRI3_NQP 12

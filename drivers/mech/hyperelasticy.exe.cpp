@@ -1,30 +1,28 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
-#include "sfem_Env.hpp"
-#include "sfem_P1toP2.hpp"
-#include "sfem_Packed.hpp"
-#include "sfem_SFC.hpp"
+#include "smesh_env.hpp"
+#include "smesh_sideset.hpp"
 
-#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
-#ifdef SFEM_ENABLE_CUDA
-#include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
-#include "sfem_cuda_solver.hpp"
-#endif
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+// #ifdef SFEM_ENABLE_CUDA
+// #include "sfem_Function_incore_cuda.hpp"
+// #include "sfem_cuda_blas.hpp"
+// #include "sfem_cuda_solver.hpp"
+// #endif
 
 #include "sfem_ssmgc.hpp"
 
@@ -36,8 +34,8 @@ static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
                                   const int                          step,
                                   const int                          total_steps) {
     const ptrdiff_t nelements = mesh->n_elements();
-    const int       nxe       = mesh->n_nodes_per_element();
-    auto            elements  = mesh->elements()->data();
+    const int       nxe       = mesh->n_nodes_per_element(0);
+    auto            elements  = mesh->elements(0)->data();
     auto            points    = mesh->points()->data();
 
     const geom_t r2         = radius * radius;
@@ -149,7 +147,8 @@ struct RotateYZ {
                                             const int                                   steps,
                                             const real_t                                angle,
                                             const sfem::ExecutionSpace                  execution_space) {
-        auto nodeset = sfem::create_nodeset_from_sideset(space, sideset);
+        auto mesh_for_sideset = space->mesh_ptr();
+        auto nodeset          = smesh::create_nodeset_from_sideset(mesh_for_sideset, sideset);
 
         auto uy  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
         auto uz  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
@@ -159,17 +158,17 @@ struct RotateYZ {
 
     static std::shared_ptr<RotateYZ> create_from_env(const std::shared_ptr<sfem::FunctionSpace> &space,
                                                      const sfem::ExecutionSpace                  execution_space) {
-        const real_t      angle        = sfem::Env::read("SFEM_ROTATE_ANGLE", 0.0);
-        const std::string sideset_path = sfem::Env::read_string("SFEM_ROTATE_SIDESET", "");
-        const int         steps        = sfem::Env::read("SFEM_ROTATE_STEPS", 10);
+        const real_t      angle        = smesh::Env::read("SFEM_ROTATE_ANGLE", 0.0);
+        const std::string sideset_path = smesh::Env::read_string("SFEM_ROTATE_SIDESET", "");
+        const int         steps        = smesh::Env::read("SFEM_ROTATE_STEPS", 10);
 
         if (!sideset_path.empty()) {
             printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
-            auto sideset    = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
+            auto sideset    = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(sideset_path));
             auto ret        = RotateYZ::create(space, sideset, steps, angle, execution_space);
-            ret->rcenter[0] = sfem::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
-            ret->rcenter[1] = sfem::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
-            ret->rcenter[2] = sfem::Env::read("SFEM_ROTATE_RCENTER_Z", 0.0);
+            ret->rcenter[0] = smesh::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
+            ret->rcenter[1] = smesh::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
+            ret->rcenter[2] = smesh::Env::read("SFEM_ROTATE_RCENTER_Z", 0.0);
             return ret;
         }
         return nullptr;
@@ -188,20 +187,20 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         SFEM_ERROR("MPI runtimes are not supported!\n");
     }
 
-    const char *mesh_path      = argv[1];
-    const char *dirichlet_path = argv[2];
-    std::string output_path    = argv[3];
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path dirichlet_path{argv[2]};
+    smesh::Path output_path{argv[3]};
 
-    int         SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+    int         SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
     const char *SFEM_OPERATOR             = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
-    const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
-    const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
-    const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-9);
-    bool SFEM_USE_ACTIVE_STRAIN = sfem::Env::read("SFEM_USE_ACTIVE_STRAIN", false);
+    const bool   SFEM_VERBOSE           = smesh::Env::read("SFEM_VERBOSE", 0);
+    const real_t SFEM_LSOLVE_RTOL       = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
+    const real_t SFEM_NL_TOL            = smesh::Env::read("SFEM_NL_TOL", 1e-9);
+    bool         SFEM_USE_ACTIVE_STRAIN = smesh::Env::read("SFEM_USE_ACTIVE_STRAIN", false);
 
-    const real_t SFEM_ACTIVE_STRAIN_XX = sfem::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
+    const real_t SFEM_ACTIVE_STRAIN_XX = smesh::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -214,18 +213,14 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
 
-    if (sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
-        mesh = sfem::convert_p1_mesh_to_p2(mesh);
+    if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+        mesh = smesh::promote_to(smesh::TET10, mesh);
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }
 
-    // FIXME SFC should also sort the BCs
-    // if (sfem::Env::read("SFEM_USE_SFC", false)) {
-    //     auto sfc = sfem::SFC::create_from_env();
-    //     sfc->reorder(*mesh);
-    // }
-
     std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
-    if (sfem::Env::read("SFEM_USE_PACKED_MESH", false)) {
+    if (smesh::Env::read("SFEM_USE_PACKED_MESH", false)) {
         packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
     }
 
@@ -237,22 +232,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         fs = sfem::FunctionSpace::create(mesh, block_size);
     }
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
-
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-
-// FIXME
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -268,14 +248,14 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         for (int d = 0; d < mesh->spatial_dimension(); d++) {
             center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
         }
-        const geom_t dx     = bb_max[0] - bb_min[0];
-        const geom_t dy     = bb_max[1] - bb_min[1];
-        const geom_t dz     = bb_max[2] - bb_min[2];
-        const geom_t span   = std::min(dx, std::min(dy, dz));
-        geom_t       radius = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
-        const ptrdiff_t nelements = mesh->n_elements();    
-        Fa_storage = sfem::create_host_buffer<real_t>(9 * nelements);
-        auto Fa    = Fa_storage->data();
+        const geom_t    dx        = bb_max[0] - bb_min[0];
+        const geom_t    dy        = bb_max[1] - bb_min[1];
+        const geom_t    dz        = bb_max[2] - bb_min[2];
+        const geom_t    span      = std::min(dx, std::min(dy, dz));
+        geom_t          radius    = smesh::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
+        const ptrdiff_t nelements = mesh->n_elements();
+        Fa_storage                = sfem::create_host_buffer<real_t>(9 * nelements);
+        auto Fa                   = Fa_storage->data();
         fill_active_strain_Fa(mesh, Fa, center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
         op->set_field("active_strain", Fa_storage, 0);
     }
@@ -293,7 +273,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
 
-    const std::string SFEM_OP_TYPE = sfem::Env::read_string("SFEM_OP_TYPE", "MF");
+    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", "MF");
     auto              linear_op    = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
     auto              cg           = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose                    = SFEM_VERBOSE;
@@ -304,8 +284,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     std::function<void(const real_t *const)> update_preconditioner = [](const real_t *const disp) {};
 
-    if (sfem::Env::read("SFEM_USE_PRECONDITIONER", false)) {
-        if (fs->element_type() == HEX8) {
+    if (smesh::Env::read("SFEM_USE_PRECONDITIONER", false)) {
+        if (fs->element_type() == smesh::HEX8) {
             auto diag                = sfem::create_buffer<real_t>(ndofs, es);
             auto sj                  = sfem::create_shiftable_jacobi(diag, es);
             sj->relaxation_parameter = 1. / fs->block_size();
@@ -318,28 +298,28 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     }
 
     // Newton iteration
-    int    nl_max_it          = sfem::Env::read("SFEM_NL_MAX_IT", 30);
-    real_t alpha              = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
-    bool   enable_line_search = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
+    int    nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
+    real_t alpha              = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
+    bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
     auto   blas               = sfem::blas<real_t>(es);
 
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
 
     // Output to disk
-    sfem::create_directory(output_path.c_str());
+    smesh::create_directory(output_path);
     if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
-        fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
+        fs->mesh_ptr()->write(output_path / "coarse_mesh");
     } else {
-        fs->mesh_ptr()->write((output_path + "/mesh").c_str());
+        fs->mesh_ptr()->write(output_path / "mesh");
     }
 
     auto out = f->output();
-    sfem::create_directory((output_path + "/out").c_str());
-    out->set_output_dir((output_path + "/out").c_str());
+    smesh::create_directory(output_path / "out");
+    out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
 
-    if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
+    if (smesh::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
             blas->zeros(ndofs, rhs->data());
             f->gradient(displacement->data(), rhs->data());
@@ -352,8 +332,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
 
-        out->write("rhs", sfem::to_host(rhs)->data());
-        out->write("disp", sfem::to_host(displacement)->data());
+        out->write("rhs", smesh::to_host(rhs)->data());
+        out->write("disp", smesh::to_host(displacement)->data());
     } else {
         real_t energy         = 0;
         real_t selected_alpha = 0;
@@ -365,8 +345,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
         int steps = rotate_conds ? rotate_conds->steps : 1;
         if (rotate_conds) {
-            out->write_time_step("rhs", 0, sfem::to_host(rhs)->data());
-            out->write_time_step("disp", 0, sfem::to_host(displacement)->data());
+            out->write_time_step("rhs", 0, smesh::to_host(rhs)->data());
+            out->write_time_step("disp", 0, smesh::to_host(displacement)->data());
         }
 
         int       last_iterations         = 0;
@@ -378,21 +358,21 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
             // Update active strain field per step (incremental loading)
             if (SFEM_USE_ACTIVE_STRAIN) {
-                    auto   bbox_step   = mesh->compute_bounding_box();
-                    auto   bb_min_s    = bbox_step.first->data();
-                    auto   bb_max_s    = bbox_step.second->data();
-                    geom_t center_s[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
-                    for (int d = 0; d < mesh->spatial_dimension(); d++) {
-                        center_s[d] = (bb_min_s[d] + bb_max_s[d]) * (geom_t)0.5;
-                    }
-                    const geom_t dx_s     = bb_max_s[0] - bb_min_s[0];
-                    const geom_t dy_s     = bb_max_s[1] - bb_min_s[1];
-                    const geom_t dz_s     = bb_max_s[2] - bb_min_s[2];
-                    const geom_t span_s   = std::min(dx_s, std::min(dy_s, dz_s));
-                    geom_t       radius_s = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
+                auto   bbox_step   = mesh->compute_bounding_box();
+                auto   bb_min_s    = bbox_step.first->data();
+                auto   bb_max_s    = bbox_step.second->data();
+                geom_t center_s[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
+                for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                    center_s[d] = (bb_min_s[d] + bb_max_s[d]) * (geom_t)0.5;
+                }
+                const geom_t dx_s     = bb_max_s[0] - bb_min_s[0];
+                const geom_t dy_s     = bb_max_s[1] - bb_min_s[1];
+                const geom_t dz_s     = bb_max_s[2] - bb_min_s[2];
+                const geom_t span_s   = std::min(dx_s, std::min(dy_s, dz_s));
+                geom_t       radius_s = smesh::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
 
-                    fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
-                    op->set_field("active_strain", Fa_storage, 0);
+                fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
+                op->set_field("active_strain", Fa_storage, 0);
             }
 
             for (int i = 0; i < nl_max_it; i++) {
@@ -443,11 +423,11 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             }
 
             if (rotate_conds) {
-                out->write_time_step("rhs", step, sfem::to_host(rhs)->data());
-                out->write_time_step("disp", step, sfem::to_host(displacement)->data());
+                out->write_time_step("rhs", step, smesh::to_host(rhs)->data());
+                out->write_time_step("disp", step, smesh::to_host(displacement)->data());
             } else {
-                out->write("rhs", sfem::to_host(rhs)->data());
-                out->write("disp", sfem::to_host(displacement)->data());
+                out->write("rhs", smesh::to_host(rhs)->data());
+                out->write("disp", smesh::to_host(displacement)->data());
             }
         }
 

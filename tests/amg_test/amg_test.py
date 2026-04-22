@@ -39,9 +39,10 @@ def run_amg_test(mesh, name_op):
 	block_size = 1
 	if name_op == "LinearElasticity":
 		block_size = dim
-	space = sfem.FunctionSpace(mesh, block_size)
-	print(f'COARSE: #dofs {space.n_dofs()}')
-	space.promote_to_semi_structured(8)
+	coarse_space = sfem.FunctionSpace(mesh, block_size)
+	print(f'COARSE: #dofs {coarse_space.n_dofs()}')
+	fine_mesh = sfem.to_semistructured(8, mesh)
+	space = sfem.FunctionSpace(fine_mesh, block_size)
 	print(f'FINE: #dofs {space.n_dofs()}')
 	coarse_space = space.derefine(1)
 	

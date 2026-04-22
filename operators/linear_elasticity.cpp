@@ -1,0 +1,523 @@
+#include "linear_elasticity.hpp"
+
+#include "hex8_linear_elasticity.hpp"
+#include "sfem_defs.hpp"
+#include "sshex8_linear_elasticity.hpp"
+
+#include "macro_tet4_linear_elasticity.hpp"
+#include "tet10_linear_elasticity.hpp"
+#include "tet4_linear_elasticity.hpp"
+#include "tri3_linear_elasticity.hpp"
+
+#include <mpi.h>
+#include <stdio.h>
+
+int linear_elasticity_is_opt(smesh::ElemType element_type) {
+    return element_type == smesh::HEX8 || sfem::is_semistructured_type(element_type);
+}
+
+int linear_elasticity_assemble_value_soa(const smesh::ElemType                element_type,
+                                         const ptrdiff_t                    nelements,
+                                         const ptrdiff_t                    nnodes,
+                                         idx_t **const SFEM_RESTRICT        elements,
+                                         geom_t **const SFEM_RESTRICT       points,
+                                         const real_t                       mu,
+                                         const real_t                       lambda,
+                                         const real_t **const SFEM_RESTRICT u,
+                                         real_t *const SFEM_RESTRICT        value) {
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_value(nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], value);
+        }
+        // case smesh::TET4: {
+        //     return tet4_linear_elasticity_assemble_value_soa(
+        //         nelements, nnodes, elements, points, mu, lambda, u, value);
+        //
+        // }
+        default: {
+            SFEM_ERROR("linear_elasticity_assemble_value_soa not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_apply_soa(const smesh::ElemType                element_type,
+                                const ptrdiff_t                    nelements,
+                                const ptrdiff_t                    nnodes,
+                                idx_t **const SFEM_RESTRICT        elements,
+                                geom_t **const SFEM_RESTRICT       points,
+                                const real_t                       mu,
+                                const real_t                       lambda,
+                                const real_t **const SFEM_RESTRICT u,
+                                real_t **const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_apply_soa not implemented for semi-structured element type %s (use linear_elasticity_apply_aos)\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_apply(
+                    nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], 1, values[0], values[1]);
+        }
+        case smesh::TET4: {
+            return tet4_linear_elasticity_apply(
+                    nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
+        }
+        case smesh::HEX8: {
+            return hex8_linear_elasticity_apply(
+                    nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_apply_soa not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_assemble_value_aos(const smesh::ElemType               element_type,
+                                         const ptrdiff_t                   nelements,
+                                         const ptrdiff_t                   nnodes,
+                                         idx_t **const SFEM_RESTRICT       elements,
+                                         geom_t **const SFEM_RESTRICT      points,
+                                         const real_t                      mu,
+                                         const real_t                      lambda,
+                                         const real_t *const SFEM_RESTRICT u,
+                                         real_t *const SFEM_RESTRICT       value) {
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_value(nelements, nnodes, elements, points, mu, lambda, 2, &u[0], &u[1], value);
+        }
+        case smesh::TET4: {
+            return tet4_linear_elasticity_value(nelements, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], value);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_assemble_value_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_assemble_gradient_aos(const smesh::ElemType               element_type,
+                                            const ptrdiff_t                   nelements,
+                                            const ptrdiff_t                   nnodes,
+                                            idx_t **const SFEM_RESTRICT       elements,
+                                            geom_t **const SFEM_RESTRICT      points,
+                                            const real_t                      mu,
+                                            const real_t                      lambda,
+                                            const real_t *const SFEM_RESTRICT u,
+                                            real_t *const SFEM_RESTRICT       values) {
+    return linear_elasticity_apply_aos(element_type, nelements, nnodes, elements, points, mu, lambda, u, values);
+}
+
+int linear_elasticity_crs_aos(const smesh::ElemType                element_type,
+                              const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    nnodes,
+                              idx_t **const SFEM_RESTRICT        elements,
+                              geom_t **const SFEM_RESTRICT       points,
+                              const real_t                       mu,
+                              const real_t                       lambda,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              real_t *const SFEM_RESTRICT        values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_crs_aos not implemented for semi-structured element type %s\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_crs_aos(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        case smesh::TET4: {
+            return tet4_linear_elasticity_crs(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        case smesh::TET10: {
+            return tet10_linear_elasticity_crs(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        case smesh::MACRO_TET4: {
+            return macro_tet4_linear_elasticity_crs(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_crs_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_assemble_diag_aos(const smesh::ElemType          element_type,
+                                        const ptrdiff_t              nelements,
+                                        const ptrdiff_t              nnodes,
+                                        idx_t **const SFEM_RESTRICT  elements,
+                                        geom_t **const SFEM_RESTRICT points,
+                                        const real_t                 mu,
+                                        const real_t                 lambda,
+                                        real_t *const SFEM_RESTRICT  values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_diag(level,
+                                                    nelements,
+                                                    nnodes,
+                                                    elements,
+                                                    points,
+                                                    mu,
+                                                    lambda,
+                                                    3,
+                                                    &values[0],
+                                                    &values[1],
+                                                    &values[2]);
+    }
+
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_diag(nelements, nnodes, elements, points, mu, lambda, 2, &values[0], &values[1]);
+        }
+        case smesh::TET4: {
+            return tet4_linear_elasticity_diag(
+                    nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        }
+        case smesh::TET10: {
+            return tet10_linear_elasticity_diag(
+                    nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        }
+        case smesh::MACRO_TET4: {
+            return macro_tet4_linear_elasticity_diag(
+                    nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        }
+        case smesh::HEX8: {
+            return affine_hex8_linear_elasticity_diag(
+                    nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_assemble_diag_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_apply_aos(const smesh::ElemType               element_type,
+                                const ptrdiff_t                   nelements,
+                                const ptrdiff_t                   nnodes,
+                                idx_t **const SFEM_RESTRICT       elements,
+                                geom_t **const SFEM_RESTRICT      points,
+                                const real_t                      mu,
+                                const real_t                      lambda,
+                                const real_t *const SFEM_RESTRICT u,
+                                real_t *const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_linear_elasticity_apply(level,
+                                              nelements,
+                                              nnodes,
+                                              elements,
+                                              points,
+                                              mu,
+                                              lambda,
+                                              3,
+                                              &u[0],
+                                              &u[1],
+                                              &u[2],
+                                              3,
+                                              &values[0],
+                                              &values[1],
+                                              &values[2]);
+    }
+
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_apply(
+                    nelements, nnodes, elements, points, mu, lambda, 2, &u[0], &u[1], 2, &values[0], &values[1]);
+        }
+        case smesh::TET4: {
+            return tet4_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                3,
+                                                &u[0],
+                                                &u[1],
+                                                &u[2],
+                                                3,
+                                                &values[0],
+                                                &values[1],
+                                                &values[2]);
+        }
+        case smesh::HEX8: {
+            return hex8_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                3,
+                                                &u[0],
+                                                &u[1],
+                                                &u[2],
+                                                3,
+                                                &values[0],
+                                                &values[1],
+                                                &values[2]);
+        }
+        case smesh::MACRO_TET4: {
+            return macro_tet4_linear_elasticity_apply(nelements,
+                                                      nnodes,
+                                                      elements,
+                                                      points,
+                                                      mu,
+                                                      lambda,
+                                                      3,
+                                                      &u[0],
+                                                      &u[1],
+                                                      &u[2],
+                                                      3,
+                                                      &values[0],
+                                                      &values[1],
+                                                      &values[2]);
+        }
+        case smesh::TET10: {
+            return tet10_linear_elasticity_apply(nelements,
+                                                 nnodes,
+                                                 elements,
+                                                 points,
+                                                 mu,
+                                                 lambda,
+                                                 3,
+                                                 &u[0],
+                                                 &u[1],
+                                                 &u[2],
+                                                 3,
+                                                 &values[0],
+                                                 &values[1],
+                                                 &values[2]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_apply_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         geom_t **const SFEM_RESTRICT          points,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT     jacobian_determinant,
+                                         const real_t                          mu,
+                                         const real_t                          lambda,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values) {
+    // Affine kernels only: HEX8 uses corner adjugate; semistructured hex uses macro-element adjugate at (1/2,1/2,1/2).
+
+    if (element_type == smesh::HEX8) {
+        return affine_hex8_linear_elasticity_apply_adjugate(nelements,
+                                                            nnodes,
+                                                            elements,
+                                                            jacobian_adjugate,
+                                                            (const jacobian_t *)jacobian_determinant,
+                                                            mu,
+                                                            lambda,
+                                                            3,
+                                                            &u[0],
+                                                            &u[1],
+                                                            &u[2],
+                                                            3,
+                                                            &values[0],
+                                                            &values[1],
+                                                            &values[2]);
+    }
+
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_apply_macro_adjugate(level,
+                                                                    nelements,
+                                                                    nnodes,
+                                                                    elements,
+                                                                    points,
+                                                                    jacobian_adjugate,
+                                                                    jacobian_determinant,
+                                                                    mu,
+                                                                    lambda,
+                                                                    3,
+                                                                    &u[0],
+                                                                    &u[1],
+                                                                    &u[2],
+                                                                    3,
+                                                                    &values[0],
+                                                                    &values[1],
+                                                                    &values[2]);
+    }
+
+    SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_crs_soa(const smesh::ElemType                element_type,
+                              const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    nnodes,
+                              idx_t **const SFEM_RESTRICT        elements,
+                              geom_t **const SFEM_RESTRICT       points,
+                              const real_t                       mu,
+                              const real_t                       lambda,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              real_t **const SFEM_RESTRICT       values) {
+    switch (element_type) {
+        case smesh::TRI3: {
+            return tri3_linear_elasticity_crs_soa(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_crs_soa not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_bsr(const smesh::ElemType                element_type,
+                          const ptrdiff_t                    nelements,
+                          const ptrdiff_t                    nnodes,
+                          idx_t **const SFEM_RESTRICT        elements,
+                          geom_t **const SFEM_RESTRICT       points,
+                          const real_t                       mu,
+                          const real_t                       lambda,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT   colidx,
+                          real_t *const SFEM_RESTRICT        values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_elasticity_bsr(
+                level, nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+    }
+
+    switch (element_type) {
+        case smesh::TET4: {
+            return tet4_linear_elasticity_bsr(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        case smesh::HEX8: {
+            return affine_hex8_linear_elasticity_bsr(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_bsr is not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int linear_elasticity_bcrs_sym(const smesh::ElemType                element_type,
+                               const ptrdiff_t                    nelements,
+                               const ptrdiff_t                    nnodes,
+                               idx_t **const SFEM_RESTRICT        elements,
+                               geom_t **const SFEM_RESTRICT       points,
+                               const real_t                       mu,
+                               const real_t                       lambda,
+                               const count_t *const SFEM_RESTRICT rowptr,
+                               const idx_t *const SFEM_RESTRICT   colidx,
+                               const ptrdiff_t                    block_stride,
+                               real_t **const SFEM_RESTRICT       diag_values,
+                               real_t **const SFEM_RESTRICT       off_diag_values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        SFEM_ERROR("linear_elasticity_bcrs_sym not implemented for semi-structured element type %s\n",
+                   type_to_string(element_type));
+        return SFEM_FAILURE;
+    }
+
+    switch (element_type) {
+        case smesh::HEX8: {
+            return affine_hex8_linear_elasticity_crs_sym(
+                    nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, block_stride, diag_values, off_diag_values);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_bcrs_sym not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int linear_elasticity_block_diag_sym_aos(const smesh::ElemType          element_type,
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t *const                out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_block_diag_sym(level,
+                                                              nelements,
+                                                              nnodes,
+                                                              elements,
+                                                              points,
+                                                              mu,
+                                                              lambda,
+                                                              6,
+                                                              &out[0],
+                                                              &out[1],
+                                                              &out[2],
+                                                              &out[3],
+                                                              &out[4],
+                                                              &out[5]);
+    }
+
+    switch (element_type) {
+        case smesh::HEX8: {
+            return affine_hex8_linear_elasticity_block_diag_sym(
+                    nelements, nnodes, elements, points, mu, lambda, 6, &out[0], &out[1], &out[2], &out[3], &out[4], &out[5]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_block_diag_aos not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int linear_elasticity_block_diag_sym_soa(const smesh::ElemType          element_type,
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t **const SFEM_RESTRICT out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return affine_sshex8_linear_elasticity_block_diag_sym(level,
+                                                              nelements,
+                                                              nnodes,
+                                                              elements,
+                                                              points,
+                                                              mu,
+                                                              lambda,
+                                                              1,
+                                                              out[0],
+                                                              out[1],
+                                                              out[2],
+                                                              out[3],
+                                                              out[4],
+                                                              out[5]);
+    }
+
+    switch (element_type) {
+        case smesh::HEX8: {
+            return affine_hex8_linear_elasticity_block_diag_sym(
+                    nelements, nnodes, elements, points, mu, lambda, 1, out[0], out[1], out[2], out[3], out[4], out[5]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_block_diag_sym_soa not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+

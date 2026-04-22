@@ -4,3 +4,15 @@
 [submodule "external/HXTSort"]
 	path = external/HXTSort
 	url = https://git.immc.ucl.ac.be/hextreme/HXTSort
+[submodule "external/smesh"]
+	path = external/smesh
+	url = https://github.com/zulianp/smesh
+[submodule "external/sccd"]
+	path = external/sccd
+	url = https://github.com/zulianp/sccd.git
+[submodule "external/ssdf"]
+	path = external/ssdf
+	url = https://github.com/zulianp/ssdf.git
+[submodule "external/sresample"]
+	path = external/sresample
+	url = https://github.com/zulianp/sresample.git

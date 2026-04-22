@@ -2,7 +2,7 @@
 #define SFEM_CONTACT_CONDITIONS_HPP
 
 #include "sfem_Function.hpp"
-#include "sfem_Grid.hpp"
+#include "smesh_grid.hpp"
 
 namespace sfem {
 
@@ -69,7 +69,7 @@ namespace sfem {
                                                                    const enum ExecutionSpace             es);
 
         static std::shared_ptr<ContactConditions> create(const std::shared_ptr<FunctionSpace> &space,
-                                                         const std::shared_ptr<Grid<geom_t>>  &sdf,
+                                                         const std::shared_ptr<smesh::Grid<geom_t>>  &sdf,
                                                          const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                          const enum ExecutionSpace             es);
 
