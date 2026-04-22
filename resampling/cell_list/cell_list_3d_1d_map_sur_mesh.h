@@ -66,14 +66,15 @@ intersection_point_triangle_xy(const real_t v0[3],   //
  * @param size_z Number of entries in z_array.
  * @return Triangle index (>= 0) if found, -1 if no containing triangle is found.
  */
-int                                                                                             //
-query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,                //
-                                               const boxes_t               *boxes,              //
-                                               const mesh_tri3_geom_t      *mesh_geom,          //
-                                               const real_t                 x,                  //
-                                               const real_t                 y,                  //
-                                               int                         *size_t3_array,      //
-                                               real_t                     **tri3_intersect_z);  //
+int                                                                                                  //
+query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,                     //
+                                               const boxes_t               *boxes,                   //
+                                               const mesh_tri3_geom_t      *mesh_geom,               //
+                                               const real_t                 x,                       //
+                                               const real_t                 y,                       //
+                                               const int                    start_index_tri3_array,  //
+                                               int                         *size_t3_array,           //
+                                               real_t                     **tri3_intersect_z);       //
 
 /**
  * @brief Compute the z coordinate of the intersection point between a vertical ray from (x, y) and the triangle defined by v0,
@@ -87,13 +88,26 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
  * @param out_z Pointer to store the computed z coordinate of the intersection point.
  * @return void. The computed z coordinate is stored in *out_z.
  */
-int                                                                                                          //
-query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(const cell_list_split_3d_1d_map_t *map,                 //
-                                                     const boxes_t                     *boxes,               //
-                                                     const mesh_tri3_geom_t            *mesh_geom,           //
-                                                     const real_t                       x,                   //
-                                                     const real_t                       y,                   //
-                                                     int                               *size_t3_array,       //
-                                                     real_t                           **tri3_intersect_z);   //
+int                                                                                                         //
+query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(const cell_list_split_3d_1d_map_t *map,                //
+                                                     const boxes_t                     *boxes,              //
+                                                     const mesh_tri3_geom_t            *mesh_geom,          //
+                                                     const real_t                       x,                  //
+                                                     const real_t                       y,                  //
+                                                     int                               *size_t3_array,      //
+                                                     real_t                           **tri3_intersect_z);  //
+
+/**
+ * @brief
+ */
+int                                                                                                      //
+raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_1d_map_t *map,           //
+                                                       const boxes_t                     *boxes,         //
+                                                       const mesh_tri3_geom_t            *mesh_geom,     //
+                                                       const real_t                       x,             //
+                                                       const real_t                       y,             //
+                                                       const real_t                      *z_coords,      //
+                                                       const int                          num_z_coords,  //
+                                                       real_t                            *out_z);        //
 
 #endif  // __CELL_LIST_3D_1D_MAP_SUR_MESH_H__
