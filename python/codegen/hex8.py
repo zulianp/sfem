@@ -7,9 +7,10 @@ from quad4 import QuadShell4
 
 
 class Hex8(FE):
-    def __init__(self, isoparam=False):
+    def __init__(self, isoparam=False, exact_integrals=True):
         super().__init__()
         self.isoparam = isoparam
+        self.exact_integrals = exact_integrals
 
     def name(self):
         return "Hex8"
@@ -118,7 +119,10 @@ class Hex8(FE):
         return 3
 
     def integrate(self, q, expr):
-        return sp.integrate(expr, (q[2], 0, 1), (q[1], 0, 1), (q[0], 0, 1))
+        if self.exact_integrals:
+            return sp.integrate(expr, (q[2], 0, 1), (q[1], 0, 1), (q[0], 0, 1))
+        else:
+            return expr * sp.symbols("qw") * self.reference_measure()
 
     def jacobian(self, q):
         return self.isoparametric_jacobian(q)
@@ -494,6 +498,18 @@ def gen_grads_AoS_separate():
         c_code(expr)
         print(f"return; }}")
 
+def gen_fun_separate():
+    f = Hex8().fun(vec3(qx, qy, qz))
+
+    for i in range(0, len(f)):
+        expr = []
+        var = sp.symbols(f"f{i}")
+        expr.append(ast.Assignment(var, f[i]))
+        print(f"case {i}: {{")
+        c_code(expr)
+        print(f"return f{i};")
+        print("}")
+
 
 if __name__ == "__main__":
     # Hex8().generate_qp_based_code()
@@ -504,4 +520,5 @@ if __name__ == "__main__":
 
     # gen_grads_SoA()
     # gen_grads_AoS()
-    gen_grads_AoS_separate()
+    # gen_grads_AoS_separate()
+    gen_fun_separate()

@@ -1,15 +1,15 @@
 #include "mg_builder.hpp"
 #include <stdio.h>
 #include <cstddef>
-#include "partitioner.h"
+#include "partitioner.hpp"
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_LpSmoother.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_pwc_interpolator.hpp"
-#include "smoother.h"
+#include "smoother.hpp"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(
         const real_t coarsening_factor, const std::shared_ptr<sfem::Buffer<mask_t>> bdy_dofs_buff,
@@ -108,7 +108,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
             weights_buff->data()[k] = near_null->data()[k];
         }
 
-        auto pt = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+        auto pt = sfem::h_pwc_interp(weights_buff, partition_buff, coarser_dim);
         pt->transpose();
 
         // Convert matrix?
@@ -117,7 +117,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
         stat_iter->set_max_it(smoothing_steps);
         amg->add_level(coarse_op, stat_iter, p, pt);
-        p = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+        p = sfem::h_pwc_interp(weights_buff, partition_buff, coarser_dim);
 
         amg_levels++;
 

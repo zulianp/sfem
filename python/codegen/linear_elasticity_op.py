@@ -649,20 +649,20 @@ def main():
     # c_log("--------------------------")
     # c_code(op.gradient())
 
-    # c_log("--------------------------")
-    # c_log("hessian")
-    # c_log("--------------------------")
-    # c_code(op.hessian())
+    c_log("--------------------------")
+    c_log("hessian")
+    c_log("--------------------------")
+    c_code(op.hessian())
 
     # c_log("--------------------------")
     # c_log("hessian_sym_SoA")
     # c_log("--------------------------")
     # c_code(op.hessian_sym_SoA())
 
-    c_log("--------------------------")
-    c_log("apply")
-    c_log("--------------------------")
-    c_code(op.apply())
+    # c_log("--------------------------")
+    # c_log("apply")
+    # c_log("--------------------------")
+    # c_code(op.apply())
 
     # c_log("--------------------------")
     # c_log("hessian_diag")

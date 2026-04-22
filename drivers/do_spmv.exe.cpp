@@ -8,10 +8,10 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
-#include "sfem_base.h"
-#include "spmv.h"
+#include "sfem_base.hpp"
+#include "spmv.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

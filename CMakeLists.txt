@@ -106,6 +106,10 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling/adjoint
         resampling/data_structures
     )
+
+    if(SFEM_ENABLE_CUDA)
+        list(APPEND SFEM_MODULES resampling/cuda)
+    endif()
 endif()
 
 list(APPEND SFEM_MODULES 
@@ -126,6 +130,14 @@ if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
+if(SFEM_ENABLE_SCCD)
+    list(APPEND SFEM_MODULES frontend/collisions)
+endif()
+
+if(SFEM_ENABLE_SSDF)
+    list(APPEND SFEM_MODULES frontend/distances)
+endif()
+
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda
@@ -143,7 +155,6 @@ if(SFEM_ENABLE_CUDA)
         operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
-        resampling/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
     )
@@ -176,6 +187,13 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
     list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
 endif()
+
+list(REMOVE_ITEM SFEM_SOURCES
+    "frontend/sfem_Communicator.cpp"
+    "frontend/sfem_CRSGraph.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_Communicator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_CRSGraph.cpp")
+list(FILTER SFEM_SOURCES EXCLUDE REGEX "sfem_(Communicator|CRSGraph)\\.cpp$")
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
@@ -229,7 +247,7 @@ target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+    $<INSTALL_INTERFACE:include>)
 
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
@@ -329,7 +347,11 @@ foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
 
-    if (${LIST_INDEX} GREATER -1)
+    if(TARGET ${DRIVER_NAME})
+        message(
+            STATUS
+                "Skipping DRIVER_NAME (already provided): ${DRIVER_NAME}")
+    elseif (${LIST_INDEX} GREATER -1)
         message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
     else()
         add_executable(${DRIVER_NAME} ${DRIVER})
@@ -355,14 +377,24 @@ if(SFEM_ENABLE_TESTING)
         list(APPEND SFEM_UNIT_TESTS
             frontend/tests/cuda
         )
-
     endif()
+
+    if(SFEM_ENABLE_SCCD)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/collisions/tests
+        )
+    endif()
+
+
+    if(SFEM_ENABLE_SSDF)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/distances/tests
+        )
+    endif()
+
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
-    
-        file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
         file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
-        list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
         list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
     endforeach(UNIT_TEST)

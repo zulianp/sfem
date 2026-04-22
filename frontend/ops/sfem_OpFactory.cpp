@@ -5,17 +5,12 @@
 #include "sfem_Mass.hpp"
 #include "sfem_VectorLaplacian.hpp"
 #include "sfem_LumpedMass.hpp"
-#include "sfem_SemiStructuredLinearElasticity.hpp"
-#include "sfem_SemiStructuredLaplacian.hpp"
-#include "sfem_SemiStructuredVectorLaplacian.hpp"
-#include "sfem_SemiStructuredLumpedMass.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_SemiStructuredNeoHookeanOgden.hpp"
 #include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
 #include "sfem_PackedLaplacian.hpp"
@@ -23,13 +18,9 @@
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-
+#include "sfem_Gradient.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
 #include <map>
-
-// Forward declarations for other operators that will be moved
-namespace sfem {
-    std::unique_ptr<Op> create_kelvin_voigt_newmark(const std::shared_ptr<FunctionSpace> &space);
-}
 
 namespace sfem {
 
@@ -47,14 +38,15 @@ namespace sfem {
         static Factory instance_;
 
         if (instance_.impl_->name_to_create.empty()) {
-            instance_.private_register_op("KelvinVoigtNewmark", create_kelvin_voigt_newmark);
+            instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
+            instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
-            instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
+            instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
-            instance_.private_register_op("ss:VectorLaplacian", SemiStructuredVectorLaplacian::create);
-            instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
-            instance_.private_register_op("ss:LumpedMass", SemiStructuredLumpedMass::create);
+            instance_.private_register_op("ss:VectorLaplacian", VectorLaplacian::create);
+            instance_.private_register_op("ss:Laplacian", Laplacian::create);
+            instance_.private_register_op("ss:LumpedMass", LumpedMass::create);
             instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
             instance_.private_register_op("ss:SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
@@ -69,8 +61,9 @@ namespace sfem {
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
-            instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
+            instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
+            instance_.private_register_op("Gradient", Gradient::create);
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 

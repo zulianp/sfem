@@ -1,14 +1,14 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
+#include "smesh_env.hpp"
 
 // FIXME
-#include "hex8_fff.h"
-#include "sshex8_laplacian.h"
+#include "hex8_fff.hpp"
+#include "sshex8_laplacian.hpp"
 
 int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -44,17 +44,17 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
 
     // Zero displacement
     {
-        auto du = sfem::to_host(u);
+        auto du = smesh::to_host(u);
         for (ptrdiff_t i = 0; i < ndofs / dim; ++i) du->data()[i * dim + 0] = 0.1;
     }
     SFEM_TEST_ASSERT(f->update(u->data()) == SFEM_SUCCESS);
 
     // Deterministic input based on node coordinates
     {
-        auto     dh = sfem::to_host(h);
+        auto     dh = smesh::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->semi_structured_mesh().points()->data();
+            pts = fs->mesh().points()->data();
         } else {
             pts = fs->mesh_ptr()->points()->data();
         }
@@ -74,8 +74,8 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
 
-    auto   hy_mf    = sfem::to_host(y_mf);
-    auto   hy_bsr   = sfem::to_host(y_bsr);
+    auto hy_mf  = smesh::to_host(y_mf);
+    auto hy_bsr = smesh::to_host(y_bsr);
 
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
         SFEM_TEST_APPROXEQ(hy_mf->data()[i], hy_bsr->data()[i], (real_t)1e-10);
@@ -95,11 +95,21 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
     }
 
     const int dim = 3;
-    const int N   = 4;
+    const int N   = 10;
 
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, 0, 0, 0, 1, 1, 1);
     auto fs   = sfem::FunctionSpace::create(mesh, dim);
     fs->initialize_packed_mesh();
+
+    // std::cout << "Mesh:" << std::endl;
+    // mesh->print(std::cout);
+    // std::cout << std::endl;
+
+    // mesh->write(smesh::Path("mesh_r"));
+
+    // std::cout << "Packed mesh:" << std::endl;
+    // fs->packed_mesh()->print(std::cout, 1);
+    // std::cout << std::endl;
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, op_name.c_str(), es);
@@ -131,17 +141,17 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
 
     // Zero displacement
     {
-        auto du = sfem::to_host(u);
+        auto du = smesh::to_host(u);
         for (ptrdiff_t i = 0; i < ndofs; ++i) du->data()[i] = 0;
     }
     SFEM_TEST_ASSERT(f->update(u->data()) == SFEM_SUCCESS);
 
     // Deterministic input based on node coordinates
     {
-        auto     dh = sfem::to_host(h);
+        auto     dh = smesh::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->semi_structured_mesh().points()->data();
+            pts = fs->mesh().points()->data();
         } else {
             pts = fs->mesh_ptr()->points()->data();
         }
@@ -161,29 +171,27 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
 
-
-    auto   hy_mf    = sfem::to_host(y_mf);
-    auto   hy_bsr   = sfem::to_host(y_bsr);
+    auto hy_mf  = smesh::to_host(y_mf);
+    auto hy_bsr = smesh::to_host(y_bsr);
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
         SFEM_TEST_APPROXEQ(hy_mf->data()[i], hy_bsr->data()[i], (real_t)1e-10);
     }
-    
+
     return SFEM_TEST_SUCCESS;
 }
 
 int test_hyperelasticity_partial_assembly_all() {
-    return test_hyperelasticity_partial_assembly("NeoHookeanOgden") +
-           test_hyperelasticity_partial_assembly("MooneyRivlin");
+    return test_hyperelasticity_partial_assembly("NeoHookeanOgden");
+    +test_hyperelasticity_partial_assembly("MooneyRivlin");
 }
 
 int test_hyperelasticity_active_strain_partial_assembly_all() {
-    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked") +
-           test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
+    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked");
+    +test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
     SFEM_RUN_TEST(test_hyperelasticity_partial_assembly_all);
     SFEM_RUN_TEST(test_hyperelasticity_active_strain_partial_assembly_all);
     SFEM_UNIT_TEST_FINALIZE();

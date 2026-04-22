@@ -8,10 +8,10 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
-#include "inverse.c"
-#include "sfem_base.h"
+#include "inverse.cpp"
+#include "sfem_base.hpp"
 
 #define MAX_BLOCK_SIZE 4
 

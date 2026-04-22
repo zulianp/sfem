@@ -9,23 +9,23 @@
 #include <string>
 #include <vector>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
-#include "sfem_mask.h"
+#include "sfem_mask.hpp"
 
 // #include "isolver_function.h"
 
-#include "sfem_Buffer.hpp"
 #include "sfem_Operator.hpp"
+#include "sfem_aliases.hpp"
 
-#include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_Sideset.hpp"
-#include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_NeumannConditions.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_output.hpp"
 
 // Operator includes
 #include "sfem_Op.hpp"
@@ -35,11 +35,12 @@
 
 namespace sfem {
 
+    // using Output = smesh::Output;
     class Output {
     public:
         Output(const std::shared_ptr<FunctionSpace> &space);
         ~Output();
-        void set_output_dir(const char *path);
+        void set_output_dir(const smesh::Path &path);
         int  write(const char *name, const real_t *const x);
         int  write_time_step(const char *name, const real_t t, const real_t *const x);
         void enable_AoS_to_SoA(const bool val);
@@ -112,9 +113,9 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);
-        int constaints_mask(mask_t *mask);
+        int constraints_mask(mask_t *mask);
 
-        int set_output_dir(const char *path);
+        int set_output_dir(const smesh::Path &path);
 
         std::shared_ptr<Output> output();
         ExecutionSpace          execution_space() const;
@@ -128,12 +129,12 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+    std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset);
 
-    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder);
+    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator> &comm, const char *folder);
 
-} // namespace sfem
+}  // namespace sfem
 
-#endif //SFEM_FUNCTION_HPP
+#endif  // SFEM_FUNCTION_HPP

@@ -1,13 +1,13 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -16,7 +16,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -26,7 +26,7 @@
 
 #include <vector>
 
-int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::string &name) {
+int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const smesh::Path &name) {
     auto fs  = f->space();
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
@@ -36,18 +36,19 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     auto mg = create_ssgmg(f, f->execution_space());
     SFEM_TEST_ASSERT(mg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
 
-#if 0
-    sfem::create_directory(name.c_str());
-    sfem::create_directory((name +"/fields").c_str());
+    int SFEM_ENABLE_OUTPUT = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    if (SFEM_ENABLE_OUTPUT) {
+        smesh::create_directory(name);
+        smesh::create_directory(name / "fields");
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), name / "mesh");
 
-    SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((name +"/mesh").c_str()) == SFEM_SUCCESS);
+        sfem::Output out(fs);
+        out.enable_AoS_to_SoA(true);
 
-    sfem::Output out(fs);
-    out.enable_AoS_to_SoA(true);
-
-    out.set_output_dir((name +"/fields").c_str());
-    SFEM_TEST_ASSERT(out.write("u", x->data()) == SFEM_SUCCESS);
-#endif
+        out.set_output_dir(name / "fields");
+        SFEM_TEST_ASSERT(out.write("u", smesh::to_host(x)->data()) == SFEM_SUCCESS);
+    }
     return SFEM_TEST_SUCCESS;
 }
 
@@ -85,10 +86,10 @@ int test_ssgmg_poisson_cube() {
                                           1,
                                           1);
 
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -107,7 +108,7 @@ int test_ssgmg_poisson_cube() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
 
-    return test_linear_problem(f, "test_ssgmg_poisson_cube");
+    return test_linear_problem(f, smesh::Path("test_ssgmg_poisson_cube"));
 }
 
 int test_ssgmg_linear_elasticity_cube() {
@@ -146,10 +147,10 @@ int test_ssgmg_linear_elasticity_cube() {
                                           1,
                                           1);
 
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+
     int  block_size = 3;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -170,7 +171,7 @@ int test_ssgmg_linear_elasticity_cube() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right0, right1, right2}, es);
     f->add_constraint(conds);
 
-    return test_linear_problem(f, "test_ssgmg_linear_elasticity_cube");
+    return test_linear_problem(f, smesh::Path("test_ssgmg_linear_elasticity_cube"));
 }
 
 int main(int argc, char *argv[]) {

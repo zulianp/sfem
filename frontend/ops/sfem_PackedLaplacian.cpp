@@ -1,31 +1,43 @@
 #include "sfem_PackedLaplacian.hpp"
-#include "sfem_Tracer.hpp"
 
-#include "sfem_Env.hpp"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
 
-#include "hex8_fff.h"
-#include "hex8_laplacian_inline_cpu.h"
-#include "laplacian.h"
-#include "tet10_laplacian_inline_cpu.h"
-#include "tet4_inline_cpu.h"
-#include "tet4_laplacian_inline_cpu.h"
+#include "smesh_env.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
+
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "laplacian.hpp"
+#include "tet10_laplacian_inline_cpu.hpp"
+#include "tet4_inline_cpu.hpp"
+#include "tet4_laplacian_inline_cpu.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "sfem_CRSGraph.hpp"
+namespace {
+    smesh::block_idx_t block_id_for_packed(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
+        for (size_t i = 0; i < mesh.n_blocks(); i++) {
+            if (mesh.block(i).get() == &block) {
+                return static_cast<smesh::block_idx_t>(i);
+            }
+        }
+        SFEM_ERROR("PackedLaplacian: mesh block not found");
+        return 0;
+    }
+}  // namespace
+
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_kernel_data.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_spaces.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
-#include "sfem_Packed.hpp"
+
 #include "sfem_Parameters.hpp"
 
 #ifdef _OPENMP
@@ -45,8 +57,8 @@ using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 struct PackedLaplacianScratch {
     struct ThreadData {
         ptrdiff_t max_nodes_per_pack;
-        real_t *in;
-        real_t *out;
+        real_t   *in;
+        real_t   *out;
 
         ThreadData(const ptrdiff_t max_nodes_per_pack) : max_nodes_per_pack(max_nodes_per_pack) {
             in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
@@ -109,7 +121,7 @@ struct PackedLaplacianApply {
                      const idx_t *const SFEM_RESTRICT      ghost_idx,
                      const real_t *const SFEM_RESTRICT     u,
                      real_t *const SFEM_RESTRICT           values,
-                     PackedLaplacianScratch &scratch) {        
+                     PackedLaplacianScratch               &scratch) {
 #pragma omp parallel
         {
 #ifdef _OPENMP
@@ -120,7 +132,7 @@ struct PackedLaplacianApply {
 
             real_t *in  = scratch.in(thread_id);
             real_t *out = scratch.out(thread_id);
-            memset(out, 0, max_nodes_per_pack * sizeof(real_t)); 
+            memset(out, 0, max_nodes_per_pack * sizeof(real_t));
 
 #pragma omp for schedule(static)
             for (ptrdiff_t p = 0; p < n_packs; p++) {
@@ -139,30 +151,7 @@ struct PackedLaplacianApply {
                     in[n_contiguous + k] = u[ghosts[k]];
                 }
 
-                for (ptrdiff_t e = e_start; e < e_end; e++) {
-                    pack_idx_t ev[NXE];
-                    for (int v = 0; v < NXE; ++v) {
-                        ev[v] = elements[v][e];
-                    }
-
-                    scalar_t element_u[NXE];
-                    for (int v = 0; v < NXE; ++v) {
-                        element_u[v] = in[ev[v]];
-                    }
-
-                    accumulator_t element_out[NXE] = {0};
-                    scalar_t      fff_i[6];
-
-                    for (int d = 0; d < 6; ++d) {
-                        fff_i[d] = fff[e * 6 + d];
-                    }
-
-                    MicroKernel::apply(fff_i, element_u, element_out);
-
-                    for (int v = 0; v < NXE; ++v) {
-                        out[ev[v]] += element_out[v];
-                    }
-                }
+                MicroKernel::apply(e_start, e_end, elements, fff, in, out);
 
                 real_t *const SFEM_RESTRICT acc = &values[owned_nodes_ptr[p]];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
@@ -189,38 +178,297 @@ struct PackedLaplacianApply {
     }
 };
 
+template <typename pack_idx_t>
 struct Tet4MicroKernel {
-    static SFEM_INLINE void apply(const scalar_t *const fff, const scalar_t *const element_u, accumulator_t *const element_out) {
-        tet4_laplacian_apply_fff(fff,
-                                 element_u[0],
-                                 element_u[1],
-                                 element_u[2],
-                                 element_u[3],
-                                 &element_out[0],
-                                 &element_out[1],
-                                 &element_out[2],
-                                 &element_out[3]);
-    }
-};
+    static SFEM_INLINE void apply(const ptrdiff_t                       e_start,
+                                  const ptrdiff_t                       e_end,
+                                  pack_idx_t **const SFEM_RESTRICT      elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const scalar_t *const SFEM_RESTRICT   in,
+                                  accumulator_t *const SFEM_RESTRICT    out) {
+        static constexpr int VECTOR_SIZE = 64;
 
-struct Hex8MicroKernel {
-    static SFEM_INLINE void apply(const scalar_t *const fff, const scalar_t *const element_u, accumulator_t *const element_out) {
-        hex8_laplacian_apply_fff_integral(fff, element_u, element_out);
-    }
-};
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
 
-struct Tet10MicroKernel {
-    static SFEM_INLINE void apply(const scalar_t *const fff, const scalar_t *const element_u, accumulator_t *const element_out) {
-        for (int i = 0; i < 10; i++) {
-            element_out[i] = 0;
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+        for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+            const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+
+            // NOTE(zulianp): This transposition could be avoided by having the SoA layout from the start
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = (evbegin + e) * 6;
+                fff0[e]              = fff[eidx];
+                fff1[e]              = fff[eidx + 1];
+                fff2[e]              = fff[eidx + 2];
+                fff3[e]              = fff[eidx + 3];
+                fff4[e]              = fff[eidx + 4];
+                fff5[e]              = fff[eidx + 5];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                u0[e]                = in[elements[0][eidx]];
+                u1[e]                = in[elements[1][eidx]];
+                u2[e]                = in[elements[2][eidx]];
+                u3[e]                = in[elements[3][eidx]];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                tet4_laplacian_apply_fff_soa(fff0[e],
+                                             fff1[e],
+                                             fff2[e],
+                                             fff3[e],
+                                             fff4[e],
+                                             fff5[e],
+                                             u0[e],
+                                             u1[e],
+                                             u2[e],
+                                             u3[e],
+                                             &out0[e],
+                                             &out1[e],
+                                             &out2[e],
+                                             &out3[e]);
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                out[elements[0][eidx]] += out0[e];
+                out[elements[1][eidx]] += out1[e];
+                out[elements[2][eidx]] += out2[e];
+                out[elements[3][eidx]] += out3[e];
+            }
         }
-
-        tet10_laplacian_apply_add_fff(fff, element_u, element_out);
     }
 };
 
 template <typename pack_idx_t>
-static int packed_laplacian_apply(enum ElemType                         element_type,
+struct Hex8MicroKernel {
+    static constexpr int    VECTOR_SIZE = 32;
+    static SFEM_INLINE void apply(const ptrdiff_t                       e_start,
+                                  const ptrdiff_t                       e_end,
+                                  pack_idx_t **const SFEM_RESTRICT      elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const scalar_t *const SFEM_RESTRICT   in,
+                                  accumulator_t *const SFEM_RESTRICT    out) {
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
+        scalar_t out4[VECTOR_SIZE];
+        scalar_t out5[VECTOR_SIZE];
+        scalar_t out6[VECTOR_SIZE];
+        scalar_t out7[VECTOR_SIZE];
+
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+        scalar_t u4[VECTOR_SIZE];
+        scalar_t u5[VECTOR_SIZE];
+        scalar_t u6[VECTOR_SIZE];
+        scalar_t u7[VECTOR_SIZE];
+
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+        for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+            const ptrdiff_t nelems = MIN(VECTOR_SIZE, e_end - evbegin);
+            // NOTE(zulianp): This transposition could be avoided by having the SoA layout from the start
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = (evbegin + e) * 6;
+                fff0[e]              = fff[eidx];
+                fff1[e]              = fff[eidx + 1];
+                fff2[e]              = fff[eidx + 2];
+                fff3[e]              = fff[eidx + 3];
+                fff4[e]              = fff[eidx + 4];
+                fff5[e]              = fff[eidx + 5];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                u0[e]                = in[elements[0][eidx]];
+                u1[e]                = in[elements[1][eidx]];
+                u2[e]                = in[elements[2][eidx]];
+                u3[e]                = in[elements[3][eidx]];
+                u4[e]                = in[elements[4][eidx]];
+                u5[e]                = in[elements[5][eidx]];
+                u6[e]                = in[elements[6][eidx]];
+                u7[e]                = in[elements[7][eidx]];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                hex8_laplacian_apply_fff_integral_soa(fff0[e],
+                                                      fff1[e],
+                                                      fff2[e],
+                                                      fff3[e],
+                                                      fff4[e],
+                                                      fff5[e],
+                                                      u0[e],
+                                                      u1[e],
+                                                      u2[e],
+                                                      u3[e],
+                                                      u4[e],
+                                                      u5[e],
+                                                      u6[e],
+                                                      u7[e],
+                                                      &out0[e],
+                                                      &out1[e],
+                                                      &out2[e],
+                                                      &out3[e],
+                                                      &out4[e],
+                                                      &out5[e],
+                                                      &out6[e],
+                                                      &out7[e]);
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                out[elements[0][eidx]] += out0[e];
+                out[elements[1][eidx]] += out1[e];
+                out[elements[2][eidx]] += out2[e];
+                out[elements[3][eidx]] += out3[e];
+                out[elements[4][eidx]] += out4[e];
+                out[elements[5][eidx]] += out5[e];
+                out[elements[6][eidx]] += out6[e];
+                out[elements[7][eidx]] += out7[e];
+            }
+        }
+    }
+};
+
+template <typename pack_idx_t>
+struct Tet10MicroKernel {
+    static SFEM_INLINE void apply(const ptrdiff_t                       e_start,
+                                  const ptrdiff_t                       e_end,
+                                  pack_idx_t **const SFEM_RESTRICT      elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const scalar_t *const SFEM_RESTRICT   in,
+                                  accumulator_t *const SFEM_RESTRICT    out) {
+        static constexpr int VECTOR_SIZE = 32;
+
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
+        scalar_t out4[VECTOR_SIZE];
+        scalar_t out5[VECTOR_SIZE];
+        scalar_t out6[VECTOR_SIZE];
+        scalar_t out7[VECTOR_SIZE];
+        scalar_t out8[VECTOR_SIZE];
+        scalar_t out9[VECTOR_SIZE];
+
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+        scalar_t u4[VECTOR_SIZE];
+        scalar_t u5[VECTOR_SIZE];
+        scalar_t u6[VECTOR_SIZE];
+        scalar_t u7[VECTOR_SIZE];
+        scalar_t u8[VECTOR_SIZE];
+        scalar_t u9[VECTOR_SIZE];
+
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+        for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+            const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+
+            // NOTE(zulianp): This transposition could be avoided by having the SoA layout from the start
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = (evbegin + e) * 6;
+                fff0[e]              = fff[eidx];
+                fff1[e]              = fff[eidx + 1];
+                fff2[e]              = fff[eidx + 2];
+                fff3[e]              = fff[eidx + 3];
+                fff4[e]              = fff[eidx + 4];
+                fff5[e]              = fff[eidx + 5];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                u0[e]                = in[elements[0][eidx]];
+                u1[e]                = in[elements[1][eidx]];
+                u2[e]                = in[elements[2][eidx]];
+                u3[e]                = in[elements[3][eidx]];
+                u4[e]                = in[elements[4][eidx]];
+                u5[e]                = in[elements[5][eidx]];
+                u6[e]                = in[elements[6][eidx]];
+                u7[e]                = in[elements[7][eidx]];
+                u8[e]                = in[elements[8][eidx]];
+                u9[e]                = in[elements[9][eidx]];
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                tet10_laplacian_apply_fff_soa(fff0[e],
+                                              fff1[e],
+                                              fff2[e],
+                                              fff3[e],
+                                              fff4[e],
+                                              fff5[e],
+                                              u0[e],
+                                              u1[e],
+                                              u2[e],
+                                              u3[e],
+                                              u4[e],
+                                              u5[e],
+                                              u6[e],
+                                              u7[e],
+                                              u8[e],
+                                              u9[e],
+                                              &out0[e],
+                                              &out1[e],
+                                              &out2[e],
+                                              &out3[e],
+                                              &out4[e],
+                                              &out5[e],
+                                              &out6[e],
+                                              &out7[e],
+                                              &out8[e],
+                                              &out9[e]);
+            }
+
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                out[elements[0][eidx]] += out0[e];
+                out[elements[1][eidx]] += out1[e];
+                out[elements[2][eidx]] += out2[e];
+                out[elements[3][eidx]] += out3[e];
+                out[elements[4][eidx]] += out4[e];
+                out[elements[5][eidx]] += out5[e];
+                out[elements[6][eidx]] += out6[e];
+                out[elements[7][eidx]] += out7[e];
+                out[elements[8][eidx]] += out8[e];
+                out[elements[9][eidx]] += out9[e];
+            }
+        }
+    }
+};
+
+template <typename pack_idx_t>
+static int packed_laplacian_apply(smesh::ElemType                         element_type,
                                   const ptrdiff_t                       n_packs,
                                   const ptrdiff_t                       n_elements_per_pack,
                                   const ptrdiff_t                       n_elements,
@@ -233,50 +481,50 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                   const idx_t *const SFEM_RESTRICT      ghost_idx,
                                   const real_t *const SFEM_RESTRICT     u,
                                   real_t *const SFEM_RESTRICT           values,
-                                  PackedLaplacianScratch &scratch) {
+                                  PackedLaplacianScratch               &scratch) {
     switch (element_type) {
-        case TET4:
-            return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel>::apply(n_packs,
-                                                                                  n_elements_per_pack,
-                                                                                  n_elements,
-                                                                                  max_nodes_per_pack,
-                                                                                  elements,
-                                                                                  fff,
-                                                                                  owned_nodes_ptr,
-                                                                                  n_shared_nodes,
-                                                                                  ghost_ptr,
-                                                                                  ghost_idx,
-                                                                                  u,
-                                                                                  values,
-                                                                                  scratch);
-        case HEX8:
-            return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel>::apply(n_packs,
-                                                                                  n_elements_per_pack,
-                                                                                  n_elements,
-                                                                                  max_nodes_per_pack,
-                                                                                  elements,
-                                                                                  fff,
-                                                                                  owned_nodes_ptr,
-                                                                                  n_shared_nodes,
-                                                                                  ghost_ptr,
-                                                                                  ghost_idx,
-                                                                                  u,
-                                                                                  values,
-                                                                                  scratch);
-        case TET10:
-            return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel>::apply(n_packs,
-                                                                                    n_elements_per_pack,
-                                                                                    n_elements,
-                                                                                    max_nodes_per_pack,
-                                                                                    elements,
-                                                                                    fff,
-                                                                                    owned_nodes_ptr,
-                                                                                    n_shared_nodes,
-                                                                                    ghost_ptr,
-                                                                                    ghost_idx,
-                                                                                    u,
-                                                                                    values,
-                                                                                    scratch);
+        case smesh::TET4:
+            return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel<PackedIdxType>>::apply(n_packs,
+                                                                                                 n_elements_per_pack,
+                                                                                                 n_elements,
+                                                                                                 max_nodes_per_pack,
+                                                                                                 elements,
+                                                                                                 fff,
+                                                                                                 owned_nodes_ptr,
+                                                                                                 n_shared_nodes,
+                                                                                                 ghost_ptr,
+                                                                                                 ghost_idx,
+                                                                                                 u,
+                                                                                                 values,
+                                                                                                 scratch);
+        case smesh::HEX8:
+            return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel<PackedIdxType>>::apply(n_packs,
+                                                                                                 n_elements_per_pack,
+                                                                                                 n_elements,
+                                                                                                 max_nodes_per_pack,
+                                                                                                 elements,
+                                                                                                 fff,
+                                                                                                 owned_nodes_ptr,
+                                                                                                 n_shared_nodes,
+                                                                                                 ghost_ptr,
+                                                                                                 ghost_idx,
+                                                                                                 u,
+                                                                                                 values,
+                                                                                                 scratch);
+        case smesh::TET10:
+            return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel<PackedIdxType>>::apply(n_packs,
+                                                                                                   n_elements_per_pack,
+                                                                                                   n_elements,
+                                                                                                   max_nodes_per_pack,
+                                                                                                   elements,
+                                                                                                   fff,
+                                                                                                   owned_nodes_ptr,
+                                                                                                   n_shared_nodes,
+                                                                                                   ghost_ptr,
+                                                                                                   ghost_idx,
+                                                                                                   u,
+                                                                                                   values,
+                                                                                                   scratch);
         default: {
             SFEM_ERROR("packed_laplacian_apply not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
@@ -288,10 +536,10 @@ namespace sfem {
 
     class PackedLaplacian::Impl {
     public:
-        std::shared_ptr<FunctionSpace>         space;  ///< Function space for the operator
-        std::shared_ptr<MultiDomainOp>         domains;
-        std::shared_ptr<Packed<PackedIdxType>> packed;
-        std::vector<SharedBuffer<jacobian_t>>  fff;
+        std::shared_ptr<FunctionSpace>                       space;  ///< Function space for the operator
+        std::shared_ptr<MultiDomainOp>                       domains;
+        std::shared_ptr<FunctionSpace::PackedMesh>          packed;
+        std::vector<SharedBuffer<jacobian_t>>                fff;
         std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
 
 #if SFEM_PRINT_THROUGHPUT
@@ -308,6 +556,10 @@ namespace sfem {
 
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
+
+    ptrdiff_t PackedLaplacian::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t PackedLaplacian::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int PackedLaplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("PackedLaplacian::initialize");
@@ -336,17 +588,13 @@ namespace sfem {
             domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
 
-            if (domain->second.element_type == HEX8 || domain->second.element_type == SSHEX8) {
-                hex8_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
-            } else {
-                tet4_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
+            auto mesh_ptr = impl_->space->mesh_ptr();
+            auto fff_src  = smesh::FFF::create_AoS(mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
+            if (!fff_src) {
+                return SFEM_FAILURE;
             }
+            const size_t nbytes = (size_t)domain->second.block->n_elements() * 6u * sizeof(jacobian_t);
+            memcpy(impl_->fff[b]->data(), fff_src->fff_AoS()->data(), nbytes);
         }
 
         return SFEM_SUCCESS;
@@ -526,7 +774,8 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void PackedLaplacian::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void PackedLaplacian::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem
+

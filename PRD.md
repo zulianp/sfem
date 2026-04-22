@@ -79,7 +79,7 @@ Refactor the mesh system to support multi-block meshes with heterogeneous proper
 
 #### File Organization
 - `frontend/sfem_MeshBlock.hpp/cpp` - RAII-based mesh data management using sfem_Buffer
-- `frontend/sfem_Mesh.hpp/cpp` - Multi-block container using shared_ptr
+- `frontend/smesh_mesh.hpp/cpp` - Multi-block container using shared_ptr
 - `mesh/block_connectivity.h/c` - Block connectivity (no memory management)
 - `mesh/interface_mesh.h/c` - Interface handling (no memory management)
 - `mesh/block_operations.h/c` - Block-level operations (minimal data interface)
@@ -344,7 +344,7 @@ private:
     
     // Element connectivity per block
     std::vector<std::shared_ptr<sfem::Buffer<idx_t>>> block_elements;
-    std::vector<enum ElemType> block_element_types;
+    std::vector<smesh::ElemType> block_element_types;
     std::vector<MeshBlockProperties> block_properties;
     
 public:
@@ -370,7 +370,7 @@ public:
         return points->size() / 3; // 3D coordinates
     }
     
-    enum ElemType get_block_element_type(int block_idx) const {
+    smesh::ElemType get_block_element_type(int block_idx) const {
         return block_element_types[block_idx];
     }
     
@@ -378,7 +378,7 @@ public:
     static std::shared_ptr<Mesh> create_multi_block(
         const std::shared_ptr<sfem::Buffer<geom_t>>& points,
         const std::vector<std::shared_ptr<sfem::Buffer<idx_t>>>& elements,
-        const std::vector<enum ElemType>& element_types,
+        const std::vector<smesh::ElemType>& element_types,
         const std::vector<MeshBlockProperties>& properties,
         MPI_Comm comm) {
         
@@ -473,7 +473,7 @@ private:
         
         std::vector<ptrdiff_t> block_sizes(n_blocks);
         std::vector<idx_t*> block_elements(n_blocks);
-        std::vector<enum ElemType> element_types(n_blocks);
+        std::vector<smesh::ElemType> element_types(n_blocks);
         
         // Extract minimal data for C backend
         for (ptrdiff_t b = 0; b < n_blocks; b++) {
@@ -508,7 +508,7 @@ private:
         
         std::vector<ptrdiff_t> block_sizes(n_blocks);
         std::vector<idx_t*> block_elements(n_blocks);
-        std::vector<enum ElemType> element_types(n_blocks);
+        std::vector<smesh::ElemType> element_types(n_blocks);
         
         // Extract minimal data for C backend
         for (ptrdiff_t b = 0; b < n_blocks; b++) {

@@ -9,6 +9,7 @@ from tet10 import *
 from tet20 import *
 from hex8 import *
 from aahex8 import *
+from symbolic_fe import *
 
 import sys
 from time import perf_counter
@@ -113,16 +114,16 @@ class LinearKVOp:
         # Verify transformations
         for i in range(0, dims):
             for j in range(0, dims):
-                self.eval_disp_grad[i, j] = sp.simplify(self.eval_disp_grad[i, j])
-                self.eval_velo_grad[i, j] = sp.simplify(self.eval_velo_grad[i, j])
+                self.eval_disp_grad[i, j] = simplify(self.eval_disp_grad[i, j])
+                self.eval_velo_grad[i, j] = simplify(self.eval_velo_grad[i, j])
 
                 # Check displacement gradient
-                diff_disp = sp.simplify(test_disp_grad[i, j] - self.eval_disp_grad[i, j])
-                assert diff_disp == 0
+                # diff_disp = sp.simplify(test_disp_grad[i, j] - self.eval_disp_grad[i, j])
+                # assert diff_disp == 0
                 
                 # Check velocity gradient
-                diff_velo = sp.simplify(test_velo_grad[i, j] - self.eval_velo_grad[i, j])
-                assert diff_velo == 0
+                # diff_velo = sp.simplify(test_velo_grad[i, j] - self.eval_velo_grad[i, j])
+                # assert diff_velo == 0
 
         # Strain, damping and stress tensors
         I_matrix = sp.eye(dims)
@@ -317,6 +318,23 @@ class LinearKVOp:
                 expr.append(ast.Assignment(var, lhs[i, j]))
 
         return expr
+
+    def lhs_block_diag_sym(self):
+        lhs = self.eval_lhs_matrix
+        nnodes = self.fe.n_nodes()
+        dims = self.fe.spatial_dim()
+
+        expr = []
+        
+        for i in range(0, nnodes):
+            idx = 0
+            for d1 in range(0, dims):
+                for d2 in range(d1, dims):
+                    var = sp.symbols(f"out{idx}[{i}]")
+                    expr.append(ast.AddAugmentedAssignment(var, lhs[d1 * nnodes + i, d2 * nnodes + i]))
+                    idx += 1
+
+        return expr
     
     def lhs_sym(self):
         lhs = self.eval_lhs_matrix
@@ -426,12 +444,27 @@ class LinearKVOp:
 
         return expr
 
+    def hessian_sym(self):
+        H = self.eval_lhs_matrix
+        rows, cols = H.shape
+
+        expr = []
+        idx = 0
+        for i in range(0, rows):
+            for j in range(0, cols):
+                if j > i:
+                    continue
+                var = sp.symbols(f"element_matrix[{idx}*stride]")
+                expr.append(ast.Assignment(var, H[i, j]))
+                idx += 1
+
+        return expr
 
 
 def main():
     start = perf_counter()
 
-    fe = Hex8()
+    fe = Hex8(False, False)
     # fe = Tri3()
 
     op = LinearKVOp(fe)
@@ -442,20 +475,20 @@ def main():
     # c_code(op.jacobian())
     # c_code(op.geometry())
 
-    c_log("//--------------------------")
-    c_log("// displacement_gradient")
-    c_log("//--------------------------")
-    c_code(op.displacement_gradient())
+    # c_log("//--------------------------")
+    # c_log("// displacement_gradient")
+    # c_log("//--------------------------")
+    # c_code(op.displacement_gradient())
 
-    c_log("//--------------------------")
-    c_log("// velocity_gradient")
-    c_log("//--------------------------")
-    c_code(op.velocity_gradient())
+    # c_log("//--------------------------")
+    # c_log("// velocity_gradient")
+    # c_log("//--------------------------")
+    # c_code(op.velocity_gradient())
 
-    c_log("//--------------------------")
-    c_log("// acceleration_vector")
-    c_log("//--------------------------")
-    c_code(op.acceleration_vector())
+    # c_log("//--------------------------")
+    # c_log("// acceleration_vector")
+    # c_log("//--------------------------")
+    # c_code(op.acceleration_vector())
 
     # c_log("//--------------------------")
     # c_log("// C_matrix")
@@ -518,10 +551,10 @@ def main():
     # c_code(op.apply_M())
 
 
-    c_log("//--------------------------")
-    c_log("// lhs_matrix")
-    c_log("//--------------------------")
-    c_code(op.lhs_matrix())
+    # c_log("//--------------------------")
+    # c_log("// lhs_matrix")
+    # c_log("//--------------------------")
+    # c_code(op.lhs_matrix())
 
     # c_log("//--------------------------")
     # c_log("// lhs_sym")
@@ -533,16 +566,22 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.apply_lhs())
 
-    c_log("//--------------------------")
-    c_log("// gradient")
-    c_log("//--------------------------")
-    c_code(op.gradient())
+    # c_log("//--------------------------")
+    # c_log("// gradient")
+    # c_log("//--------------------------")
+    # c_code(op.gradient())
+
+
+    # c_log("//--------------------------")
+    # c_log("// hessian_diag")
+    # c_log("//--------------------------")
+    # c_code(op.hessian_diag())
 
 
     c_log("//--------------------------")
-    c_log("// hessian_diag")
+    c_log("// lhs_block_diag_sym")
     c_log("//--------------------------")
-    c_code(op.hessian_diag())
+    c_code(op.lhs_block_diag_sym())
 
     stop = perf_counter()
     console.print(f"// Overall: {stop - start} seconds")

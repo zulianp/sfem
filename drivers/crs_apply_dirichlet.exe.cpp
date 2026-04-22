@@ -8,10 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
-#include "sfem_base.h"
-#include "sfem_glob.hpp"
+#include "sfem_base.hpp"
+#include "smesh_glob.hpp"
+
+#include "smesh_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -43,7 +45,7 @@ int main(int argc, char *argv[]) {
     const real_t diag_value    = atof(argv[5]);
     const char  *output_folder = argv[6];
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

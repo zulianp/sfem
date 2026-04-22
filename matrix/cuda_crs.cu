@@ -1,9 +1,9 @@
 
 extern "C" {
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 }
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 
 extern "C" void crs_device_create(const ptrdiff_t nnodes,

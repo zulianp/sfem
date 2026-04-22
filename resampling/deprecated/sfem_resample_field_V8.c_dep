@@ -1,8 +1,8 @@
-#include "sfem_resample_field.h"
+#include "sfem_resample_field.hpp"
 
 #include "mass.h"
 #include "matrixio_array.h"
-#include "sfem_resample_V.h"
+#include "sfem_resample_V.hpp"
 
 #include <math.h>
 #include <stddef.h>
@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include "quadratures_rule.h"
-#include "sfem_resample_field_vec.h"
+#include "sfem_resample_field_vec.hpp"
 
 #define SFEM_RESTRICT __restrict__
 

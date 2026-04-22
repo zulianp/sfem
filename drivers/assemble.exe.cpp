@@ -7,6 +7,7 @@
 
 #include "sfem_API.hpp"
 
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -43,7 +44,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     auto        fs     = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto        f      = sfem::Function::create(fs);
 
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     if (SFEM_EXPORT_FP32) {
         array_dtof(nnz, (const real_t *)values->data(), (float *)values->data());

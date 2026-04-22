@@ -1,7 +1,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "matrixio_array.h"
 
@@ -9,7 +9,7 @@
 #include <stdio.h>
 // #include <sys/stat.h>
 
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #define POW2(x) ((x) * (x))
 
@@ -410,7 +410,7 @@ int main(int argc, char *argv[]) {
     const geom_t dx = 2. / nx;
     const geom_t dy = 2. / ny;
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     const ptrdiff_t ndofs = (nx + 1) * (ny + 1);
     real_t *u = (real_t *)calloc(ndofs, sizeof(real_t));

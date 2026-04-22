@@ -8,20 +8,20 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
 
-#include "operators/div.h"
-#include "tet4_grad.h"
+#include "sfem_defs.hpp"
 
-#include "operators/tet4/tet4_l2_projection_p0_p1.h"
+#include "operators/div.hpp"
+#include "tet4_grad.hpp"
 
-#include "operators/tet10/tet10_grad.h"
-#include "operators/tet10/tet10_l2_projection_p1_p2.h"
+#include "operators/tet4/tet4_l2_projection_p0_p1.hpp"
 
-#include "read_mesh.h"
+#include "operators/tet10/tet10_grad.hpp"
+#include "operators/tet10/tet10_l2_projection_p1_p2.hpp"
+
+
 
 #include "sfem_API.hpp"
 
@@ -76,7 +76,7 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
     free(p1_dudz);
 }
 
-void grad_and_project(const enum ElemType element_type,
+void grad_and_project(const smesh::ElemType element_type,
                       const ptrdiff_t nelements,
                       const ptrdiff_t nnodes,
                       idx_t **const SFEM_RESTRICT elems,
@@ -88,11 +88,11 @@ void grad_and_project(const enum ElemType element_type,
 
 {
     switch (element_type) {
-        case TET4: {
+        case smesh::TET4: {
             tet4_p1_p1_grad_and_project(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
             break;
         }
-        case TET10: {
+        case smesh::TET10: {
             tet10_p2_p2_grad_and_project(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
             break;
         }
@@ -178,7 +178,7 @@ void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
     free(p1_dudz);
 }
 
-void grad_and_project_coeffs(const enum ElemType element_type,
+void grad_and_project_coeffs(const smesh::ElemType element_type,
                              const ptrdiff_t nelements,
                              const ptrdiff_t nnodes,
                              idx_t **const SFEM_RESTRICT elems,
@@ -190,11 +190,11 @@ void grad_and_project_coeffs(const enum ElemType element_type,
 
 {
     switch (element_type) {
-        case TET4: {
+        case smesh::TET4: {
             tet4_p1_p1_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
             break;
         }
-        case TET10: {
+        case smesh::TET10: {
             tet10_p2_p2_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
             break;
         }
@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -258,10 +258,10 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        grad_and_project_coeffs(mesh->element_type(),
+        grad_and_project_coeffs(mesh->element_type(0),
                                 n_elements,
                                 n_nodes,
-                                mesh->elements()->data(),
+                                mesh->elements(0)->data(),
                                 mesh->points()->data(),
                                 u,
                                 grad_u[0],
@@ -269,10 +269,10 @@ int main(int argc, char *argv[]) {
                                 grad_u[2]);
 
     } else {
-        grad_and_project(mesh->element_type(),
+        grad_and_project(mesh->element_type(0),
                          n_elements,
                          n_nodes,
-                         mesh->elements()->data(),
+                         mesh->elements(0)->data(),
                          mesh->points()->data(),
                          u,
                          grad_u[0],

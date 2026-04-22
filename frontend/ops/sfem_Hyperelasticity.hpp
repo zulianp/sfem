@@ -9,6 +9,8 @@ namespace sfem {
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override { return "Hyperelasticity"; }
         inline bool                is_linear() const override { return true; }
+        ptrdiff_t                  n_dofs_domain() const override;
+        ptrdiff_t                  n_dofs_image() const override;
         int                        initialize(const std::vector<std::string> &block_names = {}) override;
         Hyperelasticity(const std::shared_ptr<FunctionSpace> &space);
         int                 hessian_crs(const real_t *const  x,
@@ -31,7 +33,7 @@ namespace sfem {
                         real_t *const       out) override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
-        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
     private:
         class Impl;

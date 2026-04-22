@@ -1,11 +1,57 @@
 # SFEMDependencies.cmake
 
+set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
+
+# CUDA must be enabled before add_subdirectory(smesh): otherwise CMake does not
+# treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
+# are never compiled into libsmesh.
 if(SFEM_ENABLE_CUDA)
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
+endif()
+
+if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
+    set(SMESH_ENABLE_AVX2 ${SFEM_ENABLE_AVX2} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_AVX512 ${SFEM_ENABLE_AVX512} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_AVX512_SORT ${SFEM_ENABLE_AVX512_SORT} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_BLAS ${SFEM_ENABLE_BLAS} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_CUDA_LINEINFO ${SFEM_ENABLE_CUDA_LINEINFO} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_RYAML ${SFEM_ENABLE_RYAML} CACHE BOOL "" FORCE)
+    set(SMESH_USE_OCCUPANCY_MAX_POTENTIAL ${SFEM_USE_OCCUPANCY_MAX_POTENTIAL} CACHE BOOL "" FORCE)
+
+    foreach(_type_name
+            REAL_TYPE
+            SCALAR_TYPE
+            GEOM_TYPE
+            JACOBIAN_CPU_TYPE
+            JACOBIAN_GPU_TYPE
+            ACCUMULATOR_TYPE
+            IDX_TYPE
+            COUNT_TYPE
+            ELEMENT_IDX_TYPE
+            LOCAL_IDX_TYPE)
+        set(SMESH_${_type_name} ${SFEM_${_type_name}} CACHE STRING "" FORCE)
+    endforeach()
+
+    add_subdirectory("${SFEM_SMESH_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/smesh")
+
+    set(SFEM_ENABLE_CUBLAS ${SMESH_ENABLE_CUBLAS} CACHE BOOL "" FORCE)
+    set(SFEM_ENABLE_CUSPARSE ${SMESH_ENABLE_CUSPARSE} CACHE BOOL "" FORCE)
+
+    if(TARGET smesh::smesh)
+        list(APPEND SFEM_SUBMODULES smesh::smesh)
+    endif()
+else()
+    message(FATAL_ERROR "Missing mandatory submodule external/smesh. Run: git submodule update --init --recursive")
 endif()
 
 if(SFEM_ENABLE_OPENMP)
@@ -87,10 +133,14 @@ find_package(Doxygen QUIET)
 if(DOXYGEN_FOUND)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.txt ${CMAKE_BINARY_DIR}
                    @ONLY IMMEDIATE)
-    add_custom_target(
-        docs
-        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile.txt
-        SOURCES ${CMAKE_BINARY_DIR}/Doxyfile.txt)
+    if(TARGET docs)
+        message(STATUS "Skipping SFEM docs target: target 'docs' already exists")
+    else()
+        add_custom_target(
+            docs
+            COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile.txt
+            SOURCES ${CMAKE_BINARY_DIR}/Doxyfile.txt)
+    endif()
 
 endif()
 
@@ -122,8 +172,6 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
 
     set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
-    set(SFEM_ENABLE_CUBLAS TRUE)
-    set(SFEM_ENABLE_CUSPARSE TRUE)
 
     set(SFEM_CUDA_MATH_LIBS_FOUND FALSE)
 
@@ -209,3 +257,41 @@ if(SFEM_ENABLE_AVX512_SORT)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
 endif()
 
+
+if(SFEM_ENABLE_SCCD)
+    set(SCCD_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SCCD_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+
+    set(SFEM_SCCD_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sccd")
+    add_subdirectory("${SFEM_SCCD_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sccd")
+
+    if(TARGET SCCD::sccd)
+        list(APPEND SFEM_SUBMODULES SCCD::sccd)
+    elseif(TARGET sccd::sccd)
+        list(APPEND SFEM_SUBMODULES sccd::sccd)
+    else()
+        message(FATAL_ERROR "Failed to build SCCD library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
+if(SFEM_ENABLE_SSDF)
+    if(NOT SFEM_ENABLE_SCCD)
+        message(FATAL_ERROR "SSDF usage requires SCCD to be enabled")
+    endif()
+
+    set(SSDF_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    
+    set(SSDF_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/ssdf")
+    add_subdirectory("${SSDF_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/ssdf")
+
+    if(TARGET ssdf)
+        list(APPEND SFEM_SUBMODULES ssdf)
+    elseif(TARGET SSDF::ssdf)
+        list(APPEND SFEM_SUBMODULES SSDF::ssdf)
+    elseif(TARGET ssdf::ssdf)
+        list(APPEND SFEM_SUBMODULES ssdf::ssdf)
+    else()
+        message(FATAL_ERROR "Failed to build SSDF library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()

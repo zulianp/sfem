@@ -1,24 +1,23 @@
 #include <stdio.h>
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_SFC.hpp"
-#include "sfem_P1toP2.hpp"
+#include "smesh_env.hpp"
+#include "smesh_mesh_reorder.hpp"
 
-int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
 
-    int    SFEM_MAX_IT             = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
-    bool   SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
-    bool   SFEM_VERBOSE            = sfem::Env::read<bool>("SFEM_VERBOSE", true);
-    real_t SFEM_RTOL               = sfem::Env::read<real_t>("SFEM_RTOL", 1e-6);
+    int    SFEM_MAX_IT             = smesh::Env::read<int>("SFEM_MAX_IT", 20000);
+    bool   SFEM_USE_PRECONDITIONER = smesh::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
+    bool   SFEM_VERBOSE            = smesh::Env::read<bool>("SFEM_VERBOSE", true);
+    real_t SFEM_RTOL               = smesh::Env::read<real_t>("SFEM_RTOL", 1e-6);
 
     cg->set_max_it(SFEM_MAX_IT);
     cg->verbose = SFEM_VERBOSE;
@@ -48,30 +47,30 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
         printf("---------------------\n");
     }
 
-    bool SFEM_ENABLE_OUTPUT = sfem::Env::read<bool>("SFEM_ENABLE_OUTPUT", true);
+    bool SFEM_ENABLE_OUTPUT = smesh::Env::read<bool>("SFEM_ENABLE_OUTPUT", true);
 
     if (SFEM_ENABLE_OUTPUT) {
         if (SFEM_VERBOSE) {
             printf("Writing output in %s\n", output_dir.c_str());
         }
 
-        sfem::create_directory(output_dir.c_str());
+        smesh::create_directory(output_dir);
 
         if (fs->has_semi_structured_mesh()) {
-            m->write((output_dir + "/coarse_mesh").c_str());
-            fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str());
+            m->write(output_dir / "coarse_mesh");
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh");
         } else {
-            m->write((output_dir + "/mesh").c_str());
+            m->write(output_dir / "mesh");
         }
 
         auto output = f->output();
         output->enable_AoS_to_SoA(fs->block_size() > 1);
-        output->set_output_dir(output_dir.c_str());
+        output->set_output_dir(output_dir);
 
 #ifdef SFEM_ENABLE_CUDA
         if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
-            output->write("x", sfem::to_host(x)->data());
-            output->write("rhs", sfem::to_host(rhs)->data());
+            output->write("x", smesh::to_host(x)->data());
+            output->write("rhs", smesh::to_host(rhs)->data());
         } else
 #endif
         {
@@ -86,23 +85,29 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
 int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("solve_linear_elasticity");
 
-    if(argc != 4) {
-        fprintf(stderr, "usage %s <mesh> <dirichlet.yaml> <output>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "usage %s <mesh> <dirichlet.yaml> <output_dir>\n", argv[0]);
         return SFEM_FAILURE;
     }
-    
-    auto es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto SFEM_OPERATOR             = sfem::Env::read_string("SFEM_OPERATOR", "LinearElasticity");
-    int  SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
 
-    auto m = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto SFEM_OPERATOR             = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity");
+    int  SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path dirichlet_path{argv[2]};
+    smesh::Path output_dir{argv[3]};
+
+    auto m = sfem::Mesh::create_from_file(comm, mesh_path);
 
     // Important for packed elements
-    auto sfc = sfem::SFC::create_from_env();
+    auto sfc = smesh::SFC::create_from_env();
     sfc->reorder(*m);
 
-    if(sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
-        m = sfem::convert_p1_mesh_to_p2(m);
+    if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+        m = smesh::promote_to(smesh::TET10, m);
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
@@ -111,17 +116,12 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
 
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
-
     auto f     = sfem::Function::create(fs);
-    auto conds = sfem::DirichletConditions::create_from_file(fs, argv[2]);
+    auto conds = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
     f->add_constraint(conds);
     f->add_operator(op);
 
-    return lsolve(f, argv[3]);
+    return lsolve(f, output_dir);
 }
 
 int main(int argc, char *argv[]) {

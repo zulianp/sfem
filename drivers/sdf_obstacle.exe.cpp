@@ -2,7 +2,7 @@
 
 #include "sfem_ShiftedPenalty.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
@@ -12,14 +12,14 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.h"
-#include "sshex8.h"
-#include "sshex8_laplacian.h"
-#include "sshex8_linear_elasticity.h"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
+#include "sshex8.hpp"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_linear_elasticity.hpp"
+
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
 
 #include "matrixio_array.h"
 
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     // Read inputs
     // -------------------------------
 
-    const char *output_path = argv[2];
+    smesh::Path output_path{argv[2]};
 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -103,20 +103,19 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    sfem::create_directory(output_path);
+    smesh::create_directory(output_path);
 
     double tick = MPI_Wtime();
 
-    const char *folder     = argv[1];
-    auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    smesh::Path folder{argv[1]};
+    auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const int   block_size = 3;
 
-    auto fs = sfem::FunctionSpace::create(m, block_size);
-
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
+
+    auto fs = sfem::FunctionSpace::create(m, block_size);
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -187,7 +186,7 @@ int main(int argc, char *argv[]) {
         auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
         auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->hessian_block_diag_sym(nullptr, diag->data());
-        f->constaints_mask(mask->data());
+        f->constraints_mask(mask->data());
 
         auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
         cg->set_preconditioner_op(sj);
@@ -246,21 +245,15 @@ int main(int argc, char *argv[]) {
 
     double solve_tock = MPI_Wtime();
 
-#ifdef SFEM_ENABLE_CUDA
-    auto h_x   = sfem::to_host(x);
-    auto h_rhs = sfem::to_host(rhs);
-#else
-    auto h_x   = x;
-    auto h_rhs = rhs;
-#endif
+    auto h_x   = smesh::to_host(x);
+    auto h_rhs = smesh::to_host(rhs);
 
     auto upper_bound_viz = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
     contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data());
 
     if (fs->has_semi_structured_mesh()) {
-        std::string path = output_path;
-        path += "/ssmesh";
-        fs->semi_structured_mesh().export_as_standard(path.c_str());
+        smesh::Path path = output_path / "ssmesh";
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path);
     }
 
     auto output = f->output();
@@ -273,7 +266,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().n_nodes() : m->n_nodes();
+    ptrdiff_t nnodes    = fs->mesh().n_nodes();
 
     if (!rank) {
         printf("----------------------------------------\n");

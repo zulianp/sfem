@@ -1,11 +1,11 @@
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #ifdef SFEM_ENABLE_CUDA
 
 #include <thrust/device_vector.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
-#include "coo_sort.h"
+#include "coo_sort.hpp"
 
 struct CompareTuplesWeights {
     __host__ __device__ bool operator()(const thrust::tuple<idx_t, idx_t, real_t> &a,

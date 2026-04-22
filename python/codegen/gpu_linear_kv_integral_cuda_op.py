@@ -9,6 +9,7 @@ from tet10 import *
 from tet20 import *
 from hex8 import *
 from aahex8 import *
+from symbolic_fe import *
 
 import sys
 from time import perf_counter
@@ -717,6 +718,7 @@ def main():
 
     fe = Hex8()
     # fe = Tri3()
+    fe = SymbolicFE3D()
 
     op = GPULinearKVOp(fe)
 
