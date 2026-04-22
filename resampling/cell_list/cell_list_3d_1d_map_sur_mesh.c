@@ -58,14 +58,15 @@ intersection_point_triangle_xy(const real_t v0[3],    //
 //////////////////////////////////////////////////
 // query_cell_list_3d_1d_map_mesh_given_xy_tri3_v
 //////////////////////////////////////////////////
-int                                                                                               //
-query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,                  //
-                                               const boxes_t               *boxes,                //
-                                               const mesh_tri3_geom_t      *mesh_geom,            //
-                                               const real_t                 x,                    //
-                                               const real_t                 y,                    //
-                                               int                         *size_t3_array,        //
-                                               real_t                     **tri3_intersect_z) {   //
+int                                                                                                  //
+query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,                     //
+                                               const boxes_t               *boxes,                   //
+                                               const mesh_tri3_geom_t      *mesh_geom,               //
+                                               const real_t                 x,                       //
+                                               const real_t                 y,                       //
+                                               const int                    start_index_tri3_array,  //
+                                               int                         *size_t3_array,           //
+                                               real_t                     **tri3_intersect_z) {      //
 
     const int ix_tmp = coord_to_grid_index(x, map->min_x, map->delta_x);
     const int ix     = (ix_tmp < 0) ? 0 : (ix_tmp >= map->num_cells_x) ? map->num_cells_x - 1 : ix_tmp;
@@ -141,7 +142,7 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
                                       (real_t[3]){x2, y2, z2},  //
                                       x,
                                       y)) {
-                if (triangles_found >= *size_t3_array) {
+                if (triangles_found + start_index_tri3_array >= *size_t3_array) {
                     *size_t3_array *= 2;
                     real_t *tmp = realloc(*tri3_intersect_z, (*size_t3_array) * sizeof(real_t));
                     if (!tmp) return EXIT_FAILURE;
@@ -153,15 +154,116 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
                                                (real_t[3]){x2, y2, z2},  //
                                                x,
                                                y,
-                                               &(*tri3_intersect_z)[triangles_found]);
+                                               &(*tri3_intersect_z)[triangles_found + start_index_tri3_array]);
 
                 triangles_found++;
             }
         }
+    }
+    return triangles_found;
+}
 
-    } else {
-        // nothing at the moment
+////////////////////////////////////////////////////////////////
+// query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v
+////////////////////////////////////////////////////////////////
+int                                                                                                          //
+query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(const cell_list_split_3d_1d_map_t *map,                 //
+                                                     const boxes_t                     *boxes,               //
+                                                     const mesh_tri3_geom_t            *mesh_geom,           //
+                                                     const real_t                       x,                   //
+                                                     const real_t                       y,                   //
+                                                     int                               *size_t3_array,       //
+                                                     real_t                           **tri3_intersect_z) {  //
+
+    if (map == NULL || boxes == NULL || mesh_geom == NULL) {
+        return -1;  // Invalid pointer
     }
 
-    return EXIT_SUCCESS;
+    const int num_found_lower = query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(map->map_lower,     //
+                                                                               boxes,              //
+                                                                               mesh_geom,          //
+                                                                               x,                  //
+                                                                               y,                  //
+                                                                               0,                  // start_index_tri3_array
+                                                                               size_t3_array,      //
+                                                                               tri3_intersect_z);  //
+
+    const int num_found_upper = query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(map->map_upper,     //
+                                                                               boxes,              //
+                                                                               mesh_geom,          //
+                                                                               x,                  //
+                                                                               y,                  //
+                                                                               num_found_lower,    // start_index_tri3_array
+                                                                               size_t3_array,      //
+                                                                               tri3_intersect_z);  //
+    return num_found_lower + num_found_upper;
+}
+
+static int cmp_real_t(const void *a, const void *b) {
+    real_t diff = *(const real_t *)a - *(const real_t *)b;
+    return (diff > 0) - (diff < 0);  // returns 1 if a > b, -1 if a < b, 0 if equal
+}
+
+static void check_intervals(const real_t A[], const int n, const real_t I[], const int i_size, real_t out[]) {
+    int i = 0;
+    int k = 0;
+
+    while (i < n && k < i_size) {
+        const real_t lo = I[k];
+        const real_t hi = I[k + 1];
+
+        while (i < n && A[i] < lo) out[i++] = 0.0;
+        while (i < n && A[i] <= hi) out[i++] = 1.0;
+
+        k += 2;
+    }
+
+    while (i < n) out[i++] = 0.0;
+}
+
+int                                                                                                      //
+raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_1d_map_t *map,           //
+                                                       const boxes_t                     *boxes,         //
+                                                       const mesh_tri3_geom_t            *mesh_geom,     //
+                                                       const real_t                       x,             //
+                                                       const real_t                       y,             //
+                                                       const real_t                      *z_coords,      //
+                                                       const int                          num_z_coords,  //
+                                                       real_t                            *out_z) {       //
+
+    if (map == NULL || boxes == NULL || mesh_geom == NULL || out_z == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    int     size_t3_array    = 64;  // Initial size for intersecting triangles array
+    real_t *tri3_intersect_z = malloc(size_t3_array * sizeof(real_t));
+    if (!tri3_intersect_z) {
+        return -1;  // Memory allocation failure
+    }
+
+    const int num_triangles = query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(map,                 //
+                                                                                   boxes,               //
+                                                                                   mesh_geom,           //
+                                                                                   x,                   //
+                                                                                   y,                   //
+                                                                                   &size_t3_array,      //
+                                                                                   &tri3_intersect_z);  //
+
+    if (num_triangles <= 0) {
+        free(tri3_intersect_z);
+        return -1;  // No intersecting triangles found
+    }
+
+    if (num_triangles % 2 != 0) {
+        free(tri3_intersect_z);
+        return -1;  // Odd number of intersections suggests a problem (e.g., non-manifold geometry)
+    }
+
+    // sort the intersecting triangles' z values
+    qsort(tri3_intersect_z, num_triangles, sizeof(real_t), cmp_real_t);
+
+    check_intervals(z_coords, num_z_coords, tri3_intersect_z, num_triangles, out_z);
+
+    free(tri3_intersect_z);
+    return 0;
 }
