@@ -204,6 +204,9 @@ static int cmp_real_t(const void *a, const void *b) {
     return (diff > 0) - (diff < 0);  // returns 1 if a > b, -1 if a < b, 0 if equal
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// check_intervals
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void check_intervals(const real_t A[], const int n, const real_t I[], const int i_size, real_t out[]) {
     int i = 0;
     int k = 0;
@@ -221,6 +224,9 @@ static void check_intervals(const real_t A[], const int n, const real_t I[], con
     while (i < n) out[i++] = 0.0;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 int                                                                                                      //
 raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_1d_map_t *map,           //
                                                        const boxes_t                     *boxes,         //
