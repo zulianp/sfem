@@ -600,7 +600,7 @@ make_mesh_tets_boxes(const ptrdiff_t                    start_element,  //
                      const ptrdiff_t                    nnodes,         //
                      const idx_t **const SFEM_RESTRICT  elems,          //
                      const geom_t **const SFEM_RESTRICT xyz,            //
-                     boxes_t                          **boxes) {                                 //
+                     boxes_t                          **boxes) {        //
 
     PRINT_CURRENT_FUNCTION;
 
@@ -666,3 +666,78 @@ make_mesh_tets_boxes(const ptrdiff_t                    start_element,  //
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
 }  // END: Function: make_mesh_tets_boxes
+
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+// make_mesh_tri3_boxes
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+int                                                                     //
+make_mesh_tri3_boxes(const ptrdiff_t                    start_element,  // Mesh
+                     const ptrdiff_t                    end_element,    //
+                     const ptrdiff_t                    nnodes,         //
+                     const idx_t **const SFEM_RESTRICT  elems,          //
+                     const geom_t **const SFEM_RESTRICT xyz,            //
+                     boxes_t                          **boxes) {        //
+
+    PRINT_CURRENT_FUNCTION;
+
+    const ptrdiff_t num_elements = end_element - start_element;
+
+    // Allocate memory for boxes
+    boxes_t *const SFEM_RESTRICT boxes_loc_ptr = allocate_boxes_t((int)num_elements);
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        idx_t ev[3];
+
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][element_i];
+        }  // END: for vq
+
+#if SFEM_LOG_LEVEL > 5
+        if (element_i % 1000000 == 0) {
+            printf("*** Processing element %td / %td \n", element_i, end_element);
+        }
+#endif
+
+        // Read the coordinates of the vertices of the triangle
+        // In the physical space
+        const real_t x0_n = xyz[0][ev[0]];
+        const real_t x1_n = xyz[0][ev[1]];
+        const real_t x2_n = xyz[0][ev[2]];
+
+        const real_t y0_n = xyz[1][ev[0]];
+        const real_t y1_n = xyz[1][ev[1]];
+        const real_t y2_n = xyz[1][ev[2]];
+
+        const real_t z0_n = xyz[2][ev[0]];
+        const real_t z1_n = xyz[2][ev[1]];
+        const real_t z2_n = xyz[2][ev[2]];
+
+        const real_t min_x = MY_MIN(MY_MIN(x0_n, x1_n), x2_n);
+        const real_t max_x = MY_MAX(MY_MAX(x0_n, x1_n), x2_n);
+
+        const real_t min_y = MY_MIN(MY_MIN(y0_n, y1_n), y2_n);
+        const real_t max_y = MY_MAX(MY_MAX(y0_n, y1_n), y2_n);
+
+        const real_t min_z = MY_MIN(MY_MIN(z0_n, z1_n), z2_n);
+        const real_t max_z = MY_MAX(MY_MAX(z0_n, z1_n), z2_n);
+
+        const ptrdiff_t box_index = element_i - start_element;
+
+        boxes_loc_ptr->min_x[box_index] = min_x;
+        boxes_loc_ptr->max_x[box_index] = max_x;
+        boxes_loc_ptr->min_y[box_index] = min_y;
+        boxes_loc_ptr->max_y[box_index] = max_y;
+        boxes_loc_ptr->min_z[box_index] = min_z;
+        boxes_loc_ptr->max_z[box_index] = max_z;
+
+    }  // END: for element_i
+
+    *boxes = (boxes_t *)boxes_loc_ptr;
+
+    bounding_box_statistics_t stats = calculate_bounding_box_statistics(boxes_loc_ptr);
+    // print_bounding_box_statistics(&stats);
+
+    RETURN_FROM_FUNCTION(EXIT_SUCCESS);
+}
