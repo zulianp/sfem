@@ -1622,7 +1622,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             clock_gettime(CLOCK_MONOTONIC, &t_start);
 #endif
 
-            ret = tet4_resample_field_adjoint_cell_quad_gpu(0,
+            ret = tet4_resample_field_adjoint_cell_quad(0,
                                                             mesh->nelements,      //
                                                             mesh,                 //
                                                             n,                    // SDF
