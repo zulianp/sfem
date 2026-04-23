@@ -31,8 +31,8 @@ typedef struct {
     real_t max_volume;
     real_t min_volume;
     real_t avg_volume;
-    int max_volume_idx;
-    int min_volume_idx;
+    int    max_volume_idx;
+    int    min_volume_idx;
     real_t max_volume_side_x;
     real_t max_volume_side_y;
     real_t max_volume_side_z;
@@ -64,11 +64,11 @@ int write_domain_side_lengths(const bounding_box_statistics_t *stats, const char
  * @brief Structure to hold histogram data for side lengths
  */
 typedef struct {
-    int num_classes;
+    int    num_classes;
     real_t min_value;
     real_t max_value;
     real_t bin_width;
-    int *counts;  // Array of size num_classes
+    int   *counts;  // Array of size num_classes
 } side_length_histogram_t;
 
 //////////////////////////////////////////////////////////
@@ -86,10 +86,8 @@ typedef struct {
 //////////////////////////////////////////////////////////
 // calculate_side_length_histograms
 //////////////////////////////////////////////////////////
-side_length_histograms_t calculate_side_length_histograms(
-    const boxes_t *boxes,
-    const bounding_box_statistics_t *stats,
-    const int num_classes);
+side_length_histograms_t calculate_side_length_histograms(const boxes_t *boxes, const bounding_box_statistics_t *stats,
+                                                          const int num_classes);
 
 //////////////////////////////////////////////////////////
 // print_side_length_histograms
@@ -104,8 +102,7 @@ void free_side_length_histograms(side_length_histograms_t *histograms);
 //////////////////////////////////////////////////////////
 // write_side_length_histograms
 //////////////////////////////////////////////////////////
-int write_side_length_histograms(const side_length_histograms_t *histograms,
-                                 const char *output_dir);
+int write_side_length_histograms(const side_length_histograms_t *histograms, const char *output_dir);
 
 //////////////////////////////////////////////////////////
 // side_length_cdf_thresholds_t
@@ -132,11 +129,8 @@ typedef struct {
  * @param cdf_ratio_z CDF ratio for z dimension (0.0 to 1.0)
  * @return Structure containing threshold values where CDF exceeds the given ratios
  */
-side_length_cdf_thresholds_t calculate_cdf_thresholds(
-    const side_length_histograms_t *histograms,
-    real_t cdf_ratio_x,
-    real_t cdf_ratio_y,
-    real_t cdf_ratio_z);
+side_length_cdf_thresholds_t calculate_cdf_thresholds(const side_length_histograms_t *histograms, real_t cdf_ratio_x,
+                                                      real_t cdf_ratio_y, real_t cdf_ratio_z);
 
 //////////////////////////////////////////////////////////
 // print_cdf_thresholds
@@ -147,8 +141,16 @@ int                                                                     //
 make_mesh_tets_boxes(const ptrdiff_t                    start_element,  // Mesh
                      const ptrdiff_t                    end_element,    //
                      const ptrdiff_t                    nnodes,         //
-                     const idx_t** const SFEM_RESTRICT  elems,          //
-                     const geom_t** const SFEM_RESTRICT xyz,            //
-                     boxes_t**                          boxes);
+                     const idx_t **const SFEM_RESTRICT  elems,          //
+                     const geom_t **const SFEM_RESTRICT xyz,            //
+                     boxes_t                          **boxes);
+
+int                                                                     //
+make_mesh_tri3_boxes(const ptrdiff_t                    start_element,  // Mesh
+                     const ptrdiff_t                    end_element,    //
+                     const ptrdiff_t                    nnodes,         //
+                     const idx_t **const SFEM_RESTRICT  elems,          //
+                     const geom_t **const SFEM_RESTRICT xyz,            //
+                     boxes_t                          **boxes);
 
 #endif  // __CELL_TET2BOX_H__
