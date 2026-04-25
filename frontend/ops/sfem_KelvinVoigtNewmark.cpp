@@ -428,7 +428,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         int  err  = SFEM_SUCCESS;
 
-        impl_->iterate([&](const OpDomain &domain) {
+        err = impl_->iterate([&](const OpDomain &domain) {
             auto block  = domain.block;
             auto params = domain.parameters;
             const real_t beta  = params->require_real_value("beta");
