@@ -292,6 +292,8 @@ int test_newmark_kv() {
 
         const ptrdiff_t ndofs        = fs->n_dofs();
         const int       block_size   = 3;
+        real_t          SFEM_NEUMANN_FORCE = -0.5;
+        SFEM_READ_ENV(SFEM_NEUMANN_FORCE, atof);
         auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
         auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
         auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
@@ -501,6 +503,16 @@ int test_newmark_kv() {
                 // If no issues encountered we log the time
                 output->log_time(t);
             }
+        }
+
+        const real_t displacement_norm = blas->norm2(ndofs, displacement->data());
+        const real_t velocity_norm     = blas->norm2(ndofs, velocity->data());
+        const real_t acceleration_norm = blas->norm2(ndofs, acceleration->data());
+        SFEM_TEST_ASSERT(isfinite(displacement_norm));
+        SFEM_TEST_ASSERT(isfinite(velocity_norm));
+        SFEM_TEST_ASSERT(isfinite(acceleration_norm));
+        if (!SFEM_ENABLE_CONTACT && SFEM_NEUMANN_FORCE != 0 && T > 0) {
+            SFEM_TEST_ASSERT(displacement_norm > 0);
         }
 
         printf("===== Test Completed =====\n");
