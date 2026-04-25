@@ -68,7 +68,7 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
                                           1.,
                                           1.);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
@@ -98,9 +98,11 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
     // Neumann force on right side (negative = compression, same as Mooney-Rivlin)
     real_t SFEM_NEUMANN_FORCE = -0.5;
     SFEM_READ_ENV(SFEM_NEUMANN_FORCE, atof);
-    sfem::NeumannConditions::Condition nc_right{.sidesets = right_sideset, .value = SFEM_NEUMANN_FORCE, .component = 0};
-    auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_right}, es);
-    f->add_operator(n_conds);
+    if (SFEM_NEUMANN_FORCE != 0) {
+        sfem::NeumannConditions::Condition nc_right{.sidesets = right_sideset, .value = SFEM_NEUMANN_FORCE, .component = 0};
+        auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_right}, es);
+        f->add_operator(n_conds);
+    }
 
     auto kelvin_voigt_newmark = sfem::create_op(fs, "KelvinVoigtNewmark", es);
     kelvin_voigt_newmark->initialize();

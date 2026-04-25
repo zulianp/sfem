@@ -44,7 +44,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     smesh::Path output_path{argv[4]};
 
     auto m = sfem::Mesh::create_from_file(comm, mesh_path);
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
