@@ -33,6 +33,11 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
         real_t *z_coords = malloc(z_size * sizeof(real_t));
         real_t *out_z    = malloc(z_size * sizeof(real_t));
 
+        for (ptrdiff_t i = 0; i < z_size; i++) {
+            z_coords[i] = origin[2] + (real_t)(i)*delta[2];
+            out_z[i]    = 0.0;  // Initialize out_z to zero (or any default value as needed)
+        }
+
         if (z_coords && out_z) {
             for (ptrdiff_t start_i = 0; start_i < 3; start_i++) {
                 for (ptrdiff_t start_j = 0; start_j < 3; start_j++) {
