@@ -44,8 +44,15 @@ int main(int argc, char* argv[]) {
     int SFEM_TEST_CCELL = 0;
     SFEM_READ_ENV(SFEM_TEST_CCELL, atoi);
 
+    int SFEM_RASTER_TRI_MESH = 0;
+    SFEM_READ_ENV(SFEM_RASTER_TRI_MESH, atoi);
+
     if (SFEM_ADJOINT == 1) {
         return main_adjoint(argc, argv);
+    }
+
+    if (SFEM_RASTER_TRI_MESH == 1) {
+        return main_raster_from_surface_mesh(argc, argv);
     }
 
     if (SFEM_TEST_CCELL == 1) {
