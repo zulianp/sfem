@@ -2,6 +2,7 @@
 #include <omp.h>
 #endif
 
+#include "cell_tet2box.h"
 #include "sfem_raster_surface_mesh_1d_cell.h"
 
 int                                                                                        //
@@ -75,6 +76,56 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
         free(out_z);
         out_z = NULL;
     }
+
+    RETURN_FROM_FUNCTION(0);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad
+///////////////////////////////////////////////////////////////////////////
+int                                                                              //
+tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,   // Mesh
+                           const ptrdiff_t                      end_element,     //
+                           const mesh_t                        *mesh,            //
+                           const ptrdiff_t *const SFEM_RESTRICT n,               // SDF
+                           const ptrdiff_t *const SFEM_RESTRICT stride,          //
+                           const geom_t *const SFEM_RESTRICT    origin,          //
+                           const geom_t *const SFEM_RESTRICT    delta,           //
+                           const real_t *const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                           real_t *const SFEM_RESTRICT          data) {          // END Function: tri3_raster_mesh_cell_quad
+
+    PRINT_CURRENT_FUNCTION;
+
+    boxes_t *bounding_boxes_ptr = NULL;
+
+    const int fb_error =                                          //
+            make_mesh_tri3_boxes(start_element,                   //
+                                 end_element,                     //
+                                 mesh->nnodes,                    //
+                                 (const idx_t **)mesh->elements,  //
+                                 (const geom_t **)mesh->points,   //
+                                 &bounding_boxes_ptr);            //
+
+    bounding_box_statistics_t stats = calculate_bounding_box_statistics(bounding_boxes_ptr);
+    print_bounding_box_statistics(&stats);
+
+    side_length_histograms_t histograms =                         //
+            calculate_side_length_histograms(bounding_boxes_ptr,  //
+                                             &stats,              //
+                                             50);                 //
+    print_side_length_histograms(&histograms);
+
+    side_length_cdf_thresholds_t thresholds =                         //
+            calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);  //
+
+    mesh_tri3_geom_t *geom = NULL;
+
+finalize:
+
+    // free_mesh_tri3_geometry(geom);
+
+    free_boxes_t(bounding_boxes_ptr);
+    bounding_boxes_ptr = NULL;
 
     RETURN_FROM_FUNCTION(0);
 }

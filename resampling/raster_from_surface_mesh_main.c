@@ -9,31 +9,31 @@
 #include "cell_tet2box.h"
 #include "resampling_utils.h"
 #include "sfem_base.h"
+#include "sfem_raster_surface_mesh_1d_cell.h"
 #include "sfem_resample_field.h"
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-// print_mesh_info_and_coordinate_bounds
+// find_mesh_bounds
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-static int print_mesh_info_and_coordinate_bounds(MPI_Comm comm, const int mpi_rank, const mesh_t* const mesh,
-                                                 const char* const folder) {
-    const long local_nelements = (long)mesh->nelements;
-    const long local_nnodes    = (long)mesh->nnodes;
-    const long local_nowned    = (long)mesh->n_owned_nodes;
+static int find_mesh_bounds(MPI_Comm comm, const mesh_t* mesh, geom_t local_min[3], geom_t local_max[3], geom_t global_min[3],
+                            geom_t global_max[3], int* const scan_dim_out) {
+    local_min[0] = INFINITY;
+    local_min[1] = INFINITY;
+    local_min[2] = INFINITY;
 
-    long global_nelements = 0;
-    long global_nnodes    = 0;
-    long global_nowned    = 0;
+    local_max[0] = -INFINITY;
+    local_max[1] = -INFINITY;
+    local_max[2] = -INFINITY;
 
-    MPI_Reduce(&local_nelements, &global_nelements, 1, MPI_LONG, MPI_SUM, 0, comm);
-    MPI_Reduce(&local_nnodes, &global_nnodes, 1, MPI_LONG, MPI_SUM, 0, comm);
-    MPI_Reduce(&local_nowned, &global_nowned, 1, MPI_LONG, MPI_SUM, 0, comm);
+    global_min[0] = INFINITY;
+    global_min[1] = INFINITY;
+    global_min[2] = INFINITY;
 
-    geom_t local_min[3]  = {INFINITY, INFINITY, INFINITY};
-    geom_t local_max[3]  = {-INFINITY, -INFINITY, -INFINITY};
-    geom_t global_min[3] = {INFINITY, INFINITY, INFINITY};
-    geom_t global_max[3] = {-INFINITY, -INFINITY, -INFINITY};
+    global_max[0] = -INFINITY;
+    global_max[1] = -INFINITY;
+    global_max[2] = -INFINITY;
 
     const int scan_dim = mesh->spatial_dim < 3 ? mesh->spatial_dim : 3;
 
@@ -47,6 +47,71 @@ static int print_mesh_info_and_coordinate_bounds(MPI_Comm comm, const int mpi_ra
 
     MPI_Allreduce(local_min, global_min, scan_dim, SFEM_MPI_GEOM_T, MPI_MIN, comm);
     MPI_Allreduce(local_max, global_max, scan_dim, SFEM_MPI_GEOM_T, MPI_MAX, comm);
+
+    *scan_dim_out = scan_dim;
+
+    RETURN_FROM_FUNCTION(0);
+}  // END Function: find_mesh_bounds
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// compute_reasonable_grid_from_bounds
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static int compute_reasonable_grid_from_bounds(const ptrdiff_t nglobal[3], const geom_t global_min[3], const geom_t global_max[3],
+                                               const int scan_dim, geom_t origin[3], geom_t delta[3]) {
+    const geom_t padding_fraction = 0.05;
+    geom_t       cube_extent      = 0;
+    ptrdiff_t    max_nintervals   = 1;
+
+    for (int d = 0; d < scan_dim; d++) {
+        const geom_t    extent         = global_max[d] - global_min[d];
+        const geom_t    reference_size = fabs((double)extent) > 0 ? extent : 1;
+        const geom_t    padded_extent  = (1 + 2 * padding_fraction) * reference_size;
+        const ptrdiff_t nintervals     = nglobal[d] > 1 ? nglobal[d] - 1 : 1;
+
+        cube_extent    = padded_extent > cube_extent ? padded_extent : cube_extent;
+        max_nintervals = nintervals > max_nintervals ? nintervals : max_nintervals;
+    }  // END for (int d = 0; d < scan_dim; d++)
+
+    const geom_t isotropic_delta = cube_extent / (geom_t)max_nintervals;
+
+    for (int d = 0; d < scan_dim; d++) {
+        const geom_t    center      = 0.5 * (global_min[d] + global_max[d]);
+        const ptrdiff_t nintervals  = nglobal[d] > 1 ? nglobal[d] - 1 : 1;
+        const geom_t    axis_extent = isotropic_delta * (geom_t)nintervals;
+
+        origin[d] = center - 0.5 * axis_extent;
+        delta[d]  = isotropic_delta;
+    }  // END for (int d = 0; d < scan_dim; d++)
+
+    for (int d = scan_dim; d < 3; d++) {
+        origin[d] = 0;
+        delta[d]  = 1;
+    }  // END for (int d = scan_dim; d < 3; d++)
+
+    RETURN_FROM_FUNCTION(0);
+}  // END Function: compute_reasonable_grid_from_bounds
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// print_mesh_info_and_coordinate_bounds
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static int print_mesh_info_and_coordinate_bounds(MPI_Comm comm, const int mpi_rank, const mesh_t* const mesh,
+                                                 const char* const folder, const geom_t local_min[3], const geom_t local_max[3],
+                                                 const geom_t global_min[3], const geom_t global_max[3], const int scan_dim) {
+    const long local_nelements = (long)mesh->nelements;
+    const long local_nnodes    = (long)mesh->nnodes;
+    const long local_nowned    = (long)mesh->n_owned_nodes;
+
+    long global_nelements = 0;
+    long global_nnodes    = 0;
+    long global_nowned    = 0;
+
+    MPI_Reduce(&local_nelements, &global_nelements, 1, MPI_LONG, MPI_SUM, 0, comm);
+    MPI_Reduce(&local_nnodes, &global_nnodes, 1, MPI_LONG, MPI_SUM, 0, comm);
+    MPI_Reduce(&local_nowned, &global_nowned, 1, MPI_LONG, MPI_SUM, 0, comm);
 
     if (mpi_rank == 0) {
         printf("Mesh info:\n");
@@ -164,10 +229,34 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
         return EXIT_FAILURE;
     }
 
-    if (print_mesh_info_and_coordinate_bounds(comm, mpi_rank, &mesh, folder)) {
+    geom_t local_min[3];
+    geom_t local_max[3];
+    geom_t global_min[3];
+    geom_t global_max[3];
+    int    scan_dim = 0;
+
+    if (find_mesh_bounds(comm, &mesh, local_min, local_max, global_min, global_max, &scan_dim)) {
+        fprintf(stderr, "Error: find_mesh_bounds failed %s:%d\n", __FILE__, __LINE__);
+        return EXIT_FAILURE;
+    }  // END if (find_mesh_bounds(...))
+
+    if (compute_reasonable_grid_from_bounds(nglobal, global_min, global_max, scan_dim, origin, delta)) {
+        fprintf(stderr, "Error: compute_reasonable_grid_from_bounds failed %s:%d\n", __FILE__, __LINE__);
+        return EXIT_FAILURE;
+    }  // END if (compute_reasonable_grid_from_bounds(...))
+
+    if (print_mesh_info_and_coordinate_bounds(
+                comm, mpi_rank, &mesh, folder, local_min, local_max, global_min, global_max, scan_dim)) {
         fprintf(stderr, "Error: print_mesh_info_and_coordinate_bounds failed %s:%d\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
+
+    if (mpi_rank == 0) {
+        printf("Computed raster grid parameters:\n");
+        printf("--------------------------------------------\n");
+        printf("  origin                   : %g %g %g\n", (double)origin[0], (double)origin[1], (double)origin[2]);
+        printf("  delta                    : %g %g %g\n", (double)delta[0], (double)delta[1], (double)delta[2]);
+    }  // END if (mpi_rank == 0)
 
     int SFEM_READ_FP32 = 1;
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
@@ -223,7 +312,18 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
 
     const double raster_tick_start = MPI_Wtime();
 
+    tri3_raster_mesh_cell_quad(0,               //
+                               mesh.nelements,  //
+                               &mesh,           //
+                               nlocal,          //
+                               stride,          //
+                               origin,          //
+                               delta,           //
+                               NULL,            //
+                               field);          //
+
     const double raster_tick_end = MPI_Wtime();
+
     printf("Rasterization time: %.6f seconds\n", raster_tick_end - raster_tick_start);
 
 finalize:
