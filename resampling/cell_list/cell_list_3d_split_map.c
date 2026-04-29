@@ -235,23 +235,24 @@ int free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map) {
 /////////////////////////////////////////////////
 // fill_cell_lists_3d_2d_split_map
 /////////////////////////////////////////////////
-int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
-                                    cell_list_3d_2d_map_t *map_upper,  //
-                                    const real_t           split_x,    //
-                                    const real_t           split_y,    //
-                                    const real_t          *box_min_x,  //
-                                    const real_t          *box_min_y,  //
-                                    const real_t          *box_min_z,  //
-                                    const real_t          *box_max_x,  //
-                                    const real_t          *box_max_y,  //
-                                    const real_t          *box_max_z,  //
-                                    const int              num_boxes,  //
-                                    const real_t           x_min,      //
-                                    const real_t           x_max,      //
-                                    const real_t           y_min,      //
-                                    const real_t           y_max,      //
-                                    const real_t           z_min,      //
-                                    const real_t           z_max) {    //
+int                                                                //
+fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
+                                cell_list_3d_2d_map_t *map_upper,  //
+                                const real_t           split_x,    //
+                                const real_t           split_y,    //
+                                const real_t          *box_min_x,  //
+                                const real_t          *box_min_y,  //
+                                const real_t          *box_min_z,  //
+                                const real_t          *box_max_x,  //
+                                const real_t          *box_max_y,  //
+                                const real_t          *box_max_z,  //
+                                const int              num_boxes,  //
+                                const real_t           x_min,      //
+                                const real_t           x_max,      //
+                                const real_t           y_min,      //
+                                const real_t           y_max,      //
+                                const real_t           z_min,      //
+                                const real_t           z_max) {    //
 
     real_t max_delta_lower_x = 0.0;
     real_t max_delta_lower_y = 0.0;
@@ -407,22 +408,23 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
 /////////////////////////////////////////////////
 // build_cell_list_3d_2d_split_map
 /////////////////////////////////////////////////
-int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
-                                    const real_t                  split_x,    //
-                                    const real_t                  split_y,    //
-                                    const real_t                 *box_min_x,  //
-                                    const real_t                 *box_min_y,  //
-                                    const real_t                 *box_min_z,  //
-                                    const real_t                 *box_max_x,  //
-                                    const real_t                 *box_max_y,  //
-                                    const real_t                 *box_max_z,  //
-                                    const int                     num_boxes,  //
-                                    const real_t                  x_min,      //
-                                    const real_t                  x_max,      //
-                                    const real_t                  y_min,      //
-                                    const real_t                  y_max,      //
-                                    const real_t                  z_min,      //
-                                    const real_t                  z_max) {    //
+int                                                                       //
+build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
+                                const real_t                  split_x,    //
+                                const real_t                  split_y,    //
+                                const real_t                 *box_min_x,  //
+                                const real_t                 *box_min_y,  //
+                                const real_t                 *box_min_z,  //
+                                const real_t                 *box_max_x,  //
+                                const real_t                 *box_max_y,  //
+                                const real_t                 *box_max_z,  //
+                                const int                     num_boxes,  //
+                                const real_t                  x_min,      //
+                                const real_t                  x_max,      //
+                                const real_t                  y_min,      //
+                                const real_t                  y_max,      //
+                                const real_t                  z_min,      //
+                                const real_t                  z_max) {    //
 
     if (split_map == NULL) {
         return -1;  // Invalid pointer

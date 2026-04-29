@@ -77,6 +77,21 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
                                                real_t                     **tri3_intersect_z);       //
 
 /**
+ * @brief Build a split 3D->1D cell-list map for triangle meshes, partitioning triangles based on their centroids relative to a
+ * split line. This function computes the centroids of the triangles, determines a split line (e.g., median x or y), partitions
+ * the triangles into "lower" and "upper" groups, and builds separate cell-list maps for each group.
+ * @param mesh Pointer to the input mesh containing the triangles.
+ * @param boxes Pointer to the bounding boxes associated with triangles.
+ * @param split_map Output pointer to the allocated split map. Caller owns the memory and must free it using
+ * free_cell_list_split_3d_1d_map_mesh.
+ * @return EXIT_SUCCESS on success, or EXIT_FAILURE on error (e.g., memory allocation failure).
+ */
+int                                                                            //
+build_cell_list_split_3d_1d_map_mesh(cell_list_split_3d_1d_map_t **split_map,  //
+                                     const mesh_t                 *mesh,       //
+                                     const boxes_t                *boxes);     //
+
+/**
  * @brief Compute the z coordinate of the intersection point between a vertical ray from (x, y) and the triangle defined by v0,
  * v1, v2. This function assumes that (x, y) is inside the projection of the triangle onto the XY plane. It computes the z
  * coordinate of the point on the triangle that corresponds to (x, y).
@@ -98,7 +113,19 @@ query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(const cell_list_split_3d_1d
                                                      real_t                           **tri3_intersect_z);  //
 
 /**
- * @brief
+ * @brief Rasterize a triangle mesh using the 3D->1D cell-list map to efficiently find candidate triangles for each (x, y) and
+ * compute the corresponding z values. This function queries the split map for each (x, y), checks candidate triangles for
+ * intersection, and fills out_z with the z coordinates of the intersections.
+ * @param map Pointer to the split cell-list map.
+ * @param boxes Pointer to the bounding boxes associated with triangles.
+ * @param mesh_geom Pointer to triangle geometric data used for point-in-triangle tests.
+ * @param x Query x coordinate.
+ * @param y Query y coordinate.
+ * @param z_coords Array of z coordinates to check for intersection (used for filtering candidates).
+ * @param num_z_coords Number of entries in z_coords.
+ * @param out_z Output array to store the z coordinates of the intersections. Must be pre-allocated with size at least
+ * num_z_coords.
+ * @return EXIT_SUCCESS on success, or EXIT_FAILURE on error (e.g., memory allocation failure).
  */
 int                                                                                                      //
 raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_1d_map_t *map,           //

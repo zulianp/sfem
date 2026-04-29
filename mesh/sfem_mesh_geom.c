@@ -377,3 +377,78 @@ real_t *get_vertices_zero_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i)
 
     return &geom->vetices_zero[element_i * 3];
 }
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// mesh_tri3_geometry_init
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+mesh_tri3_geom_t mesh_tri3_geometry_init(const mesh_t *mesh) {
+    mesh_tri3_geom_t geom = {0};
+
+    geom.ref_mesh      = (mesh_t *)mesh;
+    geom.vertices_zero = NULL;
+
+    return geom;
+}  // END Function: mesh_tri3_geometry_init
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// mesh_tri3_geometry_alloc
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+mesh_tri3_geom_t *mesh_tri3_geometry_alloc(const mesh_t *mesh) {
+    mesh_tri3_geom_t *geom = malloc(sizeof(mesh_tri3_geom_t));
+
+    if (geom == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for mesh_tri3_geom_t\n");
+        return NULL;
+    }  // END if (geom == NULL)
+
+    *geom = mesh_tri3_geometry_init(mesh);
+
+    return geom;
+}  // END Function: mesh_tri3_geometry_alloc
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// mesh_tri3_geometry_alloc_nelements
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+mesh_tri3_geom_t *mesh_tri3_geometry_alloc_nelements(int nelements) {
+    mesh_tri3_geom_t *geom = malloc(sizeof(mesh_tri3_geom_t));
+
+    if (geom == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for mesh_tri3_geom_t\n");
+        return NULL;
+    }  // END if (geom == NULL)
+
+    geom->ref_mesh      = NULL;
+    geom->vertices_zero = malloc(nelements * 3 * sizeof(real_t));
+
+    if (geom->vertices_zero == NULL) {
+        fprintf(stderr, "Error: Failed to allocate mesh_tri3_geom_t arrays for %d elements\n", nelements);
+        free(geom);
+        return NULL;
+    }  // END if (geom->vertices_zero == NULL)
+
+    return geom;
+}  // END Function: mesh_tri3_geometry_alloc_nelements
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// mesh_tri3_geometry_free
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+void mesh_tri3_geometry_free(mesh_tri3_geom_t *geom) {
+    if (geom == NULL) {
+        return;
+    }
+
+    if (geom->vertices_zero) {
+        free(geom->vertices_zero);
+        geom->vertices_zero = NULL;
+    }
+
+    free(geom);
+}

@@ -60,7 +60,7 @@ typedef struct {
 typedef struct {
     mesh_t *ref_mesh;
 
-    // An array of size (ref_mesh->nelements x 3) in row-major ordering storing the coordinates of the first vertex of each tet.
+    // An array of size (ref_mesh->nelements x 3) in row-major ordering storing the coordinates of the first vertex of each tri3.
     real_t *vertices_zero;
 } mesh_tri3_geom_t;
 
@@ -80,6 +80,14 @@ void mesh_tet_geometry_compute_inv_Jacobian(mesh_tet_geom_t *geom);
 real_t *get_inv_Jacobian_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i);
 
 real_t *get_vertices_zero_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i);
+
+mesh_tri3_geom_t mesh_tri3_geometry_init(const mesh_t *mesh);
+
+mesh_tri3_geom_t *mesh_tri3_geometry_alloc(const mesh_t *mesh);
+
+mesh_tri3_geom_t *mesh_tri3_geometry_alloc_nelements(int nelements);
+
+void mesh_tri3_geometry_free(mesh_tri3_geom_t *geom);
 
 bool                                            //
 is_point_out_of_tet(const real_t inv_J_tet[9],  //
