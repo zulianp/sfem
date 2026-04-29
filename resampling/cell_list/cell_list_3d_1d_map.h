@@ -81,10 +81,20 @@ void free_cell_list_3d_1d_map(cell_list_3d_1d_map_t *map);
  * @param z_max Domain upper bound in z.
  * @return EXIT_SUCCESS on success.
  */
-int build_cell_list_3d_1d_map(cell_list_3d_1d_map_t *map, const real_t *box_min_x, const real_t *box_min_y,
-                              const real_t *box_min_z, const real_t *box_max_x, const real_t *box_max_y, const real_t *box_max_z,
-                              const int num_boxes, const real_t x_min, const real_t x_max, const real_t y_min, const real_t y_max,
-                              const real_t z_min, const real_t z_max);
+int build_cell_list_3d_1d_map(cell_list_3d_1d_map_t *map,        //
+                              const real_t          *box_min_x,  //
+                              const real_t          *box_min_y,  //
+                              const real_t          *box_min_z,  //
+                              const real_t          *box_max_x,  //
+                              const real_t          *box_max_y,  //
+                              const real_t          *box_max_z,  //
+                              const int              num_boxes,  //
+                              const real_t           x_min,      //
+                              const real_t           x_max,      //
+                              const real_t           y_min,      //
+                              const real_t           y_max,      //
+                              const real_t           z_min,      //
+                              const real_t           z_max);     //
 
 /**
  * @brief Query candidate boxes that contain one point (x, y, z).

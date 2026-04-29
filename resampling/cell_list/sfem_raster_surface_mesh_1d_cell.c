@@ -2,6 +2,8 @@
 #include <omp.h>
 #endif
 
+#include <time.h>
+
 #include "cell_tet2box.h"
 #include "sfem_raster_surface_mesh_1d_cell.h"
 
@@ -28,7 +30,7 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
     const ptrdiff_t y_size = n[1];
 
 #pragma omp parallel
-    {
+    {  // OpenMP parallel region
         const ptrdiff_t z_size = n[2];
 
         real_t *z_coords = malloc(z_size * sizeof(real_t));
@@ -63,6 +65,10 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
                                                                                            z_coords,   //
                                                                                            z_size,     //
                                                                                            out_z);     //
+
+                            for (ptrdiff_t iz = 0; iz < z_size; iz++) {
+                                hex_field[i_grid * stride[0] + j_grid * stride[1] + iz * stride[2]] = out_z[iz];
+                            }  // END for (iz)
                         }
                     }
 #pragma omp barrier
@@ -75,7 +81,7 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
 
         free(out_z);
         out_z = NULL;
-    }
+    }  // END OpenMP parallel region
 
     RETURN_FROM_FUNCTION(0);
 }
@@ -95,6 +101,9 @@ tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,  
                            real_t *const SFEM_RESTRICT          data) {          // END Function: tri3_raster_mesh_cell_quad
 
     PRINT_CURRENT_FUNCTION;
+
+    struct timespec tick, tock;
+    clock_gettime(CLOCK_MONOTONIC, &tick);
 
     boxes_t *bounding_boxes_ptr = NULL;
 
@@ -118,11 +127,56 @@ tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,  
     side_length_cdf_thresholds_t thresholds =                         //
             calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);  //
 
-    mesh_tri3_geom_t *geom = NULL;
+    mesh_tri3_geom_t *geom = mesh_tri3_geometry_alloc_nelements(mesh->nelements);
+
+    cell_list_3d_1d_map_t *map = make_empty_cell_list_3d_1d_map();
+
+    {
+        struct timespec build_tick, build_tock;
+        clock_gettime(CLOCK_MONOTONIC, &build_tick);
+        build_cell_list_3d_1d_map(map,  //
+                                  bounding_boxes_ptr->min_x,
+                                  bounding_boxes_ptr->min_y,
+                                  bounding_boxes_ptr->min_z,  //
+                                  bounding_boxes_ptr->max_x,
+                                  bounding_boxes_ptr->max_y,
+                                  bounding_boxes_ptr->max_z,      //
+                                  bounding_boxes_ptr->num_boxes,  //
+                                  stats.min_x,
+                                  stats.max_x,
+                                  stats.min_y,
+                                  stats.max_y,
+                                  stats.min_z,
+                                  stats.max_z);  //
+        clock_gettime(CLOCK_MONOTONIC, &build_tock);
+        const double build_elapsed_s =
+                (double)(build_tock.tv_sec - build_tick.tv_sec) + (double)(build_tock.tv_nsec - build_tick.tv_nsec) / 1e9;
+        printf("[build_cell_list_3d_1d_map] elapsed time: %.6f s\n", build_elapsed_s);
+    }  // END block: clock build_cell_list_3d_1d_map
+
+    int64_t      cell_list_mem_bytes = cell_list_3d_1d_map_bytes(map);
+    const double cell_list_MB        = ((double)cell_list_mem_bytes) / (1024.0 * 1024.0);
+    //
+    printf("[build_cell_list_3d_1d_map] Cell list uses %ld bytes of memory (%.2f MB).\n", cell_list_mem_bytes, cell_list_MB);
+
+    // raster_to_hex_field_cell_split_par_tri3(map,                 //
+    //                                         bounding_boxes_ptr,  //
+    //                                         geom,
+    //                                         mesh,
+    //                                         n,
+    //                                         stride,
+    //                                         origin,
+    //                                         delta,
+    //                                         data);
 
 finalize:
 
-    // free_mesh_tri3_geometry(geom);
+    clock_gettime(CLOCK_MONOTONIC, &tock);
+    const double elapsed_s = (double)(tock.tv_sec - tick.tv_sec) + (double)(tock.tv_nsec - tick.tv_nsec) / 1e9;
+    printf("[tri3_raster_mesh_cell_quad] elapsed time: %.6f s\n", elapsed_s);
+
+    mesh_tri3_geometry_free(geom);
+    geom = NULL;
 
     free_boxes_t(bounding_boxes_ptr);
     bounding_boxes_ptr = NULL;
