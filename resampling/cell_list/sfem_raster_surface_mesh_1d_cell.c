@@ -42,16 +42,18 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
         }
 
         if (z_coords && out_z) {
-            for (ptrdiff_t start_i = 0; start_i < 3; start_i++) {
-                for (ptrdiff_t start_j = 0; start_j < 3; start_j++) {
-                    ptrdiff_t loop_count_i = (x_size > start_i) ? ((x_size - start_i + 2) / 3) : 0;
-                    ptrdiff_t loop_count_j = (y_size > start_j) ? ((y_size - start_j + 2) / 3) : 0;
+            const ptrdiff_t step = 3;  // Step size for collapsing loops
+
+            for (ptrdiff_t start_i = 0; start_i < step; start_i++) {
+                for (ptrdiff_t start_j = 0; start_j < step; start_j++) {
+                    ptrdiff_t loop_count_i = (x_size > start_i) ? ((x_size - start_i + step - 1) / step) : 0;
+                    ptrdiff_t loop_count_j = (y_size > start_j) ? ((y_size - start_j + step - 1) / step) : 0;
 
 #pragma omp for collapse(2) schedule(guided) nowait
-                    for (ptrdiff_t k = 0; k < loop_count_i; k++) {
-                        for (ptrdiff_t m = 0; m < loop_count_j; m++) {
-                            ptrdiff_t i_grid = start_i + (k * 3);
-                            ptrdiff_t j_grid = start_j + (m * 3);
+                    for (ptrdiff_t i = 0; i < loop_count_i; i++) {
+                        for (ptrdiff_t j = 0; j < loop_count_j; j++) {
+                            ptrdiff_t i_grid = start_i + (i * step);
+                            ptrdiff_t j_grid = start_j + (j * step);
 
                             real_t grid_x = origin[0] + i_grid * delta[0];
                             real_t grid_y = origin[1] + j_grid * delta[1];
@@ -133,9 +135,9 @@ tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,  
     {
         struct timespec build_tick, build_tock;
         clock_gettime(CLOCK_MONOTONIC, &build_tick);
-        build_cell_list_split_3d_1d_map_mesh(&split_map,  //
-                                             mesh,        //
-                                             bounding_boxes_ptr);
+        build_cell_list_split_3d_1d_map_mesh(&split_map,           //
+                                             mesh,                 //
+                                             bounding_boxes_ptr);  //
         clock_gettime(CLOCK_MONOTONIC, &build_tock);
         const double build_elapsed_s =
                 (double)(build_tock.tv_sec - build_tick.tv_sec) + (double)(build_tock.tv_nsec - build_tick.tv_nsec) / 1e9;
