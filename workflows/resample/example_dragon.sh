@@ -151,7 +151,7 @@ function process_raw_file() {
     local raw_file="${file_base}.raw"
     local metadata_file="metadata_${file_base}.yml"
     
-    if [[ $SFEM_ADJOINT -eq 1 && -f $raw_file ]]; then
+    if [[ ($SFEM_ADJOINT -eq 1 || $SFEM_RASTER_TRI_MESH -eq 1) && -f $raw_file ]]; then
         echo "Processing $raw_file..."
         head -11 metadata_sdf.float32.yml > $metadata_file
         echo "path: $PWD/$raw_file" >> $metadata_file

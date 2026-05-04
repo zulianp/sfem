@@ -7,6 +7,9 @@
 ////////////////////////////////////////////////
 static inline int coord_to_grid_index(real_t coord, real_t origin, real_t delta) { return (int)((coord - origin) / delta); }
 
+//////////////////////////////////////////////////
+// count_box_into_map
+//////////////////////////////////////////////////
 static void count_box_into_map(cell_list_3d_1d_map_t *map, const real_t box_min, const real_t box_max) {
     int ix_min = coord_to_grid_index(box_min, map->min_x, map->delta_x);
     int ix_max = coord_to_grid_index(box_max, map->min_x, map->delta_x);
@@ -19,6 +22,9 @@ static void count_box_into_map(cell_list_3d_1d_map_t *map, const real_t box_min,
     }
 }
 
+//////////////////////////////////////////////////
+// fill_box_into_map
+//////////////////////////////////////////////////
 static void fill_box_into_map(cell_list_3d_1d_map_t *map, const int box_index, const real_t *box_min_x, const real_t *box_max_x,
                               const real_t *box_min_y, const real_t *box_max_y, int *current_count) {
     int ix_min = coord_to_grid_index(box_min_x[box_index], map->min_x, map->delta_x);
@@ -61,6 +67,9 @@ static void propagate_upper_bounds_y(cell_list_3d_1d_map_t *map) {
     }
 }
 
+//////////////////////////////////////////////
+// sort_map_cells_by_lower_bounds_y
+//////////////////////////////////////////////
 static void sort_map_cells_by_lower_bounds_y(cell_list_3d_1d_map_t *map, int *size_arg_indices, int **arg_indices,
                                              real_t **buffer, int **buffer_int) {
     for (int cell_index = 0; cell_index < map->num_cells_x; cell_index++) {
@@ -92,6 +101,9 @@ static void sort_map_cells_by_lower_bounds_y(cell_list_3d_1d_map_t *map, int *si
     }
 }
 
+///////////////////////////////////////////////
+// fill_cell_lists_3d_1d_split_map
+///////////////////////////////////////////////
 int                                                                //
 fill_cell_lists_3d_1d_split_map(cell_list_3d_1d_map_t *map_lower,  //
                                 cell_list_3d_1d_map_t *map_upper,  //

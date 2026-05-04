@@ -66,9 +66,11 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
                                                                                            z_size,     //
                                                                                            out_z);     //
 
-                            for (ptrdiff_t iz = 0; iz < z_size; iz++) {
-                                hex_field[i_grid * stride[0] + j_grid * stride[1] + iz * stride[2]] = out_z[iz];
-                            }  // END for (iz)
+                            if (flag == 0) {
+                                for (ptrdiff_t iz = 0; iz < z_size; iz++) {
+                                    hex_field[i_grid * stride[0] + j_grid * stride[1] + iz * stride[2]] = out_z[iz];
+                                }  // END for (iz)
+                            }  // END if (flag == 0)
                         }
                     }
 #pragma omp barrier
@@ -124,50 +126,43 @@ tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,  
                                              50);                 //
     print_side_length_histograms(&histograms);
 
-    side_length_cdf_thresholds_t thresholds =                         //
-            calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);  //
+    mesh_tri3_geom_t *geom = mesh_tri3_geometry_alloc(mesh);
 
-    mesh_tri3_geom_t *geom = mesh_tri3_geometry_alloc_nelements(mesh->nelements);
-
-    cell_list_3d_1d_map_t *map = make_empty_cell_list_3d_1d_map();
+    cell_list_split_3d_1d_map_t *split_map = NULL;
 
     {
         struct timespec build_tick, build_tock;
         clock_gettime(CLOCK_MONOTONIC, &build_tick);
-        build_cell_list_3d_1d_map(map,  //
-                                  bounding_boxes_ptr->min_x,
-                                  bounding_boxes_ptr->min_y,
-                                  bounding_boxes_ptr->min_z,  //
-                                  bounding_boxes_ptr->max_x,
-                                  bounding_boxes_ptr->max_y,
-                                  bounding_boxes_ptr->max_z,      //
-                                  bounding_boxes_ptr->num_boxes,  //
-                                  stats.min_x,
-                                  stats.max_x,
-                                  stats.min_y,
-                                  stats.max_y,
-                                  stats.min_z,
-                                  stats.max_z);  //
+        build_cell_list_split_3d_1d_map_mesh(&split_map,  //
+                                             mesh,        //
+                                             bounding_boxes_ptr);
         clock_gettime(CLOCK_MONOTONIC, &build_tock);
         const double build_elapsed_s =
                 (double)(build_tock.tv_sec - build_tick.tv_sec) + (double)(build_tock.tv_nsec - build_tick.tv_nsec) / 1e9;
         printf("[build_cell_list_3d_1d_map] elapsed time: %.6f s\n", build_elapsed_s);
     }  // END block: clock build_cell_list_3d_1d_map
 
-    int64_t      cell_list_mem_bytes = cell_list_3d_1d_map_bytes(map);
-    const double cell_list_MB        = ((double)cell_list_mem_bytes) / (1024.0 * 1024.0);
+    free_side_length_histograms(&histograms);
+
+    int64_t cell_list_mem_bytes = 0;
+    if (split_map != NULL) {
+        cell_list_mem_bytes += cell_list_3d_1d_map_bytes(split_map->map_lower);
+        cell_list_mem_bytes += cell_list_3d_1d_map_bytes(split_map->map_upper);
+    }  // END if (split_map != NULL)
+
+    const double cell_list_MB = ((double)cell_list_mem_bytes) / (1024.0 * 1024.0);
     //
     printf("[build_cell_list_3d_1d_map] Cell list uses %ld bytes of memory (%.2f MB).\n", cell_list_mem_bytes, cell_list_MB);
 
-    // raster_to_hex_field_cell_split_par_tri3(map,                 //
-    //                                         bounding_boxes_ptr,  //
-    //                                         geom,
-    //                                         mesh,
-    //                                         n,
-    //                                         stride,
-    //                                         origin,
-    //                                         delta,
-    //                                         data);
+    raster_to_hex_field_cell_split_par_tri3(split_map,           //
+                                            bounding_boxes_ptr,  //
+                                            geom,                //
+                                            mesh,                //
+                                            n,                   //
+                                            stride,              //
+                                            origin,              //
+                                            delta,               //
+                                            data);               //
 
 finalize:
 
@@ -177,6 +172,13 @@ finalize:
 
     mesh_tri3_geometry_free(geom);
     geom = NULL;
+
+    if (split_map != NULL) {
+        free_cell_list_3d_1d_map(split_map->map_lower);
+        free_cell_list_3d_1d_map(split_map->map_upper);
+        free(split_map);
+        split_map = NULL;
+    }  // END if (split_map != NULL)
 
     free_boxes_t(bounding_boxes_ptr);
     bounding_boxes_ptr = NULL;
