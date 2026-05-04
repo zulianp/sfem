@@ -5,12 +5,17 @@
 ////////////////////////////////////////////////
 // coord_to_grid_index
 ////////////////////////////////////////////////
-static inline int coord_to_grid_index(real_t coord, real_t origin, real_t delta) { return (int)((coord - origin) / delta); }
+static inline int coord_to_grid_index(real_t coord, real_t origin, real_t delta) {  //
+    return (int)((coord - origin) / delta);
+}
 
 //////////////////////////////////////////////////
 // count_box_into_map
 //////////////////////////////////////////////////
-static void count_box_into_map(cell_list_3d_1d_map_t *map, const real_t box_min, const real_t box_max) {
+static void count_box_into_map(cell_list_3d_1d_map_t *map,        //
+                               const real_t           box_min,    //
+                               const real_t           box_max) {  //
+
     int ix_min = coord_to_grid_index(box_min, map->min_x, map->delta_x);
     int ix_max = coord_to_grid_index(box_max, map->min_x, map->delta_x);
 
@@ -146,17 +151,17 @@ fill_cell_lists_3d_1d_split_map(cell_list_3d_1d_map_t *map_lower,  //
 
     for (int i = 0; i < num_boxes; i++) {
         const real_t dx = fabs(box_max_x[i] - box_min_x[i]);
-        const real_t dy = fabs(box_max_y[i] - box_min_y[i]);
-        const real_t dz = fabs(box_max_z[i] - box_min_z[i]);
+        // const real_t dy = fabs(box_max_y[i] - box_min_y[i]);
+        // const real_t dz = fabs(box_max_z[i] - box_min_z[i]);
 
         if (dx < split_x) {
             if (dx > max_delta_x_lower) max_delta_x_lower = dx;
-            if (dy > max_delta_y_lower) max_delta_y_lower = dy;
-            if (dz > max_delta_z_lower) max_delta_z_lower = dz;
+            // if (dy > max_delta_y_lower) max_delta_y_lower = dy;
+            // if (dz > max_delta_z_lower) max_delta_z_lower = dz;
         } else {
             if (dx > map_upper->delta_x) map_upper->delta_x = dx;
-            if (dy > map_upper->delta_y) map_upper->delta_y = dy;
-            if (dz > map_upper->delta_z) map_upper->delta_z = dz;
+            // if (dy > map_upper->delta_y) map_upper->delta_y = dy;
+            // if (dz > map_upper->delta_z) map_upper->delta_z = dz;
         }
     }
 
@@ -309,7 +314,7 @@ build_cell_list_split_3d_1d_map_mesh(cell_list_split_3d_1d_map_t **split_map,  /
 
     bounding_box_statistics_t    stats      = calculate_bounding_box_statistics(boxes);
     side_length_histograms_t     histograms = calculate_side_length_histograms(boxes, &stats, 50);
-    side_length_cdf_thresholds_t thresholds = calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);
+    side_length_cdf_thresholds_t thresholds = calculate_cdf_thresholds(&histograms, 0.6, 0.6, 0.6);
     free_side_length_histograms(&histograms);
 
     (*split_map)->split_x = thresholds.threshold_x;
@@ -386,6 +391,21 @@ intersection_point_triangle_xy(const real_t v0[3],    //
     // Degenerate or axis-aligned triangle: nz ≈ 0 means no unique z solution
     if (nz * nz < 1e-24) {
         *out_z = v0[2];
+        fprintf(stderr,
+                "Warning: Triangle is degenerate or nearly axis-aligned in XY plane. Returning z of first vertex as intersection "
+                "point.\n"
+                "  v0 = (%.6g, %.6g, %.6g)\n"
+                "  v1 = (%.6g, %.6g, %.6g)\n"
+                "  v2 = (%.6g, %.6g, %.6g)\n"
+                "  e1 = (%.6g, %.6g, %.6g)\n"
+                "  e2 = (%.6g, %.6g, %.6g)\n"
+                "  normal = (%.6g, %.6g, %.6g)  |nz| = %.6g\n",
+                v0[0], v0[1], v0[2],
+                v1[0], v1[1], v1[2],
+                v2[0], v2[1], v2[2],
+                e1x, e1y, e1z,
+                e2x, e2y, e2z,
+                nx, ny, nz, fabs(nz));
         return;
     }
 
@@ -483,7 +503,7 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
                 if (triangles_found + start_index_tri3_array >= *size_t3_array) {
                     *size_t3_array *= 2;
                     real_t *tmp = realloc(*tri3_intersect_z, (*size_t3_array) * sizeof(real_t));
-                    if (!tmp) return EXIT_FAILURE;
+                    if (!tmp) return -1;
                     *tri3_intersect_z = tmp;
                 }
 
@@ -534,6 +554,14 @@ query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_v(const cell_list_split_3d_1d
                                                                                num_found_lower,    // start_index_tri3_array
                                                                                size_t3_array,      //
                                                                                tri3_intersect_z);  //
+
+    if ((num_found_lower + num_found_upper) % 2 != 0) {
+        fprintf(stderr,
+                "Warning: Odd number of triangle intersections found. "
+                "\n*  %d found in lower map, %d found in upper map.\n",
+                num_found_lower,
+                num_found_upper);
+    }
     return num_found_lower + num_found_upper;
 }
 
@@ -574,7 +602,7 @@ raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_
         return -1;  // Invalid pointer
     }
 
-    int     size_t3_array    = 64;  // Initial size for intersecting triangles array
+    int     size_t3_array    = 2000;  // Initial size for intersecting triangles array
     real_t *tri3_intersect_z = malloc(size_t3_array * sizeof(real_t));
     if (!tri3_intersect_z) {
         return -1;  // Memory allocation failure
@@ -590,16 +618,28 @@ raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(const cell_list_split_3d_
 
     if (num_triangles <= 0) {
         free(tri3_intersect_z);
+        // fprintf(stderr, "Error: No intersecting triangles found for the given (x, y) coordinates.\n");
         return -1;  // No intersecting triangles found
     }
 
     if (num_triangles % 2 != 0) {
         free(tri3_intersect_z);
+        fprintf(stderr,
+                "Error: Odd number of triangle intersections found. This may indicate non-manifold geometry or an error in the "
+                "mesh.\n");
         return -1;  // Odd number of intersections suggests a problem (e.g., non-manifold geometry)
     }
 
     // sort the intersecting triangles' z values
     qsort(tri3_intersect_z, num_triangles, sizeof(real_t), cmp_real_t);
+
+    if (num_triangles % 2 != 0) {
+        free(tri3_intersect_z);
+        fprintf(stderr,
+                "Error: Odd number of triangle intersections found. This may indicate non-manifold geometry or an error in the "
+                "mesh.\n");
+        return -1;  // Odd number of intersections suggests a problem (e.g., non-manifold geometry)
+    }
 
     check_intervals(z_coords, num_z_coords, tri3_intersect_z, num_triangles, out_z);
 

@@ -245,6 +245,34 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
         return EXIT_FAILURE;
     }  // END if (compute_reasonable_grid_from_bounds(...))
 
+    // Normalize mesh to the bounds in a grid (0, 0, 0) to (1, 1, 1) for better numerical stability in rasterization
+    for (int d = 0; d < scan_dim; d++) {
+        const geom_t min_d = origin[d];
+        const geom_t max_d = origin[d] + delta[d] * (nglobal[d] - 1);
+        const geom_t range = max_d - min_d;
+
+        if (range > 0) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                mesh.points[d][i] = (mesh.points[d][i] - min_d) / range;
+            }
+            origin[d] = (origin[d] - min_d) / range;
+            delta[d]  = delta[d] / range;
+        } else {
+            // If the range is zero, set all coordinates to 0.5 (center of the grid)
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                mesh.points[d][i] = 0.5;
+            }
+            origin[d] = 0.5;
+            delta[d]  = 1.0;  // Set delta to 1 to avoid division by zero in rasterization
+        }
+    }  // END for (int d = 0; d < scan_dim; d++)
+
+    for (int d = 0; d < 3; d++) {
+        const ptrdiff_t nintervals = nglobal[d] > 1 ? nglobal[d] - 1 : 1;
+        origin[d]                  = 0;
+        delta[d]                   = 1.0 / nintervals;
+    }  // END for (int d = 0; d < 3; d++)
+
     if (print_mesh_info_and_coordinate_bounds(
                 comm, mpi_rank, &mesh, folder, local_min, local_max, global_min, global_max, scan_dim)) {
         fprintf(stderr, "Error: print_mesh_info_and_coordinate_bounds failed %s:%d\n", __FILE__, __LINE__);
