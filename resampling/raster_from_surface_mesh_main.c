@@ -326,6 +326,32 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
 
     printf("Rasterization time: %.6f seconds\n", raster_tick_end - raster_tick_start);
 
+    char out_filename_raw[1000];
+
+    const char* env_out_filename = getenv("OUT_FILENAME_RAW");
+    if (env_out_filename && strlen(env_out_filename) > 0) {
+        snprintf(out_filename_raw, 1000, "%s", env_out_filename);
+    } else {
+        snprintf(out_filename_raw, 1000, "%s/test_field.raw", out_base_directory);
+    }
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Writing output field to: %s, %s:%d\n", out_filename_raw, __FILE__, __LINE__);
+#endif
+    {
+        // Convert geom_t arrays to real_t for make_metadata
+        real_t delta_real[3]  = {(real_t)delta[0], (real_t)delta[1], (real_t)delta[2]};
+        real_t origin_real[3] = {(real_t)origin[0], (real_t)origin[1], (real_t)origin[2]};
+        make_metadata(nlocal, delta_real, origin_real, out_base_directory);
+        ndarray_write(MPI_COMM_WORLD,                                       //
+                      out_filename_raw,                                     //
+                      ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),  //
+                      3,                                                    //
+                      field,                                                //
+                      nlocal,                                               //
+                      nglobal);                                             //
+    }
+
 finalize:
 
     if (field) free(field);
