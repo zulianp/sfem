@@ -20,6 +20,7 @@
 #include "sfem_prolongation_restriction.h"
 
 #include <list>
+#include <algorithm>
 
 namespace sfem {
 
