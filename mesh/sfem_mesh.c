@@ -459,7 +459,7 @@ void remap_elements_to_contiguous_index(const ptrdiff_t  n_elements,
         }
     }
 
-    idx_t *node_mapping = malloc(n_contiguous * sizeof(idx_t));
+    idx_t *node_mapping = (idx_t*)malloc(n_contiguous * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < n; ++i) {
         if (remap[i] != SFEM_IDX_INVALID) {
             node_mapping[remap[i]] = i;
