@@ -386,8 +386,9 @@ real_t *get_vertices_zero_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i)
 mesh_tri3_geom_t mesh_tri3_geometry_init(const mesh_t *mesh) {
     mesh_tri3_geom_t geom = {0};
 
-    geom.ref_mesh      = (mesh_t *)mesh;
-    geom.vertices_zero = NULL;
+    geom.ref_mesh        = (mesh_t *)mesh;
+    geom.vertices_zero   = NULL;
+    geom.element_coords  = NULL;
 
     return geom;
 }  // END Function: mesh_tri3_geometry_init
@@ -450,5 +451,44 @@ void mesh_tri3_geometry_free(mesh_tri3_geom_t *geom) {
         geom->vertices_zero = NULL;
     }
 
+    if (geom->element_coords) {
+        free(geom->element_coords);
+        geom->element_coords = NULL;
+    }
+
     free(geom);
+}
+
+////////////////////////////////////////////////////////////
+// mesh_tri3_geometry_compute_element_coords
+////////////////////////////////////////////////////////////
+void mesh_tri3_geometry_compute_element_coords(mesh_tri3_geom_t *geom) {
+    if (geom == NULL || geom->ref_mesh == NULL) return;
+
+    const mesh_t    *m  = geom->ref_mesh;
+    const ptrdiff_t  ne = m->nelements;
+
+    if (geom->element_coords == NULL) {
+        geom->element_coords = malloc(ne * 9 * sizeof(geom_t));
+        if (geom->element_coords == NULL) {
+            fprintf(stderr, "Error: Failed to allocate element_coords for %td elements\n", ne);
+            return;
+        }
+    }
+
+    const idx_t  *const e0 = m->elements[0];
+    const idx_t  *const e1 = m->elements[1];
+    const idx_t  *const e2 = m->elements[2];
+    const geom_t *const px = m->points[0];
+    const geom_t *const py = m->points[1];
+    const geom_t *const pz = m->points[2];
+    geom_t *const        ec = geom->element_coords;
+
+    for (ptrdiff_t i = 0; i < ne; i++) {
+        const idx_t v0 = e0[i], v1 = e1[i], v2 = e2[i];
+        geom_t *const row = ec + i * 9;
+        row[0] = px[v0]; row[1] = py[v0]; row[2] = pz[v0];
+        row[3] = px[v1]; row[4] = py[v1]; row[5] = pz[v1];
+        row[6] = px[v2]; row[7] = py[v2]; row[8] = pz[v2];
+    }
 }

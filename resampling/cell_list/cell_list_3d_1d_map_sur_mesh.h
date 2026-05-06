@@ -46,7 +46,7 @@ intersect_triangle_xy(const real_t v0[3],  //
  * @param out_z Pointer to store the computed z coordinate of the intersection point.
  * @return void. The computed z coordinate is stored in *out_z.
  */
-void                                                 //
+int                                                  //
 intersection_point_triangle_xy(const real_t v0[3],   //
                                const real_t v1[3],   //
                                const real_t v2[3],   //

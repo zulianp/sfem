@@ -36,55 +36,40 @@ raster_to_hex_field_cell_split_par_tri3(const cell_list_split_3d_1d_map_t   *spl
         real_t *z_coords = malloc(z_size * sizeof(real_t));
         real_t *out_z    = malloc(z_size * sizeof(real_t));
 
-        for (ptrdiff_t i = 0; i < z_size; i++) {
-            z_coords[i] = origin[2] + (real_t)(i)*delta[2];
-            out_z[i]    = 0.0;  // Initialize out_z to zero (or any default value as needed)
-        }
-
         if (z_coords && out_z) {
-            const ptrdiff_t step = 3;  // Step size for collapsing loops
-
-            for (ptrdiff_t start_i = 0; start_i < step; start_i++) {
-                for (ptrdiff_t start_j = 0; start_j < step; start_j++) {
-                    ptrdiff_t loop_count_i = (x_size > start_i) ? ((x_size - start_i + step - 1) / step) : 0;
-                    ptrdiff_t loop_count_j = (y_size > start_j) ? ((y_size - start_j + step - 1) / step) : 0;
+            for (ptrdiff_t i = 0; i < z_size; i++) {
+                z_coords[i] = origin[2] + (real_t)i * delta[2];
+                out_z[i]    = 0.0;
+            }
 
 #pragma omp for collapse(2) schedule(guided) nowait
-                    for (ptrdiff_t i = 0; i < loop_count_i; i++) {
-                        for (ptrdiff_t j = 0; j < loop_count_j; j++) {
-                            ptrdiff_t i_grid = start_i + (i * step);
-                            ptrdiff_t j_grid = start_j + (j * step);
+            for (ptrdiff_t i = 0; i < x_size; i++) {
+                for (ptrdiff_t j = 0; j < y_size; j++) {
+                    real_t grid_x = origin[0] + i * delta[0];
+                    real_t grid_y = origin[1] + j * delta[1];
 
-                            real_t grid_x = origin[0] + i_grid * delta[0];
-                            real_t grid_y = origin[1] + j_grid * delta[1];
+                    const int flag =                                                           //
+                            raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(split_map,  //
+                                                                                   boxes,      //
+                                                                                   mesh_geom,  //
+                                                                                   grid_x,     //
+                                                                                   grid_y,     //
+                                                                                   z_coords,   //
+                                                                                   z_size,     //
+                                                                                   out_z);     //
 
-                            const int flag =                                                           //
-                                    raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_v(split_map,  //
-                                                                                           boxes,      //
-                                                                                           mesh_geom,  //
-                                                                                           grid_x,     //
-                                                                                           grid_y,     //
-                                                                                           z_coords,   //
-                                                                                           z_size,     //
-                                                                                           out_z);     //
-
-                            if (flag == 0) {
-                                for (ptrdiff_t iz = 0; iz < z_size; iz++) {
-                                    hex_field[i_grid * stride[0] + j_grid * stride[1] + iz * stride[2]] = out_z[iz];
-                                }  // END for (iz)
-                            }  // END if (flag == 0)
+                    if (flag == 0) {
+                        const ptrdiff_t idx = i * stride[0] + j * stride[1];
+                        for (ptrdiff_t iz = 0; iz < z_size; iz++) {
+                            hex_field[idx + iz * stride[2]] = out_z[iz];
                         }
                     }
-#pragma omp barrier
                 }
             }
         }  // END if (z_coords && out_z)
 
         free(z_coords);
-        z_coords = NULL;
-
         free(out_z);
-        out_z = NULL;
     }  // END OpenMP parallel region
 
     RETURN_FROM_FUNCTION(0);
@@ -129,6 +114,7 @@ tri3_raster_mesh_cell_quad(const ptrdiff_t                      start_element,  
     print_side_length_histograms(&histograms);
 
     mesh_tri3_geom_t *geom = mesh_tri3_geometry_alloc(mesh);
+    mesh_tri3_geometry_compute_element_coords(geom);
 
     cell_list_split_3d_1d_map_t *split_map = NULL;
 
