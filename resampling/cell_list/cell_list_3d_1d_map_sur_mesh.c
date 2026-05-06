@@ -371,7 +371,7 @@ intersect_triangle_xy(const real_t v0[3],  //
 ////////////////////////////////////////////////////
 // intersection_point_triangle_xy
 ////////////////////////////////////////////////////
-void                                                  //
+int                                                   //
 intersection_point_triangle_xy(const real_t v0[3],    //
                                const real_t v1[3],    //
                                const real_t v2[3],    //
@@ -400,17 +400,31 @@ intersection_point_triangle_xy(const real_t v0[3],    //
                 "  e1 = (%.6g, %.6g, %.6g)\n"
                 "  e2 = (%.6g, %.6g, %.6g)\n"
                 "  normal = (%.6g, %.6g, %.6g)  |nz| = %.6g\n",
-                v0[0], v0[1], v0[2],
-                v1[0], v1[1], v1[2],
-                v2[0], v2[1], v2[2],
-                e1x, e1y, e1z,
-                e2x, e2y, e2z,
-                nx, ny, nz, fabs(nz));
-        return;
+                v0[0],
+                v0[1],
+                v0[2],
+                v1[0],
+                v1[1],
+                v1[2],
+                v2[0],
+                v2[1],
+                v2[2],
+                e1x,
+                e1y,
+                e1z,
+                e2x,
+                e2y,
+                e2z,
+                nx,
+                ny,
+                nz,
+                fabs(nz));
+        return EXIT_FAILURE;
     }
 
     // Plane equation:  n · (P − v0) = 0  →  solve for z
     *out_z = v0[2] - (nx * (x - v0[0]) + ny * (y - v0[1])) / nz;
+    return EXIT_SUCCESS;
 }
 
 //////////////////////////////////////////////////
@@ -465,29 +479,50 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
 
         // const int *cell_dict_local = &map->cell_dict[start_index];
 
+        const int *const    cell_dict = &map->cell_dict[start_index];
+        const geom_t *const ec        = mesh_geom->element_coords;
+
+        // Fallback pointers used only when element_coords is not precomputed
+        const mesh_t *const rmesh = (ec == NULL) ? mesh_geom->ref_mesh : NULL;
+        const idx_t *const  re0   = (ec == NULL) ? rmesh->elements[0] : NULL;
+        const idx_t *const  re1   = (ec == NULL) ? rmesh->elements[1] : NULL;
+        const idx_t *const  re2   = (ec == NULL) ? rmesh->elements[2] : NULL;
+        const geom_t *const rpx   = (ec == NULL) ? rmesh->points[0] : NULL;
+        const geom_t *const rpy   = (ec == NULL) ? rmesh->points[1] : NULL;
+        const geom_t *const rpz   = (ec == NULL) ? rmesh->points[2] : NULL;
+
         for (int i = lower_bound_index; i < upper_bound_index; i++) {
-            const int box_index = map->cell_dict[start_index + i];
+            const int box_index = cell_dict[i];
 
-            // Capture the triangle vertices for the current box
-            // mesh_geom->ref_mesh->points
-
-            idx_t ev[3];
-            for (int v = 0; v < 3; ++v) {
-                ev[v] = mesh_geom->ref_mesh->elements[v][box_index];
+            real_t x0, y0, z0, x1, y1, z1, x2, y2, z2;
+            if (ec != NULL) {
+                if (i + 1 < upper_bound_index) {
+                    __builtin_prefetch(&ec[cell_dict[i + 1] * 9], 0, 1);
+                }
+                const geom_t *const row = ec + box_index * 9;
+                x0                      = row[0];
+                y0                      = row[1];
+                z0                      = row[2];
+                x1                      = row[3];
+                y1                      = row[4];
+                z1                      = row[5];
+                x2                      = row[6];
+                y2                      = row[7];
+                z2                      = row[8];
+            } else {
+                const idx_t ev0 = re0[box_index];
+                const idx_t ev1 = re1[box_index];
+                const idx_t ev2 = re2[box_index];
+                x0              = rpx[ev0];
+                y0              = rpy[ev0];
+                z0              = rpz[ev0];
+                x1              = rpx[ev1];
+                y1              = rpy[ev1];
+                z1              = rpz[ev1];
+                x2              = rpx[ev2];
+                y2              = rpy[ev2];
+                z2              = rpz[ev2];
             }
-
-            // Read the coordinates of the vertices of the tetrahedron
-            const real_t x0 = mesh_geom->ref_mesh->points[0][ev[0]];
-            const real_t x1 = mesh_geom->ref_mesh->points[0][ev[1]];
-            const real_t x2 = mesh_geom->ref_mesh->points[0][ev[2]];
-
-            const real_t y0 = mesh_geom->ref_mesh->points[1][ev[0]];
-            const real_t y1 = mesh_geom->ref_mesh->points[1][ev[1]];
-            const real_t y2 = mesh_geom->ref_mesh->points[1][ev[2]];
-
-            const real_t z0 = mesh_geom->ref_mesh->points[2][ev[0]];
-            const real_t z1 = mesh_geom->ref_mesh->points[2][ev[1]];
-            const real_t z2 = mesh_geom->ref_mesh->points[2][ev[2]];
 
             // Check if the vertical ray from (x, y) intersects the triangle
             // defined by the vertices of the current box.
@@ -500,21 +535,25 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
                                       (real_t[3]){x2, y2, z2},  //
                                       x,
                                       y)) {
-                if (triangles_found + start_index_tri3_array >= *size_t3_array) {
-                    *size_t3_array *= 2;
-                    real_t *tmp = realloc(*tri3_intersect_z, (*size_t3_array) * sizeof(real_t));
-                    if (!tmp) return -1;
-                    *tri3_intersect_z = tmp;
+                real_t intersection_z;
+
+                int f = intersection_point_triangle_xy((real_t[3]){x0, y0, z0},  //
+                                                       (real_t[3]){x1, y1, z1},  //
+                                                       (real_t[3]){x2, y2, z2},  //
+                                                       x,
+                                                       y,
+                                                       &intersection_z);
+                if (f == EXIT_SUCCESS) {
+                    if (triangles_found + start_index_tri3_array >= *size_t3_array) {
+                        *size_t3_array *= 2;
+                        real_t *tmp = realloc(*tri3_intersect_z, (*size_t3_array) * sizeof(real_t));
+                        if (!tmp) return -1;
+                        *tri3_intersect_z = tmp;
+                    }
+
+                    (*tri3_intersect_z)[triangles_found + start_index_tri3_array] = intersection_z;
+                    triangles_found++;
                 }
-
-                intersection_point_triangle_xy((real_t[3]){x0, y0, z0},  //
-                                               (real_t[3]){x1, y1, z1},  //
-                                               (real_t[3]){x2, y2, z2},  //
-                                               x,
-                                               y,
-                                               &(*tri3_intersect_z)[triangles_found + start_index_tri3_array]);
-
-                triangles_found++;
             }
         }
     }

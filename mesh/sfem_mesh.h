@@ -62,6 +62,10 @@ typedef struct {
 
     // An array of size (ref_mesh->nelements x 3) in row-major ordering storing the coordinates of the first vertex of each tri3.
     real_t *vertices_zero;
+
+    // AoS precomputed coords: nelements * 9 geom_t values, layout [x0,y0,z0,x1,y1,z1,x2,y2,z2] per element.
+    // Eliminates 2-level gather (elements->points) in query inner loops. NULL if not computed.
+    geom_t *element_coords;
 } mesh_tri3_geom_t;
 
 /**
@@ -88,6 +92,8 @@ mesh_tri3_geom_t *mesh_tri3_geometry_alloc(const mesh_t *mesh);
 mesh_tri3_geom_t *mesh_tri3_geometry_alloc_nelements(int nelements);
 
 void mesh_tri3_geometry_free(mesh_tri3_geom_t *geom);
+
+void mesh_tri3_geometry_compute_element_coords(mesh_tri3_geom_t *geom);
 
 bool                                            //
 is_point_out_of_tet(const real_t inv_J_tet[9],  //

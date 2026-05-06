@@ -27,7 +27,15 @@ export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
 # mesh=on_raw
-mesh=dragon
+
+# Available meshes: bunny, dragon, goat
+AVAILABLE_MESHES="bunny dragon goat"
+SFEM_MESH=${SFEM_MESH:-dragon}
+
+echo "Available meshes: $AVAILABLE_MESHES"
+echo "Selected mesh: $SFEM_MESH"
+
+mesh=$SFEM_MESH
 
 export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -96,8 +104,8 @@ LAUNCH="${Nsight_PATH}/ncu \
         mpiexec -np $n_procs "
 fi
 
-GRID_TO_MESH="grid_to_mesh"
-# GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
+# GRID_TO_MESH="grid_to_mesh"
+GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 # LAUNCH="lldb --"
 
@@ -169,3 +177,18 @@ process_raw_file test_field
 if [[ -f "test_field.xdmf" && $PRECISION == "float64" ]]; then
     sed -i 's/Precision="4"/Precision="8"/' test_field.xdmf
 fi
+
+echo ""
+echo "========================================"
+echo "Summary of environment variables:"
+echo "========================================"
+echo "  Available meshes: $AVAILABLE_MESHES"
+echo "  SFEM_MESH          = ${SFEM_MESH} (available: bunny, dragon, goat)"
+echo "  SFEM_HEX_SIZE      = ${SFEM_HEX_SIZE:-800}"
+echo "  SFEM_CLUSTER_SIZE  = ${SFEM_CLUSTER_SIZE:-32}"
+echo "  SFEM_ADJOINT       = ${SFEM_ADJOINT:-0}"
+echo "  SFEM_RASTER_TRI_MESH = ${SFEM_RASTER_TRI_MESH:-1}"
+echo "  SFEM_INTERPOLATE   = ${SFEM_INTERPOLATE:-0}"
+echo "  SFEM_READ_FP32     = ${SFEM_READ_FP32:-1}"
+echo "  OMP_NUM_THREADS    = ${OMP_NUM_THREADS}"
+echo "========================================"
