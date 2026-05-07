@@ -74,14 +74,33 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     f->add_operator(kv_op);
 
     // Get problem size
-    auto            blas  = sfem::blas<real_t>(es);
-    const ptrdiff_t ndofs = fs->n_dofs();
+    auto            blas       = sfem::blas<real_t>(es);
+    const ptrdiff_t ndofs      = fs->n_dofs();
+    const int       block_size = fs->block_size();
+
+    // Body force parameters. This driver targets the regular HEX8 workflow; keep
+    // semistructured/body-force behavior out of scope unless explicitly added.
+    real_t SFEM_BODY_FORCE_X = smesh::Env::read("SFEM_BODY_FORCE_X", real_t(0));
+    real_t SFEM_BODY_FORCE_Y = smesh::Env::read("SFEM_BODY_FORCE_Y", real_t(0));
+    real_t SFEM_BODY_FORCE_Z = smesh::Env::read("SFEM_BODY_FORCE_Z", real_t(0));
+    const real_t body_force[3] = {SFEM_BODY_FORCE_X, SFEM_BODY_FORCE_Y, SFEM_BODY_FORCE_Z};
+    const real_t body_force_norm = sqrt(SFEM_BODY_FORCE_X * SFEM_BODY_FORCE_X +
+                                        SFEM_BODY_FORCE_Y * SFEM_BODY_FORCE_Y +
+                                        SFEM_BODY_FORCE_Z * SFEM_BODY_FORCE_Z);
+
+    if (body_force_norm > 0 && es != sfem::EXECUTION_SPACE_HOST) {
+        if (!comm->rank()) {
+            fprintf(stderr, "SFEM_BODY_FORCE_* is currently supported by this driver only on host execution space.\n");
+        }
+        return SFEM_FAILURE;
+    }
 
     if (!comm->rank() && verbose) {
         printf("\n=== Kelvin-Voigt Newmark Time Integration ===\n");
         printf("Number of DOFs: %td\n", ndofs);
         printf("Execution space: %s\n", SFEM_EXECUTION_SPACE ? SFEM_EXECUTION_SPACE : "HOST");
         printf("Refine level: %d\n", SFEM_ELEMENT_REFINE_LEVEL);
+        printf("Body force: [%g, %g, %g]\n", SFEM_BODY_FORCE_X, SFEM_BODY_FORCE_Y, SFEM_BODY_FORCE_Z);
     }
 
     // Create state vectors
@@ -92,6 +111,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     auto temp_vel     = sfem::create_buffer<real_t>(ndofs, es);
     auto solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto g            = sfem::create_buffer<real_t>(ndofs, es);
+    auto body_rhs     = sfem::create_buffer<real_t>(ndofs, es);
 
     // Initialize all buffers to zero
     blas->zeros(ndofs, displacement->data());
@@ -101,6 +121,44 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     blas->zeros(ndofs, increment->data());
     blas->zeros(ndofs, temp_vel->data());
     blas->zeros(ndofs, g->data());
+    blas->zeros(ndofs, body_rhs->data());
+
+    if (body_force_norm > 0) {
+        auto mass_op = sfem::create_op(fs, "LumpedMass", es);
+        if (!mass_op) {
+            if (!comm->rank()) {
+                fprintf(stderr, "Failed to create LumpedMass operator for Kelvin-Voigt body force.\n");
+            }
+            return SFEM_FAILURE;
+        }
+
+        int err = mass_op->initialize();
+        if (err != SFEM_SUCCESS) {
+            if (!comm->rank()) {
+                fprintf(stderr, "Failed to initialize LumpedMass operator for Kelvin-Voigt body force.\n");
+            }
+            return err;
+        }
+
+        auto mass_diag = sfem::create_buffer<real_t>(ndofs, es);
+        err            = mass_op->hessian_diag(nullptr, mass_diag->data());
+        if (err != SFEM_SUCCESS) {
+            if (!comm->rank()) {
+                fprintf(stderr, "Failed to compute LumpedMass diagonal for Kelvin-Voigt body force.\n");
+            }
+            return err;
+        }
+
+        const ptrdiff_t n_nodes = m->n_nodes();
+        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+            for (int d = 0; d < block_size && d < 3; ++d) {
+                const ptrdiff_t dof = node * block_size + d;
+                body_rhs->data()[dof] = mass_diag->data()[dof] * body_force[d];
+            }
+        }
+
+        f->set_value_to_constrained_dofs(0, body_rhs->data());
+    }
 
     // Time integration parameters
     real_t dt          = smesh::Env::read("SFEM_DT", 0.1);
@@ -201,6 +259,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             blas->zeros(ndofs, g->data());
             // Adds material gradient computation to g
             f->gradient(solution->data(), g->data());
+            if (body_force_norm > 0) {
+                blas->axpy(ndofs, 1.0, body_rhs->data(), g->data());
+            }
 
             blas->zeros(ndofs, increment->data());
             solver->apply(g->data(), increment->data());
@@ -238,6 +299,31 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             out->write_time_step("acceleration", t, a->data());
             out->log_time(t);
         }
+    }
+
+    const real_t displacement_norm = blas->norm2(ndofs, displacement->data());
+    const real_t velocity_norm     = blas->norm2(ndofs, velocity->data());
+    const real_t acceleration_norm = blas->norm2(ndofs, acceleration->data());
+
+    if (!comm->rank()) {
+        printf("Final norms: displacement=%g velocity=%g acceleration=%g\n",
+               displacement_norm,
+               velocity_norm,
+               acceleration_norm);
+    }
+
+    if (!isfinite(displacement_norm) || !isfinite(velocity_norm) || !isfinite(acceleration_norm)) {
+        if (!comm->rank()) {
+            fprintf(stderr, "Kelvin-Voigt Newmark produced non-finite final state.\n");
+        }
+        return SFEM_FAILURE;
+    }
+
+    if (body_force_norm > 0 && T > 0 && displacement_norm <= 0) {
+        if (!comm->rank()) {
+            fprintf(stderr, "Kelvin-Voigt body-force run produced zero final displacement.\n");
+        }
+        return SFEM_FAILURE;
     }
 
     if (!comm->rank() && verbose) {
