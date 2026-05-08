@@ -15,6 +15,34 @@
 #define RESET_TEXT "\x1b[0m"
 
 //////////////////////////////////////////////////////////
+// field_replace_with_relative_error (debug only)
+//////////////////////////////////////////////////////////
+#define SFEM_DEBUG_RELATIVE_ERROR
+#ifdef SFEM_DEBUG_RELATIVE_ERROR
+static void field_replace_with_relative_error(real_t* const          field,   //
+                                              const geom_t* const    origin,  //
+                                              const ptrdiff_t* const stride,  //
+                                              const ptrdiff_t* const n,       //
+                                              const geom_t* const    delta,   //
+                                              const function_XYZ_t   fun) {   //
+    for (ptrdiff_t iz = 0; iz < n[2]; iz++) {
+        for (ptrdiff_t iy = 0; iy < n[1]; iy++) {
+            for (ptrdiff_t ix = 0; ix < n[0]; ix++) {
+                const ptrdiff_t idx = stride[0] * ix + stride[1] * iy + stride[2] * iz;
+                const real_t    v   = field[idx];
+                if (v == 0.0) continue;
+                const real_t x = origin[0] + ix * delta[0];
+                const real_t y = origin[1] + iy * delta[1];
+                const real_t z = origin[2] + iz * delta[2];
+                const real_t f = fun(x, y, z);
+                field[idx]     = fabs(f - v) / fabs(f);
+            }
+        }
+    }
+}
+#endif  // SFEM_DEBUG_RELATIVE_ERROR
+
+//////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // main_adjoint
 //////////////////////////////////////////////////////////
@@ -40,7 +68,7 @@ int main_adjoint(int argc, char* argv[]) {
     MPI_Comm_rank(comm, &mpi_rank);
     MPI_Comm_size(comm, &mpi_size);
 
-    const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig_pos;
+    const function_XYZ_t mesh_fun_XYZ = mesh_fun_ones;
 
     char out_base_directory[2048];
 
@@ -282,7 +310,7 @@ int main_adjoint(int argc, char* argv[]) {
                 info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                 // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                 info.adjoint_refine_type = ADJOINT_BASE;
-                info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
+                // info.adjoint_refine_type = ADJOINT_REFINE_ONE_STEP;
 
                 mini_tet_parameters_t mini_tet_parameters;
                 {
@@ -306,14 +334,14 @@ int main_adjoint(int argc, char* argv[]) {
                     printf("info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE\n");
                 } else if (info.adjoint_refine_type == ADJOINT_BASE) {
                     printf("info.adjoint_refine_type =  ADJOINT_BASE\n");
-                } else if (info.adjoint_refine_type == ADJOINT_REFINE_HYTEG_REFINEMENT) {
-                    printf("info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT\n");
+                } else if (info.adjoint_refine_type == ADJOINT_REFINE_ONE_STEP) {
+                    printf("info.adjoint_refine_type = ADJOINT_REFINE_ONE_STEP\n");
                 } else {
                     printf("info.adjoint_refine_type = UNKNOWN\n");
                 }
 #endif
 
-                int ENABLE_NORMALIZE_MESH_FLAG = 1;
+                int ENABLE_NORMALIZE_MESH_FLAG = 0;
                 SFEM_READ_ENV(ENABLE_NORMALIZE_MESH_FLAG, atoi);
 
                 real_t new_origin[3];
@@ -388,6 +416,10 @@ int main_adjoint(int argc, char* argv[]) {
                                                  &max_field_index_tet4);  //
 
                 int max_field_coords[3];
+
+#ifdef SFEM_DEBUG_RELATIVE_ERROR
+                field_replace_with_relative_error(field, origin, stride, nlocal, delta, mesh_fun_XYZ);
+#endif  // SFEM_DEBUG_RELATIVE_ERROR
 
                 get_3d_coordinates(max_field_index_tet4,  //
                                    nlocal,
