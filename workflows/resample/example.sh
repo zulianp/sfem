@@ -34,7 +34,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=${SFEM_TORUS_MESH:-torus}
+mesh=${SFEM_TORUS_MESH:-torus2}
 # mesh=impeller_tet4
 
 out=resampled
@@ -73,7 +73,7 @@ fi
 # sdf_test.py $sdf 500
 
 # Use HEX_SIZE environment variable if defined, otherwise use default
-SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-800}
+SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-250}
 sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
@@ -104,7 +104,7 @@ Nsight_OUTPUT="/home/simone/App/ncu_out/ncu_grid_to_mesh"
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
 
-PROFILE=1
+PROFILE=0
 if [[ $PROFILE -eq 1 ]]
 then
 LAUNCH="${Nsight_PATH}/ncu \
@@ -165,7 +165,7 @@ set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 set +x
 
-PRECISION=float32
+PRECISION=float64
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION
 
 
