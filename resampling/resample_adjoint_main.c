@@ -17,7 +17,7 @@
 //////////////////////////////////////////////////////////
 // field_replace_with_relative_error (debug only)
 //////////////////////////////////////////////////////////
-#define SFEM_DEBUG_RELATIVE_ERROR
+// #define SFEM_DEBUG_RELATIVE_ERROR
 #ifdef SFEM_DEBUG_RELATIVE_ERROR
 static void field_replace_with_relative_error(real_t* const          field,   //
                                               const geom_t* const    origin,  //
@@ -310,7 +310,8 @@ int main_adjoint(int argc, char* argv[]) {
                 info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                 // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                 info.adjoint_refine_type = ADJOINT_BASE;
-                // info.adjoint_refine_type = ADJOINT_REFINE_ONE_STEP;
+                info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
+                info.adjoint_refine_type = ADJOINT_CELL_LIST;
 
                 mini_tet_parameters_t mini_tet_parameters;
                 {

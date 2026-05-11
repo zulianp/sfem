@@ -502,6 +502,7 @@ int main(int argc, char* argv[]) {
                     // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                     info.adjoint_refine_type = ADJOINT_BASE;
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
+                    info.adjoint_refine_type = ADJOINT_CELL_LIST;
 
                     mini_tet_parameters_t mini_tet_parameters;
                     {
@@ -527,6 +528,8 @@ int main(int argc, char* argv[]) {
                         printf("info.adjoint_refine_type =  ADJOINT_BASE\n");
                     } else if (info.adjoint_refine_type == ADJOINT_REFINE_HYTEG_REFINEMENT) {
                         printf("info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT\n");
+                    } else if (info.adjoint_refine_type == ADJOINT_CELL_LIST) {
+                        printf("info.adjoint_refine_type = ADJOINT_CELL_LIST\n");
                     } else {
                         printf("info.adjoint_refine_type = UNKNOWN\n");
                     }
@@ -570,12 +573,14 @@ int main(int argc, char* argv[]) {
                     }
 #endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
 
-#define ENABLE_NORMALIZE_MESH
+                    // Declare new_origin and new_delta for use in metadata
+                    real_t new_origin[3];
+                    real_t new_delta[3];
+
+// #define ENABLE_NORMALIZE_MESH
 #ifdef ENABLE_NORMALIZE_MESH
 
-                    real_t new_origin[3];
                     real_t new_side[3];
-                    real_t new_delta[3];
 
                     // const real_t norm_side = 100.0;
 
@@ -618,6 +623,15 @@ int main(int argc, char* argv[]) {
                     printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
                     printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
 #endif
+#else
+                    // For non-normalized meshes, use the regular origin and delta
+                    new_origin[0] = origin[0];
+                    new_origin[1] = origin[1];
+                    new_origin[2] = origin[2];
+
+                    new_delta[0] = delta[0];
+                    new_delta[1] = delta[1];
+                    new_delta[2] = delta[2];
 #endif
 
 // #define REDEFINE_BOUNDING_BOX

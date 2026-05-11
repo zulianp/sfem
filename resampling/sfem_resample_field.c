@@ -1532,12 +1532,13 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                     fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh->n_owned_nodes, mesh->nnodes);
 
                 assert(mass_vector[i] != 0);
-                // g[i] /= mass_vector[i];
-                mass_vector[i] = g[i] / mass_vector[i];
-                // printf("mass_vector[%ld] = %g\n", i, mass_vector[i]);
 
-                // DEBUG: - to be removed
-                mass_vector[i] = g[i];  // DEBUG: - to be removed: it directly pass the weighted field
+                if (info->adjoint_refine_type != ADJOINT_CELL_LIST) {
+                    mass_vector[i] = g[i] / mass_vector[i];
+                } else {
+                    mass_vector[i] = g[i];  // DEBUG: - to be removed: it directly pass the weighted field
+                                            // Useful with cell list 
+                }
 
             }  // end for i < mesh.n_owned_nodes
         }
@@ -1593,13 +1594,16 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                            data);                          //
             break;
 
-        case ADJOINT_REFINE_HYTEG_REFINEMENT:
-
+        case ADJOINT_REFINE_HYTEG_REFINEMENT: {
+            // Uncomment to activate the HyTeG test GPU path:
             // #define TEST_GPU_HYTEG_REFINEMENT
-            // #define COMPUTE_FUN_XYZ_HEX  /// TETST HERE .......
+            // Uncomment to apply fun_XYZ on the hex grid after the adjoint:
+            // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
-
+            ////////////////////////////////////////////////////////////////////
+            // HyTeG refinement adjoint — GPU test path
+            ////////////////////////////////////////////////////////////////////
             ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                              //
                                                                      mesh->nelements,                //
                                                                      mesh->nnodes,                   //
@@ -1613,16 +1617,16 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                                      mini_tet_parameters,            //
                                                                      data);                          //
 
-            break;
-
-#else
-
+#elif defined(SFEM_ENABLE_CUDA)
+            ////////////////////////////////////////////////////////////////////
+            // HyTeG refinement adjoint — GPU path
+            ////////////////////////////////////////////////////////////////////
 #if SFEM_LOG_LEVEL >= 5
             struct timespec t_start;
             clock_gettime(CLOCK_MONOTONIC, &t_start);
-#endif
+#endif  // END if (SFEM_LOG_LEVEL >= 5)
 
-            ret = tet4_resample_field_adjoint_cell_quad(0,
+            ret = tet4_resample_field_adjoint_cell_quad_gpu(0,                    //
                                                             mesh->nelements,      //
                                                             mesh,                 //
                                                             n,                    // SDF
@@ -1633,29 +1637,12 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                             mini_tet_parameters,  //
                                                             data);                //
 
-            // ret = tet4_resample_field_adjoint_hex_quad_norm  //
-            //                                                  // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
-            //                                                  // ret = tet4_resample_field_adjoint_hex_quad_norm  //
-            //                                                  //  ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
-            //         (0,                              //
-            //          mesh->nelements,                //
-            //          mesh->nnodes,                   //
-            //          (const idx_t**)mesh->elements,  //
-            //          (const geom_t**)mesh->points,   //
-            //          n,                              //
-            //          stride,                         //
-            //          origin,                         //
-            //          delta,                          //
-            //          mass_vector,                    //
-            //          mini_tet_parameters,            //
-            //          data);                          //
-
 #if SFEM_LOG_LEVEL >= 5
             struct timespec t_end;
             clock_gettime(CLOCK_MONOTONIC, &t_end);
             double elapsed = (t_end.tv_sec - t_start.tv_sec) + (t_end.tv_nsec - t_start.tv_nsec) * 1e-9;
-            printf("Elapsed: %.6f s\n", elapsed);
-#endif
+            printf("ADJOINT_REFINE_HYTEG_REFINEMENT GPU elapsed: %.6f s\n", elapsed);
+#endif  // END if (SFEM_LOG_LEVEL >= 5)
 
 #ifdef COMPUTE_FUN_XYZ_HEX
             if (fun_XYZ != NULL && data_fun_XYZ != NULL) {
@@ -1672,12 +1659,60 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                               mini_tet_parameters,            //
                                                               fun_XYZ,                        //
                                                               data_fun_XYZ);                  //
-            }
+            }  // END if (fun_XYZ != NULL && data_fun_XYZ != NULL)
+#endif  // END ifdef COMPUTE_FUN_XYZ_HEX
+
+#else
+            ////////////////////////////////////////////////////////////////////
+            // HyTeG refinement adjoint — CPU fallback path
+            ////////////////////////////////////////////////////////////////////
+            ret = tet4_resample_field_adjoint_cell_quad(0,                    //
+                                                        mesh->nelements,      //
+                                                        mesh,                 //
+                                                        n,                    // SDF
+                                                        stride,               //
+                                                        origin,               //
+                                                        delta,                //
+                                                        mass_vector,          // Input weighted field
+                                                        mini_tet_parameters,  //
+                                                        data);                //
+
+#endif  // END if (TEST_GPU_HYTEG_REFINEMENT / SFEM_ENABLE_CUDA)
+
+            break;
+        }  // END case ADJOINT_REFINE_HYTEG_REFINEMENT
+
+        case ADJOINT_CELL_LIST:  // Cell list adjoint refinement ///////////////////////
+
+#ifdef SFEM_ENABLE_CUDA
+
+            ret = tet4_resample_field_adjoint_cell_quad_gpu(0,                    //
+                                                            mesh->nelements,      //
+                                                            mesh,                 //
+                                                            n,                    // SDF
+                                                            stride,               //
+                                                            origin,               //
+                                                            delta,                //
+                                                            mass_vector,          // Input weighted field
+                                                            mini_tet_parameters,  //
+                                                            data);                //
+
+#else
+
+            ret = tet4_resample_field_adjoint_cell_quad(0,                    //
+                                                        mesh->nelements,      //
+                                                        mesh,                 //
+                                                        n,                    // SDF
+                                                        stride,               //
+                                                        origin,               //
+                                                        delta,                //
+                                                        mass_vector,          // Input weighted field
+                                                        mini_tet_parameters,  //
+                                                        data);                //
+
 #endif
 
             break;
-
-#endif
 
         case ADJOINT_BASE:
         default:
@@ -1690,7 +1725,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                     stride,                         //
                                                     origin,                         //
                                                     delta,                          //
-                                                    mass_vector,                    //
+                                                    g,                              //
                                                     data);                          //
 
             break;
