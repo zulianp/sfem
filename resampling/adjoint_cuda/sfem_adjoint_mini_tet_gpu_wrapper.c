@@ -36,7 +36,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     for (int i = 0; i < repetitions; i++) {
         //
 
-#define TEST_KERNEL_MODEL 3
+#define TEST_KERNEL_MODEL 2
 
 // ATTENTION: Fron 0 to 3, the kernels are based on Hyteg mini_tet, while 4 is based on the HEX quad.
 
