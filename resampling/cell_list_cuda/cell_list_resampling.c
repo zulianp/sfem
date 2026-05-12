@@ -233,8 +233,10 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
                                                                           z_min, z_max,
                                                                           &gpu_data);
         const double tock_build_device = MPI_Wtime();
-        printf("Time taken for tet4_resample_field_adjoint_cell_quad_gpu_build_device_data: %f seconds\n", 
-               tock_build_device - tick_build_device);
+        const double build_device_time = tock_build_device - tick_build_device;
+        printf("Time taken for tet4_resample_field_adjoint_cell_quad_gpu_build_device_data: %f seconds (%f Mtets/s)\n",
+               build_device_time,
+               (double)cpu_data.bounding_boxes->num_boxes / build_device_time / 1e6);
         
         if (ret != 0) {
             goto cleanup;
