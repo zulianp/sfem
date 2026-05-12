@@ -223,19 +223,21 @@ int main_adjoint(int argc, char* argv[]) {
                           mesh_fun_XYZ,                 //
                           g);                           //
 
-        // {
-        //     double* g_dbl = calloc(mesh.n_owned_nodes, sizeof(double));
+#ifdef SFEM_ENABLE_BONE_EDF_FIELD
+        {
+            double* g_dbl = calloc(mesh.n_owned_nodes, sizeof(double));
 
-        //     mesh_read_nodal_field(&mesh,                                                                               //
-        //                           "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
-        //                           MPI_DOUBLE,                                                                          //
-        //                           g_dbl);                                                                              //
+            mesh_read_nodal_field(&mesh,                                                                               //
+                                  "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
+                                  MPI_DOUBLE,                                                                          //
+                                  g_dbl);                                                                              //
 
-        //     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-        //         g[i] = (real_t)(g_dbl[i]);
-        //     }
-        //     free(g_dbl);
-        // }
+            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                g[i] = (real_t)(g_dbl[i]);
+            }
+            free(g_dbl);
+        }
+#endif  // SFEM_ENABLE_BONE_EDF_FIELD
 
         const real_t alpha_th_tet10 = 2.5;
 
@@ -311,7 +313,7 @@ int main_adjoint(int argc, char* argv[]) {
                 // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                 info.adjoint_refine_type = ADJOINT_BASE;
                 info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
-                info.adjoint_refine_type = ADJOINT_CELL_LIST;
+                // info.adjoint_refine_type = ADJOINT_CELL_LIST;
 
                 mini_tet_parameters_t mini_tet_parameters;
                 {
