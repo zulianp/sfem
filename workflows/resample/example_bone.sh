@@ -26,8 +26,8 @@ export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
-# mesh=on_raw
-mesh=bone
+mesh=on_raw
+#  mesh=bone
 
 export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
