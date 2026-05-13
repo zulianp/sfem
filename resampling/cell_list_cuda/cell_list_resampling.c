@@ -152,7 +152,7 @@ tet4_resample_field_adjoint_cell_quad_gpu_build_cpu_data(const ptrdiff_t        
         goto exit;
     }  // END if (ret != 0 || cpu_data->split_map == NULL)
 
-#endif  /* !BUILD_CELL_LIST_GPU */
+#endif /* !BUILD_CELL_LIST_GPU */
 
 exit:
     RETURN_FROM_FUNCTION(ret);
@@ -188,7 +188,7 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
                                               const geom_t *const SFEM_RESTRICT    delta,                //
                                               const real_t *const SFEM_RESTRICT    weighted_field,       //
                                               const mini_tet_parameters_t          mini_tet_parameters,  //
-                                              real_t *const SFEM_RESTRICT          data) {                        //
+                                              real_t *const SFEM_RESTRICT          data) {               //
     int ret = 0;
 
     (void)mini_tet_parameters;
@@ -203,7 +203,7 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
 #ifdef BUILD_CELL_LIST_GPU
     tet4_resample_field_adjoint_cell_quad_gpu_device_data_t gpu_data;
     tet4_resample_field_adjoint_cell_quad_gpu_init_device_data(&gpu_data);
-#endif  /* BUILD_CELL_LIST_GPU */
+#endif /* BUILD_CELL_LIST_GPU */
 
     ret = tet4_resample_field_adjoint_cell_quad_gpu_build_cpu_data(start_element, end_element, mesh, n, origin, delta, &cpu_data);
     if (ret != 0) {
@@ -214,8 +214,18 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
     /* Re-derive the same CDF thresholds used during box statistics so the GPU
      * cell list is built with identical split parameters. */
     {
-        const side_length_cdf_thresholds_t thresholds =
-                calculate_cdf_thresholds(&cpu_data.histograms, 0.96, 0.96, 0.96);
+
+        const char *cdf_ratio_env = getenv("SFEM_CDF_RATIO");
+        real_t cdf_ratio = 0.96;  // default
+        if (cdf_ratio_env != NULL) {
+            real_t parsed_value = (real_t)atof(cdf_ratio_env);
+            // Validate that the value is mathematically valid for a CDF ratio (between 0 and 1)
+            if (parsed_value > 0.0 && parsed_value <= 1.0) {
+                cdf_ratio = parsed_value;
+            }
+        }  // END if (cdf_ratio_env != NULL)
+
+        const side_length_cdf_thresholds_t thresholds = calculate_cdf_thresholds(&cpu_data.histograms, cdf_ratio, cdf_ratio, cdf_ratio);
 
         const real_t x_min = (real_t)origin[0];
         const real_t y_min = (real_t)origin[1];
@@ -225,24 +235,27 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
         const real_t z_max = (real_t)(origin[2] + delta[2] * n[2]);
 
         const double tick_build_device = MPI_Wtime();
-        ret = tet4_resample_field_adjoint_cell_quad_gpu_build_device_data(cpu_data.bounding_boxes,
-                                                                          thresholds.threshold_x,
-                                                                          thresholds.threshold_y,
-                                                                          x_min, x_max,
-                                                                          y_min, y_max,
-                                                                          z_min, z_max,
-                                                                          &gpu_data);
+        ret                            = tet4_resample_field_adjoint_cell_quad_gpu_build_device_data(cpu_data.bounding_boxes,
+                                                                                                     thresholds.threshold_x,
+                                                                                                     thresholds.threshold_y,
+                                                                                                     x_min,
+                                                                                                     x_max,
+                                                                                                     y_min,
+                                                                                                     y_max,
+                                                                                                     z_min,
+                                                                                                     z_max,
+                                                                                                     &gpu_data);
         const double tock_build_device = MPI_Wtime();
         const double build_device_time = tock_build_device - tick_build_device;
         printf("Time taken for tet4_resample_field_adjoint_cell_quad_gpu_build_device_data: %f seconds (%f Mtets/s)\n",
                build_device_time,
                (double)cpu_data.bounding_boxes->num_boxes / build_device_time / 1e6);
-        
+
         if (ret != 0) {
             goto cleanup;
         }  // END if (ret != 0)
     }
-#endif  /* BUILD_CELL_LIST_GPU */
+#endif /* BUILD_CELL_LIST_GPU */
 
     const double tick_transfer = MPI_Wtime();
 
@@ -251,7 +264,7 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
             &cpu_data, &gpu_data, mesh, n, stride, origin, delta, weighted_field, data);
 #else
     ret = tet4_resample_field_adjoint_cell_quad_gpu_launch(&cpu_data, mesh, n, stride, origin, delta, weighted_field, data);
-#endif  /* BUILD_CELL_LIST_GPU */
+#endif /* BUILD_CELL_LIST_GPU */
 
     if (ret != 0) {
         goto cleanup;
@@ -268,7 +281,7 @@ cleanup:
 
 #ifdef BUILD_CELL_LIST_GPU
     tet4_resample_field_adjoint_cell_quad_gpu_destroy_device_data(&gpu_data);
-#endif  /* BUILD_CELL_LIST_GPU */
+#endif /* BUILD_CELL_LIST_GPU */
 
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tet4_resample_field_adjoint_cell_quad_gpu
