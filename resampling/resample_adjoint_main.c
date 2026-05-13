@@ -313,7 +313,7 @@ int main_adjoint(int argc, char* argv[]) {
                 // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                 info.adjoint_refine_type = ADJOINT_BASE;
                 info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
-                // info.adjoint_refine_type = ADJOINT_CELL_LIST;
+                info.adjoint_refine_type = ADJOINT_CELL_LIST;
 
                 mini_tet_parameters_t mini_tet_parameters;
                 {
