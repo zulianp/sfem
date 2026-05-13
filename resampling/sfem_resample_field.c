@@ -1638,7 +1638,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
             break;
         }  // END case ADJOINT_REFINE_HYTEG_REFINEMENT
-            ///////////////////////////////////////////////////////////////////////////////////
+           ///////////////////////////////////////////////////////////////////////////////////
 
         case ADJOINT_CELL_LIST:  // Cell list adjoint refinement ///////////////////////
 
@@ -1651,7 +1651,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                             stride,               //
                                                             origin,               //
                                                             delta,                //
-                                                            mass_vector,          // Input weighted field
+                                                            g,                    // Input weighted field
                                                             mini_tet_parameters,  //
                                                             data);                //
 
@@ -1664,7 +1664,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                         stride,               //
                                                         origin,               //
                                                         delta,                //
-                                                        mass_vector,          // Input weighted field
+                                                        g,                    // Input weighted field
                                                         mini_tet_parameters,  //
                                                         data);                //
 
@@ -1699,7 +1699,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
         //                             stride,                         //
         //                             origin,                         //
         //                             delta,                          //
-        //                             mass_vector,                    //
+        //                             g,                              //
         //                             data_cnt);                      //
     }
 
@@ -1713,7 +1713,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
         //                                stride,                         //
         //                                origin,                         //
         //                                delta,                          //
-        //                                mass_vector,                    //
+        //                                g,                              //
         //                                alpha,                          //
         //                                volume);                        //
     }
