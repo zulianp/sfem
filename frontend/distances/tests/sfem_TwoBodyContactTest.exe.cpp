@@ -114,7 +114,7 @@ int test_toi() {
     {
         Output out(FunctionSpace::create(surface, 1));
         out.enable_AoS_to_SoA(true);
-        out.set_output_dir(smesh::Path("contac_surface_output"));
+        out.set_output_dir(smesh::Path("contact_surface_output"));
         out.write("d", d->data());
         out.write("nx", normals->data()[0]);
         out.write("ny", normals->data()[1]);
@@ -130,6 +130,9 @@ int test_toi() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
     out->write("disp", displacement->data());
+
+    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
+    printf("TOI: %g\n", toi);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -175,6 +178,7 @@ int test_two_body_contact() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
     out->write("g", g->data());
+    out->write("disp", displacement->data());
 
     // blas->norm(space->n_dofs(), g->data());
     printf("Gradient norm: %g\n", blas->norm2(space->n_dofs(), g->data()));
