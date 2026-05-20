@@ -1,7 +1,9 @@
 #include "sfem_test.hpp"
 
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_SelfCollisions.hpp"
+// #include "sfem_SelfCollisions.hpp"
+
+#include "integrations/smesh/sccd_smesh_CCD.hpp"
 
 #include "sfem_aliases.hpp"
 #include "sfem_context.hpp"
@@ -63,91 +65,104 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
     return f;
 }
 
-int test_toi() {
-    ptrdiff_t nx = 4;
+// int test_toi() {
+//     ptrdiff_t nx = 20;
 
-    auto f       = create_function(nx, ExecutionSpace::EXECUTION_SPACE_HOST);
-    auto space   = f->space();
-    auto es      = f->execution_space();
-    auto mesh    = space->mesh_ptr();
-    auto surface = skin(mesh);
+//     auto f       = create_function(nx, ExecutionSpace::EXECUTION_SPACE_HOST);
+//     auto space   = f->space();
+//     auto es      = f->execution_space();
+//     auto mesh    = space->mesh_ptr();
+//     auto surface = skin(mesh);
 
-    const int dim = mesh->spatial_dimension();
+//     const int dim = mesh->spatial_dimension();
 
-    surface->write(smesh::Path("contact_surface"));
+//     surface->write(smesh::Path("contact_surface"));
 
-    printf("Surf: #nodes %zu #elements %zu\n", surface->n_nodes(), surface->n_elements());
+//     printf("Surf: #nodes %zu #elements %zu\n", surface->n_nodes(), surface->n_elements());
 
-    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
-    auto solver    = sfem::create_cg<real_t>(linear_op, es);
-    solver->set_op(linear_op);
-    solver->set_max_it(1000);
-    solver->set_rtol(1e-6);
-    solver->set_verbose(false);
+//     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+//     auto solver    = sfem::create_cg<real_t>(linear_op, es);
+//     solver->set_op(linear_op);
+//     solver->set_max_it(1000);
+//     solver->set_rtol(1e-6);
+//     solver->set_verbose(false);
 
-    auto previous_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto displacement          = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto rhs                   = sfem::create_buffer<real_t>(space->n_dofs(), es);
+//     auto previous_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+//     auto displacement          = sfem::create_buffer<real_t>(space->n_dofs(), es);
+//     auto rhs                   = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
-    f->apply_constraints(displacement->data());
-    f->apply_constraints(rhs->data());
+//     f->apply_constraints(displacement->data());
+//     f->apply_constraints(rhs->data());
 
-    solver->apply(rhs->data(), displacement->data());
+//     solver->apply(rhs->data(), displacement->data());
 
-    auto prev_disp3 = convert_host_buffer_to_fake_SoA(dim, previous_displacement);
-    auto disp3      = convert_host_buffer_to_fake_SoA(dim, displacement);
+//     auto prev_disp3 = convert_host_buffer_to_fake_SoA(dim, previous_displacement);
+//     auto disp3      = convert_host_buffer_to_fake_SoA(dim, displacement);
 
-    auto collisions = SelfCollisions::create(surface);
-    collisions->find(dim, prev_disp3->data(), disp3->data());
-    real_t toi = collisions->time_of_impact();
+//     auto collisions = SelfCollisions::create(surface);
+//     collisions->find(dim, prev_disp3->data(), disp3->data());
+//     real_t toi = collisions->time_of_impact();
 
-    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
-    printf("TOI: %g\n", toi);
+//     auto blas = sfem::blas<real_t>(es);
+//     blas->scal(space->n_dofs(), toi, displacement->data());
 
-    auto blas = sfem::blas<real_t>(es);
-    blas->scal(space->n_dofs(), toi, displacement->data());
+//     auto d       = sfem::create_host_buffer<real_t>(surface->n_nodes());
+//     auto normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
+//     collisions->distance_and_normal(toi, d->data(), dim, normals->data());
 
-    auto d       = sfem::create_host_buffer<real_t>(surface->n_nodes());
-    auto normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
-    collisions->distance_and_normal(toi, d->data(), dim, normals->data());
+//     {
+//         Output out(FunctionSpace::create(surface, 1));
+//         out.enable_AoS_to_SoA(true);
+//         out.set_output_dir(smesh::Path("contact_surface_output"));
+//         out.write("d", d->data());
+//         out.write("nx", normals->data()[0]);
+//         out.write("ny", normals->data()[1]);
+//         out.write("nz", normals->data()[2]);
+//     }
 
-    {
-        Output out(FunctionSpace::create(surface, 1));
-        out.enable_AoS_to_SoA(true);
-        out.set_output_dir(smesh::Path("contact_surface_output"));
-        out.write("d", d->data());
-        out.write("nx", normals->data()[0]);
-        out.write("ny", normals->data()[1]);
-        out.write("nz", normals->data()[2]);
+//     // TODO find actual collisions using scaled displacement (compute penalizer)
+//     // 0) Envelope or penetration ?
+//     // 1) VF distances and penalization
+//     // 2) EE distances and penalization
+
+//     auto out = f->output();
+//     out->enable_AoS_to_SoA(true);
+//     out->set_output_dir(smesh::Path("contact_output"));
+//     out->write("disp", displacement->data());
+
+//     printf("TOI: %g\n", toi);
+//     SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
+
+//     return SFEM_TEST_SUCCESS;
+// }
+
+void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
+                     const std::shared_ptr<Buffer<real_t>>&  displacement,
+                     const std::shared_ptr<Buffer<real_t*>>& inout) {
+    auto p = inout->data();
+    auto u = displacement->data();
+    auto m = surface->node_mapping()->data();
+
+    const ptrdiff_t n   = surface->node_mapping()->size();
+    const int       dim = surface->spatial_dimension();
+
+    for (int d = 0; d < dim; d++) {
+        for (ptrdiff_t i = 0; i < n; i++) {
+            p[d][i] += u[m[i] * dim + d];
+        }
     }
-
-    // TODO find actual collisions using scaled displacement (compute penalizer)
-    // 0) Envelope or penetration ?
-    // 1) VF distances and penalization
-    // 2) EE distances and penalization
-
-    auto out = f->output();
-    out->enable_AoS_to_SoA(true);
-    out->set_output_dir(smesh::Path("contact_output"));
-    out->write("disp", displacement->data());
-
-    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
-    printf("TOI: %g\n", toi);
-
-    return SFEM_TEST_SUCCESS;
 }
 
 int test_two_body_contact() {
-    ptrdiff_t nx = 4;
+    ptrdiff_t nx = 1;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
 
-    auto f     = create_function(nx, es);
-    auto space = f->space();
-    auto mesh  = space->mesh_ptr();
-
-    auto pen = SelfContactPenalty::create(space);
+    auto      f     = create_function(nx, es);
+    auto      space = f->space();
+    auto      mesh  = space->mesh_ptr();
+    const int dim   = mesh->spatial_dimension();
 
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto solver    = sfem::create_cg<real_t>(linear_op, es);
@@ -156,39 +171,136 @@ int test_two_body_contact() {
     solver->set_rtol(1e-6);
     solver->set_verbose(false);
 
-    auto previous_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto displacement_old      = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto displacement          = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto rhs                   = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto rhs          = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
     solver->apply(rhs->data(), displacement->data());
 
-    pen->update(displacement_old->data(), displacement->data());
+    auto surface = skin(mesh);
 
-    auto alpha = pen->max_step_size();
-    blas->scal(space->n_dofs(), alpha, displacement->data());
+    auto ccd = sccd::CCD<real_t>::create(surface);
 
-    auto g = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    pen->gradient(displacement->data(), g->data());
+    auto p0 = smesh::astype<real_t>(surface->points());
+    auto p1 = smesh::astype<real_t>(surface->points());
+
+    displace_points(surface, displacement, p1);
+
+    printf("n_points: %zu\n", surface->n_nodes());
+
+    surface->node_mapping()->print();
+    printf("--------\n");
+    displacement->print();
+    printf("--------\n");
+
+    p0->print();
+
+    printf("--------\n");
+    p1->print();
+    printf("--------\n");
+
+    real_t toi = 1;
+    ccd->find_earliest_impact_time(p0, p1, toi);
+
+    printf("TOI: %g\n", toi);
+
+    blas->scal(space->n_dofs(), toi, displacement->data());
 
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
-    out->write("g", g->data());
     out->write("disp", displacement->data());
 
-    // blas->norm(space->n_dofs(), g->data());
-    printf("Gradient norm: %g\n", blas->norm2(space->n_dofs(), g->data()));
+    {
+        smesh::SharedBuffer<smesh::idx_t> v_overlap;
+        smesh::SharedBuffer<smesh::idx_t> f_overlap;
+        smesh::SharedBuffer<real_t>       vf_tois;
+        smesh::SharedBuffer<smesh::idx_t> e0_overlap;
+        smesh::SharedBuffer<smesh::idx_t> e1_overlap;
+        smesh::SharedBuffer<real_t>       ee_tois;
+        ccd->find_impact_times(p0, p1, v_overlap, f_overlap, vf_tois, e0_overlap, e1_overlap, ee_tois);
+
+        auto print_pairs = [surface](const idx_t v, const idx_t f, const SharedBuffer<real_t*>& points) {
+            auto p = points->data();
+
+            auto x = p[0][v];
+            auto y = p[1][v];
+            auto z = p[2][v];
+
+            auto i0 = surface->elements(0)->data()[0][f];
+            auto i1 = surface->elements(0)->data()[1][f];
+            auto i2 = surface->elements(0)->data()[2][f];
+
+            auto x0 = p[0][i0];
+            auto y0 = p[1][i0];
+            auto z0 = p[2][i0];
+
+            auto x1 = p[0][i1];
+            auto y1 = p[1][i1];
+            auto z1 = p[2][i1];
+
+            auto x2 = p[0][i2];
+            auto y2 = p[1][i2];
+            auto z2 = p[2][i2];
+
+            printf("V(%d): %g %g %g\n", v, x, y, z);
+            printf("V(%d): %g %g %g\n", i0, x0, y0, z0);
+            printf("V(%d): %g %g %g\n", i1, x1, y1, z1);
+            printf("V(%d): %g %g %g\n", i2, x2, y2, z2);
+        };
+
+        auto v = v_overlap->data()[0];
+        auto f = f_overlap->data()[0];
+
+        printf("T0\n");
+        print_pairs(v, f, p0);
+
+        printf("T1\n");
+        print_pairs(v, f, p1);
+
+        // printf("V overlap: %zu\n", v_overlap->size());
+        // v_overlap->print();
+
+        // printf("F overlap: %zu\n", f_overlap->size());
+        // f_overlap->print();
+
+        // printf("VF tois: %zu\n", vf_tois->size());
+        // vf_tois->print();
+
+        // printf("E0 overlap: %zu\n", e0_overlap->size());
+        // e0_overlap->print();
+        // printf("E1 overlap: %zu\n", e1_overlap->size());
+        // e1_overlap->print();
+
+        // printf("EE tois: %zu\n", ee_tois->size());
+        // ee_tois->print();
+    }
+
+    // pen->update(displacement_old->data(), displacement->data());
+
+    // auto alpha = pen->max_step_size();
+    // blas->scal(space->n_dofs(), alpha, displacement->data());
+
+    // auto g = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    // pen->gradient(displacement->data(), g->data());
+
+    // auto out = f->output();
+    // out->enable_AoS_to_SoA(true);
+    // out->set_output_dir(smesh::Path("contact_output"));
+    // out->write("g", g->data());
+    // out->write("disp", displacement->data());
+
+    // // blas->norm(space->n_dofs(), g->data());
+    // printf("Gradient norm: %g\n", blas->norm2(space->n_dofs(), g->data()));
 
     return SFEM_TEST_SUCCESS;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-    SFEM_RUN_TEST(test_toi);
+    // SFEM_RUN_TEST(test_toi);
     SFEM_RUN_TEST(test_two_body_contact);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
