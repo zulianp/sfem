@@ -22,6 +22,8 @@ namespace sfem {
         std::shared_ptr<smesh::Mesh>        surface;
         std::shared_ptr<sccd::CCD<real_t>>  ccd;
         smesh::SharedBuffer<smesh::real_t*> p0, p1;
+        int max_depth{96};
+        real_t tol{3e-8};
 
         Edges edges;
 
@@ -88,7 +90,7 @@ namespace sfem {
             smesh::real_t                      toi = 1;
             smesh::SharedBuffer<smesh::real_t> vf_tois;
             smesh::SharedBuffer<smesh::real_t> ee_tois;
-            ccd->narrow_phase(toi, vf_tois, ee_tois);
+            ccd->narrow_phase(toi, vf_tois, ee_tois, max_depth, tol);
             return ee_tois && ee_tois->size() > 0 ? ee_tois->data()[0] : toi;
         }
 
