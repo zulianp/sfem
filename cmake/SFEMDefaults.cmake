@@ -27,6 +27,13 @@ if(CMAKE_VERSION VERSION_GREATER "3.13.0")
 endif()
 
 set(CMAKE_MACOSX_RPATH 1)
+
+if(APPLE)
+    list(APPEND CMAKE_INSTALL_RPATH "@loader_path/../lib")
+elseif(UNIX)
+    list(APPEND CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+endif()
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # ##############################################################################
