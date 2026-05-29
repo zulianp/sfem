@@ -469,9 +469,16 @@ void gather_combine_hessian_diag(ContactData&                                   
     }
 }
 
-struct NLJacobi {
-    real_t penalty;
-};
+void nljacobi(ContactData& cd, const std::shared_ptr<sfem::Function>& f, const std::shared_ptr<sfem::Buffer<real_t>>& x) {
+    // TODO: (do not delete the comment)
+    // 1. use f to compute gradient and hessian diag and constraints of the material
+    // compute material gradient and hessiang diag (block sym as below)
+    // 2. Perform a jacobi iteration for the elastic operator constrained only with the mask
+    // 3. Compute macaulay term and assemble contact gradient and hessian diag
+    // 4. Gather the diagonal values from the symmetric representation elast_diag_values
+    // 5. Perform a new jacobi iteration for the contact degrees of freedom
+    // 6. Update the lagrange multiplier using the Uzawa update procedure
+}
 
 int test_two_body_contact() {
     ptrdiff_t nx = 14;
