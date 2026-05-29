@@ -10,6 +10,7 @@
 #include "smesh_mesh.hpp"
 
 #include "sfem_API.hpp"
+#include "sfem_mask.hpp"
 
 #include "bvh/bvh.hpp"
 
@@ -392,13 +393,85 @@ void assemble_contact_hessian_diag(ContactData&                                 
 
 // Gather the diagonal values from the symmetric representation elast_diag_values (uses node mapping to read), add them to the
 // diag_values, mask (uses node mapping to read) them for the constraint rows with an identiity row
-void gather_add_hessian_diag(ContactData&        cd,
-                             const mask_t* const is_constrained,
-                             const real_t* const elast_diag_values,
-                             const ptrdiff_t     diag_stride,
-                             real_t* const       diag_values) {
-    // TODO: Implement based on the comments above
+void gather_combine_hessian_diag(ContactData&                                     cd,
+                                 const mask_t* const                              is_constrained,
+                                 const real_t* const                              elast_diag_values,
+                                 const ptrdiff_t                                  diag_stride,
+                                 real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
+    SFEM_TRACE_SCOPE("gather_combine_hessian_diag");
+    const int       dim = cd.surface->spatial_dimension();
+    const ptrdiff_t n   = cd.surface->node_mapping()->size();
+    const idx_t*    nm  = cd.surface->node_mapping()->data();
+
+    if (dim == 3) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t global_node = nm[i];
+            const real_t*   ed          = &elast_diag_values[global_node * 6];
+            const ptrdiff_t local_node  = i * diag_stride;
+
+            diag_values[0][local_node] += ed[0];
+            diag_values[1][local_node] += ed[1];
+            diag_values[2][local_node] += ed[2];
+            diag_values[3][local_node] += ed[1];
+            diag_values[4][local_node] += ed[3];
+            diag_values[5][local_node] += ed[4];
+            diag_values[6][local_node] += ed[2];
+            diag_values[7][local_node] += ed[4];
+            diag_values[8][local_node] += ed[5];
+
+            const ptrdiff_t dof = global_node * 3;
+            if (mask_get(dof, is_constrained)) {
+                diag_values[0][local_node] = 1;
+                diag_values[1][local_node] = 0;
+                diag_values[2][local_node] = 0;
+            }
+
+            if (mask_get(dof + 1, is_constrained)) {
+                diag_values[3][local_node] = 0;
+                diag_values[4][local_node] = 1;
+                diag_values[5][local_node] = 0;
+            }
+
+            if (mask_get(dof + 2, is_constrained)) {
+                diag_values[6][local_node] = 0;
+                diag_values[7][local_node] = 0;
+                diag_values[8][local_node] = 1;
+            }
+        }
+    } else {
+        const int sym_block_size = (dim * (dim + 1)) / 2;
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t global_node = nm[i];
+            const real_t*   ed          = &elast_diag_values[global_node * sym_block_size];
+            const ptrdiff_t local_node  = i * diag_stride;
+
+            int s = 0;
+            for (int d1 = 0; d1 < dim; ++d1) {
+                diag_values[d1 * dim + d1][local_node] += ed[s++];
+                for (int d2 = d1 + 1; d2 < dim; ++d2) {
+                    const real_t e = ed[s++];
+                    diag_values[d1 * dim + d2][local_node] += e;
+                    diag_values[d2 * dim + d1][local_node] += e;
+                }
+            }
+
+            const ptrdiff_t dof = global_node * dim;
+            for (int d1 = 0; d1 < dim; ++d1) {
+                if (!mask_get(dof + d1, is_constrained)) continue;
+                for (int d2 = 0; d2 < dim; ++d2) {
+                    diag_values[d1 * dim + d2][local_node] = (d1 == d2) ? 1 : 0;
+                }
+            }
+        }
+    }
 }
+
+struct NLJacobi {
+    real_t penalty;
+};
 
 int test_two_body_contact() {
     ptrdiff_t nx = 14;
@@ -565,11 +638,18 @@ int test_two_body_contact() {
     auto elast_diag_values = sfem::create_buffer<real_t>(dim * dim * space->n_dofs(), es);
     f->hessian_block_diag_sym(displacement->data(), elast_diag_values->data());
 
+    auto constraint_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
+    f->constraints_mask(constraint_mask->data());
+
+    f->apply_constraints(displacement->data());
+    f->apply_constraints(rhs->data());
+
     // TODO: memset to zero the accumulators
 
     compute_macaulay_term(cd, penalty, displacement->data(), macaulay->data());
     assemble_contact_gradient(cd, penalty, macaulay->data(), grad->data());
     assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
+    gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
 
     // pen->update(displacement_old->data(), displacement->data());
 
