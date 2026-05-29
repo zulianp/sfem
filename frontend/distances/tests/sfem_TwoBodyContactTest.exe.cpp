@@ -510,12 +510,6 @@ void nljacobi(ContactData&                                 cd,
     const mask_t* const contact_mask = contact_node_mask->data();
     real_t* const       xd           = x->data();
 
-    auto out = f->output();
-    out->enable_AoS_to_SoA(true);
-    out->set_output_dir(smesh::Path("contact_output"));
-    out->write_time_step("disp", 0, x->data());
-    out->log_time(0);
-
     for (int loop = 0; loop < n_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
         blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
@@ -656,11 +650,6 @@ void nljacobi(ContactData&                                 cd,
         for (ptrdiff_t i = 0; i < n_contact; ++i) {
             aug[i] = penalty * m[i];
         }
-
-        if ((loop + 1) % 100 == 0) {
-            out->write_time_step("disp", loop, x->data());
-            out->log_time(loop + 1);
-        }
     }
 }
 
@@ -711,42 +700,51 @@ int test_two_body_contact() {
     const real_t search_radius     = 0.06;
     const real_t search_radius_sqr = search_radius * search_radius;
 
-    p1 = smesh::astype<real_t>(surface->points());
-    displace_points(surface, displacement, p1);
-
     auto surface_elements = surface->block(0)->elements();
     auto npoints          = surface->n_nodes();
     auto nselements       = surface->n_elements();
 
-    auto closest_points    = sfem::create_buffer<real_t>(dim, npoints, es);
-    auto distances         = sfem::create_buffer<real_t>(npoints, es);
-    auto closest_triangles = sfem::create_buffer<idx_t>(npoints, es);
+    auto                                             closest_points      = sfem::create_buffer<real_t>(dim, npoints, es);
+    auto                                             distances           = sfem::create_buffer<real_t>(npoints, es);
+    auto                                             closest_triangles   = sfem::create_buffer<idx_t>(npoints, es);
+    auto                                             distances_whole     = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto                                             directors           = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto                                             normals             = sfem::create_buffer<real_t>(dim, npoints, es);
+    auto                                             frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph;
+    smesh::SharedBuffer<real_t>                      values;
 
-    ssdf::closest_within_radius_bvh(npoints,
-                                    p1->data()[0],
-                                    p1->data()[1],
-                                    p1->data()[2],
-                                    nselements,
-                                    surface_elements->data()[0],
-                                    surface_elements->data()[1],
-                                    surface_elements->data()[2],
-                                    npoints,
-                                    p1->data()[0],
-                                    p1->data()[1],
-                                    p1->data()[2],
-                                    0,
-                                    &search_radius_sqr,
-                                    closest_triangles->data(),
-                                    distances->data(),
-                                    closest_points->data()[0],
-                                    closest_points->data()[1],
-                                    closest_points->data()[2],
-                                    true);
+    auto recompute_contact_conditions = [&]() {
+        p1 = smesh::astype<real_t>(surface->points());
+        displace_points(surface, displacement, p1);
 
-    auto distances_whole = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto directors       = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto normals         = sfem::create_buffer<real_t>(dim, npoints, es);
-    {
+        ssdf::closest_within_radius_bvh(npoints,
+                                        p1->data()[0],
+                                        p1->data()[1],
+                                        p1->data()[2],
+                                        nselements,
+                                        surface_elements->data()[0],
+                                        surface_elements->data()[1],
+                                        surface_elements->data()[2],
+                                        npoints,
+                                        p1->data()[0],
+                                        p1->data()[1],
+                                        p1->data()[2],
+                                        0,
+                                        &search_radius_sqr,
+                                        closest_triangles->data(),
+                                        distances->data(),
+                                        closest_points->data()[0],
+                                        closest_points->data()[1],
+                                        closest_points->data()[2],
+                                        true);
+
+        blas->values(space->n_dofs(), 0, distances_whole->data());
+        blas->values(space->n_dofs(), 0, directors->data());
+        for (int d = 0; d < dim; ++d) {
+            blas->values(npoints, 0, normals->data()[d]);
+        }
+
         auto node_mapping           = surface->node_mapping()->data();
         auto directors_data         = directors->data();
         auto distances_whole_data   = distances_whole->data();
@@ -813,11 +811,13 @@ int test_two_body_contact() {
             normals_data[1][i]        = -ny;
             normals_data[2][i]        = -nz;
         }
-    }
 
-    auto graph  = create_contact_graph(surface_elements, closest_triangles);
-    auto values = sfem::create_buffer<real_t>(graph->nnz(), es);
-    local_coordinates(surface_elements, p1, closest_triangles, closest_points, *graph, values);
+        graph  = create_contact_graph(surface_elements, closest_triangles);
+        values = sfem::create_buffer<real_t>(graph->nnz(), es);
+        local_coordinates(surface_elements, p1, closest_triangles, closest_points, *graph, values);
+        blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
+    };
+
     auto trace_space = std::make_shared<FunctionSpace>(surface, 1);
     auto mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
 
@@ -830,18 +830,7 @@ int test_two_body_contact() {
         bop->apply(nullptr, ones->data(), mass_vector->data());
     }
 
-    auto agumentation        = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
-    auto frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
-
-    ContactData cd = {.surface             = surface,
-                      .graph               = graph,
-                      .values              = values,
-                      .mass_vector         = mass_vector,
-                      .normals             = normals,
-                      .distances           = distances,
-                      .frozen_displacement = frozen_displacement,
-                      .agumentation        = agumentation};
+    auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
 
     real_t penalty     = 10;
     auto   grad        = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -857,10 +846,32 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    nljacobi(cd, f, displacement, penalty, 10000);
+    auto out = f->output();
+    out->enable_AoS_to_SoA(true);
+    out->set_output_dir(smesh::Path("contact_output"));
 
-    // out->write("distance", distances_whole->data());
-    // out->write("directors", directors->data());
+    const int outer_loops = 20;
+    const int inner_loops = 1000;
+    for (int outer = 0; outer < outer_loops; ++outer) {
+        recompute_contact_conditions();
+
+        ContactData cd = {.surface             = surface,
+                          .graph               = graph,
+                          .values              = values,
+                          .mass_vector         = mass_vector,
+                          .normals             = normals,
+                          .distances           = distances,
+                          .frozen_displacement = frozen_displacement,
+                          .agumentation        = agumentation};
+
+        nljacobi(cd, f, displacement, penalty, inner_loops);
+
+        recompute_contact_conditions();
+        out->write_time_step("disp", outer, displacement->data());
+        out->write_time_step("distance", outer, distances_whole->data());
+        out->write_time_step("directors", outer, directors->data());
+        out->log_time(outer);
+    }
 
     return SFEM_TEST_SUCCESS;
 }
