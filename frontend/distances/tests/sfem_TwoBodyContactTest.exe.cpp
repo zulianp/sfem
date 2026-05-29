@@ -55,7 +55,7 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
     assert(bottom_ns->size() > 0);
 
     DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-    DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.2, .component = 1};
+    DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.8, .component = 1};
     DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
     DirichletConditions::Condition xbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 0};
@@ -703,7 +703,7 @@ int test_two_body_contact() {
     ccd->find_earliest_impact_time(p0, p1, toi, 69, 1e-12);
 
     printf("TOI: %g\n", toi);
-    SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
+    SFEM_TEST_APPROXEQ(toi, 0.125, 1e-2);
 
     // toi *= 1.1;
     blas->scal(space->n_dofs(), toi, displacement->data());
@@ -744,43 +744,74 @@ int test_two_body_contact() {
                                     true);
 
     auto distances_whole = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    {
-        auto node_mapping         = surface->node_mapping()->data();
-        auto distances_whole_data = distances_whole->data();
-        auto distances_data       = distances->data();
-
-        for (ptrdiff_t i = 0; i < npoints; i++) {
-            distances_data[i]                           = std::sqrt(distances_data[i]);
-            distances_whole_data[node_mapping[i] * dim] = distances_data[i];
-        }
-    }
-
-    auto directors = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto normals   = sfem::create_buffer<real_t>(dim, npoints, es);
+    auto directors       = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto normals         = sfem::create_buffer<real_t>(dim, npoints, es);
     {
         auto node_mapping           = surface->node_mapping()->data();
         auto directors_data         = directors->data();
+        auto distances_whole_data   = distances_whole->data();
+        auto distances_data         = distances->data();
         auto closest_points_data    = closest_points->data();
         auto p1_data                = p1->data();
         auto closest_triangles_data = closest_triangles->data();
         auto normals_data           = normals->data();
+        auto surface_elements_data  = surface_elements->data();
 
-        for (int d = 0; d < dim; d++) {
-            for (ptrdiff_t i = 0; i < npoints; i++) {
-                if (closest_triangles_data[i] == -1) continue;
-                real_t dx                                 = closest_points_data[d][i] - p1_data[d][i];
-                directors_data[node_mapping[i] * dim + d] = dx;
-                normals_data[d][i]                        = dx;
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < npoints; i++) {
+            const idx_t tri = closest_triangles_data[i];
+            if (tri == -1) {
+                distances_data[i] = std::sqrt(distances_data[i]);
+                continue;
             }
-        }
 
-        auto distances_data = distances->data();
+            const idx_t e0 = surface_elements_data[0][tri];
+            const idx_t e1 = surface_elements_data[1][tri];
+            const idx_t e2 = surface_elements_data[2][tri];
 
-        for (int d = 0; d < dim; d++) {
-            for (ptrdiff_t i = 0; i < npoints; i++) {
-                if (closest_triangles_data[i] == -1) continue;
-                normals_data[d][i] /= distances_data[i];
+            const real_t v0x = p1_data[0][e1] - p1_data[0][e0];
+            const real_t v0y = p1_data[1][e1] - p1_data[1][e0];
+            const real_t v0z = p1_data[2][e1] - p1_data[2][e0];
+
+            const real_t v1x = p1_data[0][e2] - p1_data[0][e0];
+            const real_t v1y = p1_data[1][e2] - p1_data[1][e0];
+            const real_t v1z = p1_data[2][e2] - p1_data[2][e0];
+
+            real_t nx = v0y * v1z - v0z * v1y;
+            real_t ny = v0z * v1x - v0x * v1z;
+            real_t nz = v0x * v1y - v0y * v1x;
+
+            const real_t nn = std::sqrt(nx * nx + ny * ny + nz * nz);
+            if (nn > 0) {
+                nx /= nn;
+                ny /= nn;
+                nz /= nn;
+            } else {
+                const real_t dx = p1_data[0][i] - closest_points_data[0][i];
+                const real_t dy = p1_data[1][i] - closest_points_data[1][i];
+                const real_t dz = p1_data[2][i] - closest_points_data[2][i];
+                const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
+                if (dn > 0) {
+                    nx = dx / dn;
+                    ny = dy / dn;
+                    nz = dz / dn;
+                }
             }
+
+            const real_t    dx          = p1_data[0][i] - closest_points_data[0][i];
+            const real_t    dy          = p1_data[1][i] - closest_points_data[1][i];
+            const real_t    dz          = p1_data[2][i] - closest_points_data[2][i];
+            const real_t    signed_dist = dx * nx + dy * ny + dz * nz;
+            const ptrdiff_t dof         = node_mapping[i] * dim;
+
+            distances_data[i]         = signed_dist;
+            distances_whole_data[dof] = signed_dist;
+            directors_data[dof + 0]   = -signed_dist * nx;
+            directors_data[dof + 1]   = -signed_dist * ny;
+            directors_data[dof + 2]   = -signed_dist * nz;
+            normals_data[0][i]        = -nx;
+            normals_data[1][i]        = -ny;
+            normals_data[2][i]        = -nz;
         }
     }
 
@@ -826,7 +857,7 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    nljacobi(cd, f, displacement, penalty, 60000);
+    nljacobi(cd, f, displacement, penalty, 10000);
 
     // out->write("distance", distances_whole->data());
     // out->write("directors", directors->data());
