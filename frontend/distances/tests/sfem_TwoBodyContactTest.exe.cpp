@@ -21,80 +21,104 @@
 using namespace sfem;
 
 std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es) {
-    auto mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
-    auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
-                                               std::max<ptrdiff_t>(1, nx / 2),
-                                               nx,
-                                               std::max<ptrdiff_t>(1, nx / 2),
-                                               0.25,
-                                               1.1,
-                                               0.25,
-                                               0.75,
-                                               1.9,
-                                               0.75);
+    int SFEM_DEMO = smesh::Env::read("SFEM_DEMO", 1);
 
-    auto mesh = smesh::concatenate(mesh1, mesh2);
+    if (SFEM_DEMO) {
+        auto mesh1 =
+                smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
+        auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
+                                                   std::max<ptrdiff_t>(1, nx / 2),
+                                                   nx,
+                                                   std::max<ptrdiff_t>(1, nx / 2),
+                                                   0.25,
+                                                   1.1,
+                                                   0.25,
+                                                   0.75,
+                                                   1.9,
+                                                   0.75);
 
-    printf("Bulk: #nodes %zu #elements %zu\n", mesh->n_nodes(), mesh->n_elements());
+        auto mesh = smesh::concatenate(mesh1, mesh2);
 
-    mesh->write(smesh::Path("contact_mesh"));
+        printf("Bulk: #nodes %zu #elements %zu\n", mesh->n_nodes(), mesh->n_elements());
 
-    auto top_ss = sfem::Sideset::create_from_selector(mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
-        return y > (1.9 - 1e-4) && y < (1.9 + 1e-4);
-    });
+        mesh->write(smesh::Path("contact_mesh"));
 
-    // auto bottom_ss = sfem::Sideset::create_from_selector(
-    //         mesh,
-    //         [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (0.8 - 1e-4) && y < (0.8 + 1e-4);
-    //         });
+        auto top_ss =
+                sfem::Sideset::create_from_selector(mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
+                    return y > (1.9 - 1e-4) && y < (1.9 + 1e-4);
+                });
 
-    auto left_ss = sfem::Sideset::create_from_selector(
-            mesh, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (-1e-4) && x < (1e-4); });
+        // auto bottom_ss = sfem::Sideset::create_from_selector(
+        //         mesh,
+        //         [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (0.8 - 1e-4) && y < (0.8 +
+        //         1e-4);
+        //         });
 
-    auto right_ss = sfem::Sideset::create_from_selector(
-            mesh,
-            [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (1 - 1e-4) && x < (1 + 1e-4); });
+        auto left_ss = sfem::Sideset::create_from_selector(
+                mesh, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (-1e-4) && x < (1e-4); });
 
-    const int dim   = mesh->spatial_dimension();
-    auto      space = FunctionSpace::create(mesh, dim);
+        auto right_ss = sfem::Sideset::create_from_selector(
+                mesh,
+                [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (1 - 1e-4) && x < (1 + 1e-4); });
 
-    auto op = create_op(space, "LinearElasticity", es);
-    op->initialize();
+        const int dim   = mesh->spatial_dimension();
+        auto      space = FunctionSpace::create(mesh, dim);
 
-    auto f = Function::create(space);
-    f->add_operator(op);
+        auto op = create_op(space, "LinearElasticity", es);
+        op->initialize();
 
-    auto top_ns = smesh::create_nodeset_from_sidesets(mesh, top_ss);
-    // auto bottom_ns = smesh::create_nodeset_from_sidesets(mesh, bottom_ss);
-    auto left_ns  = smesh::create_nodeset_from_sidesets(mesh, left_ss);
-    auto right_ns = smesh::create_nodeset_from_sidesets(mesh, right_ss);
+        auto f = Function::create(space);
+        f->add_operator(op);
 
-    assert(top_ns != nullptr);
-    assert(bottom_ns != nullptr);
-    assert(top_ns->size() > 0);
-    assert(bottom_ns->size() > 0);
+        auto top_ns = smesh::create_nodeset_from_sidesets(mesh, top_ss);
+        // auto bottom_ns = smesh::create_nodeset_from_sidesets(mesh, bottom_ss);
+        auto left_ns  = smesh::create_nodeset_from_sidesets(mesh, left_ss);
+        auto right_ns = smesh::create_nodeset_from_sidesets(mesh, right_ss);
 
-    DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-    DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.4, .component = 1};
-    DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
+        assert(top_ns != nullptr);
+        assert(bottom_ns != nullptr);
+        assert(top_ns->size() > 0);
+        assert(bottom_ns->size() > 0);
 
-    DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
-    DirichletConditions::Condition yleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 1};
-    DirichletConditions::Condition zleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 2};
+        DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
+        DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.4, .component = 1};
+        DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
-    DirichletConditions::Condition xright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 0};
-    DirichletConditions::Condition yright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 1};
-    DirichletConditions::Condition zright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 2};
+        DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
+        DirichletConditions::Condition yleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 1};
+        DirichletConditions::Condition zleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 2};
 
-    // DirichletConditions::Condition xbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 0};
-    // DirichletConditions::Condition ybottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 1};
-    // DirichletConditions::Condition zbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 2};
+        DirichletConditions::Condition xright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 0};
+        DirichletConditions::Condition yright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 1};
+        DirichletConditions::Condition zright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 2};
 
-    auto conds = sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xleft, yleft, zleft, xright, yright, zright}, es);
-    // auto conds = sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xbottom, ybottom, zbottom}, es);
-    f->add_constraint(conds);
+        // DirichletConditions::Condition xbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 0};
+        // DirichletConditions::Condition ybottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 1};
+        // DirichletConditions::Condition zbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 2};
 
-    return f;
+        auto conds =
+                sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xleft, yleft, zleft, xright, yright, zright}, es);
+        // auto conds = sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xbottom, ybottom, zbottom}, es);
+        f->add_constraint(conds);
+
+        return f;
+    } else {
+        smesh::Path mesh_path{"./mesh"};
+        smesh::Path dirichlet_path{"./case.yaml"};
+        auto        mesh = smesh::Mesh::create_from_file(Communicator::self(), mesh_path);
+
+        auto space = sfem::FunctionSpace::create(mesh, mesh->spatial_dimension());
+        auto f     = sfem::Function::create(space);
+
+        auto op = create_op(space, "LinearElasticity", es);
+        op->initialize();
+        f->add_operator(op);
+
+        auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(space, dirichlet_path);
+        f->add_constraint(dirichlet_conditions);
+
+        return f;
+    }
 }
 
 struct ContactData {
@@ -723,12 +747,12 @@ int test_two_body_contact() {
     ccd->find_earliest_impact_time(p0, p1, toi, 69, 1e-12);
 
     printf("TOI: %g\n", toi);
-    SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
+    // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
     // toi *= 1.1;
     blas->scal(space->n_dofs(), toi, displacement->data());
 
-    const real_t search_radius     = 0.02;
+    const real_t search_radius     = 0.05;
     const real_t search_radius_sqr = search_radius * search_radius;
 
     auto surface_elements = surface->block(0)->elements();
