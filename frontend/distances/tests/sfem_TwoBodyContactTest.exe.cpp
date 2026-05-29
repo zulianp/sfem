@@ -75,6 +75,7 @@ struct ContactData {
     smesh::SharedBuffer<real_t>&                     mass_vector;
     smesh::SharedBuffer<real_t*>&                    normals;
     smesh::SharedBuffer<real_t>&                     distances;
+    smesh::SharedBuffer<real_t>&                     frozen_displacement;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
 
@@ -220,6 +221,7 @@ void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* 
     auto aug     = cd.agumentation->data();
     auto normals = cd.normals->data();
     auto mass    = cd.mass_vector->data();
+    auto disp0   = cd.frozen_displacement->data();
 
     auto nm = cd.surface->node_mapping()->data();
 
@@ -237,13 +239,15 @@ void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* 
 
         real_t u1[3] = {0, 0, 0};
         for (int d = 0; d < dim; d++) {
-            u1[d] = disp[nm[i] * dim + d];
+            const ptrdiff_t dof = nm[i] * dim + d;
+            u1[d]               = disp[dof] - disp0[dof];
         }
 
         real_t u2[3] = {0, 0, 0};
         for (int d = 0; d < dim; d++) {
             for (count_t j = 0; j < lenrow; j++) {
-                u2[d] += weights[j] * disp[nm[row[j]] * dim + d];
+                const ptrdiff_t dof = nm[row[j]] * dim + d;
+                u2[d] += weights[j] * (disp[dof] - disp0[dof]);
             }
         }
 
@@ -639,8 +643,10 @@ void nljacobi(ContactData&                                 cd,
             aug[i] = penalty * m[i];
         }
 
-        out->write_time_step("disp", loop, x->data());
-        out->log_time(loop + 1);
+        if ((loop + 1) % 100 == 0) {
+            out->write_time_step("disp", loop, x->data());
+            out->log_time(loop + 1);
+        }
     }
 }
 
@@ -686,7 +692,7 @@ int test_two_body_contact() {
     SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
 
     // toi *= 1.1;
-    blas->scal(space->n_dofs(), toi, displacement->data());
+    blas->scal(space->n_dofs(), 1.05 * toi, displacement->data());
 
     const real_t search_radius     = 0.05;
     const real_t search_radius_sqr = search_radius * search_radius;
@@ -779,15 +785,18 @@ int test_two_body_contact() {
         bop->apply(nullptr, ones->data(), mass_vector->data());
     }
 
-    auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
+    auto agumentation        = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
+    auto frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
 
-    ContactData cd = {.surface      = surface,
-                      .graph        = graph,
-                      .values       = values,
-                      .mass_vector  = mass_vector,
-                      .normals      = normals,
-                      .distances    = distances,
-                      .agumentation = agumentation};
+    ContactData cd = {.surface             = surface,
+                      .graph               = graph,
+                      .values              = values,
+                      .mass_vector         = mass_vector,
+                      .normals             = normals,
+                      .distances           = distances,
+                      .frozen_displacement = frozen_displacement,
+                      .agumentation        = agumentation};
 
     real_t penalty     = 10;
     auto   grad        = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -803,7 +812,7 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    nljacobi(cd, f, displacement, 80);
+    nljacobi(cd, f, displacement, 60000);
 
     // out->write("distance", distances_whole->data());
     // out->write("directors", directors->data());
