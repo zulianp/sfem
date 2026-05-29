@@ -20,23 +20,6 @@
 
 using namespace sfem;
 
-static SFEM_INLINE void tri3_find_cols(const idx_t* const SFEM_RESTRICT targets,
-                                       const idx_t* const SFEM_RESTRICT row,
-                                       const int                        lenrow,
-                                       idx_t* const SFEM_RESTRICT       ks) {
-#pragma unroll(3)
-    for (int d = 0; d < 3; ++d) {
-        ks[d] = 0;
-    }
-
-    for (int i = 0; i < lenrow; ++i) {
-#pragma unroll(3)
-        for (int d = 0; d < 3; ++d) {
-            ks[d] += row[i] < targets[d];
-        }
-    }
-}
-
 std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es) {
     auto mesh1 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0, 0, 0, 1, 1, 1);
     auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(), nx, nx, nx, 0.1, 1.1, 0.1, 0.9, 1.9, 0.9);
@@ -189,14 +172,18 @@ void local_coordinates(const smesh::SharedBuffer<idx_t*>&     elements,
 
         real_t ws[3]   = {w0, w1, w2};
         idx_t  keys[3] = {e0, e1, e2};
-        idx_t  ks[3];
 
-        idx_t*    row    = &colidx[rowptr[e0]];
-        const int lenrow = rowptr[e0 + 1] - rowptr[e0];
+        const count_t row_offset = rowptr[i];
+        idx_t*        row        = &colidx[row_offset];
+        const int     lenrow     = rowptr[i + 1] - row_offset;
 
-        tri3_find_cols(keys, row, lenrow, ks);
         for (int j = 0; j < 3; j++) {
-            vals[ks[j]] = ws[j];
+            for (int k = 0; k < lenrow; k++) {
+                if (row[k] == keys[j]) {
+                    vals[row_offset + k] = ws[j];
+                    break;
+                }
+            }
         }
     }
 }
@@ -469,15 +456,192 @@ void gather_combine_hessian_diag(ContactData&                                   
     }
 }
 
-void nljacobi(ContactData& cd, const std::shared_ptr<sfem::Function>& f, const std::shared_ptr<sfem::Buffer<real_t>>& x) {
-    // TODO: (do not delete the comment)
-    // 1. use f to compute gradient and hessian diag and constraints of the material
-    // compute material gradient and hessiang diag (block sym as below)
-    // 2. Perform a jacobi iteration for the elastic operator constrained only with the mask
-    // 3. Compute macaulay term and assemble contact gradient and hessian diag
-    // 4. Gather the diagonal values from the symmetric representation elast_diag_values
-    // 5. Perform a new jacobi iteration for the contact degrees of freedom
-    // 6. Update the lagrange multiplier using the Uzawa update procedure
+void nljacobi(ContactData&                                 cd,
+              const std::shared_ptr<sfem::Function>&       f,
+              const std::shared_ptr<sfem::Buffer<real_t>>& x,
+              const int                                    n_loops) {
+    SFEM_TRACE_SCOPE("nljacobi");
+
+    auto      space = f->space();
+    auto      mesh  = space->mesh_ptr();
+    const int dim   = mesh->spatial_dimension();
+    assert(dim == 3);
+
+    const ptrdiff_t ndofs          = space->n_dofs();
+    const ptrdiff_t n_nodes        = ndofs / dim;
+    const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
+    const int       sym_block_size = (dim * (dim + 1)) / 2;
+    const real_t    penalty        = 1;
+    const real_t    omega          = 1. / 3;
+    auto            es             = f->execution_space();
+    auto            blas           = sfem::blas<real_t>(es);
+
+    auto material_grad     = sfem::create_buffer<real_t>(ndofs, es);
+    auto elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
+    auto constraint_mask   = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
+    auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
+    auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
+    auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < constraint_mask->size(); ++i) {
+        constraint_mask->data()[i] = 0;
+    }
+
+    f->constraints_mask(constraint_mask->data());
+
+    const mask_t* const mask = constraint_mask->data();
+    real_t* const       xd   = x->data();
+
+    auto out = f->output();
+    out->enable_AoS_to_SoA(true);
+    out->set_output_dir(smesh::Path("contact_output"));
+    out->write_time_step("disp", 0, x->data());
+    out->log_time(0);
+
+    for (int loop = 0; loop < n_loops; ++loop) {
+        blas->values(ndofs, 0, material_grad->data());
+        blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
+
+        f->gradient(x->data(), material_grad->data());
+        f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
+
+        const real_t* const eg = material_grad->data();
+        const real_t* const ed = elast_diag_values->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            real_t a0 = ed[i * 6 + 0], a1 = ed[i * 6 + 1], a2 = ed[i * 6 + 2];
+            real_t a3 = ed[i * 6 + 1], a4 = ed[i * 6 + 3], a5 = ed[i * 6 + 4];
+            real_t a6 = ed[i * 6 + 2], a7 = ed[i * 6 + 4], a8 = ed[i * 6 + 5];
+
+            const ptrdiff_t dof = i * 3;
+            if (mask_get(dof, mask)) {
+                a0 = 1;
+                a1 = 0;
+                a2 = 0;
+            }
+
+            if (mask_get(dof + 1, mask)) {
+                a3 = 0;
+                a4 = 1;
+                a5 = 0;
+            }
+
+            if (mask_get(dof + 2, mask)) {
+                a6 = 0;
+                a7 = 0;
+                a8 = 1;
+            }
+
+            const real_t g0 = eg[dof + 0];
+            const real_t g1 = eg[dof + 1];
+            const real_t g2 = eg[dof + 2];
+
+            const real_t x0  = a4 * a8;
+            const real_t x1  = a5 * a7;
+            const real_t x2  = a1 * a5;
+            const real_t x3  = a1 * a8;
+            const real_t x4  = a2 * a4;
+            const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
+
+            if (!std::isfinite(det) || det == 0) {
+                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
+                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
+                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                continue;
+            }
+
+            const real_t inv_det = 1 / det;
+
+            const real_t i0 = inv_det * (x0 - x1);
+            const real_t i1 = inv_det * (a2 * a7 - x3);
+            const real_t i2 = inv_det * (x2 - x4);
+            const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
+            const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
+            const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
+            const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
+            const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
+            const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
+
+            xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
+            xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
+            xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+        }
+
+        blas->values(ndofs, 0, contact_grad->data());
+        for (int d = 0; d < dim * dim; ++d) {
+            blas->values(n_contact, 0, diag_values->data()[d]);
+        }
+
+        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
+        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
+        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
+
+        const idx_t* const         nm = cd.surface->node_mapping()->data();
+        const real_t* const* const dv = diag_values->data();
+        const real_t* const        cg = contact_grad->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_contact; ++i) {
+            const ptrdiff_t local_node  = i;
+            const ptrdiff_t global_node = nm[i];
+            const ptrdiff_t dof         = global_node * 3;
+
+            const real_t g0 = mask_get(dof + 0, mask) ? 0 : cg[dof + 0];
+            const real_t g1 = mask_get(dof + 1, mask) ? 0 : cg[dof + 1];
+            const real_t g2 = mask_get(dof + 2, mask) ? 0 : cg[dof + 2];
+
+            if (g0 == 0 && g1 == 0 && g2 == 0) continue;
+
+            const real_t a0 = dv[0][local_node], a1 = dv[1][local_node], a2 = dv[2][local_node];
+            const real_t a3 = dv[3][local_node], a4 = dv[4][local_node], a5 = dv[5][local_node];
+            const real_t a6 = dv[6][local_node], a7 = dv[7][local_node], a8 = dv[8][local_node];
+
+            const real_t x0  = a4 * a8;
+            const real_t x1  = a5 * a7;
+            const real_t x2  = a1 * a5;
+            const real_t x3  = a1 * a8;
+            const real_t x4  = a2 * a4;
+            const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
+
+            if (!std::isfinite(det) || det == 0) {
+                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
+                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
+                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                continue;
+            }
+
+            const real_t inv_det = 1 / det;
+
+            const real_t i0 = inv_det * (x0 - x1);
+            const real_t i1 = inv_det * (a2 * a7 - x3);
+            const real_t i2 = inv_det * (x2 - x4);
+            const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
+            const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
+            const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
+            const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
+            const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
+            const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
+
+            xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
+            xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
+            xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+        }
+
+        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+
+        real_t* const       aug = cd.agumentation->data();
+        const real_t* const m   = macaulay->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_contact; ++i) {
+            aug[i] = penalty * m[i];
+        }
+
+        out->write_time_step("disp", loop, x->data());
+        out->log_time(loop + 1);
+    }
 }
 
 int test_two_body_contact() {
@@ -600,18 +764,6 @@ int test_two_body_contact() {
         }
     }
 
-    auto out = f->output();
-    out->enable_AoS_to_SoA(true);
-    out->set_output_dir(smesh::Path("contact_output"));
-    out->write("disp", displacement->data());
-    out->write("distance", distances_whole->data());
-    out->write("directors", directors->data());
-
-    // TODO: Compute
-    // 1. local coordinates of the closest points on the triangles and P matrix
-    // 2. normalized directors
-    // 3. distances (sqrt?)
-
     auto graph  = create_contact_graph(surface_elements, closest_triangles);
     auto values = sfem::create_buffer<real_t>(graph->nnz(), es);
     local_coordinates(surface_elements, p1, closest_triangles, closest_points, *graph, values);
@@ -651,29 +803,10 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    // TODO: memset to zero the accumulators
+    nljacobi(cd, f, displacement, 80);
 
-    compute_macaulay_term(cd, penalty, displacement->data(), macaulay->data());
-    assemble_contact_gradient(cd, penalty, macaulay->data(), grad->data());
-    assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
-    gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
-
-    // pen->update(displacement_old->data(), displacement->data());
-
-    // auto alpha = pen->max_step_size();
-    // blas->scal(space->n_dofs(), alpha, displacement->data());
-
-    // auto g = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    // pen->gradient(displacement->data(), g->data());
-
-    // auto out = f->output();
-    // out->enable_AoS_to_SoA(true);
-    // out->set_output_dir(smesh::Path("contact_output"));
-    // out->write("g", g->data());
-    // out->write("disp", displacement->data());
-
-    // // blas->norm(space->n_dofs(), g->data());
-    // printf("Gradient norm: %g\n", blas->norm2(space->n_dofs(), g->data()));
+    // out->write("distance", distances_whole->data());
+    // out->write("directors", directors->data());
 
     return SFEM_TEST_SUCCESS;
 }
