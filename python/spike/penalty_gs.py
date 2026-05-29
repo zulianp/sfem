@@ -47,7 +47,7 @@ def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
 
         Dmu = 0.0 if (x[i] + temp[i]) < 0 else I[i, i] * penalty
 
-        # Nonlinear Gauss-Seidel (penalty method)
+        # Nonlinear Jacobi (penalty method)
         ri = I[i, i] * penalty * max(0.0, x[i] + temp[i])
         x[i] -= ri / (A[i, i] + Dmu)
 
