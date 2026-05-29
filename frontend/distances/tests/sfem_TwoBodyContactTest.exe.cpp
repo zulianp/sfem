@@ -463,6 +463,7 @@ void gather_combine_hessian_diag(ContactData&                                   
 void nljacobi(ContactData&                                 cd,
               const std::shared_ptr<sfem::Function>&       f,
               const std::shared_ptr<sfem::Buffer<real_t>>& x,
+              const real_t                                 penalty,
               const int                                    n_loops) {
     SFEM_TRACE_SCOPE("nljacobi");
 
@@ -475,7 +476,6 @@ void nljacobi(ContactData&                                 cd,
     const ptrdiff_t n_nodes        = ndofs / dim;
     const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
     const int       sym_block_size = (dim * (dim + 1)) / 2;
-    const real_t    penalty        = 1;
     const real_t    omega          = 1. / 3;
     auto            es             = f->execution_space();
     auto            blas           = sfem::blas<real_t>(es);
@@ -483,6 +483,7 @@ void nljacobi(ContactData&                                 cd,
     auto material_grad     = sfem::create_buffer<real_t>(ndofs, es);
     auto elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
     auto constraint_mask   = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
+    auto contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
@@ -492,10 +493,22 @@ void nljacobi(ContactData&                                 cd,
         constraint_mask->data()[i] = 0;
     }
 
+    const idx_t* const nm = cd.surface->node_mapping()->data();
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < contact_node_mask->size(); ++i) {
+        contact_node_mask->data()[i] = 0;
+    }
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_contact; ++i) {
+        mask_set(nm[i], contact_node_mask->data());
+    }
+
     f->constraints_mask(constraint_mask->data());
 
-    const mask_t* const mask = constraint_mask->data();
-    real_t* const       xd   = x->data();
+    const mask_t* const mask         = constraint_mask->data();
+    const mask_t* const contact_mask = contact_node_mask->data();
+    real_t* const       xd           = x->data();
 
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
@@ -513,8 +526,20 @@ void nljacobi(ContactData&                                 cd,
         const real_t* const eg = material_grad->data();
         const real_t* const ed = elast_diag_values->data();
 
+        blas->values(ndofs, 0, contact_grad->data());
+        for (int d = 0; d < dim * dim; ++d) {
+            blas->values(n_contact, 0, diag_values->data()[d]);
+        }
+
+        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
+        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
+        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            if (mask_get(i, contact_mask)) continue;
+
             real_t a0 = ed[i * 6 + 0], a1 = ed[i * 6 + 1], a2 = ed[i * 6 + 2];
             real_t a3 = ed[i * 6 + 1], a4 = ed[i * 6 + 3], a5 = ed[i * 6 + 4];
             real_t a6 = ed[i * 6 + 2], a7 = ed[i * 6 + 4], a8 = ed[i * 6 + 5];
@@ -573,17 +598,6 @@ void nljacobi(ContactData&                                 cd,
             xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
-        blas->values(ndofs, 0, contact_grad->data());
-        for (int d = 0; d < dim * dim; ++d) {
-            blas->values(n_contact, 0, diag_values->data()[d]);
-        }
-
-        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
-        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
-        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
-        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
-
-        const idx_t* const         nm = cd.surface->node_mapping()->data();
         const real_t* const* const dv = diag_values->data();
         const real_t* const        cg = contact_grad->data();
 
@@ -593,9 +607,9 @@ void nljacobi(ContactData&                                 cd,
             const ptrdiff_t global_node = nm[i];
             const ptrdiff_t dof         = global_node * 3;
 
-            const real_t g0 = mask_get(dof + 0, mask) ? 0 : cg[dof + 0];
-            const real_t g1 = mask_get(dof + 1, mask) ? 0 : cg[dof + 1];
-            const real_t g2 = mask_get(dof + 2, mask) ? 0 : cg[dof + 2];
+            const real_t g0 = eg[dof + 0] + (mask_get(dof + 0, mask) ? 0 : cg[dof + 0]);
+            const real_t g1 = eg[dof + 1] + (mask_get(dof + 1, mask) ? 0 : cg[dof + 1]);
+            const real_t g2 = eg[dof + 2] + (mask_get(dof + 2, mask) ? 0 : cg[dof + 2]);
 
             if (g0 == 0 && g1 == 0 && g2 == 0) continue;
 
@@ -692,9 +706,9 @@ int test_two_body_contact() {
     SFEM_TEST_APPROXEQ(toi, 0.5, 1e-2);
 
     // toi *= 1.1;
-    blas->scal(space->n_dofs(), 1.05 * toi, displacement->data());
+    blas->scal(space->n_dofs(), toi, displacement->data());
 
-    const real_t search_radius     = 0.05;
+    const real_t search_radius     = 0.06;
     const real_t search_radius_sqr = search_radius * search_radius;
 
     p1 = smesh::astype<real_t>(surface->points());
@@ -812,7 +826,7 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    nljacobi(cd, f, displacement, 60000);
+    nljacobi(cd, f, displacement, penalty, 60000);
 
     // out->write("distance", distances_whole->data());
     // out->write("directors", directors->data());
