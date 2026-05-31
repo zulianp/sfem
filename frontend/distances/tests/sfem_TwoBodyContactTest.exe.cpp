@@ -752,8 +752,9 @@ int test_two_body_contact() {
     // toi *= 1.1;
     blas->scal(space->n_dofs(), toi, displacement->data());
 
-    const real_t search_radius     = 0.05;
+    const real_t search_radius     = 0.001;
     const real_t search_radius_sqr = search_radius * search_radius;
+    const real_t margin            = smesh::Env::read("SFEM_MARGIN", 0);
 
     auto surface_elements = surface->block(0)->elements();
     auto npoints          = surface->n_nodes();
@@ -854,7 +855,7 @@ int test_two_body_contact() {
             const real_t    dx          = p1_data[0][i] - closest_points_data[0][i];
             const real_t    dy          = p1_data[1][i] - closest_points_data[1][i];
             const real_t    dz          = p1_data[2][i] - closest_points_data[2][i];
-            const real_t    signed_dist = dx * nx + dy * ny + dz * nz;
+            const real_t    signed_dist = dx * nx + dy * ny + dz * nz - margin;
             const ptrdiff_t dof         = node_mapping[i] * dim;
 
             distances_data[i]         = signed_dist;
@@ -897,8 +898,8 @@ int test_two_body_contact() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
 
-    const int outer_loops = 800;
-    const int inner_loops = 100;
+    const int outer_loops = smesh::Env::read("SFEM_OUTER_LOOPS", 100);
+    const int inner_loops = smesh::Env::read("SFEM_INNER_LOOPS", 8);
     for (int outer = 0; outer < outer_loops; ++outer) {
         recompute_contact_conditions();
 
@@ -940,7 +941,7 @@ int test_two_body_contact() {
         out->write_time_step("lagr_mult_normal", outer, lagr_mult_normal->data());
         out->log_time(outer);
 
-        recompute_contact_conditions();
+        // recompute_contact_conditions();
     }
 
     return SFEM_TEST_SUCCESS;
