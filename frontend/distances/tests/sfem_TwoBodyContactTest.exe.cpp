@@ -20,10 +20,32 @@
 
 using namespace sfem;
 
-std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es) {
-    int SFEM_DEMO = smesh::Env::read("SFEM_DEMO", 1);
+struct TwoBodyContactOptions {
+    int    demo             = 1;
+    real_t omega            = 1. / 3;
+    int    use_augmentation = 1;
+    real_t toi_scale        = 1.00;
+    real_t penalty          = 1000;
+    int    outer_loops      = 30;
+    int    inner_loops      = 100;
+    real_t contact_tol      = 1e-4;
 
-    if (SFEM_DEMO) {
+    static TwoBodyContactOptions from_env() {
+        TwoBodyContactOptions opts;
+        opts.demo             = smesh::Env::read("SFEM_DEMO", opts.demo);
+        opts.omega            = smesh::Env::read("SFEM_OMEGA", opts.omega);
+        opts.use_augmentation = smesh::Env::read("SFEM_USE_AUGMENTATION", opts.use_augmentation);
+        opts.toi_scale        = smesh::Env::read("SFEM_TOI_SCALE", opts.toi_scale);
+        opts.penalty          = smesh::Env::read("SFEM_PENALTY", opts.penalty);
+        opts.outer_loops      = smesh::Env::read("SFEM_OUTER_LOOPS", opts.outer_loops);
+        opts.inner_loops      = smesh::Env::read("SFEM_INNER_LOOPS", opts.inner_loops);
+        opts.contact_tol      = smesh::Env::read("SFEM_CONTACT_TOL", opts.contact_tol);
+        return opts;
+    }
+};
+
+std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es, const TwoBodyContactOptions& opts) {
+    if (opts.demo) {
         auto mesh1 =
                 smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
         auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
@@ -527,8 +549,7 @@ void gather_combine_hessian_diag(ContactData&                                   
 void nljacobi(ContactData&                                 cd,
               const std::shared_ptr<sfem::Function>&       f,
               const std::shared_ptr<sfem::Buffer<real_t>>& x,
-              const real_t                                 penalty,
-              const int                                    n_loops) {
+              const TwoBodyContactOptions&                 opts) {
     SFEM_TRACE_SCOPE("nljacobi");
 
     auto      space = f->space();
@@ -540,8 +561,6 @@ void nljacobi(ContactData&                                 cd,
     const ptrdiff_t n_nodes        = ndofs / dim;
     const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
     const int       sym_block_size = (dim * (dim + 1)) / 2;
-    const real_t    omega          = smesh::Env::read("SFEM_OMEGA", 1. / 3);
-    const int       use_aug        = smesh::Env::read("SFEM_USE_AUGMENTATION", 1);
     auto            es             = f->execution_space();
     auto            blas           = sfem::blas<real_t>(es);
 
@@ -567,7 +586,7 @@ void nljacobi(ContactData&                                 cd,
     blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
     f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
 
-    for (int loop = 0; loop < n_loops; ++loop) {
+    for (int loop = 0; loop < opts.inner_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
         f->gradient(x->data(), material_grad->data());
 
@@ -611,9 +630,9 @@ void nljacobi(ContactData&                                 cd,
             const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
 
             if (!std::isfinite(det) || det == 0) {
-                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
-                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
-                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= opts.omega * g0 / a0;
+                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= opts.omega * g1 / a4;
+                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= opts.omega * g2 / a8;
                 continue;
             }
 
@@ -629,9 +648,9 @@ void nljacobi(ContactData&                                 cd,
             const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
             const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
 
-            xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
-            xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
-            xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+            xd[dof + 0] -= opts.omega * (i0 * g0 + i1 * g1 + i2 * g2);
+            xd[dof + 1] -= opts.omega * (i3 * g0 + i4 * g1 + i5 * g2);
+            xd[dof + 2] -= opts.omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
         blas->values(ndofs, 0, contact_grad->data());
@@ -639,9 +658,9 @@ void nljacobi(ContactData&                                 cd,
             blas->values(n_contact, 0, diag_values->data()[d]);
         }
 
-        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
-        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
-        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
+        compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
+        assemble_contact_gradient(cd, opts.penalty, macaulay->data(), contact_grad->data());
+        assemble_contact_hessian_diag(cd, opts.penalty, macaulay->data(), 1, diag_values->data());
         gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
 
         const real_t* const* const dv = diag_values->data();
@@ -671,9 +690,9 @@ void nljacobi(ContactData&                                 cd,
             const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
 
             if (!std::isfinite(det) || det == 0) {
-                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
-                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
-                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= opts.omega * g0 / a0;
+                if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= opts.omega * g1 / a4;
+                if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= opts.omega * g2 / a8;
                 continue;
             }
 
@@ -689,19 +708,19 @@ void nljacobi(ContactData&                                 cd,
             const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
             const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
 
-            xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
-            xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
-            xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+            xd[dof + 0] -= opts.omega * (i0 * g0 + i1 * g1 + i2 * g2);
+            xd[dof + 1] -= opts.omega * (i3 * g0 + i4 * g1 + i5 * g2);
+            xd[dof + 2] -= opts.omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
-        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+        compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
 
-        if (use_aug) {
+        if (opts.use_augmentation) {
             real_t* const       aug = cd.agumentation->data();
             const real_t* const m   = macaulay->data();
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_contact; ++i) {
-                aug[i] = penalty * m[i];
+                aug[i] = opts.penalty * m[i];
             }
         }
     }
@@ -713,7 +732,9 @@ int test_two_body_contact() {
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
 
-    auto      f     = create_function(nx, es);
+    const auto opts = TwoBodyContactOptions::from_env();
+
+    auto      f     = create_function(nx, es, opts);
     auto      space = f->space();
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
@@ -748,8 +769,7 @@ int test_two_body_contact() {
     printf("TOI: %g\n", toi);
     // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
-    const real_t toi_scale = smesh::Env::read("SFEM_TOI_SCALE", 1.00);
-    blas->scal(space->n_dofs(), toi_scale * toi, displacement->data());
+    blas->scal(space->n_dofs(), opts.toi_scale * toi, displacement->data());
 
     const real_t search_radius     = 0.001;
     const real_t search_radius_sqr = search_radius * search_radius;
@@ -906,7 +926,6 @@ int test_two_body_contact() {
     auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
     blas->values(trace_space->n_dofs(), 0, agumentation->data());
 
-    real_t penalty          = smesh::Env::read("SFEM_PENALTY", 1000);
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
     f->apply_constraints(displacement->data());
@@ -916,10 +935,7 @@ int test_two_body_contact() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
 
-    const int    outer_loops = smesh::Env::read("SFEM_OUTER_LOOPS", 30);
-    const int    inner_loops = smesh::Env::read("SFEM_INNER_LOOPS", 100);
-    const real_t contact_tol = smesh::Env::read("SFEM_CONTACT_TOL", 1e-4);
-    for (int outer = 0; outer < outer_loops; ++outer) {
+    for (int outer = 0; outer < opts.outer_loops; ++outer) {
         recompute_contact_conditions();
 
         ContactData cd = {.surface             = surface,
@@ -931,7 +947,7 @@ int test_two_body_contact() {
                           .frozen_displacement = frozen_displacement,
                           .agumentation        = agumentation};
 
-        nljacobi(cd, f, displacement, penalty, inner_loops);
+        nljacobi(cd, f, displacement, opts);
 
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
