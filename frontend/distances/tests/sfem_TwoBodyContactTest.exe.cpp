@@ -76,9 +76,9 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
         auto right_ns = smesh::create_nodeset_from_sidesets(mesh, right_ss);
 
         assert(top_ns != nullptr);
-        assert(bottom_ns != nullptr);
+        // assert(bottom_ns != nullptr);
         assert(top_ns->size() > 0);
-        assert(bottom_ns->size() > 0);
+        // assert(bottom_ns->size() > 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
         DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.4, .component = 1};
@@ -278,6 +278,7 @@ void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* 
 
     auto nm = cd.surface->node_mapping()->data();
 
+    // printf("------------------\n");
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; i++) {
         auto lenrow = rowptr[i + 1] - rowptr[i];
@@ -323,6 +324,16 @@ void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* 
         real_t pen       = normal_diff - g;
         real_t lagr_mult = aug[i];
         macaulay[i]      = std::max(pen + lagr_mult / penalty, real_t(0));
+
+        // printf("%d) pen = (%g - %g) = %g, <> = %g, (%g, %g, %g)\n",
+        //    (int)i,
+        //    normal_diff,
+        //    g,
+        //    pen,
+        //    macaulay[i],
+        //    normal[0],
+        //    normal[1],
+        //    normal[2]);
     }
 }
 
@@ -529,7 +540,8 @@ void nljacobi(ContactData&                                 cd,
     const ptrdiff_t n_nodes        = ndofs / dim;
     const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
     const int       sym_block_size = (dim * (dim + 1)) / 2;
-    const real_t    omega          = 1. / 3;
+    const real_t    omega          = smesh::Env::read("SFEM_OMEGA", 1. / 3);
+    const int       use_aug        = smesh::Env::read("SFEM_USE_AUGMENTATION", 0);
     auto            es             = f->execution_space();
     auto            blas           = sfem::blas<real_t>(es);
 
@@ -569,21 +581,10 @@ void nljacobi(ContactData&                                 cd,
 
     for (int loop = 0; loop < n_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
-
         f->gradient(x->data(), material_grad->data());
 
         const real_t* const eg = material_grad->data();
         const real_t* const ed = elast_diag_values->data();
-
-        blas->values(ndofs, 0, contact_grad->data());
-        for (int d = 0; d < dim * dim; ++d) {
-            blas->values(n_contact, 0, diag_values->data()[d]);
-        }
-
-        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
-        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
-        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
-        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n_nodes; ++i) {
@@ -647,6 +648,16 @@ void nljacobi(ContactData&                                 cd,
             xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
+        blas->values(ndofs, 0, contact_grad->data());
+        for (int d = 0; d < dim * dim; ++d) {
+            blas->values(n_contact, 0, diag_values->data()[d]);
+        }
+
+        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+        assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
+        assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
+        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
+
         const real_t* const* const dv = diag_values->data();
         const real_t* const        cg = contact_grad->data();
 
@@ -699,17 +710,19 @@ void nljacobi(ContactData&                                 cd,
 
         compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
 
-        real_t* const       aug = cd.agumentation->data();
-        const real_t* const m   = macaulay->data();
+        if (use_aug) {
+            real_t* const       aug = cd.agumentation->data();
+            const real_t* const m   = macaulay->data();
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n_contact; ++i) {
-            aug[i] = penalty * m[i];
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                aug[i] = penalty * m[i];
+            }
         }
     }
 }
 
 int test_two_body_contact() {
-    ptrdiff_t nx = 14;
+    ptrdiff_t nx = 10;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
@@ -749,10 +762,10 @@ int test_two_body_contact() {
     printf("TOI: %g\n", toi);
     // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
-    // toi *= 1.1;
-    blas->scal(space->n_dofs(), toi, displacement->data());
+    const real_t toi_scale = smesh::Env::read("SFEM_TOI_SCALE", 1.001);
+    blas->scal(space->n_dofs(), toi_scale * toi, displacement->data());
 
-    const real_t search_radius     = 0.05;
+    const real_t search_radius     = 0.001;
     const real_t search_radius_sqr = search_radius * search_radius;
 
     auto surface_elements = surface->block(0)->elements();
@@ -809,14 +822,19 @@ int test_two_body_contact() {
         auto closest_triangles_data = closest_triangles->data();
         auto normals_data           = normals->data();
         auto surface_elements_data  = surface_elements->data();
-
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < npoints; i++) {
             const idx_t tri = closest_triangles_data[i];
             if (tri == -1) {
-                distances_data[i] = std::sqrt(distances_data[i]);
+                distances_data[i] = 1000;
                 continue;
             }
+
+            real_t nx = 0, ny = 0, nz = 0;
+            real_t dx = p1_data[0][i] - closest_points_data[0][i];
+            real_t dy = p1_data[1][i] - closest_points_data[1][i];
+            real_t dz = p1_data[2][i] - closest_points_data[2][i];
+            real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
 
             const idx_t e0 = surface_elements_data[0][tri];
             const idx_t e1 = surface_elements_data[1][tri];
@@ -830,47 +848,62 @@ int test_two_body_contact() {
             const real_t v1y = p1_data[1][e2] - p1_data[1][e0];
             const real_t v1z = p1_data[2][e2] - p1_data[2][e0];
 
-            real_t nx = v0y * v1z - v0z * v1y;
-            real_t ny = v0z * v1x - v0x * v1z;
-            real_t nz = v0x * v1y - v0y * v1x;
+            real_t tnx = v0y * v1z - v0z * v1y;
+            real_t tny = v0z * v1x - v0x * v1z;
+            real_t tnz = v0x * v1y - v0y * v1x;
 
-            const real_t nn = std::sqrt(nx * nx + ny * ny + nz * nz);
+            const real_t nn = std::sqrt(tnx * tnx + tny * tny + tnz * tnz);
             if (nn > 0) {
-                nx /= nn;
-                ny /= nn;
-                nz /= nn;
+                tnx /= -nn;
+                tny /= -nn;
+                tnz /= -nn;
             } else {
-                const real_t dx = p1_data[0][i] - closest_points_data[0][i];
-                const real_t dy = p1_data[1][i] - closest_points_data[1][i];
-                const real_t dz = p1_data[2][i] - closest_points_data[2][i];
-                const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
-                if (dn > 0) {
-                    nx = dx / dn;
-                    ny = dy / dn;
-                    nz = dz / dn;
-                }
+                SFEM_ERROR("Triangle normal is zero\n");
             }
 
-            const real_t    dx          = p1_data[0][i] - closest_points_data[0][i];
-            const real_t    dy          = p1_data[1][i] - closest_points_data[1][i];
-            const real_t    dz          = p1_data[2][i] - closest_points_data[2][i];
-            const real_t    signed_dist = dx * nx + dy * ny + dz * nz;
+            if (dn > 0) {
+                nx = dx / dn;
+                ny = dy / dn;
+                nz = dz / dn;
+            } else {
+                nx = tnx;
+                ny = tny;
+                nz = tnz;
+            }
+
+            const real_t    normal_dot  = tnx * nx + tny * ny + tnz * nz;
+            const real_t    signed_dist = -dn * normal_dot;
             const ptrdiff_t dof         = node_mapping[i] * dim;
 
             distances_data[i]         = signed_dist;
             distances_whole_data[dof] = signed_dist;
-            directors_data[dof + 0]   = -signed_dist * nx;
-            directors_data[dof + 1]   = -signed_dist * ny;
-            directors_data[dof + 2]   = -signed_dist * nz;
-            normals_data[0][i]        = -nx;
-            normals_data[1][i]        = -ny;
-            normals_data[2][i]        = -nz;
+            directors_data[dof + 0]   = -dx;
+            directors_data[dof + 1]   = -dy;
+            directors_data[dof + 2]   = -dz;
+            normals_data[0][i]        = nx;
+            normals_data[1][i]        = ny;
+            normals_data[2][i]        = nz;
         }
 
         graph  = create_contact_graph(surface_elements, closest_triangles);
         values = sfem::create_buffer<real_t>(graph->nnz(), es);
         local_coordinates(surface_elements, p1, closest_triangles, closest_points, *graph, values);
         blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
+    };
+
+    auto max_contact_violation = [&]() -> real_t {
+        real_t max_violation = 0;
+
+        const real_t* const  d      = distances->data();
+        const count_t* const rowptr = graph->rowptr()->data();
+
+#pragma omp parallel for reduction(max : max_violation)
+        for (ptrdiff_t i = 0; i < npoints; ++i) {
+            if (rowptr[i + 1] == rowptr[i]) continue;
+            max_violation = std::max(max_violation, -d[i]);
+        }
+
+        return max_violation;
     };
 
     auto trace_space = std::make_shared<FunctionSpace>(surface, 1);
@@ -886,8 +919,9 @@ int test_two_body_contact() {
     }
 
     auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
+    blas->values(trace_space->n_dofs(), 0, agumentation->data());
 
-    real_t penalty          = 10;
+    real_t penalty          = smesh::Env::read("SFEM_PENALTY", 1000);
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
     f->apply_constraints(displacement->data());
@@ -897,10 +931,17 @@ int test_two_body_contact() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
 
-    const int outer_loops = 800;
-    const int inner_loops = 100;
+    const int    outer_loops = smesh::Env::read("SFEM_OUTER_LOOPS", 30);
+    const int    inner_loops = smesh::Env::read("SFEM_INNER_LOOPS", 100);
+    const real_t contact_tol = smesh::Env::read("SFEM_CONTACT_TOL", 1e-4);
     for (int outer = 0; outer < outer_loops; ++outer) {
         recompute_contact_conditions();
+
+        // const real_t max_violation = max_contact_violation();
+        // if (outer > 0 && max_violation <= contact_tol) {
+        //     printf("Contact converged: max_violation=%g <= %g\n", max_violation, contact_tol);
+        //     break;
+        // }
 
         ContactData cd = {.surface             = surface,
                           .graph               = graph,
@@ -913,7 +954,7 @@ int test_two_body_contact() {
 
         nljacobi(cd, f, displacement, penalty, inner_loops);
 
-        blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
+        // blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
@@ -939,8 +980,6 @@ int test_two_body_contact() {
         out->write_time_step("directors", outer, directors->data());
         out->write_time_step("lagr_mult_normal", outer, lagr_mult_normal->data());
         out->log_time(outer);
-
-        recompute_contact_conditions();
     }
 
     return SFEM_TEST_SUCCESS;
