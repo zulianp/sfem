@@ -762,7 +762,7 @@ int test_two_body_contact() {
     printf("TOI: %g\n", toi);
     // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
-    const real_t toi_scale = smesh::Env::read("SFEM_TOI_SCALE", 1.001);
+    const real_t toi_scale = smesh::Env::read("SFEM_TOI_SCALE", 1.00);
     blas->scal(space->n_dofs(), toi_scale * toi, displacement->data());
 
     const real_t search_radius     = 0.001;
