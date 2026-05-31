@@ -830,12 +830,6 @@ int test_two_body_contact() {
                 continue;
             }
 
-            real_t nx = 0, ny = 0, nz = 0;
-            real_t dx = p1_data[0][i] - closest_points_data[0][i];
-            real_t dy = p1_data[1][i] - closest_points_data[1][i];
-            real_t dz = p1_data[2][i] - closest_points_data[2][i];
-            real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
-
             const idx_t e0 = surface_elements_data[0][tri];
             const idx_t e1 = surface_elements_data[1][tri];
             const idx_t e2 = surface_elements_data[2][tri];
@@ -861,6 +855,11 @@ int test_two_body_contact() {
                 SFEM_ERROR("Triangle normal is zero\n");
             }
 
+            real_t nx = 0, ny = 0, nz = 0;
+            real_t dx = p1_data[0][i] - closest_points_data[0][i];
+            real_t dy = p1_data[1][i] - closest_points_data[1][i];
+            real_t dz = p1_data[2][i] - closest_points_data[2][i];
+            real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
             if (dn > 0) {
                 nx = dx / dn;
                 ny = dy / dn;
@@ -891,20 +890,20 @@ int test_two_body_contact() {
         blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
     };
 
-    auto max_contact_violation = [&]() -> real_t {
-        real_t max_violation = 0;
+//     auto max_contact_violation = [&]() -> real_t {
+//         real_t max_violation = 0;
 
-        const real_t* const  d      = distances->data();
-        const count_t* const rowptr = graph->rowptr()->data();
+//         const real_t* const  d      = distances->data();
+//         const count_t* const rowptr = graph->rowptr()->data();
 
-#pragma omp parallel for reduction(max : max_violation)
-        for (ptrdiff_t i = 0; i < npoints; ++i) {
-            if (rowptr[i + 1] == rowptr[i]) continue;
-            max_violation = std::max(max_violation, -d[i]);
-        }
+// #pragma omp parallel for reduction(max : max_violation)
+//         for (ptrdiff_t i = 0; i < npoints; ++i) {
+//             if (rowptr[i + 1] == rowptr[i]) continue;
+//             max_violation = std::max(max_violation, -d[i]);
+//         }
 
-        return max_violation;
-    };
+//         return max_violation;
+//     };
 
     auto trace_space = std::make_shared<FunctionSpace>(surface, 1);
     auto mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
@@ -937,12 +936,6 @@ int test_two_body_contact() {
     for (int outer = 0; outer < outer_loops; ++outer) {
         recompute_contact_conditions();
 
-        // const real_t max_violation = max_contact_violation();
-        // if (outer > 0 && max_violation <= contact_tol) {
-        //     printf("Contact converged: max_violation=%g <= %g\n", max_violation, contact_tol);
-        //     break;
-        // }
-
         ContactData cd = {.surface             = surface,
                           .graph               = graph,
                           .values              = values,
@@ -953,8 +946,6 @@ int test_two_body_contact() {
                           .agumentation        = agumentation};
 
         nljacobi(cd, f, displacement, penalty, inner_loops);
-
-        // blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
