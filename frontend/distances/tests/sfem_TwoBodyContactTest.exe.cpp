@@ -541,14 +541,13 @@ void nljacobi(ContactData&                                 cd,
     const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
     const int       sym_block_size = (dim * (dim + 1)) / 2;
     const real_t    omega          = smesh::Env::read("SFEM_OMEGA", 1. / 3);
-    const int       use_aug        = smesh::Env::read("SFEM_USE_AUGMENTATION", 0);
+    const int       use_aug        = smesh::Env::read("SFEM_USE_AUGMENTATION", 1);
     auto            es             = f->execution_space();
     auto            blas           = sfem::blas<real_t>(es);
 
     auto material_grad     = sfem::create_buffer<real_t>(ndofs, es);
     auto elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
     auto constraint_mask   = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
-    auto contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
@@ -559,21 +558,10 @@ void nljacobi(ContactData&                                 cd,
     }
 
     const idx_t* const nm = cd.surface->node_mapping()->data();
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < contact_node_mask->size(); ++i) {
-        contact_node_mask->data()[i] = 0;
-    }
-
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < n_contact; ++i) {
-        mask_set(nm[i], contact_node_mask->data());
-    }
-
     f->constraints_mask(constraint_mask->data());
 
-    const mask_t* const mask         = constraint_mask->data();
-    const mask_t* const contact_mask = contact_node_mask->data();
-    real_t* const       xd           = x->data();
+    const mask_t* const mask = constraint_mask->data();
+    real_t* const       xd   = x->data();
 
     // If the material is nonlinear should be inside the loop
     blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
@@ -588,8 +576,6 @@ void nljacobi(ContactData&                                 cd,
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            if (mask_get(i, contact_mask)) continue;
-
             real_t a0 = ed[i * 6 + 0], a1 = ed[i * 6 + 1], a2 = ed[i * 6 + 2];
             real_t a3 = ed[i * 6 + 1], a4 = ed[i * 6 + 3], a5 = ed[i * 6 + 4];
             real_t a6 = ed[i * 6 + 2], a7 = ed[i * 6 + 4], a8 = ed[i * 6 + 5];
@@ -667,9 +653,9 @@ void nljacobi(ContactData&                                 cd,
             const ptrdiff_t global_node = nm[i];
             const ptrdiff_t dof         = global_node * 3;
 
-            const real_t g0 = eg[dof + 0] + (mask_get(dof + 0, mask) ? 0 : cg[dof + 0]);
-            const real_t g1 = eg[dof + 1] + (mask_get(dof + 1, mask) ? 0 : cg[dof + 1]);
-            const real_t g2 = eg[dof + 2] + (mask_get(dof + 2, mask) ? 0 : cg[dof + 2]);
+            const real_t g0 = mask_get(dof + 0, mask) ? 0 : cg[dof + 0];
+            const real_t g1 = mask_get(dof + 1, mask) ? 0 : cg[dof + 1];
+            const real_t g2 = mask_get(dof + 2, mask) ? 0 : cg[dof + 2];
 
             if (g0 == 0 && g1 == 0 && g2 == 0) continue;
 
