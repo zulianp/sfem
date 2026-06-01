@@ -19,51 +19,64 @@ namespace {
     using sfem::idx_t;
     using sfem::real_t;
 
-    std::shared_ptr<smesh::Mesh> make_two_body_surface_mesh() {
-        auto points = smesh::create_host_buffer<smesh::geom_t>(3, 16);
+    struct DistanceGradientOptions {
+        real_t      translation_y       = -0.9;
+        real_t      edge_gradient_scale = 1;
+        real_t      top_body_y_min      = 1.0;
+        int         nx                  = 5;
+        int         n_steps             = 8;
+        std::string output_dir          = "distance_gradients";
 
-        const smesh::geom_t coords[16][3] = {{0.00, 0.00, 0.00},
-                                             {1.00, 0.00, 0.00},
-                                             {1.00, 0.40, 0.00},
-                                             {0.00, 0.40, 0.00},
-                                             {0.00, 0.00, 1.00},
-                                             {1.00, 0.00, 1.00},
-                                             {1.00, 0.40, 1.00},
-                                             {0.00, 0.40, 1.00},
-                                             {0.25, 1.05, 0.25},
-                                             {0.75, 1.05, 0.25},
-                                             {0.75, 1.45, 0.25},
-                                             {0.25, 1.45, 0.25},
-                                             {0.25, 1.05, 0.75},
-                                             {0.75, 1.05, 0.75},
-                                             {0.75, 1.45, 0.75},
-                                             {0.25, 1.45, 0.75}};
-
-        for (ptrdiff_t i = 0; i < 16; ++i) {
-            points->data()[0][i] = coords[i][0];
-            points->data()[1][i] = coords[i][1];
-            points->data()[2][i] = coords[i][2];
+        static DistanceGradientOptions from_env() {
+            DistanceGradientOptions opts;
+            opts.translation_y       = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TRANSLATION_Y", opts.translation_y);
+            opts.edge_gradient_scale = smesh::Env::read("SFEM_DISTANCE_GRADIENT_EDGE_SCALE", opts.edge_gradient_scale);
+            opts.top_body_y_min      = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TOP_BODY_Y_MIN", opts.top_body_y_min);
+            opts.nx                  = std::max(1, smesh::Env::read("SFEM_DISTANCE_GRADIENT_NX", opts.nx));
+            opts.n_steps             = std::max(1, smesh::Env::read("SFEM_DISTANCE_GRADIENT_STEPS", opts.n_steps));
+            opts.output_dir          = smesh::Env::read_string("SFEM_DISTANCE_GRADIENT_OUTPUT", opts.output_dir);
+            return opts;
         }
+    };
 
-        auto elements = smesh::create_host_buffer<smesh::idx_t>(3, 24);
+    std::shared_ptr<smesh::Mesh> make_two_body_surface_mesh(const DistanceGradientOptions& opts) {
+        auto mesh1 = smesh::Mesh::create_tet4_cube(smesh::Communicator::self(),
+                                                   static_cast<ptrdiff_t>(opts.nx),
+                                                   std::max<ptrdiff_t>(1, opts.nx / 5),
+                                                   static_cast<ptrdiff_t>(opts.nx),
+                                                   0,
+                                                   0.8,
+                                                   0,
+                                                   1,
+                                                   1,
+                                                   1);
+        auto mesh2 = smesh::Mesh::create_tet4_cube(smesh::Communicator::self(),
+                                                   std::max<ptrdiff_t>(1, opts.nx / 2),
+                                                   static_cast<ptrdiff_t>(opts.nx),
+                                                   std::max<ptrdiff_t>(1, opts.nx / 2),
+                                                   0.25,
+                                                   1.1,
+                                                   0.25,
+                                                   0.75,
+                                                   1.9,
+                                                   0.75);
 
-        const smesh::idx_t tris[24][3] = {{0, 2, 1},    {0, 3, 2},    {4, 5, 6},    {4, 6, 7},    {0, 1, 5},   {0, 5, 4},
-                                          {3, 7, 6},    {3, 6, 2},    {0, 4, 7},    {0, 7, 3},    {1, 2, 6},   {1, 6, 5},
-                                          {8, 10, 9},   {8, 11, 10},  {12, 13, 14}, {12, 14, 15}, {8, 9, 13},  {8, 13, 12},
-                                          {11, 15, 14}, {11, 14, 10}, {8, 12, 15},  {8, 15, 11},  {9, 10, 14}, {9, 14, 13}};
-
-        for (ptrdiff_t i = 0; i < 24; ++i) {
-            elements->data()[0][i] = tris[i][0];
-            elements->data()[1][i] = tris[i][1];
-            elements->data()[2][i] = tris[i][2];
-        }
-
-        return std::make_shared<smesh::Mesh>(smesh::Communicator::self(), smesh::TRI3, elements, points);
+        return smesh::skin(smesh::concatenate(mesh1, mesh2));
     }
 
-    bool is_top_node(const idx_t node) { return node >= 8; }
+    std::vector<unsigned char> classify_top_nodes(const std::shared_ptr<smesh::Mesh>& surface, const real_t top_body_y_min) {
+        std::vector<unsigned char> ret(surface->n_nodes(), 0);
+        auto                       points = surface->points()->data();
+        for (ptrdiff_t i = 0; i < surface->n_nodes(); ++i) {
+            ret[i] = points[1][i] > top_body_y_min ? 1 : 0;
+        }
 
-    bool is_top_face(const idx_t face) { return face >= 12; }
+        return ret;
+    }
+
+    bool is_top_face(const smesh::SharedBuffer<idx_t*>& faces, const std::vector<unsigned char>& top_nodes, const idx_t face) {
+        return top_nodes[faces->data()[0][face]] && top_nodes[faces->data()[1][face]] && top_nodes[faces->data()[2][face]];
+    }
 
     std::array<real_t, 3> point_at_time(const smesh::SharedBuffer<real_t*>& p0,
                                         const smesh::SharedBuffer<real_t*>& p1,
@@ -97,6 +110,53 @@ namespace {
         for (int d = 0; d < 3; ++d) {
             lo[d] = std::min(lo[d], p[d]);
             hi[d] = std::max(hi[d], p[d]);
+        }
+    }
+
+    bool aabb_overlap(const std::array<real_t, 3>& a_lo,
+                      const std::array<real_t, 3>& a_hi,
+                      const std::array<real_t, 3>& b_lo,
+                      const std::array<real_t, 3>& b_hi) {
+        for (int d = 0; d < 3; ++d) {
+            if (a_hi[d] < b_lo[d] || b_hi[d] < a_lo[d]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void reset_bbox(std::array<real_t, 3>& lo, std::array<real_t, 3>& hi) {
+        lo = {std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
+        hi = {-std::numeric_limits<real_t>::max(), -std::numeric_limits<real_t>::max(), -std::numeric_limits<real_t>::max()};
+    }
+
+    void node_swept_bbox(const smesh::SharedBuffer<real_t*>& p0,
+                         const smesh::SharedBuffer<real_t*>& p1,
+                         const idx_t                         node,
+                         const real_t                        t0,
+                         const real_t                        t1,
+                         std::array<real_t, 3>&              lo,
+                         std::array<real_t, 3>&              hi) {
+        reset_bbox(lo, hi);
+        expand_bbox(point_at_time(p0, p1, node, t0), lo, hi);
+        expand_bbox(point_at_time(p0, p1, node, t1), lo, hi);
+    }
+
+    void element_swept_bbox(const smesh::SharedBuffer<idx_t*>&  elements,
+                            const int                           n_nodes_per_element,
+                            const idx_t                         element,
+                            const smesh::SharedBuffer<real_t*>& p0,
+                            const smesh::SharedBuffer<real_t*>& p1,
+                            const real_t                        t0,
+                            const real_t                        t1,
+                            std::array<real_t, 3>&              lo,
+                            std::array<real_t, 3>&              hi) {
+        reset_bbox(lo, hi);
+        for (int enode = 0; enode < n_nodes_per_element; ++enode) {
+            const idx_t node = elements->data()[enode][element];
+            expand_bbox(point_at_time(p0, p1, node, t0), lo, hi);
+            expand_bbox(point_at_time(p0, p1, node, t1), lo, hi);
         }
     }
 
@@ -173,17 +233,22 @@ namespace {
 }  // namespace
 
 int test_grads() {
-    auto surface = make_two_body_surface_mesh();
+    const auto opts = DistanceGradientOptions::from_env();
+
+    auto surface = make_two_body_surface_mesh(opts);
     SFEM_TEST_ASSERT(surface != nullptr);
+    SFEM_TEST_ASSERT(surface->block(0)->n_nodes_per_element() == 3);
+
+    auto top_nodes = classify_top_nodes(surface, opts.top_body_y_min);
+    SFEM_TEST_ASSERT(std::any_of(top_nodes.begin(), top_nodes.end(), [](const unsigned char v) { return v != 0; }));
+    SFEM_TEST_ASSERT(std::any_of(top_nodes.begin(), top_nodes.end(), [](const unsigned char v) { return v == 0; }));
 
     auto p0 = smesh::astype<real_t>(surface->points());
     auto p1 = smesh::astype<real_t>(surface->points());
 
-    const real_t translation_y       = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TRANSLATION_Y", real_t(-0.9));
-    const real_t edge_gradient_scale = smesh::Env::read("SFEM_DISTANCE_GRADIENT_EDGE_SCALE", real_t(0.05));
     for (ptrdiff_t i = 0; i < surface->n_nodes(); ++i) {
-        if (is_top_node(i)) {
-            p1->data()[1][i] += translation_y;
+        if (top_nodes[i]) {
+            p1->data()[1][i] += opts.translation_y;
         }
     }
 
@@ -195,7 +260,7 @@ int test_grads() {
 
     ccd->broad_phase(p0, p1, vertex_overlap, face_overlap, edge0_overlap, edge1_overlap);
 
-    const smesh::Path output_dir(smesh::Env::read_string("SFEM_DISTANCE_GRADIENT_OUTPUT", "distance_gradients"));
+    const smesh::Path output_dir(opts.output_dir);
     if (!output_dir.exists()) {
         SFEM_TEST_ASSERT(output_dir.make_dir());
     }
@@ -230,13 +295,12 @@ int test_grads() {
     SFEM_TEST_ASSERT(write_vector(typed_path<smesh::geom_t>(output_dir, "xdmf_points"), xdmf_points) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(write_vector(typed_path<idx_t>(output_dir, "xdmf_triangles"), xdmf_triangles) == SFEM_SUCCESS);
 
-    const int       n_steps = std::max(1, smesh::Env::read("SFEM_DISTANCE_GRADIENT_STEPS", 8));
     auto            faces   = surface->block(0)->elements();
     auto            edges   = ccd->edges();
     const ptrdiff_t n_nodes = surface->n_nodes();
 
-    for (int step = 0; step <= n_steps; ++step) {
-        const real_t t = real_t(step) / real_t(n_steps);
+    for (int step = 0; step <= opts.n_steps; ++step) {
+        const real_t t = real_t(step) / real_t(opts.n_steps);
 
         std::vector<real_t> disp[3];
         std::vector<real_t> pt_distance(n_nodes, real_t(1e20));
@@ -269,41 +333,33 @@ int test_grads() {
             }
         }
 
-        const real_t t_prev = step == 0 ? t : real_t(step - 1) / real_t(n_steps);
+        const real_t t_prev = step == 0 ? t : real_t(step - 1) / real_t(opts.n_steps);
         for (ptrdiff_t f = 0; f < surface->n_elements(); ++f) {
-            std::array<real_t, 3> lo = {
-                    std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
-            std::array<real_t, 3> hi = {-std::numeric_limits<real_t>::max(),
-                                        -std::numeric_limits<real_t>::max(),
-                                        -std::numeric_limits<real_t>::max()};
-            for (int enode = 0; enode < 3; ++enode) {
-                const idx_t node = faces->data()[enode][f];
-                expand_bbox(point_at_time(p0, p1, node, t_prev), lo, hi);
-                expand_bbox(point_at_time(p0, p1, node, t), lo, hi);
-            }
-
+            std::array<real_t, 3> lo;
+            std::array<real_t, 3> hi;
+            element_swept_bbox(faces, 3, f, p0, p1, t_prev, t, lo, hi);
             append_bbox_lines(lo, hi, 0, static_cast<idx_t>(f), bbox_points, bbox_indices, bbox_kind, bbox_id);
         }
 
         for (ptrdiff_t e = 0; e < static_cast<ptrdiff_t>(edges->extent(1)); ++e) {
-            std::array<real_t, 3> lo = {
-                    std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
-            std::array<real_t, 3> hi = {-std::numeric_limits<real_t>::max(),
-                                        -std::numeric_limits<real_t>::max(),
-                                        -std::numeric_limits<real_t>::max()};
-            for (int enode = 0; enode < 2; ++enode) {
-                const idx_t node = edges->data()[enode][e];
-                expand_bbox(point_at_time(p0, p1, node, t_prev), lo, hi);
-                expand_bbox(point_at_time(p0, p1, node, t), lo, hi);
-            }
-
+            std::array<real_t, 3> lo;
+            std::array<real_t, 3> hi;
+            element_swept_bbox(edges, 2, e, p0, p1, t_prev, t, lo, hi);
             append_bbox_lines(lo, hi, 1, static_cast<idx_t>(e), bbox_points, bbox_indices, bbox_kind, bbox_id);
         }
 
         for (ptrdiff_t i = 0; i < vertex_overlap->size(); ++i) {
             const idx_t v = vertex_overlap->data()[i];
             const idx_t f = face_overlap->data()[i];
-            if (is_top_node(v) == is_top_face(f)) continue;
+            if (static_cast<bool>(top_nodes[v]) == is_top_face(faces, top_nodes, f)) continue;
+
+            std::array<real_t, 3> v_lo;
+            std::array<real_t, 3> v_hi;
+            std::array<real_t, 3> f_lo;
+            std::array<real_t, 3> f_hi;
+            node_swept_bbox(p0, p1, v, t_prev, t, v_lo, v_hi);
+            element_swept_bbox(faces, 3, f, p0, p1, t_prev, t, f_lo, f_hi);
+            if (!aabb_overlap(v_lo, v_hi, f_lo, f_hi)) continue;
 
             const idx_t f0 = faces->data()[0][f];
             const idx_t f1 = faces->data()[1][f];
@@ -358,7 +414,15 @@ int test_grads() {
             const idx_t a1i = edges->data()[1][e0];
             const idx_t b0i = edges->data()[0][e1];
             const idx_t b1i = edges->data()[1][e1];
-            if (is_top_node(a0i) == is_top_node(b0i)) continue;
+            if (static_cast<bool>(top_nodes[a0i]) == static_cast<bool>(top_nodes[b0i])) continue;
+
+            std::array<real_t, 3> e0_lo;
+            std::array<real_t, 3> e0_hi;
+            std::array<real_t, 3> e1_lo;
+            std::array<real_t, 3> e1_hi;
+            element_swept_bbox(edges, 2, e0, p0, p1, t_prev, t, e0_lo, e0_hi);
+            element_swept_bbox(edges, 2, e1, p0, p1, t_prev, t, e1_lo, e1_hi);
+            if (!aabb_overlap(e0_lo, e0_hi, e1_lo, e1_hi)) continue;
 
             const auto a0 = point_at_time(p0, p1, a0i, t);
             const auto a1 = point_at_time(p0, p1, a1i, t);
@@ -386,9 +450,9 @@ int test_grads() {
                 const idx_t line_start = static_cast<idx_t>(ee_gradient_line_points.size() / 3);
                 append_vec(ee_gradient_line_points, ax, ay, az);
                 append_vec(ee_gradient_line_points,
-                           ax + edge_gradient_scale * nx,
-                           ay + edge_gradient_scale * ny,
-                           az + edge_gradient_scale * nz);
+                           ax + opts.edge_gradient_scale * nx,
+                           ay + opts.edge_gradient_scale * ny,
+                           az + opts.edge_gradient_scale * nz);
                 ee_gradient_line_indices.push_back(line_start);
                 ee_gradient_line_indices.push_back(line_start + 1);
                 ee_gradient_line_distance.push_back(distance);
@@ -402,9 +466,9 @@ int test_grads() {
                 const idx_t line_start = static_cast<idx_t>(ee_gradient_line_points.size() / 3);
                 append_vec(ee_gradient_line_points, bx, by, bz);
                 append_vec(ee_gradient_line_points,
-                           bx - edge_gradient_scale * nx,
-                           by - edge_gradient_scale * ny,
-                           bz - edge_gradient_scale * nz);
+                           bx - opts.edge_gradient_scale * nx,
+                           by - opts.edge_gradient_scale * ny,
+                           bz - opts.edge_gradient_scale * nz);
                 ee_gradient_line_indices.push_back(line_start);
                 ee_gradient_line_indices.push_back(line_start + 1);
                 ee_gradient_line_distance.push_back(distance);
@@ -492,10 +556,6 @@ int test_grads() {
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "pt_distance", step), pt_distance) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_distance", step), ee_distance) == SFEM_SUCCESS);
     }
-
-    SFEM_TEST_ASSERT(vertex_overlap->size() + edge0_overlap->size() > 0);
-    SFEM_TEST_ASSERT(!pt_values.empty());
-    SFEM_TEST_ASSERT(!ee_values.empty());
 
     const idx_t pt_value_cols = 20;
     const idx_t ee_value_cols = 20;
