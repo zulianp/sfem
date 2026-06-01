@@ -20,21 +20,19 @@ namespace {
     using sfem::real_t;
 
     struct DistanceGradientOptions {
-        real_t      translation_y       = -0.9;
-        real_t      edge_gradient_scale = 1;
-        real_t      top_body_y_min      = 1.0;
-        int         nx                  = 5;
-        int         n_steps             = 8;
-        std::string output_dir          = "distance_gradients";
+        real_t      translation_y  = -0.9;
+        real_t      top_body_y_min = 1.0;
+        int         nx             = 5;
+        int         n_steps        = 8;
+        std::string output_dir     = "distance_gradients";
 
         static DistanceGradientOptions from_env() {
             DistanceGradientOptions opts;
-            opts.translation_y       = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TRANSLATION_Y", opts.translation_y);
-            opts.edge_gradient_scale = smesh::Env::read("SFEM_DISTANCE_GRADIENT_EDGE_SCALE", opts.edge_gradient_scale);
-            opts.top_body_y_min      = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TOP_BODY_Y_MIN", opts.top_body_y_min);
-            opts.nx                  = std::max(1, smesh::Env::read("SFEM_DISTANCE_GRADIENT_NX", opts.nx));
-            opts.n_steps             = std::max(1, smesh::Env::read("SFEM_DISTANCE_GRADIENT_STEPS", opts.n_steps));
-            opts.output_dir          = smesh::Env::read_string("SFEM_DISTANCE_GRADIENT_OUTPUT", opts.output_dir);
+            opts.translation_y  = smesh::Env::read("SFEM_TRANSLATION_Y", opts.translation_y);
+            opts.top_body_y_min = smesh::Env::read("SFEM_TOP_BODY_Y_MIN", opts.top_body_y_min);
+            opts.nx             = std::max(1, smesh::Env::read("SFEM_NX", opts.nx));
+            opts.n_steps        = std::max(1, smesh::Env::read("SFEM_STEPS", opts.n_steps));
+            opts.output_dir     = smesh::Env::read_string("SFEM_OUTPUT", opts.output_dir);
             return opts;
         }
     };
@@ -295,9 +293,10 @@ int test_grads() {
     SFEM_TEST_ASSERT(write_vector(typed_path<smesh::geom_t>(output_dir, "xdmf_points"), xdmf_points) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(write_vector(typed_path<idx_t>(output_dir, "xdmf_triangles"), xdmf_triangles) == SFEM_SUCCESS);
 
-    auto            faces   = surface->block(0)->elements();
-    auto            edges   = ccd->edges();
-    const ptrdiff_t n_nodes = surface->n_nodes();
+    auto            faces           = surface->block(0)->elements();
+    auto            edges           = ccd->edges();
+    const ptrdiff_t n_nodes         = surface->n_nodes();
+    const real_t    distance_cutoff = std::abs(opts.translation_y) / opts.n_steps;
 
     for (int step = 0; step <= opts.n_steps; ++step) {
         const real_t t = real_t(step) / real_t(opts.n_steps);
@@ -381,6 +380,7 @@ int test_grads() {
 
             real_t       nx = 0, ny = 0, nz = 0;
             const real_t distance = normalize(p[0] - cx, p[1] - cy, p[2] - cz, nx, ny, nz);
+            if (distance > distance_cutoff) continue;
 
             pt_ids.push_back(step);
             pt_ids.push_back(v);
@@ -442,6 +442,7 @@ int test_grads() {
 
             real_t       nx = 0, ny = 0, nz = 0;
             const real_t distance = normalize(ax - bx, ay - by, az - bz, nx, ny, nz);
+            if (distance > distance_cutoff) continue;
 
             append_vec(ee_closest_points, ax, ay, az);
             append_vec(ee_closest_grad, nx, ny, nz);
@@ -449,10 +450,7 @@ int test_grads() {
             {
                 const idx_t line_start = static_cast<idx_t>(ee_gradient_line_points.size() / 3);
                 append_vec(ee_gradient_line_points, ax, ay, az);
-                append_vec(ee_gradient_line_points,
-                           ax + opts.edge_gradient_scale * nx,
-                           ay + opts.edge_gradient_scale * ny,
-                           az + opts.edge_gradient_scale * nz);
+                append_vec(ee_gradient_line_points, ax + nx, ay + ny, az + nz);
                 ee_gradient_line_indices.push_back(line_start);
                 ee_gradient_line_indices.push_back(line_start + 1);
                 ee_gradient_line_distance.push_back(distance);
@@ -465,10 +463,7 @@ int test_grads() {
             {
                 const idx_t line_start = static_cast<idx_t>(ee_gradient_line_points.size() / 3);
                 append_vec(ee_gradient_line_points, bx, by, bz);
-                append_vec(ee_gradient_line_points,
-                           bx - opts.edge_gradient_scale * nx,
-                           by - opts.edge_gradient_scale * ny,
-                           bz - opts.edge_gradient_scale * nz);
+                append_vec(ee_gradient_line_points, bx - nx, by - ny, bz - nz);
                 ee_gradient_line_indices.push_back(line_start);
                 ee_gradient_line_indices.push_back(line_start + 1);
                 ee_gradient_line_distance.push_back(distance);
