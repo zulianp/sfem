@@ -15,24 +15,42 @@
 #include "bvh/bvh.hpp"
 
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
 using namespace sfem;
 
 struct TwoBodyContactOptions {
-    int    demo             = 1;
-    real_t omega            = 1. / 3;
-    int    use_augmentation = 1;
-    real_t toi_scale        = 1.00;
-    real_t penalty          = 1000;
-    int    outer_loops      = 30;
-    int    inner_loops      = 100;
-    real_t contact_tol      = 1e-4;
+    int         demo             = 1;
+    int         nx               = 5;
+    real_t      omega            = 1. / 3;
+    int         use_augmentation = 1;
+    real_t      toi_scale        = 1.00;
+    real_t      penalty          = 1000;
+    int         outer_loops      = 30;
+    int         inner_loops      = 100;
+    real_t      contact_tol      = 1e-4;
+    real_t      ytop             = -0.2;
+    int         linear_max_it    = 10000;
+    real_t      linear_rtol      = 1e-4;
+    int         linear_verbose   = 0;
+    int         cg_max_it        = 10000;
+    real_t      cg_rtol          = 1e-4;
+    int         cg_verbose       = 0;
+    int         ccd_max_it       = 69;
+    real_t      ccd_tol          = 1e-12;
+    real_t      search_radius    = 0.001;
+    real_t      margin           = 0;
+    std::string demo_mesh_output = "contact_mesh";
+    std::string mesh_path        = "./mesh";
+    std::string dirichlet_path   = "./case.yaml";
+    std::string output_dir       = "contact_output";
 
     static TwoBodyContactOptions from_env() {
         TwoBodyContactOptions opts;
         opts.demo             = smesh::Env::read("SFEM_DEMO", opts.demo);
+        opts.nx               = smesh::Env::read("SFEM_NX", opts.nx);
         opts.omega            = smesh::Env::read("SFEM_OMEGA", opts.omega);
         opts.use_augmentation = smesh::Env::read("SFEM_USE_AUGMENTATION", opts.use_augmentation);
         opts.toi_scale        = smesh::Env::read("SFEM_TOI_SCALE", opts.toi_scale);
@@ -40,6 +58,21 @@ struct TwoBodyContactOptions {
         opts.outer_loops      = smesh::Env::read("SFEM_OUTER_LOOPS", opts.outer_loops);
         opts.inner_loops      = smesh::Env::read("SFEM_INNER_LOOPS", opts.inner_loops);
         opts.contact_tol      = smesh::Env::read("SFEM_CONTACT_TOL", opts.contact_tol);
+        opts.ytop             = smesh::Env::read("SFEM_YTOP", opts.ytop);
+        opts.linear_max_it    = smesh::Env::read("SFEM_LINEAR_MAX_IT", opts.linear_max_it);
+        opts.linear_rtol      = smesh::Env::read("SFEM_LINEAR_RTOL", opts.linear_rtol);
+        opts.linear_verbose   = smesh::Env::read("SFEM_LINEAR_VERBOSE", opts.linear_verbose);
+        opts.cg_max_it        = smesh::Env::read("SFEM_CG_MAX_IT", opts.cg_max_it);
+        opts.cg_rtol          = smesh::Env::read("SFEM_CG_RTOL", opts.cg_rtol);
+        opts.cg_verbose       = smesh::Env::read("SFEM_CG_VERBOSE", opts.cg_verbose);
+        opts.ccd_max_it       = smesh::Env::read("SFEM_CCD_MAX_IT", opts.ccd_max_it);
+        opts.ccd_tol          = smesh::Env::read("SFEM_CCD_TOL", opts.ccd_tol);
+        opts.search_radius    = smesh::Env::read("SFEM_SEARCH_RADIUS", opts.search_radius);
+        opts.demo_mesh_output = smesh::Env::read_string("SFEM_DEMO_MESH_OUTPUT", opts.demo_mesh_output);
+        opts.mesh_path        = smesh::Env::read_string("SFEM_MESH_PATH", opts.mesh_path);
+        opts.dirichlet_path   = smesh::Env::read_string("SFEM_DIRICHLET_PATH", opts.dirichlet_path);
+        opts.output_dir       = smesh::Env::read_string("SFEM_OUTPUT_DIR", opts.output_dir);
+        opts.margin           = smesh::Env::read("SFEM_MARGIN", opts.margin);
         return opts;
     }
 };
@@ -63,7 +96,7 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
 
         printf("Bulk: #nodes %zu #elements %zu\n", mesh->n_nodes(), mesh->n_elements());
 
-        mesh->write(smesh::Path("contact_mesh"));
+        mesh->write(smesh::Path(opts.demo_mesh_output));
 
         auto top_ss =
                 sfem::Sideset::create_from_selector(mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
@@ -103,8 +136,7 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
         // assert(bottom_ns->size() > 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-        DirichletConditions::Condition ytop{
-                .sidesets = top_ss, .nodeset = top_ns, .value = smesh::Env::read("SFEM_YTOP", -0.2), .component = 1};
+        DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = opts.ytop, .component = 1};
         DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
         DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
@@ -126,8 +158,8 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
 
         return f;
     } else {
-        smesh::Path mesh_path{"./mesh"};
-        smesh::Path dirichlet_path{"./case.yaml"};
+        smesh::Path mesh_path{opts.mesh_path};
+        smesh::Path dirichlet_path{opts.dirichlet_path};
         auto        mesh = smesh::Mesh::create_from_file(Communicator::self(), mesh_path);
 
         auto space = sfem::FunctionSpace::create(mesh, mesh->spatial_dimension());
@@ -738,19 +770,233 @@ void nljacobi(ContactData&                                 cd,
     }
 }
 
-void cg_solve() {
-    // TODO solve the linearized system including the contact conditions using CG instead of nonlinear Jacobi
+void apply_contact_hessian(ContactData&        cd,
+                           const real_t        penalty,
+                           const real_t* const macaulay,
+                           const mask_t* const is_constrained,
+                           const real_t* const h,
+                           real_t* const       out) {
+    SFEM_TRACE_SCOPE("apply_contact_hessian");
+
+    const int dim    = cd.surface->spatial_dimension();
+    auto      graph  = cd.graph;
+    auto      values = cd.values;
+    auto      rowptr = graph->rowptr()->data();
+    auto      colidx = graph->colidx()->data();
+    auto      vals   = values->data();
+    ptrdiff_t n      = graph->rowptr()->size() - 1;
+
+    auto normals = cd.normals->data();
+    auto mass    = cd.mass_vector->data();
+    auto nm      = cd.surface->node_mapping()->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (macaulay[i] == 0) continue;
+
+        const count_t lenrow = rowptr[i + 1] - rowptr[i];
+        if (lenrow == 0) continue;
+
+        const idx_t* const  row     = &colidx[rowptr[i]];
+        const real_t* const weights = &vals[rowptr[i]];
+        const ptrdiff_t     dof1    = nm[i] * dim;
+
+        real_t diff[3] = {0, 0, 0};
+        for (int d = 0; d < dim; ++d) {
+            diff[d] = h[dof1 + d];
+        }
+
+        for (count_t j = 0; j < lenrow; ++j) {
+            const ptrdiff_t dof2 = nm[row[j]] * dim;
+            const real_t    w    = weights[j];
+            for (int d = 0; d < dim; ++d) {
+                diff[d] -= w * h[dof2 + d];
+            }
+        }
+
+        real_t normal[3] = {0, 0, 0};
+        real_t nd        = 0;
+        for (int d = 0; d < dim; ++d) {
+            normal[d] = normals[d][i];
+            nd += normal[d] * diff[d];
+        }
+
+        const real_t scale = mass[i] * penalty * nd;
+        for (int d = 0; d < dim; ++d) {
+            const real_t force = scale * normal[d];
+
+            if (!mask_get(dof1 + d, is_constrained)) {
+#pragma omp atomic update
+                out[dof1 + d] += force;
+            }
+
+            for (count_t j = 0; j < lenrow; ++j) {
+                const ptrdiff_t dof2 = nm[row[j]] * dim + d;
+                if (mask_get(dof2, is_constrained)) continue;
+#pragma omp atomic update
+                out[dof2] -= force * weights[j];
+            }
+        }
+    }
+}
+
+void assemble_contact_hessian_diag(ContactData&        cd,
+                                   const real_t        penalty,
+                                   const real_t* const macaulay,
+                                   const mask_t* const is_constrained,
+                                   real_t* const       diag) {
+    SFEM_TRACE_SCOPE("assemble_contact_hessian_diag");
+
+    const int dim    = cd.surface->spatial_dimension();
+    auto      graph  = cd.graph;
+    auto      values = cd.values;
+    auto      rowptr = graph->rowptr()->data();
+    auto      colidx = graph->colidx()->data();
+    auto      vals   = values->data();
+    ptrdiff_t n      = graph->rowptr()->size() - 1;
+
+    auto normals = cd.normals->data();
+    auto mass    = cd.mass_vector->data();
+    auto nm      = cd.surface->node_mapping()->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (macaulay[i] == 0) continue;
+
+        const count_t lenrow = rowptr[i + 1] - rowptr[i];
+        if (lenrow == 0) continue;
+
+        const idx_t* const  row     = &colidx[rowptr[i]];
+        const real_t* const weights = &vals[rowptr[i]];
+        const ptrdiff_t     dof1    = nm[i] * dim;
+
+        for (int d = 0; d < dim; ++d) {
+            const real_t nd  = normals[d][i];
+            const real_t val = mass[i] * penalty * nd * nd;
+
+            if (!mask_get(dof1 + d, is_constrained)) {
+#pragma omp atomic update
+                diag[dof1 + d] += val;
+            }
+
+            for (count_t j = 0; j < lenrow; ++j) {
+                const ptrdiff_t dof2 = nm[row[j]] * dim + d;
+                if (mask_get(dof2, is_constrained)) continue;
+#pragma omp atomic update
+                diag[dof2] += weights[j] * weights[j] * val;
+            }
+        }
+    }
+}
+
+void cg_solve(ContactData&                                 cd,
+              const std::shared_ptr<sfem::Function>&       f,
+              const std::shared_ptr<sfem::Buffer<real_t>>& x,
+              const TwoBodyContactOptions&                 opts) {
+    SFEM_TRACE_SCOPE("cg_solve");
+
+    auto            space     = f->space();
+    const ptrdiff_t ndofs     = space->n_dofs();
+    const ptrdiff_t n_contact = cd.surface->node_mapping()->size();
+    auto            es        = f->execution_space();
+    auto            blas      = sfem::blas<real_t>(es);
+
+    auto grad            = sfem::create_buffer<real_t>(ndofs, es);
+    auto rhs             = sfem::create_buffer<real_t>(ndofs, es);
+    auto dx              = sfem::create_buffer<real_t>(ndofs, es);
+    auto diag            = sfem::create_buffer<real_t>(ndofs, es);
+    auto macaulay        = sfem::create_buffer<real_t>(n_contact, es);
+    auto constraint_mask = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < constraint_mask->size(); ++i) {
+        constraint_mask->data()[i] = 0;
+    }
+
+    f->constraints_mask(constraint_mask->data());
+
+    auto linearized_op = sfem::make_op<real_t>(
+            ndofs,
+            ndofs,
+            [=, &cd](const real_t* const from, real_t* const to) {
+                blas->values(ndofs, 0, to);
+                f->apply(x->data(), from, to);
+                apply_contact_hessian(cd, opts.penalty, macaulay->data(), constraint_mask->data(), from, to);
+                f->apply_zero_constraints(to);
+            },
+            es);
+
+    auto preconditioner = sfem::create_inverse_diagonal_scaling(diag, es);
+    auto solver         = sfem::create_cg<real_t>(linearized_op, es);
+    solver->set_preconditioner_op(preconditioner);
+    solver->set_max_it(std::min<int>(opts.cg_max_it, std::max<ptrdiff_t>(1, ndofs)));
+    solver->set_rtol(opts.cg_rtol);
+    solver->set_verbose(opts.cg_verbose != 0);
+
+    for (int loop = 0; loop < opts.inner_loops; ++loop) {
+        compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
+
+        blas->values(ndofs, 0, grad->data());
+        f->gradient(x->data(), grad->data());
+        assemble_contact_gradient(cd, opts.penalty, macaulay->data(), grad->data());
+        f->apply_zero_constraints(grad->data());
+
+        real_t grad_norm = blas->norm2(ndofs, grad->data());
+        if (grad_norm < opts.contact_tol) {
+            printf("cgsolve[%d] ||g|| = %g converged\n", loop, (double)grad_norm);
+            break;
+        }
+
+        blas->values(ndofs, 0, diag->data());
+        f->hessian_diag(x->data(), diag->data());
+        assemble_contact_hessian_diag(cd, opts.penalty, macaulay->data(), constraint_mask->data(), diag->data());
+
+        real_t* const diag_data = diag->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            if (!std::isfinite(diag_data[i]) || std::abs(diag_data[i]) < real_t(1e-14)) {
+                diag_data[i] = 1;
+            }
+        }
+
+        blas->axpby(ndofs, -1, grad->data(), 0, rhs->data());
+        f->apply_zero_constraints(rhs->data());
+        blas->values(ndofs, 0, dx->data());
+        solver->apply(rhs->data(), dx->data());
+        f->apply_zero_constraints(dx->data());
+        blas->axpby(ndofs, 1, dx->data(), 1, x->data());
+        f->apply_constraints(x->data());
+
+        compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
+
+        if (opts.use_augmentation) {
+            real_t* const       aug = cd.agumentation->data();
+            const real_t* const m   = macaulay->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                aug[i] = opts.penalty * m[i];
+            }
+        }
+
+        blas->values(ndofs, 0, grad->data());
+        f->gradient(x->data(), grad->data());
+        assemble_contact_gradient(cd, opts.penalty, macaulay->data(), grad->data());
+        f->apply_zero_constraints(grad->data());
+
+        grad_norm            = blas->norm2(ndofs, grad->data());
+        const bool converged = grad_norm < opts.contact_tol;
+        printf("cgsolve[%d] ||g|| = %g%s\n", loop, (double)grad_norm, converged ? " converged" : "");
+        if (converged) break;
+    }
 }
 
 int test_two_body_contact() {
-    ptrdiff_t nx = 5;
-
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
 
     const auto opts = TwoBodyContactOptions::from_env();
 
-    auto      f     = create_function(nx, es, opts);
+    auto      f     = create_function(opts.nx, es, opts);
     auto      space = f->space();
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
@@ -758,9 +1004,9 @@ int test_two_body_contact() {
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto solver    = sfem::create_cg<real_t>(linear_op, es);
     solver->set_op(linear_op);
-    solver->set_max_it(10000);
-    solver->set_rtol(1e-4);
-    solver->set_verbose(false);
+    solver->set_max_it(opts.linear_max_it);
+    solver->set_rtol(opts.linear_rtol);
+    solver->set_verbose(opts.linear_verbose != 0);
 
     auto displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto rhs          = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -780,14 +1026,14 @@ int test_two_body_contact() {
     displace_points(surface, displacement, p1);
 
     real_t toi = 1;
-    ccd->find_earliest_impact_time(p0, p1, toi, 69, 1e-12);
+    ccd->find_earliest_impact_time(p0, p1, toi, opts.ccd_max_it, opts.ccd_tol);
 
     printf("TOI: %g\n", toi);
     // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
     blas->scal(space->n_dofs(), opts.toi_scale * toi, displacement->data());
 
-    const real_t search_radius     = 0.001;
+    const real_t search_radius     = opts.search_radius;
     const real_t search_radius_sqr = search_radius * search_radius;
 
     auto surface_elements = surface->block(0)->elements();
@@ -893,7 +1139,7 @@ int test_two_body_contact() {
             }
 
             const real_t    normal_dot  = tnx * nx + tny * ny + tnz * nz;
-            const real_t    signed_dist = -dn * normal_dot;
+            const real_t    signed_dist = -dn * normal_dot - opts.margin;
             const ptrdiff_t dof         = node_mapping[i] * dim;
 
             distances_data[i]         = signed_dist;
@@ -934,7 +1180,7 @@ int test_two_body_contact() {
 
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
-    out->set_output_dir(smesh::Path("contact_output"));
+    out->set_output_dir(smesh::Path(opts.output_dir));
 
     out->write_time_step("disp", 0, displacement->data());
     out->write_time_step("distance", 0, distances_whole->data());
@@ -954,7 +1200,7 @@ int test_two_body_contact() {
                           .frozen_displacement = frozen_displacement,
                           .agumentation        = agumentation};
 
-        nljacobi(cd, f, displacement, opts);
+        cg_solve(cd, f, displacement, opts);
 
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
