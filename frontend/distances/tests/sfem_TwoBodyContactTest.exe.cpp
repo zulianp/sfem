@@ -41,6 +41,7 @@ struct TwoBodyContactOptions {
     int         ccd_max_it       = 69;
     real_t      ccd_tol          = 1e-12;
     real_t      search_radius    = 0.001;
+    int         adaptive_radius  = 0;
     real_t      margin           = 0;
     std::string demo_mesh_output = "contact_mesh";
     std::string mesh_path        = "./mesh";
@@ -68,6 +69,7 @@ struct TwoBodyContactOptions {
         opts.ccd_max_it       = smesh::Env::read("SFEM_CCD_MAX_IT", opts.ccd_max_it);
         opts.ccd_tol          = smesh::Env::read("SFEM_CCD_TOL", opts.ccd_tol);
         opts.search_radius    = smesh::Env::read("SFEM_SEARCH_RADIUS", opts.search_radius);
+        opts.adaptive_radius  = smesh::Env::read("SMFEM_ADATIVE_RADIUS", opts.adaptive_radius);
         opts.demo_mesh_output = smesh::Env::read_string("SFEM_DEMO_MESH_OUTPUT", opts.demo_mesh_output);
         opts.mesh_path        = smesh::Env::read_string("SFEM_MESH_PATH", opts.mesh_path);
         opts.dirichlet_path   = smesh::Env::read_string("SFEM_DIRICHLET_PATH", opts.dirichlet_path);
@@ -1047,12 +1049,36 @@ int test_two_body_contact() {
     auto                                             directors           = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto                                             normals             = sfem::create_buffer<real_t>(dim, npoints, es);
     auto                                             frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto                                             adaptive_radius_sqr = sfem::create_buffer<real_t>(npoints, es);
     std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph;
     smesh::SharedBuffer<real_t>                      values;
+
+    if (opts.adaptive_radius) {
+        blas->values(space->n_dofs(), 0, frozen_displacement->data());
+    }
 
     auto recompute_contact_conditions = [&]() {
         p1 = smesh::astype<real_t>(surface->points());
         displace_points(surface, displacement, p1);
+
+        ptrdiff_t     radius_stride       = 0;
+        const real_t* radius_squared_data = &search_radius_sqr;
+        if (opts.adaptive_radius) {
+            radius_stride             = 1;
+            radius_squared_data       = adaptive_radius_sqr->data();
+            const idx_t* const node_mapping_data = surface->node_mapping()->data();
+            const real_t* const u                = displacement->data();
+            const real_t* const u0               = frozen_displacement->data();
+            real_t* const       r2               = adaptive_radius_sqr->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < npoints; i++) {
+                const ptrdiff_t dof = node_mapping_data[i] * dim;
+                const real_t    dx  = u[dof + 0] - u0[dof + 0];
+                const real_t    dy  = u[dof + 1] - u0[dof + 1];
+                const real_t    dz  = u[dof + 2] - u0[dof + 2];
+                r2[i]               = dx * dx + dy * dy + dz * dz;
+            }
+        }
 
         ssdf::closest_within_radius_bvh(npoints,
                                         p1->data()[0],
@@ -1066,8 +1092,8 @@ int test_two_body_contact() {
                                         p1->data()[0],
                                         p1->data()[1],
                                         p1->data()[2],
-                                        0,
-                                        &search_radius_sqr,
+                                        radius_stride,
+                                        radius_squared_data,
                                         closest_triangles->data(),
                                         distances->data(),
                                         closest_points->data()[0],
