@@ -769,6 +769,9 @@ void nljacobi(ContactData&                                 cd,
 
         const real_t grad_norm = blas->norm2(ndofs, material_grad->data());
         const bool   converged = grad_norm < opts.contact_tol;
+
+        // TODO Create a function compute penetration, then compute the norm of the penetration, and add it to the output of
+        // printf
         printf("nljacobi[%d] ||g|| = %g%s\n", loop, (double)grad_norm, converged ? " converged" : "");
         if (converged) break;
     }
@@ -1044,16 +1047,22 @@ int test_two_body_contact() {
     auto npoints          = surface->n_nodes();
     auto nselements       = surface->n_elements();
 
-    auto                                             closest_points      = sfem::create_buffer<real_t>(dim, npoints, es);
-    auto                                             distances           = sfem::create_buffer<real_t>(npoints, es);
-    auto                                             closest_triangles   = sfem::create_buffer<idx_t>(npoints, es);
-    auto                                             distances_whole     = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto                                             directors           = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto                                             normals             = sfem::create_buffer<real_t>(dim, npoints, es);
-    auto                                             frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto                                             adaptive_radius_sqr = sfem::create_buffer<real_t>(npoints, es);
+    auto closest_points      = sfem::create_buffer<real_t>(dim, npoints, es);
+    auto distances           = sfem::create_buffer<real_t>(npoints, es);
+    auto closest_triangles   = sfem::create_buffer<idx_t>(npoints, es);
+    auto distances_whole     = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto directors           = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto normals             = sfem::create_buffer<real_t>(dim, npoints, es);
+    auto frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto adaptive_radius_sqr = sfem::create_buffer<real_t>(npoints, es);
+    auto constraint_mask     = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
     std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph;
     smesh::SharedBuffer<real_t>                      values;
+
+    for (ptrdiff_t i = 0; i < constraint_mask->size(); ++i) {
+        constraint_mask->data()[i] = 0;
+    }
+    f->constraints_mask(constraint_mask->data());
 
     if (opts.adaptive_radius) {
         blas->values(space->n_dofs(), 0, frozen_displacement->data());
@@ -1102,6 +1111,36 @@ int test_two_body_contact() {
                                         closest_points->data()[1],
                                         closest_points->data()[2],
                                         true);
+
+        {
+            const idx_t* const  node_mapping_data      = surface->node_mapping()->data();
+            const idx_t* const* surface_elements_data  = surface_elements->data();
+            const mask_t* const constraint_mask_data   = constraint_mask->data();
+            idx_t* const        closest_triangles_data = closest_triangles->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < npoints; ++i) {
+                const idx_t tri = closest_triangles_data[i];
+                if (tri == -1) continue;
+
+                bool      remove = false;
+                ptrdiff_t dof    = node_mapping_data[i] * dim;
+                for (int d = 0; d < dim; ++d) {
+                    remove |= mask_get(dof + d, constraint_mask_data);
+                }
+
+                const idx_t e[3] = {surface_elements_data[0][tri], surface_elements_data[1][tri], surface_elements_data[2][tri]};
+                for (int v = 0; v < 3; ++v) {
+                    dof = node_mapping_data[e[v]] * dim;
+                    for (int d = 0; d < dim; ++d) {
+                        remove |= mask_get(dof + d, constraint_mask_data);
+                    }
+                }
+
+                if (remove) {
+                    closest_triangles_data[i] = -1;
+                }
+            }
+        }
 
         blas->values(space->n_dofs(), 0, distances_whole->data());
         blas->values(space->n_dofs(), 0, directors->data());
