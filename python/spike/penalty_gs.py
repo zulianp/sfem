@@ -92,7 +92,7 @@ x = np.zeros(n)
 # x = np.linalg.solve(A, b)
 ub = np.ones(n) * 0.075
 
-penalty = 1000 / h
+penalty = 10 / h
 
 xc = x.copy()
 
