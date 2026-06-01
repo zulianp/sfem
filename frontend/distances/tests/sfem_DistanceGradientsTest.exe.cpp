@@ -143,7 +143,7 @@ int test_grads() {
     auto p0 = smesh::astype<real_t>(surface->points());
     auto p1 = smesh::astype<real_t>(surface->points());
 
-    const real_t translation_y = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TRANSLATION_Y", real_t(-0.9));
+    const real_t translation_y       = smesh::Env::read("SFEM_DISTANCE_GRADIENT_TRANSLATION_Y", real_t(-0.9));
     const real_t edge_gradient_scale = smesh::Env::read("SFEM_DISTANCE_GRADIENT_EDGE_SCALE", real_t(0.05));
     for (ptrdiff_t i = 0; i < surface->n_nodes(); ++i) {
         if (is_top_node(i)) {
@@ -397,7 +397,8 @@ int test_grads() {
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_grad_vec", step), ee_grad_vec) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_closest_points", step), ee_closest_points) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_closest_grad", step), ee_closest_grad) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_closest_distance", step), ee_closest_distance) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_closest_distance", step), ee_closest_distance) ==
+                         SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_gradient_line_points", step), ee_gradient_line_points) ==
                          SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_typed_path<idx_t>(fields_dir, "ee_gradient_line_indices", step),
