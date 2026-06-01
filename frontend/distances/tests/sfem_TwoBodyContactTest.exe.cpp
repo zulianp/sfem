@@ -20,10 +20,22 @@
 
 using namespace sfem;
 
-std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es) {
-    int SFEM_DEMO = smesh::Env::read("SFEM_DEMO", 1);
+struct EnvOptions {
+    int    demo;
+    real_t margin;
+    int    outer_loops;
+    int    inner_loops;
 
-    if (SFEM_DEMO) {
+    static EnvOptions read() {
+        return {smesh::Env::read("SFEM_DEMO", 1),
+                smesh::Env::read("SFEM_MARGIN", real_t(0)),
+                smesh::Env::read("SFEM_OUTER_LOOPS", 100),
+                smesh::Env::read("SFEM_INNER_LOOPS", 8)};
+    }
+};
+
+std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es, const EnvOptions& env) {
+    if (env.demo) {
         auto mesh1 =
                 smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
         auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
@@ -792,12 +804,13 @@ void nljacobi(ContactData&                                 cd,
 }
 
 int test_two_body_contact() {
+    const EnvOptions env = EnvOptions::read();
     ptrdiff_t nx = 14;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
 
-    auto      f     = create_function(nx, es);
+    auto      f     = create_function(nx, es, env);
     auto      space = f->space();
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
@@ -845,7 +858,7 @@ int test_two_body_contact() {
 
     const real_t search_radius     = 0.001;
     const real_t search_radius_sqr = search_radius * search_radius;
-    const real_t margin            = smesh::Env::read("SFEM_MARGIN", 0);
+    const real_t margin            = env.margin;
 
     auto surface_elements = surface->block(0)->elements();
     auto npoints          = surface->n_nodes();
@@ -1019,8 +1032,8 @@ int test_two_body_contact() {
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
 
-    const int outer_loops = smesh::Env::read("SFEM_OUTER_LOOPS", 100);
-    const int inner_loops = smesh::Env::read("SFEM_INNER_LOOPS", 8);
+    const int outer_loops = env.outer_loops;
+    const int inner_loops = env.inner_loops;
 
     out->write_time_step("disp", 0, displacement->data());
     out->write_time_step("distance", 0, distances_whole->data());
