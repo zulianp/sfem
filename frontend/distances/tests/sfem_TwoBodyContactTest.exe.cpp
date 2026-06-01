@@ -26,10 +26,10 @@ struct TwoBodyContactOptions {
     int         nx               = 5;
     real_t      omega            = 1. / 3;
     int         use_augmentation = 1;
-    int         use_nljacobi     = 0;
+    int         use_nljacobi     = 1;
     real_t      toi_scale        = 1.00;
     real_t      penalty          = 1000;
-    int         outer_loops      = 30;
+    int         outer_loops      = 1;
     int         inner_loops      = 100;
     real_t      contact_tol      = 1e-4;
     real_t      ytop             = -0.2;
@@ -397,6 +397,68 @@ void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* 
     }
 }
 
+void compute_penetration(ContactData& cd, const real_t* const disp, real_t* const penetration) {
+    SFEM_TRACE_SCOPE("compute_penetration");
+    const int dim    = cd.surface->spatial_dimension();
+    auto      graph  = cd.graph;
+    auto      values = cd.values;
+    auto      rowptr = graph->rowptr()->data();
+    auto      colidx = graph->colidx()->data();
+    auto      vals   = values->data();
+    ptrdiff_t n      = graph->rowptr()->size() - 1;
+
+    auto d       = cd.distances->data();
+    auto normals = cd.normals->data();
+    auto disp0   = cd.frozen_displacement->data();
+    auto nm      = cd.surface->node_mapping()->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        const count_t lenrow = rowptr[i + 1] - rowptr[i];
+        if (lenrow == 0) {
+            penetration[i] = 0;
+            continue;
+        }
+
+        const idx_t* const  row     = &colidx[rowptr[i]];
+        const real_t* const weights = &vals[rowptr[i]];
+        const ptrdiff_t     dof1    = nm[i] * dim;
+
+        real_t normal_diff = 0;
+        for (int d = 0; d < dim; d++) {
+            real_t u2 = 0;
+            for (count_t j = 0; j < lenrow; j++) {
+                const ptrdiff_t dof2 = nm[row[j]] * dim + d;
+                u2 += weights[j] * (disp[dof2] - disp0[dof2]);
+            }
+
+            normal_diff += normals[d][i] * (disp[dof1 + d] - disp0[dof1 + d] - u2);
+        }
+
+        penetration[i] = normal_diff - d[i];
+    }
+}
+
+void compute_macaulay_term_from_penetration(ContactData&        cd,
+                                            const real_t        penalty,
+                                            const real_t* const penetration,
+                                            real_t* const       macaulay) {
+    SFEM_TRACE_SCOPE("compute_macaulay_term_from_penetration");
+    auto            rowptr = cd.graph->rowptr()->data();
+    auto            aug    = cd.agumentation->data();
+    const ptrdiff_t n      = cd.graph->rowptr()->size() - 1;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        if (rowptr[i + 1] == rowptr[i]) {
+            macaulay[i] = 0;
+            continue;
+        }
+
+        macaulay[i] = std::max(penetration[i] + aug[i] / penalty, real_t(0));
+    }
+}
+
 void assemble_contact_gradient(ContactData& cd, const real_t penalty, const real_t* const macaulay, real_t* const grad) {
     SFEM_TRACE_SCOPE("assemble_contact_gradient");
     const int dim    = cd.surface->spatial_dimension();
@@ -607,6 +669,7 @@ void nljacobi(ContactData&                                 cd,
     auto constraint_mask   = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
+    auto penetration       = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
 
 #pragma omp parallel for
@@ -751,7 +814,8 @@ void nljacobi(ContactData&                                 cd,
             xd[dof + 2] -= opts.omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
-        compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
+        compute_penetration(cd, x->data(), penetration->data());
+        compute_macaulay_term_from_penetration(cd, opts.penalty, penetration->data(), macaulay->data());
 
         if (opts.use_augmentation) {
             real_t* const       aug = cd.agumentation->data();
@@ -770,9 +834,13 @@ void nljacobi(ContactData&                                 cd,
         const real_t grad_norm = blas->norm2(ndofs, material_grad->data());
         const bool   converged = grad_norm < opts.contact_tol;
 
-        // TODO Create a function compute penetration, then compute the norm of the penetration, and add it to the output of
-        // printf
-        printf("nljacobi[%d] ||g|| = %g%s\n", loop, (double)grad_norm, converged ? " converged" : "");
+        const real_t penetration_norm = blas->norm2(n_contact, penetration->data());
+
+        printf("nljacobi[%d] ||g|| = %g ||p|| = %g%s\n",
+               loop,
+               (double)grad_norm,
+               (double)penetration_norm,
+               converged ? " converged" : "");
         if (converged) break;
     }
 }
