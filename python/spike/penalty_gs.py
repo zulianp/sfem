@@ -42,14 +42,14 @@ def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
         ri = b[i]
         for j in range(0, rows):
             ri -= A[i, j] * x_old[j]
-
         x[i] += ri / A[i, i]
 
+    # Nonlinear Jacobi (penalty method)
+    for i in range(0, rows):
         Dmu = 0.0 if (x[i] + temp[i]) < 0 else I[i, i] * penalty
-
-        # Nonlinear Jacobi (penalty method)
         ri = I[i, i] * penalty * max(0.0, x[i] + temp[i])
         x[i] -= ri / (A[i, i] + Dmu)
+
 
 def penalty_gradient(A, I, x, b, ub, penalty, shift):
     rows = A.shape[0]
@@ -101,8 +101,8 @@ shift = np.zeros(n)
 solutions = [xc.copy()]
 
 for i in range(10000):
-    penalty_gs_step(A, I, xc, b, ub, penalty, shift)
-    # penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
+    # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
+    penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
 
     # if (i + 1) % 10 == 0:
     shift = penalty * np.maximum(0.0, xc - ub + shift / penalty)
