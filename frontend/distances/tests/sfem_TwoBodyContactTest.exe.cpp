@@ -76,7 +76,7 @@ struct TwoBodyContactOptions {
         opts.mesh_path        = smesh::Env::read_string("SFEM_MESH_PATH", opts.mesh_path);
         opts.dirichlet_path   = smesh::Env::read_string("SFEM_DIRICHLET_PATH", opts.dirichlet_path);
         opts.output_dir       = smesh::Env::read_string("SFEM_OUTPUT_DIR", opts.output_dir);
-        opts.margin           = smesh::Env::read("SFEM_MARGIN", opts.margin);
+        opts.margin           = smesh::Env::read("SFEM_MARGIN", opts.search_radius);
         return opts;
     }
 };
@@ -466,6 +466,17 @@ void        positive_part(const ptrdiff_t n, const real_t* const in, real_t* con
     }
 }
 
+void update_contact_augmentation(ContactData& cd, const real_t penalty, const real_t* const macaulay) {
+    SFEM_TRACE_SCOPE("update_contact_augmentation");
+    real_t* const   aug = cd.agumentation->data();
+    const ptrdiff_t n   = cd.surface->node_mapping()->size();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        aug[i] = penalty * macaulay[i];
+    }
+}
+
 void assemble_contact_gradient(ContactData& cd, const real_t penalty, const real_t* const macaulay, real_t* const grad) {
     SFEM_TRACE_SCOPE("assemble_contact_gradient");
     const int dim    = cd.surface->spatial_dimension();
@@ -843,10 +854,10 @@ void nljacobi(ContactData&                                 cd,
         const bool   converged = grad_norm < opts.contact_tol;
 
         positive_part(n_contact, penetration->data(), pos_penetration->data());
-        const real_t penetration_norm = blas->norm2(n_contact, pos_penetration->data());
+        const real_t penetration_norm         = blas->norm2(n_contact, pos_penetration->data());
         const real_t lagrange_multiplier_norm = blas->norm2(n_contact, cd.agumentation->data());
 
-        printf("nljacobi[%d] ||g|| = %g ||p+|| = %g ||l|| = %g%s\n",
+        printf("nljacobi[%d] ||g|| = %g ||p|| = %g ||l|| = %g%s\n",
                loop,
                (double)grad_norm,
                (double)penetration_norm,
@@ -992,6 +1003,8 @@ void cg_solve(ContactData&                                 cd,
     auto dx              = sfem::create_buffer<real_t>(ndofs, es);
     auto diag            = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay        = sfem::create_buffer<real_t>(n_contact, es);
+    auto penetration     = sfem::create_buffer<real_t>(n_contact, es);
+    auto pos_penetration = sfem::create_buffer<real_t>(n_contact, es);
     auto constraint_mask = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
 
 #pragma omp parallel for
@@ -1019,6 +1032,21 @@ void cg_solve(ContactData&                                 cd,
     solver->set_rtol(opts.cg_rtol);
     solver->set_verbose(opts.cg_verbose != 0);
 
+    auto print_contact_state = [&](const int loop, const real_t grad_norm, const bool converged) {
+        compute_penetration(cd, x->data(), penetration->data());
+        positive_part(n_contact, penetration->data(), pos_penetration->data());
+
+        const real_t penetration_norm         = blas->norm2(n_contact, pos_penetration->data());
+        const real_t lagrange_multiplier_norm = blas->norm2(n_contact, cd.agumentation->data());
+
+        printf("cgsolve[%d] ||g|| = %g ||p|| = %g ||l|| = %g%s\n",
+               loop,
+               (double)grad_norm,
+               (double)penetration_norm,
+               (double)lagrange_multiplier_norm,
+               converged ? " converged" : "");
+    };
+
     for (int loop = 0; loop < opts.inner_loops; ++loop) {
         compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
 
@@ -1029,7 +1057,7 @@ void cg_solve(ContactData&                                 cd,
 
         real_t grad_norm = blas->norm2(ndofs, grad->data());
         if (grad_norm < opts.contact_tol) {
-            printf("cgsolve[%d] ||g|| = %g converged\n", loop, (double)grad_norm);
+            print_contact_state(loop, grad_norm, true);
             break;
         }
 
@@ -1054,16 +1082,6 @@ void cg_solve(ContactData&                                 cd,
         f->apply_constraints(x->data());
 
         compute_macaulay_term(cd, opts.penalty, x->data(), macaulay->data());
-
-        if (opts.use_augmentation) {
-            real_t* const       aug = cd.agumentation->data();
-            const real_t* const m   = macaulay->data();
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n_contact; ++i) {
-                aug[i] = opts.penalty * m[i];
-            }
-        }
-
         blas->values(ndofs, 0, grad->data());
         f->gradient(x->data(), grad->data());
         assemble_contact_gradient(cd, opts.penalty, macaulay->data(), grad->data());
@@ -1071,8 +1089,22 @@ void cg_solve(ContactData&                                 cd,
 
         grad_norm            = blas->norm2(ndofs, grad->data());
         const bool converged = grad_norm < opts.contact_tol;
-        printf("cgsolve[%d] ||g|| = %g%s\n", loop, (double)grad_norm, converged ? " converged" : "");
+        print_contact_state(loop, grad_norm, converged);
         if (converged) break;
+    }
+
+    if (opts.use_augmentation) {
+        compute_penetration(cd, x->data(), penetration->data());
+        compute_macaulay_term_from_penetration(cd, opts.penalty, penetration->data(), macaulay->data());
+        update_contact_augmentation(cd, opts.penalty, macaulay->data());
+
+        positive_part(n_contact, penetration->data(), pos_penetration->data());
+        const real_t penetration_norm         = blas->norm2(n_contact, pos_penetration->data());
+        const real_t lagrange_multiplier_norm = blas->norm2(n_contact, cd.agumentation->data());
+
+        printf("cgsolve augmentation ||p|| = %g ||l|| = %g\n",
+               (double)penetration_norm,
+               (double)lagrange_multiplier_norm);
     }
 }
 
