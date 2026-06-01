@@ -600,6 +600,7 @@ void nljacobi(ContactData&                                 cd,
     auto elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
     auto contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
+    auto penetration       = sfem::create_buffer<real_t>(n_contact, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
     auto constraints_mask  = cd.constraints_mask;
@@ -763,7 +764,30 @@ void nljacobi(ContactData&                                 cd,
             aug[i] = penalty * m[i];
         }
 
-        // TODO: Print full gradient norm (includes material and contact gradient)
+        compute_penetration(cd, x->data(), penetration->data());
+
+        real_t              penetration_norm2 = 0;
+        real_t              lagr_mult_norm2   = 0;
+        const real_t* const p                 = penetration->data();
+#pragma omp parallel for reduction(+ : penetration_norm2, lagr_mult_norm2)
+        for (ptrdiff_t i = 0; i < n_contact; ++i) {
+            penetration_norm2 += p[i] * p[i];
+            lagr_mult_norm2 += aug[i] * aug[i];
+        }
+
+        real_t              full_grad_norm2 = 0;
+        const real_t* const mg              = material_grad->data();
+#pragma omp parallel for reduction(+ : full_grad_norm2)
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            const real_t g = mg[i] + cg[i];
+            full_grad_norm2 += g * g;
+        }
+
+        printf("%d) full_grad_norm = %g, penetration_norm = %g, lagr_mult_norm = %g\n",
+               loop,
+               (double)std::sqrt(full_grad_norm2),
+               (double)std::sqrt(penetration_norm2),
+               (double)std::sqrt(lagr_mult_norm2));
     }
 }
 
