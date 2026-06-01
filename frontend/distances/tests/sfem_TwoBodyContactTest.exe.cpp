@@ -26,6 +26,7 @@ struct TwoBodyContactOptions {
     int         nx               = 5;
     real_t      omega            = 1. / 3;
     int         use_augmentation = 1;
+    int         use_nljacobi     = 0;
     real_t      toi_scale        = 1.00;
     real_t      penalty          = 1000;
     int         outer_loops      = 30;
@@ -54,6 +55,7 @@ struct TwoBodyContactOptions {
         opts.nx               = smesh::Env::read("SFEM_NX", opts.nx);
         opts.omega            = smesh::Env::read("SFEM_OMEGA", opts.omega);
         opts.use_augmentation = smesh::Env::read("SFEM_USE_AUGMENTATION", opts.use_augmentation);
+        opts.use_nljacobi     = smesh::Env::read("SFEM_USE_NLJACOBI", opts.use_nljacobi);
         opts.toi_scale        = smesh::Env::read("SFEM_TOI_SCALE", opts.toi_scale);
         opts.penalty          = smesh::Env::read("SFEM_PENALTY", opts.penalty);
         opts.outer_loops      = smesh::Env::read("SFEM_OUTER_LOOPS", opts.outer_loops);
@@ -1064,19 +1066,19 @@ int test_two_body_contact() {
         ptrdiff_t     radius_stride       = 0;
         const real_t* radius_squared_data = &search_radius_sqr;
         if (opts.adaptive_radius) {
-            radius_stride             = 1;
-            radius_squared_data       = adaptive_radius_sqr->data();
-            const idx_t* const node_mapping_data = surface->node_mapping()->data();
-            const real_t* const u                = displacement->data();
-            const real_t* const u0               = frozen_displacement->data();
-            real_t* const       r2               = adaptive_radius_sqr->data();
+            radius_stride                         = 1;
+            radius_squared_data                   = adaptive_radius_sqr->data();
+            const idx_t* const  node_mapping_data = surface->node_mapping()->data();
+            const real_t* const u                 = displacement->data();
+            const real_t* const u0                = frozen_displacement->data();
+            real_t* const       r2                = adaptive_radius_sqr->data();
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < npoints; i++) {
                 const ptrdiff_t dof = node_mapping_data[i] * dim;
                 const real_t    dx  = u[dof + 0] - u0[dof + 0];
                 const real_t    dy  = u[dof + 1] - u0[dof + 1];
                 const real_t    dz  = u[dof + 2] - u0[dof + 2];
-                r2[i]               = dx * dx + dy * dy + dz * dz;
+                r2[i]               = std::max(1e-10, dx * dx + dy * dy + dz * dz);
             }
         }
 
@@ -1226,7 +1228,11 @@ int test_two_body_contact() {
                           .frozen_displacement = frozen_displacement,
                           .agumentation        = agumentation};
 
-        cg_solve(cd, f, displacement, opts);
+        if (opts.use_nljacobi) {
+            nljacobi(cd, f, displacement, opts);
+        } else {
+            cg_solve(cd, f, displacement, opts);
+        }
 
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
