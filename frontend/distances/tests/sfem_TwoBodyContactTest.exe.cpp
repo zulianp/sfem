@@ -129,6 +129,7 @@ struct ContactData {
     smesh::SharedBuffer<real_t*>&                    normals;
     smesh::SharedBuffer<real_t>&                     distances;
     smesh::SharedBuffer<real_t>&                     frozen_displacement;
+    SharedBuffer<mask_t>                             constraints_mask;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
 
@@ -158,6 +159,68 @@ std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> create_contact_graph(const smes
     }
 
     return std::make_shared<smesh::CRSGraph<count_t, idx_t>>(rowptr, colidx);
+}
+
+void compute_penetration(ContactData& cd, const real_t* const disp, real_t* const penetration) {
+    SFEM_TRACE_SCOPE("compute_penetration");
+    const int dim    = cd.surface->spatial_dimension();
+    auto      graph  = cd.graph;
+    auto      values = cd.values;
+    auto      rowptr = graph->rowptr()->data();
+    auto      colidx = graph->colidx()->data();
+    auto      vals   = values->data();
+    ptrdiff_t n      = graph->rowptr()->size() - 1;
+
+    auto d       = cd.distances->data();
+    auto normals = cd.normals->data();
+    auto disp0   = cd.frozen_displacement->data();
+    auto nm      = cd.surface->node_mapping()->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        const count_t lenrow = rowptr[i + 1] - rowptr[i];
+        if (lenrow == 0) {
+            penetration[i] = 0;
+            continue;
+        }
+
+        const idx_t* const  row     = &colidx[rowptr[i]];
+        const real_t* const weights = &vals[rowptr[i]];
+        const ptrdiff_t     dof1    = nm[i] * dim;
+
+        real_t normal_diff = 0;
+        for (int d = 0; d < dim; d++) {
+            real_t u2 = 0;
+            for (count_t j = 0; j < lenrow; j++) {
+                const ptrdiff_t dof2 = nm[row[j]] * dim + d;
+                u2 += weights[j] * (disp[dof2] - disp0[dof2]);
+            }
+
+            normal_diff += normals[d][i] * (disp[dof1 + d] - disp0[dof1 + d] - u2);
+        }
+
+        penetration[i] = std::max(real_t(0), normal_diff - d[i]);
+    }
+}
+
+void compute_macaulay_term_from_penetration(ContactData&        cd,
+                                            const real_t        penalty,
+                                            const real_t* const penetration,
+                                            real_t* const       macaulay) {
+    SFEM_TRACE_SCOPE("compute_macaulay_term_from_penetration");
+    auto            rowptr = cd.graph->rowptr()->data();
+    auto            aug    = cd.agumentation->data();
+    const ptrdiff_t n      = cd.graph->rowptr()->size() - 1;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        if (rowptr[i + 1] == rowptr[i]) {
+            macaulay[i] = 0;
+            continue;
+        }
+
+        macaulay[i] = std::max(penetration[i] + aug[i] / penalty, real_t(0));
+    }
 }
 
 void local_coordinates(const smesh::SharedBuffer<idx_t*>&     elements,
@@ -535,16 +598,12 @@ void nljacobi(ContactData&                                 cd,
 
     auto material_grad     = sfem::create_buffer<real_t>(ndofs, es);
     auto elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
-    auto constraint_mask   = sfem::create_buffer<mask_t>(mask_count(ndofs), es);
     auto contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
-
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < constraint_mask->size(); ++i) {
-        constraint_mask->data()[i] = 0;
-    }
+    auto constraints_mask  = cd.constraints_mask;
+    assert(constraints_mask);
 
     const idx_t* const nm = cd.surface->node_mapping()->data();
 #pragma omp parallel for
@@ -557,9 +616,7 @@ void nljacobi(ContactData&                                 cd,
         mask_set(nm[i], contact_node_mask->data());
     }
 
-    f->constraints_mask(constraint_mask->data());
-
-    const mask_t* const mask         = constraint_mask->data();
+    const mask_t* const mask         = constraints_mask->data();
     const mask_t* const contact_mask = contact_node_mask->data();
     real_t* const       xd           = x->data();
 
@@ -583,7 +640,7 @@ void nljacobi(ContactData&                                 cd,
         compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
         assemble_contact_gradient(cd, penalty, macaulay->data(), contact_grad->data());
         assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
-        gather_combine_hessian_diag(cd, constraint_mask->data(), elast_diag_values->data(), 1, diag_values->data());
+        gather_combine_hessian_diag(cd, constraints_mask->data(), elast_diag_values->data(), 1, diag_values->data());
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n_nodes; ++i) {
@@ -705,6 +762,8 @@ void nljacobi(ContactData&                                 cd,
         for (ptrdiff_t i = 0; i < n_contact; ++i) {
             aug[i] = penalty * m[i];
         }
+
+        // TODO: Print full gradient norm (includes material and contact gradient)
     }
 }
 
@@ -726,8 +785,16 @@ int test_two_body_contact() {
     solver->set_rtol(1e-4);
     solver->set_verbose(false);
 
-    auto displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto rhs          = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto displacement     = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto rhs              = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
+        constraints_mask->data()[i] = 0;
+    }
+
+    SFEM_TEST_ASSERT(f->constraints_mask(constraints_mask->data()) == SFEM_SUCCESS);
 
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
@@ -810,6 +877,36 @@ int test_two_body_contact() {
         auto closest_triangles_data = closest_triangles->data();
         auto normals_data           = normals->data();
         auto surface_elements_data  = surface_elements->data();
+
+        {
+            const idx_t* const  node_mapping_data      = surface->node_mapping()->data();
+            const idx_t* const* surface_elements_data  = surface_elements->data();
+            const mask_t* const constraint_mask_data   = constraints_mask->data();
+            idx_t* const        closest_triangles_data = closest_triangles->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < npoints; ++i) {
+                const idx_t tri = closest_triangles_data[i];
+                if (tri == -1) continue;
+
+                bool      remove = false;
+                ptrdiff_t dof    = node_mapping_data[i] * dim;
+                for (int d = 0; d < dim; ++d) {
+                    remove |= mask_get(dof + d, constraint_mask_data);
+                }
+
+                const idx_t e[3] = {surface_elements_data[0][tri], surface_elements_data[1][tri], surface_elements_data[2][tri]};
+                for (int v = 0; v < 3; ++v) {
+                    dof = node_mapping_data[e[v]] * dim;
+                    for (int d = 0; d < dim; ++d) {
+                        remove |= mask_get(dof + d, constraint_mask_data);
+                    }
+                }
+
+                if (remove) {
+                    closest_triangles_data[i] = -1;
+                }
+            }
+        }
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < npoints; i++) {
@@ -900,6 +997,13 @@ int test_two_body_contact() {
 
     const int outer_loops = smesh::Env::read("SFEM_OUTER_LOOPS", 100);
     const int inner_loops = smesh::Env::read("SFEM_INNER_LOOPS", 8);
+
+    out->write_time_step("disp", 0, displacement->data());
+    out->write_time_step("distance", 0, distances_whole->data());
+    out->write_time_step("directors", 0, directors->data());
+    out->write_time_step("lagr_mult_normal", 0, lagr_mult_normal->data());
+    out->log_time(0);
+
     for (int outer = 0; outer < outer_loops; ++outer) {
         recompute_contact_conditions();
 
@@ -910,6 +1014,7 @@ int test_two_body_contact() {
                           .normals             = normals,
                           .distances           = distances,
                           .frozen_displacement = frozen_displacement,
+                          .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
         nljacobi(cd, f, displacement, penalty, inner_loops);
@@ -935,11 +1040,11 @@ int test_two_body_contact() {
             }
         }
 
-        out->write_time_step("disp", outer, displacement->data());
-        out->write_time_step("distance", outer, distances_whole->data());
-        out->write_time_step("directors", outer, directors->data());
-        out->write_time_step("lagr_mult_normal", outer, lagr_mult_normal->data());
-        out->log_time(outer);
+        out->write_time_step("disp", outer + 1, displacement->data());
+        out->write_time_step("distance", outer + 1, distances_whole->data());
+        out->write_time_step("directors", outer + 1, directors->data());
+        out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
+        out->log_time(outer + 1);
 
         // recompute_contact_conditions();
     }

@@ -255,11 +255,12 @@ namespace sfem {
     int Function::constraints_mask(mask_t *mask) {
         SFEM_TRACE_SCOPE("Function::constraints_mask");
 
+        int err = SFEM_SUCCESS;
         for (auto &c : impl_->constraints) {
-            c->mask(mask);
+            err += c->mask(mask);
         }
 
-        return SFEM_FAILURE;
+        return err == SFEM_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
