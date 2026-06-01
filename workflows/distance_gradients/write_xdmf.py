@@ -173,6 +173,54 @@ def add_edge_line_step(output_dir, fields_dir, collection, step):
     add_data_item(output_dir, distance_attr, distances, str(n_points))
 
 
+def add_bounding_box_step(output_dir, fields_dir, collection, step):
+    points = find_field(fields_dir, "bbox_points", step)
+    indices = find_field(fields_dir, "bbox_indices", step)
+    kinds = find_field(fields_dir, "bbox_kind", step)
+    ids = find_field(fields_dir, "bbox_id", step)
+    n_points = os.path.getsize(points) // (TYPE_INFO[extension(points)][2] * 3)
+    n_lines = os.path.getsize(indices) // (TYPE_INFO[extension(indices)][2] * 2)
+
+    grid = ET.SubElement(collection, "Grid", {"Name": f"bbox_step_{step:06d}", "GridType": "Uniform"})
+    ET.SubElement(grid, "Time", {"Value": str(step)})
+
+    topology = ET.SubElement(
+        grid,
+        "Topology",
+        {
+            "TopologyType": "Polyline",
+            "NumberOfElements": str(n_lines),
+            "NodesPerElement": "2",
+        },
+    )
+    add_data_item(output_dir, topology, indices, f"{n_lines} 2")
+
+    geometry = ET.SubElement(grid, "Geometry", {"GeometryType": "XYZ"})
+    add_data_item(output_dir, geometry, points, f"{n_points} 3")
+
+    kind_attr = ET.SubElement(
+        grid,
+        "Attribute",
+        {
+            "Name": "bbox_kind",
+            "AttributeType": "Scalar",
+            "Center": "Cell",
+        },
+    )
+    add_data_item(output_dir, kind_attr, kinds, str(n_lines))
+
+    id_attr = ET.SubElement(
+        grid,
+        "Attribute",
+        {
+            "Name": "bbox_id",
+            "AttributeType": "Scalar",
+            "Center": "Cell",
+        },
+    )
+    add_data_item(output_dir, id_attr, ids, str(n_lines))
+
+
 def write_xml(path, root):
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
@@ -228,14 +276,28 @@ def main(argv):
         },
     )
 
+    bbox_xdmf = ET.Element("Xdmf", {"Version": "3.0"})
+    bbox_domain = ET.SubElement(bbox_xdmf, "Domain")
+    bbox_collection = ET.SubElement(
+        bbox_domain,
+        "Grid",
+        {
+            "Name": "bounding_boxes",
+            "GridType": "Collection",
+            "CollectionType": "Temporal",
+        },
+    )
+
     for step in range(nsteps):
         add_surface_step(output_dir, fields_dir, surface_collection, step, points, triangles, npoints, ntriangles)
         add_edge_point_step(output_dir, fields_dir, edge_collection, step)
         add_edge_line_step(output_dir, fields_dir, edge_lines_collection, step)
+        add_bounding_box_step(output_dir, fields_dir, bbox_collection, step)
 
     write_xml(os.path.join(output_dir, "distance_gradients.xdmf"), surface_xdmf)
     write_xml(os.path.join(output_dir, "edge_gradients.xdmf"), edge_xdmf)
     write_xml(os.path.join(output_dir, "edge_gradient_lines.xdmf"), edge_lines_xdmf)
+    write_xml(os.path.join(output_dir, "bounding_boxes.xdmf"), bbox_xdmf)
 
 
 if __name__ == "__main__":

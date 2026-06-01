@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -90,6 +91,41 @@ namespace {
         out.push_back(x);
         out.push_back(y);
         out.push_back(z);
+    }
+
+    void expand_bbox(const std::array<real_t, 3>& p, std::array<real_t, 3>& lo, std::array<real_t, 3>& hi) {
+        for (int d = 0; d < 3; ++d) {
+            lo[d] = std::min(lo[d], p[d]);
+            hi[d] = std::max(hi[d], p[d]);
+        }
+    }
+
+    void append_bbox_lines(const std::array<real_t, 3>& lo,
+                           const std::array<real_t, 3>& hi,
+                           const idx_t                  kind,
+                           const idx_t                  id,
+                           std::vector<real_t>&         points,
+                           std::vector<idx_t>&          indices,
+                           std::vector<idx_t>&          kinds,
+                           std::vector<idx_t>&          ids) {
+        const idx_t base = static_cast<idx_t>(points.size() / 3);
+        append_vec(points, lo[0], lo[1], lo[2]);
+        append_vec(points, hi[0], lo[1], lo[2]);
+        append_vec(points, hi[0], hi[1], lo[2]);
+        append_vec(points, lo[0], hi[1], lo[2]);
+        append_vec(points, lo[0], lo[1], hi[2]);
+        append_vec(points, hi[0], lo[1], hi[2]);
+        append_vec(points, hi[0], hi[1], hi[2]);
+        append_vec(points, lo[0], hi[1], hi[2]);
+
+        const idx_t edges[12][2] = {
+                {0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+        for (int e = 0; e < 12; ++e) {
+            indices.push_back(base + edges[e][0]);
+            indices.push_back(base + edges[e][1]);
+            kinds.push_back(kind);
+            ids.push_back(id);
+        }
     }
 
     template <typename T>
@@ -215,6 +251,10 @@ int test_grads() {
         std::vector<real_t> ee_gradient_line_points;
         std::vector<idx_t>  ee_gradient_line_indices;
         std::vector<real_t> ee_gradient_line_distance;
+        std::vector<real_t> bbox_points;
+        std::vector<idx_t>  bbox_indices;
+        std::vector<idx_t>  bbox_kind;
+        std::vector<idx_t>  bbox_id;
 
         for (int d = 0; d < 3; ++d) {
             disp[d].resize(n_nodes);
@@ -227,6 +267,37 @@ int test_grads() {
             for (int d = 0; d < 3; ++d) {
                 disp[d][i] = t * (p1->data()[d][i] - p0->data()[d][i]);
             }
+        }
+
+        const real_t t_prev = step == 0 ? t : real_t(step - 1) / real_t(n_steps);
+        for (ptrdiff_t f = 0; f < surface->n_elements(); ++f) {
+            std::array<real_t, 3> lo = {
+                    std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
+            std::array<real_t, 3> hi = {-std::numeric_limits<real_t>::max(),
+                                        -std::numeric_limits<real_t>::max(),
+                                        -std::numeric_limits<real_t>::max()};
+            for (int enode = 0; enode < 3; ++enode) {
+                const idx_t node = faces->data()[enode][f];
+                expand_bbox(point_at_time(p0, p1, node, t_prev), lo, hi);
+                expand_bbox(point_at_time(p0, p1, node, t), lo, hi);
+            }
+
+            append_bbox_lines(lo, hi, 0, static_cast<idx_t>(f), bbox_points, bbox_indices, bbox_kind, bbox_id);
+        }
+
+        for (ptrdiff_t e = 0; e < static_cast<ptrdiff_t>(edges->extent(1)); ++e) {
+            std::array<real_t, 3> lo = {
+                    std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
+            std::array<real_t, 3> hi = {-std::numeric_limits<real_t>::max(),
+                                        -std::numeric_limits<real_t>::max(),
+                                        -std::numeric_limits<real_t>::max()};
+            for (int enode = 0; enode < 2; ++enode) {
+                const idx_t node = edges->data()[enode][e];
+                expand_bbox(point_at_time(p0, p1, node, t_prev), lo, hi);
+                expand_bbox(point_at_time(p0, p1, node, t), lo, hi);
+            }
+
+            append_bbox_lines(lo, hi, 1, static_cast<idx_t>(e), bbox_points, bbox_indices, bbox_kind, bbox_id);
         }
 
         for (ptrdiff_t i = 0; i < vertex_overlap->size(); ++i) {
@@ -405,6 +476,11 @@ int test_grads() {
                                       ee_gradient_line_indices) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "ee_gradient_line_distance", step), ee_gradient_line_distance) ==
                          SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(write_vector(timestep_path(fields_dir, "bbox_points", step), bbox_points) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(write_vector(timestep_typed_path<idx_t>(fields_dir, "bbox_indices", step), bbox_indices) ==
+                         SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(write_vector(timestep_typed_path<idx_t>(fields_dir, "bbox_kind", step), bbox_kind) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(write_vector(timestep_typed_path<idx_t>(fields_dir, "bbox_id", step), bbox_id) == SFEM_SUCCESS);
 
         ee_closest_indices.resize(ee_closest_distance.size());
         for (size_t i = 0; i < ee_closest_indices.size(); ++i) {
