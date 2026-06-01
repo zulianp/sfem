@@ -459,6 +459,13 @@ void compute_macaulay_term_from_penetration(ContactData&        cd,
     }
 }
 
+void        positive_part(const ptrdiff_t n, const real_t* const in, real_t* const out) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        out[i] = std::max(in[i], real_t(0));
+    }
+}
+
 void assemble_contact_gradient(ContactData& cd, const real_t penalty, const real_t* const macaulay, real_t* const grad) {
     SFEM_TRACE_SCOPE("assemble_contact_gradient");
     const int dim    = cd.surface->spatial_dimension();
@@ -670,6 +677,7 @@ void nljacobi(ContactData&                                 cd,
     auto contact_grad      = sfem::create_buffer<real_t>(ndofs, es);
     auto macaulay          = sfem::create_buffer<real_t>(n_contact, es);
     auto penetration       = sfem::create_buffer<real_t>(n_contact, es);
+    auto pos_penetration   = sfem::create_buffer<real_t>(n_contact, es);
     auto diag_values       = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
 
 #pragma omp parallel for
@@ -719,9 +727,9 @@ void nljacobi(ContactData&                                 cd,
                 a8 = 1;
             }
 
-            const real_t g0 = eg[dof + 0];
-            const real_t g1 = eg[dof + 1];
-            const real_t g2 = eg[dof + 2];
+            const real_t g0 = mask_get(dof + 0, mask) ? 0 : eg[dof + 0];
+            const real_t g1 = mask_get(dof + 1, mask) ? 0 : eg[dof + 1];
+            const real_t g2 = mask_get(dof + 2, mask) ? 0 : eg[dof + 2];
 
             const real_t x0  = a4 * a8;
             const real_t x1  = a5 * a7;
@@ -834,12 +842,15 @@ void nljacobi(ContactData&                                 cd,
         const real_t grad_norm = blas->norm2(ndofs, material_grad->data());
         const bool   converged = grad_norm < opts.contact_tol;
 
-        const real_t penetration_norm = blas->norm2(n_contact, penetration->data());
+        positive_part(n_contact, penetration->data(), pos_penetration->data());
+        const real_t penetration_norm = blas->norm2(n_contact, pos_penetration->data());
+        const real_t lagrange_multiplier_norm = blas->norm2(n_contact, cd.agumentation->data());
 
-        printf("nljacobi[%d] ||g|| = %g ||p|| = %g%s\n",
+        printf("nljacobi[%d] ||g|| = %g ||p+|| = %g ||l|| = %g%s\n",
                loop,
                (double)grad_norm,
                (double)penetration_norm,
+               (double)lagrange_multiplier_norm,
                converged ? " converged" : "");
         if (converged) break;
     }
