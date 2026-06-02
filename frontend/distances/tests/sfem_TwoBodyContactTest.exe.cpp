@@ -25,18 +25,25 @@ struct EnvOptions {
     real_t margin;
     int    outer_loops;
     int    inner_loops;
+    int    nx;
+    real_t ytop;
+    real_t penalty;
 
     static EnvOptions read() {
-        return {smesh::Env::read("SFEM_DEMO", 1),
+        return {smesh::Env::read("SFEM_DEMO", int(1)),
                 smesh::Env::read("SFEM_MARGIN", real_t(0)),
-                smesh::Env::read("SFEM_OUTER_LOOPS", 100),
-                smesh::Env::read("SFEM_INNER_LOOPS", 8)};
+                smesh::Env::read("SFEM_OUTER_LOOPS", int(1)),
+                smesh::Env::read("SFEM_INNER_LOOPS", int(1000)),
+                smesh::Env::read("SFEM_NX", int(10)),
+                smesh::Env::read("SFEM_YTOP", real_t(-0.4)),
+                smesh::Env::read("SFEM_PENALTY", real_t(10))};
     }
 };
 
-std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpace es, const EnvOptions& env) {
+std::shared_ptr<Function> create_function(const EnvOptions& opts, const ExecutionSpace es, const EnvOptions& env) {
     if (env.demo) {
-        auto mesh1 =
+        const ptrdiff_t nx = opts.nx;
+        auto            mesh1 =
                 smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
         auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
                                                    std::max<ptrdiff_t>(1, nx / 2),
@@ -93,7 +100,7 @@ std::shared_ptr<Function> create_function(const ptrdiff_t nx, const ExecutionSpa
         assert(bottom_ns->size() > 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-        DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.4, .component = 1};
+        DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = opts.ytop, .component = 1};
         DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
         DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
@@ -805,12 +812,12 @@ void nljacobi(ContactData&                                 cd,
 
 int test_two_body_contact() {
     const EnvOptions env = EnvOptions::read();
-    ptrdiff_t nx = 14;
+    ptrdiff_t        nx  = env.nx;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
 
-    auto      f     = create_function(nx, es, env);
+    auto      f     = create_function(env, es, env);
     auto      space = f->space();
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
@@ -1022,7 +1029,7 @@ int test_two_body_contact() {
 
     auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
 
-    real_t penalty          = 10;
+    real_t penalty          = env.penalty;
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
     f->apply_constraints(displacement->data());
