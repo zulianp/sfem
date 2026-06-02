@@ -28,6 +28,8 @@ struct EnvOptions {
     int    nx;
     real_t ytop;
     real_t penalty;
+    real_t solver_tol;
+    bool   enable_ccd;
 
     static EnvOptions read() {
         return {smesh::Env::read("SFEM_DEMO", int(1)),
@@ -36,15 +38,19 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_INNER_LOOPS", int(1000)),
                 smesh::Env::read("SFEM_NX", int(10)),
                 smesh::Env::read("SFEM_YTOP", real_t(-0.4)),
-                smesh::Env::read("SFEM_PENALTY", real_t(10))};
+                smesh::Env::read("SFEM_PENALTY", real_t(10)),
+                smesh::Env::read("SFEM_SOLVER_TOL", real_t(1e-6)),
+                smesh::Env::read("SFEM_ENABLE_CCD", false)};
     }
 };
 
 std::shared_ptr<Function> create_function(const EnvOptions& opts, const ExecutionSpace es, const EnvOptions& env) {
     if (env.demo) {
         const ptrdiff_t nx = opts.nx;
-        auto            mesh1 =
-                smesh::Mesh::create_tet4_cube(Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, 0.8, 0, 1, 1, 1);
+
+        geom_t y_bottom = 0.9;
+        auto   mesh1    = smesh::Mesh::create_tet4_cube(
+                Communicator::self(), nx, std::max<ptrdiff_t>(1, nx / 5), nx, 0, y_bottom, 0, 1, 1, 1);
         auto mesh2 = smesh::Mesh::create_tet4_cube(Communicator::self(),
                                                    std::max<ptrdiff_t>(1, nx / 2),
                                                    nx,
@@ -95,9 +101,9 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
         auto right_ns = smesh::create_nodeset_from_sidesets(mesh, right_ss);
 
         assert(top_ns != nullptr);
-        assert(bottom_ns != nullptr);
+        // assert(bottom_ns != nullptr);
         assert(top_ns->size() > 0);
-        assert(bottom_ns->size() > 0);
+        // assert(bottom_ns->size() > 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
         DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = opts.ytop, .component = 1};
@@ -178,6 +184,135 @@ std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> create_contact_graph(const smes
     }
 
     return std::make_shared<smesh::CRSGraph<count_t, idx_t>>(rowptr, colidx);
+}
+
+void remove_surface_elements_connected_to_constrained_nodes(const std::shared_ptr<smesh::Mesh>& surface,
+                                                            const smesh::SharedBuffer<mask_t>&  constraints_mask,
+                                                            const int                           block_size) {
+    auto node_mapping = surface->node_mapping();
+    assert(node_mapping);
+    assert(constraints_mask);
+
+    const ptrdiff_t            n_nodes           = surface->n_nodes();
+    const idx_t* const         node_mapping_data = node_mapping->data();
+    const mask_t* const        mask_data         = constraints_mask->data();
+    std::vector<unsigned char> constrained_node(n_nodes);
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+        const ptrdiff_t dof = node_mapping_data[i] * block_size;
+        bool            constrained{false};
+        for (int d = 0; d < block_size; ++d) {
+            constrained |= mask_get(dof + d, mask_data);
+        }
+
+        constrained_node[i] = constrained;
+    }
+
+    for (size_t b = 0; b < surface->n_blocks(); ++b) {
+        auto                       block         = surface->block(b);
+        const int                  nxe           = block->n_nodes_per_element();
+        const ptrdiff_t            n_elements    = block->n_elements();
+        auto                       elements      = block->elements();
+        auto                       elements_data = elements->data();
+        ptrdiff_t                  n_kept        = 0;
+        std::vector<unsigned char> keep(n_elements);
+
+#pragma omp parallel for reduction(+ : n_kept)
+        for (ptrdiff_t e = 0; e < n_elements; ++e) {
+            bool remove{false};
+            for (int v = 0; v < nxe; ++v) {
+                remove |= constrained_node[elements_data[v][e]];
+            }
+
+            keep[e] = !remove;
+            n_kept += keep[e];
+        }
+
+        if (n_kept == n_elements) {
+            continue;
+        }
+
+        auto filtered_elements      = smesh::create_host_buffer<idx_t>(nxe, n_kept);
+        auto filtered_elements_data = filtered_elements->data();
+
+        ptrdiff_t out = 0;
+        for (ptrdiff_t e = 0; e < n_elements; ++e) {
+            if (!keep[e]) {
+                continue;
+            }
+
+            for (int v = 0; v < nxe; ++v) {
+                filtered_elements_data[v][out] = elements_data[v][e];
+            }
+
+            ++out;
+        }
+
+        block->set_elements(filtered_elements);
+    }
+
+    std::vector<unsigned char> used_node(n_nodes);
+    std::vector<idx_t>         old_to_new(n_nodes);
+    ptrdiff_t                  n_used_nodes = 0;
+
+    for (size_t b = 0; b < surface->n_blocks(); ++b) {
+        auto            block         = surface->block(b);
+        const int       nxe           = block->n_nodes_per_element();
+        const ptrdiff_t n_elements    = block->n_elements();
+        auto            elements_data = block->elements()->data();
+
+        for (ptrdiff_t e = 0; e < n_elements; ++e) {
+            for (int v = 0; v < nxe; ++v) {
+                const idx_t node = elements_data[v][e];
+                if (!used_node[node]) {
+                    used_node[node]  = true;
+                    old_to_new[node] = n_used_nodes++;
+                }
+            }
+        }
+    }
+
+    if (n_used_nodes == n_nodes) {
+        return;
+    }
+
+    const int dim              = surface->spatial_dimension();
+    auto      points           = surface->points();
+    auto      points_data      = points->data();
+    auto      compact_points   = smesh::create_host_buffer<geom_t>(dim, n_used_nodes);
+    auto      compact_mapping  = smesh::create_host_buffer<idx_t>(n_used_nodes);
+    auto      compact_p_data   = compact_points->data();
+    auto      compact_map_data = compact_mapping->data();
+
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+        if (!used_node[i]) {
+            continue;
+        }
+
+        const idx_t new_node       = old_to_new[i];
+        compact_map_data[new_node] = node_mapping_data[i];
+        for (int d = 0; d < dim; ++d) {
+            compact_p_data[d][new_node] = points_data[d][i];
+        }
+    }
+
+    for (size_t b = 0; b < surface->n_blocks(); ++b) {
+        auto            block         = surface->block(b);
+        const int       nxe           = block->n_nodes_per_element();
+        const ptrdiff_t n_elements    = block->n_elements();
+        auto            elements_data = block->elements()->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t e = 0; e < n_elements; ++e) {
+            for (int v = 0; v < nxe; ++v) {
+                elements_data[v][e] = old_to_new[elements_data[v][e]];
+            }
+        }
+    }
+
+    surface->set_points(compact_points);
+    surface->set_node_mapping(compact_mapping);
 }
 
 void compute_penetration(ContactData& cd, const real_t* const disp, real_t* const penetration) {
@@ -599,7 +734,8 @@ void nljacobi(ContactData&                                 cd,
               const std::shared_ptr<sfem::Function>&       f,
               const std::shared_ptr<sfem::Buffer<real_t>>& x,
               const real_t                                 penalty,
-              const int                                    n_loops) {
+              const int                                    n_loops,
+              const real_t                                 solver_tol) {
     SFEM_TRACE_SCOPE("nljacobi");
 
     auto      space = f->space();
@@ -644,6 +780,7 @@ void nljacobi(ContactData&                                 cd,
     blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
     f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
 
+    ptrdiff_t each = 1;
     for (int loop = 0; loop < n_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
 
@@ -774,13 +911,15 @@ void nljacobi(ContactData&                                 cd,
             xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
         }
 
-        compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
+        real_t* const aug = cd.agumentation->data();
+        if ((loop + 1) % each == 0) {
+            compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
 
-        real_t* const       aug = cd.agumentation->data();
-        const real_t* const m   = macaulay->data();
+            const real_t* const m = macaulay->data();
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n_contact; ++i) {
-            aug[i] = penalty * m[i];
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                aug[i] = penalty * m[i];
+            }
         }
 
         compute_penetration(cd, x->data(), penetration->data());
@@ -802,11 +941,21 @@ void nljacobi(ContactData&                                 cd,
             full_grad_norm2 += g * g;
         }
 
-        printf("%d) full_grad_norm = %g, penetration_norm = %g, lagr_mult_norm = %g\n",
-               loop,
-               (double)std::sqrt(full_grad_norm2),
-               (double)std::sqrt(penetration_norm2),
-               (double)std::sqrt(lagr_mult_norm2));
+        full_grad_norm2   = std::sqrt(full_grad_norm2);
+        penetration_norm2 = std::sqrt(penetration_norm2);
+        lagr_mult_norm2   = std::sqrt(lagr_mult_norm2);
+
+        if (full_grad_norm2 < solver_tol && penetration_norm2 < solver_tol && lagr_mult_norm2 < solver_tol) {
+            break;
+        }
+
+        if (loop % 100 == 0) {
+            printf("%d) full_grad_norm = %g, penetration_norm = %g, lagr_mult_norm = %g\n",
+                   loop,
+                   full_grad_norm2,
+                   penetration_norm2,
+                   lagr_mult_norm2);
+        }
     }
 }
 
@@ -846,6 +995,8 @@ int test_two_body_contact() {
     solver->apply(rhs->data(), displacement->data());
 
     auto surface = skin(mesh);
+    remove_surface_elements_connected_to_constrained_nodes(surface, constraints_mask, dim);
+    surface->write(smesh::Path("contact_surface"));
 
     auto ccd = sccd::CCD<real_t>::create(surface);
 
@@ -922,36 +1073,6 @@ int test_two_body_contact() {
         auto normals_data           = normals->data();
         auto surface_elements_data  = surface_elements->data();
 
-        {
-            const idx_t* const  node_mapping_data      = surface->node_mapping()->data();
-            const idx_t* const* surface_elements_data  = surface_elements->data();
-            const mask_t* const constraint_mask_data   = constraints_mask->data();
-            idx_t* const        closest_triangles_data = closest_triangles->data();
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < npoints; ++i) {
-                const idx_t tri = closest_triangles_data[i];
-                if (tri == -1) continue;
-
-                bool      remove = false;
-                ptrdiff_t dof    = node_mapping_data[i] * dim;
-                for (int d = 0; d < dim; ++d) {
-                    remove |= mask_get(dof + d, constraint_mask_data);
-                }
-
-                const idx_t e[3] = {surface_elements_data[0][tri], surface_elements_data[1][tri], surface_elements_data[2][tri]};
-                for (int v = 0; v < 3; ++v) {
-                    dof = node_mapping_data[e[v]] * dim;
-                    for (int d = 0; d < dim; ++d) {
-                        remove |= mask_get(dof + d, constraint_mask_data);
-                    }
-                }
-
-                if (remove) {
-                    closest_triangles_data[i] = -1;
-                }
-            }
-        }
-
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < npoints; i++) {
             const idx_t tri = closest_triangles_data[i];
@@ -972,30 +1093,38 @@ int test_two_body_contact() {
             const real_t v1y = p1_data[1][e2] - p1_data[1][e0];
             const real_t v1z = p1_data[2][e2] - p1_data[2][e0];
 
-            real_t nx = v0y * v1z - v0z * v1y;
-            real_t ny = v0z * v1x - v0x * v1z;
-            real_t nz = v0x * v1y - v0y * v1x;
+            real_t tnx = v0y * v1z - v0z * v1y;
+            real_t tny = v0z * v1x - v0x * v1z;
+            real_t tnz = v0x * v1y - v0y * v1x;
 
-            const real_t nn = std::sqrt(nx * nx + ny * ny + nz * nz);
-            if (nn > 0) {
-                nx /= nn;
-                ny /= nn;
-                nz /= nn;
+            const real_t tnn = std::sqrt(tnx * tnx + tny * tny + tnz * tnz);
+
+            tnx /= tnn;
+            tny /= tnn;
+            tnz /= tnn;
+
+            const real_t dx = p1_data[0][i] - closest_points_data[0][i];
+            const real_t dy = p1_data[1][i] - closest_points_data[1][i];
+            const real_t dz = p1_data[2][i] - closest_points_data[2][i];
+            const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+            real_t nx = 0, ny = 0, nz = 0;
+            if (dn > 0) {
+                nx = dx / dn;
+                ny = dy / dn;
+                nz = dz / dn;
             } else {
-                const real_t dx = p1_data[0][i] - closest_points_data[0][i];
-                const real_t dy = p1_data[1][i] - closest_points_data[1][i];
-                const real_t dz = p1_data[2][i] - closest_points_data[2][i];
-                const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
-                if (dn > 0) {
-                    nx = dx / dn;
-                    ny = dy / dn;
-                    nz = dz / dn;
-                }
+                nx = tnx;
+                ny = tny;
+                nz = tnz;
             }
 
-            const real_t    dx          = p1_data[0][i] - closest_points_data[0][i];
-            const real_t    dy          = p1_data[1][i] - closest_points_data[1][i];
-            const real_t    dz          = p1_data[2][i] - closest_points_data[2][i];
+            const real_t cos_angle = nx * tnx + ny * tny + nz * tnz;
+            if (std::abs(cos_angle) < 1e-8) {
+                closest_triangles_data[i] = -1;
+                continue;
+            }
+
             const real_t    signed_dist = dx * nx + dy * ny + dz * nz - margin;
             const ptrdiff_t dof         = node_mapping[i] * dim;
 
@@ -1061,7 +1190,7 @@ int test_two_body_contact() {
                           .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
-        nljacobi(cd, f, displacement, penalty, inner_loops);
+        nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol);
 
         blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 
@@ -1081,6 +1210,29 @@ int test_two_body_contact() {
                 lagr_mult_normal_data[dof + 0] = lm * normal_x[i];
                 lagr_mult_normal_data[dof + 1] = lm * normal_y[i];
                 lagr_mult_normal_data[dof + 2] = lm * normal_z[i];
+            }
+        }
+
+        if (env.enable_ccd) {
+            p0 = smesh::astype<real_t>(surface->points());
+            displace_points(surface, frozen_displacement, p0);
+
+            p1 = smesh::astype<real_t>(surface->points());
+            displace_points(surface, displacement, p1);
+
+            real_t ccd_toi = 1;
+            ccd->find_earliest_impact_time(p0, p1, ccd_toi, 69, 1e-12);
+            printf("CCD TOI: %g\n", ccd_toi);
+
+            if (ccd_toi < 1) {
+                const real_t* const u0 = frozen_displacement->data();
+                real_t* const       u1 = displacement->data();
+                const ptrdiff_t     n  = space->n_dofs();
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    u1[i] = u0[i] + ccd_toi * (u1[i] - u0[i]);
+                }
             }
         }
 
