@@ -31,6 +31,47 @@ def penalty_gs_step(A, I, x, b, ub, penalty, shift):
         # x[i] = min(ub[i], x[i])
 
 
+# @njit(fastmath=True, boundscheck=False, nogil=True)
+# def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
+#     rows = A.shape[0]
+#     x_old = x.copy()
+
+#     temp = -ub + shift / penalty
+
+#     for i in range(0, rows):
+#         ri = b[i]
+#         for j in range(0, rows):
+#             ri -= A[i, j] * x_old[j]
+
+#         x[i] += ri / A[i, i]
+
+#         Dmu = 0.0 if (x[i] + temp[i]) < 0 else I[i, i] * penalty
+
+#         # Nonlinear Jacobi (penalty method)
+#         ri = I[i, i] * penalty * max(0.0, x[i] + temp[i])
+#         x[i] -= ri / (A[i, i] + Dmu)
+
+
+# @njit(fastmath=True, boundscheck=False, nogil=True)
+# def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
+#     rows = A.shape[0]
+#     x_old = x.copy()
+
+#     temp = -ub + shift / penalty
+
+#     for i in range(0, rows):
+#         ri = b[i]
+#         for j in range(0, rows):
+#             ri -= A[i, j] * x_old[j]
+
+#         x[i] += ri / A[i, i]
+
+#         # Projected Jacobi
+#         x[i] = min(ub[i], x[i])
+
+omega = 1
+# omega = 0.5
+
 @njit(fastmath=True, boundscheck=False, nogil=True)
 def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
     rows = A.shape[0]
@@ -39,17 +80,14 @@ def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
     temp = -ub + shift / penalty
 
     for i in range(0, rows):
-        ri = b[i]
+        ri = b[i] - I[i, i] * penalty * max(0.0, x_old[i] + temp[i])
+        Dmu = 0.0 if (x_old[i] + temp[i]) < 0 else I[i, i] * penalty
+
         for j in range(0, rows):
             ri -= A[i, j] * x_old[j]
 
-        x[i] += ri / A[i, i]
+        x[i] += omega * ri / (A[i, i] + Dmu)
 
-        Dmu = 0.0 if (x[i] + temp[i]) < 0 else I[i, i] * penalty
-
-        # Nonlinear Jacobi (penalty method)
-        ri = I[i, i] * penalty * max(0.0, x[i] + temp[i])
-        x[i] -= ri / (A[i, i] + Dmu)
 
 def penalty_gradient(A, I, x, b, ub, penalty, shift):
     rows = A.shape[0]
@@ -83,6 +121,7 @@ A *= 1 / (h)
 I = np.eye(n) * h
 
 b = np.ones(n) * 2 * h
+# b = np.ones(n) * h
 b[0] = 0
 b[n - 1] = 0
 
@@ -99,20 +138,28 @@ xc = x.copy()
 shift = np.zeros(n)
 
 solutions = [xc.copy()]
+multipliers = [np.zeros(xc.shape)]
 
-for i in range(10000):
-    penalty_gs_step(A, I, xc, b, ub, penalty, shift)
-    # penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
+njacs = 2
+for i in range(2000):
+    # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
+
+    for j in range(njacs):
+        penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
 
     # if (i + 1) % 10 == 0:
-    shift = penalty * np.maximum(0.0, xc - ub + shift / penalty)
+    shift = omega * penalty * np.maximum(0.0, xc - ub + shift / penalty) + (1-omega) * shift
+
     solutions.append(xc.copy())
+    multipliers.append(shift.copy())
 
     g = np.linalg.norm(penalty_gradient(A, I, xc, b, ub, penalty, shift))
     norm_g = np.linalg.norm(g)
     norm_pen = np.linalg.norm(np.maximum(0.0, xc - ub))
     norm_shift = np.linalg.norm(shift)
-    print(f"norm_g[{i}]: {norm_g}, norm_pen: {norm_pen}, norm_shift: {norm_shift}")
+    print(
+        f"norm_g[{i*njacs}]: {norm_g}, norm_pen: {norm_pen}, norm_shift: {norm_shift}"
+    )
 
     if norm_g < 1e-10:
         break
@@ -125,14 +172,16 @@ from matplotlib.animation import FuncAnimation
 plt.plot(x)
 plt.plot(ub)
 xc_line = plt.plot(solutions[0])[0]
-plt.legend(["x", "ub", "xc"])
+multipliers_line = plt.plot(multipliers[0])[0]
+plt.legend(["x",  "ub", "xc", "multipliers (rescaled)"])
 plt.xlabel("Index")
 plt.ylabel("Value")
 
 
 def update(frame):
     xc_line.set_ydata(solutions[frame])
-    return (xc_line,)
+    multipliers_line.set_ydata(0.01 * multipliers[frame])
+    return (xc_line, multipliers_line)
 
 
 ani = FuncAnimation(
