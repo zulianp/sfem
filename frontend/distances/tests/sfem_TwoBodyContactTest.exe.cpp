@@ -457,6 +457,262 @@ void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
     }
 }
 
+class ContactNodeToSegment final {
+public:
+    ContactNodeToSegment(const std::shared_ptr<FunctionSpace>&     space,
+                         const std::shared_ptr<smesh::Mesh>&       surface,
+                         const std::shared_ptr<Buffer<real_t>>&    displacement,
+                         const real_t                              margin,
+                         const real_t                              search_radius_sqr,
+                         const ExecutionSpace                      es)
+        : space_(space),
+          surface_(surface),
+          displacement_(displacement),
+          margin_(margin),
+          search_radius_sqr_(search_radius_sqr),
+          es_(es),
+          dim_(surface->spatial_dimension()),
+          npoints_(surface->n_nodes()),
+          nselements_(surface->n_elements()),
+          surface_elements_(surface->block(0)->elements()),
+          surface_element_type_(surface->block(0)->element_type()),
+          closest_points_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
+          closest_s_(sfem::create_buffer<real_t>(npoints_, es_)),
+          closest_t_(sfem::create_buffer<real_t>(npoints_, es_)),
+          distances_(sfem::create_buffer<real_t>(npoints_, es_)),
+          closest_triangles_(sfem::create_buffer<idx_t>(npoints_, es_)),
+          distances_whole_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
+          directors_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
+          normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
+          frozen_displacement_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)) {}
+
+    void recompute() {
+        auto blas = sfem::blas<real_t>(es_);
+
+        p1_ = smesh::astype<real_t>(surface_->points());
+        displace_points(surface_, displacement_, p1_);
+
+        if (surface_element_type_ == smesh::TRISHELL3) {
+            ssdf::closest_within_radius_local_bvh(npoints_,
+                                                  p1_->data()[0],
+                                                  p1_->data()[1],
+                                                  p1_->data()[2],
+                                                  nselements_,
+                                                  surface_elements_->data()[0],
+                                                  surface_elements_->data()[1],
+                                                  surface_elements_->data()[2],
+                                                  npoints_,
+                                                  p1_->data()[0],
+                                                  p1_->data()[1],
+                                                  p1_->data()[2],
+                                                  0,
+                                                  &search_radius_sqr_,
+                                                  closest_triangles_->data(),
+                                                  distances_->data(),
+                                                  closest_s_->data(),
+                                                  closest_t_->data(),
+                                                  true);
+        } else if (surface_element_type_ == smesh::QUADSHELL4) {
+            ssdf::closest_within_radius_quads_local_bvh(npoints_,
+                                                        p1_->data()[0],
+                                                        p1_->data()[1],
+                                                        p1_->data()[2],
+                                                        nselements_,
+                                                        surface_elements_->data()[0],
+                                                        surface_elements_->data()[1],
+                                                        surface_elements_->data()[2],
+                                                        surface_elements_->data()[3],
+                                                        npoints_,
+                                                        p1_->data()[0],
+                                                        p1_->data()[1],
+                                                        p1_->data()[2],
+                                                        0,
+                                                        &search_radius_sqr_,
+                                                        closest_triangles_->data(),
+                                                        distances_->data(),
+                                                        closest_s_->data(),
+                                                        closest_t_->data(),
+                                                        true);
+        } else {
+            SFEM_ERROR("Closest point search not implemented for element type %d\n", surface_element_type_);
+        }
+
+        blas->values(space_->n_dofs(), 0, distances_whole_->data());
+        blas->values(space_->n_dofs(), 0, directors_->data());
+        for (int d = 0; d < dim_; ++d) {
+            blas->values(npoints_, 0, normals_->data()[d]);
+        }
+
+        auto node_mapping           = surface_->node_mapping()->data();
+        auto directors_data         = directors_->data();
+        auto distances_whole_data   = distances_whole_->data();
+        auto distances_data         = distances_->data();
+        auto closest_points_data    = closest_points_->data();
+        auto p1_data                = p1_->data();
+        auto closest_triangles_data = closest_triangles_->data();
+        auto closest_s_data         = closest_s_->data();
+        auto closest_t_data         = closest_t_->data();
+        auto normals_data           = normals_->data();
+        auto surface_elements_data  = surface_elements_->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < npoints_; i++) {
+            const idx_t elem = closest_triangles_data[i];
+            if (elem == -1) {
+                distances_data[i] = std::sqrt(distances_data[i]);
+                continue;
+            }
+
+            const real_t s = closest_s_data[i];
+            const real_t t = closest_t_data[i];
+            real_t       cx, cy, cz;
+            real_t       tnx, tny, tnz;
+
+            if (surface_element_type_ == smesh::TRISHELL3) {
+                const idx_t e0 = surface_elements_data[0][elem];
+                const idx_t e1 = surface_elements_data[1][elem];
+                const idx_t e2 = surface_elements_data[2][elem];
+
+                const real_t r = 1 - s - t;
+
+                cx = r * p1_data[0][e0] + s * p1_data[0][e1] + t * p1_data[0][e2];
+                cy = r * p1_data[1][e0] + s * p1_data[1][e1] + t * p1_data[1][e2];
+                cz = r * p1_data[2][e0] + s * p1_data[2][e1] + t * p1_data[2][e2];
+
+                const real_t v0x = p1_data[0][e1] - p1_data[0][e0];
+                const real_t v0y = p1_data[1][e1] - p1_data[1][e0];
+                const real_t v0z = p1_data[2][e1] - p1_data[2][e0];
+
+                const real_t v1x = p1_data[0][e2] - p1_data[0][e0];
+                const real_t v1y = p1_data[1][e2] - p1_data[1][e0];
+                const real_t v1z = p1_data[2][e2] - p1_data[2][e0];
+
+                tnx = v0y * v1z - v0z * v1y;
+                tny = v0z * v1x - v0x * v1z;
+                tnz = v0x * v1y - v0y * v1x;
+            } else {
+                const idx_t e0 = surface_elements_data[0][elem];
+                const idx_t e1 = surface_elements_data[1][elem];
+                const idx_t e2 = surface_elements_data[2][elem];
+                const idx_t e3 = surface_elements_data[3][elem];
+
+                const real_t one_minus_s = 1 - s;
+                const real_t one_minus_t = 1 - t;
+                const real_t w0          = one_minus_s * one_minus_t;
+                const real_t w1          = s * one_minus_t;
+                const real_t w2          = s * t;
+                const real_t w3          = one_minus_s * t;
+
+                cx = w0 * p1_data[0][e0] + w1 * p1_data[0][e1] + w2 * p1_data[0][e2] + w3 * p1_data[0][e3];
+                cy = w0 * p1_data[1][e0] + w1 * p1_data[1][e1] + w2 * p1_data[1][e2] + w3 * p1_data[1][e3];
+                cz = w0 * p1_data[2][e0] + w1 * p1_data[2][e1] + w2 * p1_data[2][e2] + w3 * p1_data[2][e3];
+
+                const real_t dsx =
+                        one_minus_t * (p1_data[0][e1] - p1_data[0][e0]) + t * (p1_data[0][e2] - p1_data[0][e3]);
+                const real_t dsy =
+                        one_minus_t * (p1_data[1][e1] - p1_data[1][e0]) + t * (p1_data[1][e2] - p1_data[1][e3]);
+                const real_t dsz =
+                        one_minus_t * (p1_data[2][e1] - p1_data[2][e0]) + t * (p1_data[2][e2] - p1_data[2][e3]);
+
+                const real_t dtx =
+                        one_minus_s * (p1_data[0][e3] - p1_data[0][e0]) + s * (p1_data[0][e2] - p1_data[0][e1]);
+                const real_t dty =
+                        one_minus_s * (p1_data[1][e3] - p1_data[1][e0]) + s * (p1_data[1][e2] - p1_data[1][e1]);
+                const real_t dtz =
+                        one_minus_s * (p1_data[2][e3] - p1_data[2][e0]) + s * (p1_data[2][e2] - p1_data[2][e1]);
+
+                tnx = dsy * dtz - dsz * dty;
+                tny = dsz * dtx - dsx * dtz;
+                tnz = dsx * dty - dsy * dtx;
+            }
+
+            closest_points_data[0][i] = cx;
+            closest_points_data[1][i] = cy;
+            closest_points_data[2][i] = cz;
+
+            const real_t tnn = std::sqrt(tnx * tnx + tny * tny + tnz * tnz);
+
+            tnx /= tnn;
+            tny /= tnn;
+            tnz /= tnn;
+
+            const real_t dx = p1_data[0][i] - cx;
+            const real_t dy = p1_data[1][i] - cy;
+            const real_t dz = p1_data[2][i] - cz;
+            const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+            real_t nx = 0, ny = 0, nz = 0;
+            if (dn > 0) {
+                nx = dx / dn;
+                ny = dy / dn;
+                nz = dz / dn;
+            } else {
+                nx = tnx;
+                ny = tny;
+                nz = tnz;
+            }
+
+            const real_t cos_angle = nx * tnx + ny * tny + nz * tnz;
+            if (std::abs(cos_angle) < 1e-6) {
+                closest_triangles_data[i] = -1;
+                continue;
+            }
+
+            const real_t    signed_dist = dx * nx + dy * ny + dz * nz - margin_;
+            const ptrdiff_t dof         = (ptrdiff_t)node_mapping[i] * dim_;
+
+            distances_data[i]         = signed_dist;
+            distances_whole_data[dof] = signed_dist;
+            directors_data[dof + 0]   = -signed_dist * nx;
+            directors_data[dof + 1]   = -signed_dist * ny;
+            directors_data[dof + 2]   = -signed_dist * nz;
+            normals_data[0][i]        = -nx;
+            normals_data[1][i]        = -ny;
+            normals_data[2][i]        = -nz;
+        }
+
+        graph_  = create_contact_graph(surface_elements_, closest_triangles_);
+        values_ = sfem::create_buffer<real_t>(graph_->nnz(), es_);
+
+        assemble_coupling_operator(
+                surface_element_type_, surface_elements_, closest_triangles_, closest_s_, closest_t_, *graph_, values_);
+        blas->copy(space_->n_dofs(), displacement_->data(), frozen_displacement_->data());
+    }
+
+    const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const { return graph_; }
+    smesh::SharedBuffer<real_t>&                            values() { return values_; }
+    smesh::SharedBuffer<real_t*>&                           normals() { return normals_; }
+    smesh::SharedBuffer<real_t>&                            distances() { return distances_; }
+    smesh::SharedBuffer<real_t>&                            frozen_displacement() { return frozen_displacement_; }
+    const smesh::SharedBuffer<real_t>&                      distances_whole() const { return distances_whole_; }
+    const smesh::SharedBuffer<real_t>&                      directors() const { return directors_; }
+
+private:
+    std::shared_ptr<FunctionSpace>                     space_;
+    std::shared_ptr<smesh::Mesh>                       surface_;
+    std::shared_ptr<Buffer<real_t>>                    displacement_;
+    real_t                                             margin_;
+    real_t                                             search_radius_sqr_;
+    ExecutionSpace                                     es_;
+    int                                                dim_;
+    ptrdiff_t                                          npoints_;
+    ptrdiff_t                                          nselements_;
+    smesh::SharedBuffer<idx_t*>                        surface_elements_;
+    smesh::ElemType                                    surface_element_type_;
+    smesh::SharedBuffer<real_t*>                       p1_;
+    smesh::SharedBuffer<real_t*>                       closest_points_;
+    smesh::SharedBuffer<real_t>                        closest_s_;
+    smesh::SharedBuffer<real_t>                        closest_t_;
+    smesh::SharedBuffer<real_t>                        distances_;
+    smesh::SharedBuffer<idx_t>                         closest_triangles_;
+    smesh::SharedBuffer<real_t>                        distances_whole_;
+    smesh::SharedBuffer<real_t>                        directors_;
+    smesh::SharedBuffer<real_t*>                       normals_;
+    smesh::SharedBuffer<real_t>                        frozen_displacement_;
+    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>   graph_;
+    smesh::SharedBuffer<real_t>                        values_;
+};
+
 void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
     SFEM_TRACE_SCOPE("compute_macaulay_term");
     const int dim    = cd.surface->spatial_dimension();
@@ -978,9 +1234,6 @@ int test_two_body_contact() {
     remove_surface_elements_connected_to_constrained_nodes(surface, constraints_mask, dim);
     surface->write(smesh::Path("contact_surface"));
 
-    auto surface_elements     = surface->block(0)->elements();
-    auto surface_element_type = surface->block(0)->element_type();
-
     std::shared_ptr<sccd::CCD<real_t>> ccd;
     ccd = sccd::CCD<real_t>::create(surface);
 
@@ -1004,205 +1257,7 @@ int test_two_body_contact() {
     const real_t search_radius_sqr = search_radius * search_radius;
     const real_t margin            = env.margin;
 
-    auto npoints    = surface->n_nodes();
-    auto nselements = surface->n_elements();
-
-    auto                                             closest_points      = sfem::create_buffer<real_t>(dim, npoints, es);
-    auto                                             closest_s           = sfem::create_buffer<real_t>(npoints, es);
-    auto                                             closest_t           = sfem::create_buffer<real_t>(npoints, es);
-    auto                                             distances           = sfem::create_buffer<real_t>(npoints, es);
-    auto                                             closest_triangles   = sfem::create_buffer<idx_t>(npoints, es);
-    auto                                             distances_whole     = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto                                             directors           = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    auto                                             normals             = sfem::create_buffer<real_t>(dim, npoints, es);
-    auto                                             frozen_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
-    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph;
-    smesh::SharedBuffer<real_t>                      values;
-
-    auto recompute_contact_conditions = [&]() {
-        p1 = smesh::astype<real_t>(surface->points());
-        displace_points(surface, displacement, p1);
-
-        if (surface_element_type == smesh::TRISHELL3) {
-            ssdf::closest_within_radius_local_bvh(npoints,
-                                                  p1->data()[0],
-                                                  p1->data()[1],
-                                                  p1->data()[2],
-                                                  nselements,
-                                                  surface_elements->data()[0],
-                                                  surface_elements->data()[1],
-                                                  surface_elements->data()[2],
-                                                  npoints,
-                                                  p1->data()[0],
-                                                  p1->data()[1],
-                                                  p1->data()[2],
-                                                  0,
-                                                  &search_radius_sqr,
-                                                  closest_triangles->data(),
-                                                  distances->data(),
-                                                  closest_s->data(),
-                                                  closest_t->data(),
-                                                  true);
-        } else if (surface_element_type == smesh::QUADSHELL4) {
-            ssdf::closest_within_radius_quads_local_bvh(npoints,
-                                                        p1->data()[0],
-                                                        p1->data()[1],
-                                                        p1->data()[2],
-                                                        nselements,
-                                                        surface_elements->data()[0],
-                                                        surface_elements->data()[1],
-                                                        surface_elements->data()[2],
-                                                        surface_elements->data()[3],
-                                                        npoints,
-                                                        p1->data()[0],
-                                                        p1->data()[1],
-                                                        p1->data()[2],
-                                                        0,
-                                                        &search_radius_sqr,
-                                                        closest_triangles->data(),
-                                                        distances->data(),
-                                                        closest_s->data(),
-                                                        closest_t->data(),
-                                                        true);
-        } else {
-            SFEM_ERROR("Closest point search not implemented for element type %d\n", surface_element_type);
-        }
-
-        blas->values(space->n_dofs(), 0, distances_whole->data());
-        blas->values(space->n_dofs(), 0, directors->data());
-        for (int d = 0; d < dim; ++d) {
-            blas->values(npoints, 0, normals->data()[d]);
-        }
-
-        auto node_mapping           = surface->node_mapping()->data();
-        auto directors_data         = directors->data();
-        auto distances_whole_data   = distances_whole->data();
-        auto distances_data         = distances->data();
-        auto closest_points_data    = closest_points->data();
-        auto p1_data                = p1->data();
-        auto closest_triangles_data = closest_triangles->data();
-        auto closest_s_data         = closest_s->data();
-        auto closest_t_data         = closest_t->data();
-        auto normals_data           = normals->data();
-        auto surface_elements_data  = surface_elements->data();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < npoints; i++) {
-            const idx_t elem = closest_triangles_data[i];
-            if (elem == -1) {
-                distances_data[i] = std::sqrt(distances_data[i]);
-                continue;
-            }
-
-            const real_t s = closest_s_data[i];
-            const real_t t = closest_t_data[i];
-            real_t       cx, cy, cz;
-            real_t       tnx, tny, tnz;
-
-            if (surface_element_type == smesh::TRISHELL3) {
-                const idx_t e0 = surface_elements_data[0][elem];
-                const idx_t e1 = surface_elements_data[1][elem];
-                const idx_t e2 = surface_elements_data[2][elem];
-
-                const real_t r = 1 - s - t;
-
-                cx = r * p1_data[0][e0] + s * p1_data[0][e1] + t * p1_data[0][e2];
-                cy = r * p1_data[1][e0] + s * p1_data[1][e1] + t * p1_data[1][e2];
-                cz = r * p1_data[2][e0] + s * p1_data[2][e1] + t * p1_data[2][e2];
-
-                const real_t v0x = p1_data[0][e1] - p1_data[0][e0];
-                const real_t v0y = p1_data[1][e1] - p1_data[1][e0];
-                const real_t v0z = p1_data[2][e1] - p1_data[2][e0];
-
-                const real_t v1x = p1_data[0][e2] - p1_data[0][e0];
-                const real_t v1y = p1_data[1][e2] - p1_data[1][e0];
-                const real_t v1z = p1_data[2][e2] - p1_data[2][e0];
-
-                tnx = v0y * v1z - v0z * v1y;
-                tny = v0z * v1x - v0x * v1z;
-                tnz = v0x * v1y - v0y * v1x;
-            } else {
-                const idx_t e0 = surface_elements_data[0][elem];
-                const idx_t e1 = surface_elements_data[1][elem];
-                const idx_t e2 = surface_elements_data[2][elem];
-                const idx_t e3 = surface_elements_data[3][elem];
-
-                const real_t one_minus_s = 1 - s;
-                const real_t one_minus_t = 1 - t;
-                const real_t w0          = one_minus_s * one_minus_t;
-                const real_t w1          = s * one_minus_t;
-                const real_t w2          = s * t;
-                const real_t w3          = one_minus_s * t;
-
-                cx = w0 * p1_data[0][e0] + w1 * p1_data[0][e1] + w2 * p1_data[0][e2] + w3 * p1_data[0][e3];
-                cy = w0 * p1_data[1][e0] + w1 * p1_data[1][e1] + w2 * p1_data[1][e2] + w3 * p1_data[1][e3];
-                cz = w0 * p1_data[2][e0] + w1 * p1_data[2][e1] + w2 * p1_data[2][e2] + w3 * p1_data[2][e3];
-
-                const real_t dsx = one_minus_t * (p1_data[0][e1] - p1_data[0][e0]) + t * (p1_data[0][e2] - p1_data[0][e3]);
-                const real_t dsy = one_minus_t * (p1_data[1][e1] - p1_data[1][e0]) + t * (p1_data[1][e2] - p1_data[1][e3]);
-                const real_t dsz = one_minus_t * (p1_data[2][e1] - p1_data[2][e0]) + t * (p1_data[2][e2] - p1_data[2][e3]);
-
-                const real_t dtx = one_minus_s * (p1_data[0][e3] - p1_data[0][e0]) + s * (p1_data[0][e2] - p1_data[0][e1]);
-                const real_t dty = one_minus_s * (p1_data[1][e3] - p1_data[1][e0]) + s * (p1_data[1][e2] - p1_data[1][e1]);
-                const real_t dtz = one_minus_s * (p1_data[2][e3] - p1_data[2][e0]) + s * (p1_data[2][e2] - p1_data[2][e1]);
-
-                tnx = dsy * dtz - dsz * dty;
-                tny = dsz * dtx - dsx * dtz;
-                tnz = dsx * dty - dsy * dtx;
-            }
-
-            closest_points_data[0][i] = cx;
-            closest_points_data[1][i] = cy;
-            closest_points_data[2][i] = cz;
-
-            const real_t tnn = std::sqrt(tnx * tnx + tny * tny + tnz * tnz);
-
-            tnx /= tnn;
-            tny /= tnn;
-            tnz /= tnn;
-
-            const real_t dx = p1_data[0][i] - cx;
-            const real_t dy = p1_data[1][i] - cy;
-            const real_t dz = p1_data[2][i] - cz;
-            const real_t dn = std::sqrt(dx * dx + dy * dy + dz * dz);
-
-            real_t nx = 0, ny = 0, nz = 0;
-            if (dn > 0) {
-                nx = dx / dn;
-                ny = dy / dn;
-                nz = dz / dn;
-            } else {
-                nx = tnx;
-                ny = tny;
-                nz = tnz;
-            }
-
-            const real_t cos_angle = nx * tnx + ny * tny + nz * tnz;
-            if (std::abs(cos_angle) < 1e-8) {
-                closest_triangles_data[i] = -1;
-                continue;
-            }
-
-            const real_t    signed_dist = dx * nx + dy * ny + dz * nz - margin;
-            const ptrdiff_t dof         = node_mapping[i] * dim;
-
-            distances_data[i]         = signed_dist;
-            distances_whole_data[dof] = signed_dist;
-            directors_data[dof + 0]   = -signed_dist * nx;
-            directors_data[dof + 1]   = -signed_dist * ny;
-            directors_data[dof + 2]   = -signed_dist * nz;
-            normals_data[0][i]        = -nx;
-            normals_data[1][i]        = -ny;
-            normals_data[2][i]        = -nz;
-        }
-
-        graph  = create_contact_graph(surface_elements, closest_triangles);
-        values = sfem::create_buffer<real_t>(graph->nnz(), es);
-
-        assemble_coupling_operator(
-                surface_element_type, surface_elements, closest_triangles, closest_s, closest_t, *graph, values);
-        blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
-    };
+    ContactNodeToSegment contact_conditions(space, surface, displacement, margin, search_radius_sqr, es);
 
     auto trace_space = std::make_shared<FunctionSpace>(surface, 1);
     auto mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
@@ -1232,21 +1287,21 @@ int test_two_body_contact() {
     const int inner_loops = env.inner_loops;
 
     out->write_time_step("disp", 0, displacement->data());
-    out->write_time_step("distance", 0, distances_whole->data());
-    out->write_time_step("directors", 0, directors->data());
+    out->write_time_step("distance", 0, contact_conditions.distances_whole()->data());
+    out->write_time_step("directors", 0, contact_conditions.directors()->data());
     out->write_time_step("lagr_mult_normal", 0, lagr_mult_normal->data());
     out->log_time(0);
 
     for (int outer = 0; outer < outer_loops; ++outer) {
-        recompute_contact_conditions();
+        contact_conditions.recompute();
 
         ContactData cd = {.surface             = surface,
-                          .graph               = graph,
-                          .values              = values,
+                          .graph               = contact_conditions.graph(),
+                          .values              = contact_conditions.values(),
                           .mass_vector         = mass_vector,
-                          .normals             = normals,
-                          .distances           = distances,
-                          .frozen_displacement = frozen_displacement,
+                          .normals             = contact_conditions.normals(),
+                          .distances           = contact_conditions.distances(),
+                          .frozen_displacement = contact_conditions.frozen_displacement(),
                           .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
@@ -1257,9 +1312,9 @@ int test_two_body_contact() {
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
             const real_t* const lagr_mult             = agumentation->data();
-            const real_t* const normal_x              = normals->data()[0];
-            const real_t* const normal_y              = normals->data()[1];
-            const real_t* const normal_z              = normals->data()[2];
+            const real_t* const normal_x              = contact_conditions.normals()->data()[0];
+            const real_t* const normal_y              = contact_conditions.normals()->data()[1];
+            const real_t* const normal_z              = contact_conditions.normals()->data()[2];
             real_t* const       lagr_mult_normal_data = lagr_mult_normal->data();
             const ptrdiff_t     n                     = surface->node_mapping()->size();
 
@@ -1275,7 +1330,7 @@ int test_two_body_contact() {
 
         if (env.enable_ccd && ccd) {
             p0 = smesh::astype<real_t>(surface->points());
-            displace_points(surface, frozen_displacement, p0);
+            displace_points(surface, contact_conditions.frozen_displacement(), p0);
 
             p1 = smesh::astype<real_t>(surface->points());
             displace_points(surface, displacement, p1);
@@ -1285,7 +1340,7 @@ int test_two_body_contact() {
             printf("CCD TOI: %g\n", ccd_toi);
 
             if (ccd_toi < 1) {
-                const real_t* const u0 = frozen_displacement->data();
+                const real_t* const u0 = contact_conditions.frozen_displacement()->data();
                 real_t* const       u1 = displacement->data();
                 const ptrdiff_t     n  = space->n_dofs();
 
@@ -1297,12 +1352,12 @@ int test_two_body_contact() {
         }
 
         out->write_time_step("disp", outer + 1, displacement->data());
-        out->write_time_step("distance", outer + 1, distances_whole->data());
-        out->write_time_step("directors", outer + 1, directors->data());
+        out->write_time_step("distance", outer + 1, contact_conditions.distances_whole()->data());
+        out->write_time_step("directors", outer + 1, contact_conditions.directors()->data());
         out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
         out->log_time(outer + 1);
 
-        // recompute_contact_conditions();
+        // contact_conditions.recompute();
     }
 
     return SFEM_TEST_SUCCESS;
