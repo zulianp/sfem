@@ -21,15 +21,15 @@
 using namespace sfem;
 
 struct EnvOptions {
-    int    demo;
-    real_t margin;
-    int    outer_loops;
-    int    inner_loops;
-    int    nx;
-    real_t ytop;
-    real_t penalty;
-    real_t solver_tol;
-    bool   enable_ccd;
+    int             demo;
+    real_t          margin;
+    int             outer_loops;
+    int             inner_loops;
+    int             nx;
+    real_t          ytop;
+    real_t          penalty;
+    real_t          solver_tol;
+    bool            enable_ccd;
     smesh::ElemType element_type;
 
     static EnvOptions read() {
@@ -387,7 +387,7 @@ void assemble_coupling_operator(const smesh::ElemType                  element_t
                                 const smesh::SharedBuffer<real_t>&     t,
                                 const smesh::CRSGraph<count_t, idx_t>& graph,
                                 const smesh::SharedBuffer<real_t>&     values) {
-    const ptrdiff_t n = element_idx->size();
+    const ptrdiff_t n   = element_idx->size();
     const int       nxe = elements->extent(0);
 
     SMESH_ASSERT(n == s->size());
@@ -982,9 +982,7 @@ int test_two_body_contact() {
     auto surface_element_type = surface->block(0)->element_type();
 
     std::shared_ptr<sccd::CCD<real_t>> ccd;
-    if (surface_element_type == smesh::TRISHELL3) {
-        ccd = sccd::CCD<real_t>::create(surface);
-    }
+    ccd = sccd::CCD<real_t>::create(surface);
 
     auto p0 = smesh::astype<real_t>(surface->points());
     auto p1 = smesh::astype<real_t>(surface->points());
@@ -1201,13 +1199,8 @@ int test_two_body_contact() {
         graph  = create_contact_graph(surface_elements, closest_triangles);
         values = sfem::create_buffer<real_t>(graph->nnz(), es);
 
-        assemble_coupling_operator(surface_element_type,
-                                   surface_elements,
-                                   closest_triangles,
-                                   closest_s,
-                                   closest_t,
-                                   *graph,
-                                   values);
+        assemble_coupling_operator(
+                surface_element_type, surface_elements, closest_triangles, closest_s, closest_t, *graph, values);
         blas->copy(space->n_dofs(), displacement->data(), frozen_displacement->data());
     };
 
