@@ -763,8 +763,51 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
             const real_t ay[4] = {y[av[0]], y[av[1]], y[av[2]], y[av[3]]};
             const real_t az[4] = {z[av[0]], z[av[1]], z[av[2]], z[av[3]]};
 
-            // TODO compute normal vector from centroid tangents
-            real_t anormal[3] = {0, 0, 0};
+            const real_t asx = real_t(0.5) * (ax[1] + ax[2] - ax[0] - ax[3]);
+            const real_t asy = real_t(0.5) * (ay[1] + ay[2] - ay[0] - ay[3]);
+            const real_t asz = real_t(0.5) * (az[1] + az[2] - az[0] - az[3]);
+            const real_t atx = real_t(0.5) * (ax[2] + ax[3] - ax[0] - ax[1]);
+            const real_t aty = real_t(0.5) * (ay[2] + ay[3] - ay[0] - ay[1]);
+            const real_t atz = real_t(0.5) * (az[2] + az[3] - az[0] - az[1]);
+
+            real_t anormal[3]  = {asy * atz - asz * aty, asz * atx - asx * atz, asx * aty - asy * atx};
+            real_t anormal_len = std::sqrt(anormal[0] * anormal[0] + anormal[1] * anormal[1] + anormal[2] * anormal[2]);
+            anormal[0] /= anormal_len;
+            anormal[1] /= anormal_len;
+            anormal[2] /= anormal_len;
+
+            // Pick the most stable coordinate plane for building the first unit tangent.
+            // This avoids subtractive cancellation when the normal is close to an axis.
+            const bool   use_xy_axis      = std::abs(anormal[0]) > std::abs(anormal[2]);
+            const real_t tangent0_inv_len = use_xy_axis
+                                                    ? real_t(1) / std::sqrt(anormal[0] * anormal[0] + anormal[1] * anormal[1])
+                                                    : real_t(1) / std::sqrt(anormal[1] * anormal[1] + anormal[2] * anormal[2]);
+            // tangent0 is perpendicular to anormal and normalized by tangent0_inv_len.
+            const real_t tangent0[3] = {use_xy_axis ? -anormal[1] * tangent0_inv_len : 0,
+                                        use_xy_axis ? anormal[0] * tangent0_inv_len : -anormal[2] * tangent0_inv_len,
+                                        use_xy_axis ? 0 : anormal[1] * tangent0_inv_len};
+            // tangent1 completes the orthonormal basis of the plane: tangent1 = anormal x tangent0.
+            const real_t tangent1[3] = {anormal[1] * tangent0[2] - anormal[2] * tangent0[1],
+                                        anormal[2] * tangent0[0] - anormal[0] * tangent0[2],
+                                        anormal[0] * tangent0[1] - anormal[1] * tangent0[0]};
+
+            // Project each 3D point onto the tangent basis. The two dot products are the local 2D plane coordinates.
+            const auto project_to_normal_plane = [&tangent0, &tangent1](const real_t* const px,
+                                                                        const real_t* const py,
+                                                                        const real_t* const pz,
+                                                                        real_t* const       out_x,
+                                                                        real_t* const       out_y) {
+                for (int k = 0; k < 4; k++) {
+                    // Dot point k with each tangent axis to obtain its projected x/y coordinates.
+                    out_x[k] = px[k] * tangent0[0] + py[k] * tangent0[1] + pz[k] * tangent0[2];
+                    out_y[k] = px[k] * tangent1[0] + py[k] * tangent1[1] + pz[k] * tangent1[2];
+                }
+            };
+
+            // Project the active quad once; candidate quads reuse the same plane basis below.
+            real_t a_projected_x[4];
+            real_t a_projected_y[4];
+            project_to_normal_plane(ax, ay, az, a_projected_x, a_projected_y);
 
             for (ptrdiff_t j = 0; j < ncandidates; j++) {
                 const idx_t candidate = candidates[j];
@@ -773,6 +816,13 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 const real_t bx[4] = {x[bv[0]], x[bv[1]], x[bv[2]], x[bv[3]]};
                 const real_t by[4] = {y[bv[0]], y[bv[1]], y[bv[2]], y[bv[3]]};
                 const real_t bz[4] = {z[bv[0]], z[bv[1]], z[bv[2]], z[bv[3]]};
+
+                real_t b_projected_x[4];
+                real_t b_projected_y[4];
+                // Project the candidate quad onto the active quad plane.
+                project_to_normal_plane(bx, by, bz, b_projected_x, b_projected_y);
+
+                // TODO: Compute intersection polygon of the two projected quads
             }
         }
     } else if (element_type == smesh::TRISHELL3) {
