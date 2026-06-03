@@ -782,10 +782,12 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
             const real_t tangent0_inv_len = use_xy_axis
                                                     ? real_t(1) / std::sqrt(anormal[0] * anormal[0] + anormal[1] * anormal[1])
                                                     : real_t(1) / std::sqrt(anormal[1] * anormal[1] + anormal[2] * anormal[2]);
+
             // tangent0 is perpendicular to anormal and normalized by tangent0_inv_len.
             const real_t tangent0[3] = {use_xy_axis ? -anormal[1] * tangent0_inv_len : 0,
                                         use_xy_axis ? anormal[0] * tangent0_inv_len : -anormal[2] * tangent0_inv_len,
                                         use_xy_axis ? 0 : anormal[1] * tangent0_inv_len};
+
             // tangent1 completes the orthonormal basis of the plane: tangent1 = anormal x tangent0.
             const real_t tangent1[3] = {anormal[1] * tangent0[2] - anormal[2] * tangent0[1],
                                         anormal[2] * tangent0[0] - anormal[0] * tangent0[2],
@@ -819,10 +821,76 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
 
                 real_t b_projected_x[4];
                 real_t b_projected_y[4];
+
                 // Project the candidate quad onto the active quad plane.
                 project_to_normal_plane(bx, by, bz, b_projected_x, b_projected_y);
 
-                // TODO: Compute intersection polygon of the two projected quads
+                real_t poly_x[16] = {a_projected_x[0], a_projected_x[1], a_projected_x[2], a_projected_x[3]};
+                real_t poly_y[16] = {a_projected_y[0], a_projected_y[1], a_projected_y[2], a_projected_y[3]};
+                int    poly_n     = 4;
+
+                const real_t b_area2 = (b_projected_x[0] * b_projected_y[1] - b_projected_y[0] * b_projected_x[1]) +
+                                       (b_projected_x[1] * b_projected_y[2] - b_projected_y[1] * b_projected_x[2]) +
+                                       (b_projected_x[2] * b_projected_y[3] - b_projected_y[2] * b_projected_x[3]) +
+                                       (b_projected_x[3] * b_projected_y[0] - b_projected_y[3] * b_projected_x[0]);
+                const real_t clip_sign = b_area2 >= 0 ? real_t(1) : real_t(-1);
+
+                for (int edge = 0; edge < 4 && poly_n > 0; edge++) {
+                    const int    next_edge = (edge + 1) & 3;
+                    const real_t ex0       = b_projected_x[edge];
+                    const real_t ey0       = b_projected_y[edge];
+                    const real_t edx       = b_projected_x[next_edge] - ex0;
+                    const real_t edy       = b_projected_y[next_edge] - ey0;
+
+                    real_t clipped_x[16];
+                    real_t clipped_y[16];
+                    int    clipped_n = 0;
+
+                    real_t sx     = poly_x[poly_n - 1];
+                    real_t sy     = poly_y[poly_n - 1];
+                    real_t s_dist = clip_sign * (edx * (sy - ey0) - edy * (sx - ex0));
+                    bool   s_in   = s_dist >= 0;
+
+                    for (int p = 0; p < poly_n; p++) {
+                        const real_t ex     = poly_x[p];
+                        const real_t ey     = poly_y[p];
+                        const real_t e_dist = clip_sign * (edx * (ey - ey0) - edy * (ex - ex0));
+                        const bool   e_in   = e_dist >= 0;
+
+                        if (e_in != s_in) {
+                            const real_t alpha   = s_dist / (s_dist - e_dist);
+                            clipped_x[clipped_n] = sx + alpha * (ex - sx);
+                            clipped_y[clipped_n] = sy + alpha * (ey - sy);
+                            clipped_n++;
+                        }
+
+                        if (e_in) {
+                            clipped_x[clipped_n] = ex;
+                            clipped_y[clipped_n] = ey;
+                            clipped_n++;
+                        }
+
+                        sx     = ex;
+                        sy     = ey;
+                        s_dist = e_dist;
+                        s_in   = e_in;
+                    }
+
+                    poly_n = clipped_n;
+                    for (int p = 0; p < poly_n; p++) {
+                        poly_x[p] = clipped_x[p];
+                        poly_y[p] = clipped_y[p];
+                    }
+                }
+
+                if (poly_n < 3) {
+                    ivd[ptr[i] + j] = 0;
+                    continue;
+                }
+
+                ivd[ptr[i] + j] = 1;
+
+                // TODO: compute mortar integrals in the intersection polygon (implict triangulation)
             }
         }
     } else if (element_type == smesh::TRISHELL3) {
