@@ -723,6 +723,131 @@ private:
     smesh::SharedBuffer<real_t>                      values_;
 };
 
+void assemble_mortar_matrices(const smesh::ElemType          element_type,
+                              const SharedBuffer<idx_t*>&    elements,
+                              const SharedBuffer<real_t*>&   points,
+                              const SharedBuffer<ptrdiff_t>& pc_ptr,
+                              const SharedBuffer<idx_t>&     pc_idx,
+                              const SharedBuffer<real_t>&    values,
+                              const SharedBuffer<mask_t>&    is_valid) {
+    auto ptr  = pc_ptr->data();
+    auto idx  = pc_idx->data();
+    auto vals = values->data();
+    auto x    = points->data()[0];
+    auto y    = points->data()[1];
+    auto z    = points->data()[2];
+
+    auto i0 = elements->data()[0];
+    auto i1 = elements->data()[1];
+    auto i2 = elements->data()[2];
+    auto i3 = elements->data()[3];
+
+    const ptrdiff_t nselements = elements->extent(0);
+    const ptrdiff_t nspoints   = points->extent(0);
+    const int       nxe        = elements->extent(0);
+
+    SMESH_ASSERT(nxe == elem_num_nodes(element_type));
+
+    auto ed  = elements->data();
+    auto pd  = points->data();
+    auto ivd = is_valid->data();
+
+    if (element_type == smesh::QUADSHELL4) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nselements; i++) {
+            const idx_t     av[4]       = {i0[i], i1[i], i2[i], i3[i]};
+            const ptrdiff_t ncandidates = ptr[i + 1] - ptr[i];
+            const auto*     candidates  = &idx[ptr[i]];
+
+            const real_t ax[4] = {x[av[0]], x[av[1]], x[av[2]], x[av[3]]};
+            const real_t ay[4] = {y[av[0]], y[av[1]], y[av[2]], y[av[3]]};
+            const real_t az[4] = {z[av[0]], z[av[1]], z[av[2]], z[av[3]]};
+
+            // TODO compute normal vector from centroid tangents
+            real_t anormal[3] = {0, 0, 0};
+
+            for (ptrdiff_t j = 0; j < ncandidates; j++) {
+                const idx_t candidate = candidates[j];
+                const idx_t bv[4]     = {i0[candidate], i1[candidate], i2[candidate], i3[candidate]};
+
+                const real_t bx[4] = {x[bv[0]], x[bv[1]], x[bv[2]], x[bv[3]]};
+                const real_t by[4] = {y[bv[0]], y[bv[1]], y[bv[2]], y[bv[3]]};
+                const real_t bz[4] = {z[bv[0]], z[bv[1]], z[bv[2]], z[bv[3]]};
+            }
+        }
+    } else if (element_type == smesh::TRISHELL3) {
+        // TODO
+    } else {
+        SFEM_ERROR("assemble_mortar_matrices not implemented for element type %d\n", element_type);
+    }
+}
+
+class ContactMortar final {
+public:
+    ContactMortar(const std::shared_ptr<FunctionSpace>&  space,
+                  const std::shared_ptr<smesh::Mesh>&    surface,
+                  const std::shared_ptr<Buffer<real_t>>& displacement,
+                  const real_t                           margin,
+                  const real_t                           search_radius_sqr,
+                  const ExecutionSpace                   es)
+        : space_(space),
+          surface_(surface),
+          displacement_(displacement),
+          margin_(margin),
+          search_radius_sqr_(search_radius_sqr),
+          es_(es) {}
+
+    void recompute() {
+        // TODO
+
+        auto et = surface_->block(0)->element_type();
+
+        auto   pc_ptr = create_buffer<ptrdiff_t>(surface_->block(0)->n_elements() + 1, es_);
+        idx_t* pc_idx = nullptr;
+        if (et == smesh::TRISHELL3) {
+            // TODO
+            // template <typename G, typename T, typename I, typename F>
+            // int potential_contact_triangles_bvh(const ptrdiff_t                nselements,
+            //                                     const I* const SSDF_RESTRICT   s0,
+            //                                     const I* const SSDF_RESTRICT   s1,
+            //                                     const I* const SSDF_RESTRICT   s2,
+            //                                     const ptrdiff_t                nspoints,
+            //                                     const G* const SSDF_RESTRICT   sx,
+            //                                     const G* const SSDF_RESTRICT   sy,
+            //                                     const G* const SSDF_RESTRICT   sz,
+            //                                     const T                        extrusion,
+            //                                     ptrdiff_t* const SSDF_RESTRICT pc_ptr,
+            //                                     F** const SSDF_RESTRICT        out_pc_idx);
+        } else if (et == smesh::QUADSHELL4) {
+            // TODO
+            // template <typename G, typename T, typename I, typename F>
+            // int potential_contact_quads_bvh(const ptrdiff_t                nselements,
+            //                                 const I* const SSDF_RESTRICT   s0,
+            //                                 const I* const SSDF_RESTRICT   s1,
+            //                                 const I* const SSDF_RESTRICT   s2,
+            //                                 const I* const SSDF_RESTRICT   s3,
+            //                                 const ptrdiff_t                nspoints,
+            //                                 const G* const SSDF_RESTRICT   sx,
+            //                                 const G* const SSDF_RESTRICT   sy,
+            //                                 const G* const SSDF_RESTRICT   sz,
+            //                                 const T                        extrusion,
+            //                                 ptrdiff_t* const SSDF_RESTRICT pc_ptr,
+            //                                 F** const SSDF_RESTRICT        out_pc_idx);
+
+        } else {
+            SFEM_ERROR("ContactMortar not implemented for element type %d\n", et);
+        }
+    }
+
+private:
+    std::shared_ptr<FunctionSpace>  space_;
+    std::shared_ptr<smesh::Mesh>    surface_;
+    std::shared_ptr<Buffer<real_t>> displacement_;
+    real_t                          margin_;
+    real_t                          search_radius_sqr_;
+    ExecutionSpace                  es_;
+};
+
 void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
     SFEM_TRACE_SCOPE("compute_macaulay_term");
     const int dim    = cd.surface->spatial_dimension();
