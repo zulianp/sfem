@@ -459,12 +459,12 @@ void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
 
 class ContactNodeToSegment final {
 public:
-    ContactNodeToSegment(const std::shared_ptr<FunctionSpace>&     space,
-                         const std::shared_ptr<smesh::Mesh>&       surface,
-                         const std::shared_ptr<Buffer<real_t>>&    displacement,
-                         const real_t                              margin,
-                         const real_t                              search_radius_sqr,
-                         const ExecutionSpace                      es)
+    ContactNodeToSegment(const std::shared_ptr<FunctionSpace>&  space,
+                         const std::shared_ptr<smesh::Mesh>&    surface,
+                         const std::shared_ptr<Buffer<real_t>>& displacement,
+                         const real_t                           margin,
+                         const real_t                           search_radius_sqr,
+                         const ExecutionSpace                   es)
         : space_(space),
           surface_(surface),
           displacement_(displacement),
@@ -474,6 +474,8 @@ public:
           dim_(surface->spatial_dimension()),
           npoints_(surface->n_nodes()),
           nselements_(surface->n_elements()),
+          trace_space_(std::make_shared<FunctionSpace>(surface_, 1)),
+          mass_vector_(create_host_buffer<real_t>(trace_space_->n_dofs())),
           surface_elements_(surface->block(0)->elements()),
           surface_element_type_(surface->block(0)->element_type()),
           closest_points_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
@@ -484,7 +486,9 @@ public:
           distances_whole_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
           directors_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
           normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
-          frozen_displacement_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)) {}
+          frozen_displacement_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)) {
+        assemble_mass_vector();
+    }
 
     void recompute() {
         auto blas = sfem::blas<real_t>(es_);
@@ -607,19 +611,13 @@ public:
                 cy = w0 * p1_data[1][e0] + w1 * p1_data[1][e1] + w2 * p1_data[1][e2] + w3 * p1_data[1][e3];
                 cz = w0 * p1_data[2][e0] + w1 * p1_data[2][e1] + w2 * p1_data[2][e2] + w3 * p1_data[2][e3];
 
-                const real_t dsx =
-                        one_minus_t * (p1_data[0][e1] - p1_data[0][e0]) + t * (p1_data[0][e2] - p1_data[0][e3]);
-                const real_t dsy =
-                        one_minus_t * (p1_data[1][e1] - p1_data[1][e0]) + t * (p1_data[1][e2] - p1_data[1][e3]);
-                const real_t dsz =
-                        one_minus_t * (p1_data[2][e1] - p1_data[2][e0]) + t * (p1_data[2][e2] - p1_data[2][e3]);
+                const real_t dsx = one_minus_t * (p1_data[0][e1] - p1_data[0][e0]) + t * (p1_data[0][e2] - p1_data[0][e3]);
+                const real_t dsy = one_minus_t * (p1_data[1][e1] - p1_data[1][e0]) + t * (p1_data[1][e2] - p1_data[1][e3]);
+                const real_t dsz = one_minus_t * (p1_data[2][e1] - p1_data[2][e0]) + t * (p1_data[2][e2] - p1_data[2][e3]);
 
-                const real_t dtx =
-                        one_minus_s * (p1_data[0][e3] - p1_data[0][e0]) + s * (p1_data[0][e2] - p1_data[0][e1]);
-                const real_t dty =
-                        one_minus_s * (p1_data[1][e3] - p1_data[1][e0]) + s * (p1_data[1][e2] - p1_data[1][e1]);
-                const real_t dtz =
-                        one_minus_s * (p1_data[2][e3] - p1_data[2][e0]) + s * (p1_data[2][e2] - p1_data[2][e1]);
+                const real_t dtx = one_minus_s * (p1_data[0][e3] - p1_data[0][e0]) + s * (p1_data[0][e2] - p1_data[0][e1]);
+                const real_t dty = one_minus_s * (p1_data[1][e3] - p1_data[1][e0]) + s * (p1_data[1][e2] - p1_data[1][e1]);
+                const real_t dtz = one_minus_s * (p1_data[2][e3] - p1_data[2][e0]) + s * (p1_data[2][e2] - p1_data[2][e1]);
 
                 tnx = dsy * dtz - dsz * dty;
                 tny = dsz * dtx - dsx * dtz;
@@ -681,6 +679,7 @@ public:
 
     const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const { return graph_; }
     smesh::SharedBuffer<real_t>&                            values() { return values_; }
+    smesh::SharedBuffer<real_t>&                            mass_vector() { return mass_vector_; }
     smesh::SharedBuffer<real_t*>&                           normals() { return normals_; }
     smesh::SharedBuffer<real_t>&                            distances() { return distances_; }
     smesh::SharedBuffer<real_t>&                            frozen_displacement() { return frozen_displacement_; }
@@ -688,29 +687,40 @@ public:
     const smesh::SharedBuffer<real_t>&                      directors() const { return directors_; }
 
 private:
-    std::shared_ptr<FunctionSpace>                     space_;
-    std::shared_ptr<smesh::Mesh>                       surface_;
-    std::shared_ptr<Buffer<real_t>>                    displacement_;
-    real_t                                             margin_;
-    real_t                                             search_radius_sqr_;
-    ExecutionSpace                                     es_;
-    int                                                dim_;
-    ptrdiff_t                                          npoints_;
-    ptrdiff_t                                          nselements_;
-    smesh::SharedBuffer<idx_t*>                        surface_elements_;
-    smesh::ElemType                                    surface_element_type_;
-    smesh::SharedBuffer<real_t*>                       p1_;
-    smesh::SharedBuffer<real_t*>                       closest_points_;
-    smesh::SharedBuffer<real_t>                        closest_s_;
-    smesh::SharedBuffer<real_t>                        closest_t_;
-    smesh::SharedBuffer<real_t>                        distances_;
-    smesh::SharedBuffer<idx_t>                         closest_triangles_;
-    smesh::SharedBuffer<real_t>                        distances_whole_;
-    smesh::SharedBuffer<real_t>                        directors_;
-    smesh::SharedBuffer<real_t*>                       normals_;
-    smesh::SharedBuffer<real_t>                        frozen_displacement_;
-    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>   graph_;
-    smesh::SharedBuffer<real_t>                        values_;
+    void assemble_mass_vector() {
+        auto bop = sfem::Factory::create_op(trace_space_, "Mass");
+        bop->initialize();
+
+        auto ones = create_host_buffer<real_t>(trace_space_->n_dofs());
+        sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space_->n_dofs(), 1, ones->data());
+        bop->apply(nullptr, ones->data(), mass_vector_->data());
+    }
+
+    std::shared_ptr<FunctionSpace>                   space_;
+    std::shared_ptr<smesh::Mesh>                     surface_;
+    std::shared_ptr<Buffer<real_t>>                  displacement_;
+    real_t                                           margin_;
+    real_t                                           search_radius_sqr_;
+    ExecutionSpace                                   es_;
+    int                                              dim_;
+    ptrdiff_t                                        npoints_;
+    ptrdiff_t                                        nselements_;
+    std::shared_ptr<FunctionSpace>                   trace_space_;
+    smesh::SharedBuffer<real_t>                      mass_vector_;
+    smesh::SharedBuffer<idx_t*>                      surface_elements_;
+    smesh::ElemType                                  surface_element_type_;
+    smesh::SharedBuffer<real_t*>                     p1_;
+    smesh::SharedBuffer<real_t*>                     closest_points_;
+    smesh::SharedBuffer<real_t>                      closest_s_;
+    smesh::SharedBuffer<real_t>                      closest_t_;
+    smesh::SharedBuffer<real_t>                      distances_;
+    smesh::SharedBuffer<idx_t>                       closest_triangles_;
+    smesh::SharedBuffer<real_t>                      distances_whole_;
+    smesh::SharedBuffer<real_t>                      directors_;
+    smesh::SharedBuffer<real_t*>                     normals_;
+    smesh::SharedBuffer<real_t>                      frozen_displacement_;
+    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
+    smesh::SharedBuffer<real_t>                      values_;
 };
 
 void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
@@ -1259,19 +1269,7 @@ int test_two_body_contact() {
 
     ContactNodeToSegment contact_conditions(space, surface, displacement, margin, search_radius_sqr, es);
 
-    auto trace_space = std::make_shared<FunctionSpace>(surface, 1);
-    auto mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
-
-    {
-        auto bop = sfem::Factory::create_op(trace_space, "Mass");
-        bop->initialize();
-
-        auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
-        sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
-        bop->apply(nullptr, ones->data(), mass_vector->data());
-    }
-
-    auto agumentation = sfem::create_buffer<real_t>(trace_space->n_dofs(), es);
+    auto agumentation = sfem::create_buffer<real_t>(contact_conditions.mass_vector()->size(), es);
 
     real_t penalty          = env.penalty;
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -1286,6 +1284,8 @@ int test_two_body_contact() {
     const int outer_loops = env.outer_loops;
     const int inner_loops = env.inner_loops;
 
+    contact_conditions.recompute();
+
     out->write_time_step("disp", 0, displacement->data());
     out->write_time_step("distance", 0, contact_conditions.distances_whole()->data());
     out->write_time_step("directors", 0, contact_conditions.directors()->data());
@@ -1293,12 +1293,10 @@ int test_two_body_contact() {
     out->log_time(0);
 
     for (int outer = 0; outer < outer_loops; ++outer) {
-        contact_conditions.recompute();
-
         ContactData cd = {.surface             = surface,
                           .graph               = contact_conditions.graph(),
                           .values              = contact_conditions.values(),
-                          .mass_vector         = mass_vector,
+                          .mass_vector         = contact_conditions.mass_vector(),
                           .normals             = contact_conditions.normals(),
                           .distances           = contact_conditions.distances(),
                           .frozen_displacement = contact_conditions.frozen_displacement(),
@@ -1351,13 +1349,13 @@ int test_two_body_contact() {
             }
         }
 
+        contact_conditions.recompute();
+
         out->write_time_step("disp", outer + 1, displacement->data());
         out->write_time_step("distance", outer + 1, contact_conditions.distances_whole()->data());
         out->write_time_step("directors", outer + 1, contact_conditions.directors()->data());
         out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
         out->log_time(outer + 1);
-
-        // contact_conditions.recompute();
     }
 
     return SFEM_TEST_SUCCESS;
