@@ -8,6 +8,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_sort.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_mask.hpp"
@@ -15,6 +16,8 @@
 #include "bvh/bvh.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -481,7 +484,27 @@ void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
     }
 }
 
-class ContactNodeToSegment final {
+// Common interface for contact strategies. The downstream solver (the ContactData
+// consumers) is agnostic to the concrete strategy: it only needs the slave->master
+// node coupling graph, the (partition-of-unity) projection weights, per-slave-node
+// normals and gap, the slave tributary measure (mass) and the frozen displacement.
+class Contact {
+public:
+    virtual ~Contact() = default;
+
+    virtual void recompute() = 0;
+
+    virtual const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const            = 0;
+    virtual smesh::SharedBuffer<real_t>&                            values()                  = 0;
+    virtual smesh::SharedBuffer<real_t>&                            mass_vector()             = 0;
+    virtual smesh::SharedBuffer<real_t*>&                           normals()                 = 0;
+    virtual smesh::SharedBuffer<real_t>&                            distances()               = 0;
+    virtual smesh::SharedBuffer<real_t>&                            frozen_displacement()     = 0;
+    virtual const smesh::SharedBuffer<real_t>&                      distances_whole() const   = 0;
+    virtual const smesh::SharedBuffer<real_t>&                      directors() const         = 0;
+};
+
+class ContactNodeToSegment final : public Contact {
 public:
     ContactNodeToSegment(const std::shared_ptr<FunctionSpace>&  space,
                          const std::shared_ptr<smesh::Mesh>&    surface,
@@ -514,7 +537,7 @@ public:
         assemble_mass_vector();
     }
 
-    void recompute() {
+    void recompute() override {
         auto blas = sfem::blas<real_t>(es_);
 
         p1_ = smesh::astype<real_t>(surface_->points());
@@ -701,14 +724,14 @@ public:
         blas->copy(space_->n_dofs(), displacement_->data(), frozen_displacement_->data());
     }
 
-    const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const { return graph_; }
-    smesh::SharedBuffer<real_t>&                            values() { return values_; }
-    smesh::SharedBuffer<real_t>&                            mass_vector() { return mass_vector_; }
-    smesh::SharedBuffer<real_t*>&                           normals() { return normals_; }
-    smesh::SharedBuffer<real_t>&                            distances() { return distances_; }
-    smesh::SharedBuffer<real_t>&                            frozen_displacement() { return frozen_displacement_; }
-    const smesh::SharedBuffer<real_t>&                      distances_whole() const { return distances_whole_; }
-    const smesh::SharedBuffer<real_t>&                      directors() const { return directors_; }
+    const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
+    smesh::SharedBuffer<real_t>&                            values() override { return values_; }
+    smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
+    smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
+    smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
+    smesh::SharedBuffer<real_t>&                            frozen_displacement() override { return frozen_displacement_; }
+    const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+    const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
 private:
     void assemble_mass_vector() {
@@ -757,6 +780,48 @@ namespace {
     // Per-pair output layout in the values buffer: M(4x4) = 16 reals.
     // D (slave-slave) is diagonal by construction of the dual basis and is not stored.
     constexpr int MORTAR_PAIR_STRIDE = 16;
+
+    // Maximum number of nodes per surface element handled here (QUADSHELL4).
+    constexpr int MORTAR_MAX_NXE = 4;
+
+    // Position of key in a sorted row (lower-bound index). Key is assumed present.
+    SFEM_INLINE idx_t mortar_find_col(const idx_t key, const idx_t* const SFEM_RESTRICT row, const int lenrow) {
+        int lo = 0;
+        int hi = lenrow;
+        while (lo < hi) {
+            const int mid = (lo + hi) / 2;
+            if (row[mid] < key) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+
+    // Find the column offset of each target in a sorted row at once (mirrors tet4_find_cols).
+    // For short rows the branchless count (#entries < target == its index) is used; longer rows
+    // fall back to binary search.
+    SFEM_INLINE void mortar_find_cols(const idx_t* const SFEM_RESTRICT targets,
+                                      const int                        ntargets,
+                                      const idx_t* const SFEM_RESTRICT row,
+                                      const int                        lenrow,
+                                      idx_t* const SFEM_RESTRICT       ks) {
+        if (lenrow > 32) {
+            for (int d = 0; d < ntargets; ++d) {
+                ks[d] = mortar_find_col(targets[d], row, lenrow);
+            }
+        } else {
+            for (int d = 0; d < ntargets; ++d) {
+                ks[d] = 0;
+            }
+            for (int i = 0; i < lenrow; ++i) {
+                for (int d = 0; d < ntargets; ++d) {
+                    ks[d] += row[i] < targets[d];
+                }
+            }
+        }
+    }
 
     // QUADSHELL4 bilinear shape functions (node order: w0=(1-s)(1-t), w1=s(1-t), w2=st, w3=(1-s)t).
     SFEM_INLINE void quad4_shape(const real_t s, const real_t t, real_t* const SFEM_RESTRICT phi) {
@@ -850,9 +915,10 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
     auto i2 = elements->data()[2];
     auto i3 = elements->data()[3];
 
-    const ptrdiff_t nselements = elements->extent(0);
-    const ptrdiff_t nspoints   = points->extent(0);
+    const ptrdiff_t nselements = elements->extent(1);
+    const ptrdiff_t nspoints   = points->extent(1);
     const int       nxe        = elements->extent(0);
+    (void)nspoints;
 
     SMESH_ASSERT(nxe == elem_num_nodes(element_type));
 
@@ -1209,16 +1275,19 @@ void mortar_elemental_matrices_to_crs(const smesh::ElemType                     
     }
 
     // 2) CRS graph: slave-node row -> unique master-node columns (union of the coupled master elements' nodes).
-    const auto gather_row = [&](const ptrdiff_t node, std::vector<idx_t>& buf) {
-        buf.clear();
+    //    Gather the row's master nodes into a fixed stack buffer, then sort_and_unique (as in smesh_graph.impl.hpp).
+    static constexpr int MORTAR_ROW_BUF = 4096;
+
+    const auto gather_row = [&](const ptrdiff_t node, idx_t* const buf) -> idx_t {
+        idx_t nneighs = 0;
         for (count_t e = n2e_ptr[node]; e < n2e_ptr[node + 1]; ++e) {
             const idx_t master = n2e_idx[e];
             for (int b = 0; b < nxe; ++b) {
-                buf.push_back(ed[b][master]);
+                assert(nneighs < MORTAR_ROW_BUF);
+                buf[nneighs++] = ed[b][master];
             }
         }
-        std::sort(buf.begin(), buf.end());
-        buf.erase(std::unique(buf.begin(), buf.end()), buf.end());
+        return static_cast<idx_t>(smesh::sort_and_unique(buf, static_cast<size_t>(nneighs)));
     };
 
     auto rowptr = sfem::create_host_buffer<count_t>(n_nodes + 1);
@@ -1227,11 +1296,10 @@ void mortar_elemental_matrices_to_crs(const smesh::ElemType                     
 
 #pragma omp parallel
     {
-        std::vector<idx_t> buf;
+        idx_t buf[MORTAR_ROW_BUF];
 #pragma omp for
         for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-            gather_row(node, buf);
-            rp[node + 1] = static_cast<count_t>(buf.size());
+            rp[node + 1] = static_cast<count_t>(gather_row(node, buf));
         }
     }
 
@@ -1245,11 +1313,11 @@ void mortar_elemental_matrices_to_crs(const smesh::ElemType                     
 
 #pragma omp parallel
     {
-        std::vector<idx_t> buf;
+        idx_t buf[MORTAR_ROW_BUF];
 #pragma omp for
         for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-            gather_row(node, buf);
-            for (size_t i = 0; i < buf.size(); ++i) {
+            const idx_t nneighs = gather_row(node, buf);
+            for (idx_t i = 0; i < nneighs; ++i) {
                 cidx[rp[node] + i] = buf[i];
             }
         }
@@ -1265,6 +1333,8 @@ void mortar_elemental_matrices_to_crs(const smesh::ElemType                     
     }
 
     // 3) Scatter-add the local M blocks into the global CRS coupling values.
+    //    The master nodes are the same for all slave rows of a pair, so resolve their column
+    //    offsets per row with mortar_find_cols (mirrors tet4_local_to_global).
 #pragma omp parallel for
     for (ptrdiff_t e = 0; e < n_elements; ++e) {
         for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
@@ -1272,26 +1342,111 @@ void mortar_elemental_matrices_to_crs(const smesh::ElemType                     
             const idx_t         master = pidx[k];
             const real_t* const m      = &mvals[k * block];
 
+            idx_t targets[MORTAR_MAX_NXE];
+            for (int b = 0; b < nxe; ++b) {
+                targets[b] = ed[b][master];
+            }
+
+            idx_t ks[MORTAR_MAX_NXE];
             for (int a = 0; a < nxe; ++a) {
-                const idx_t   row     = ed[a][e];
-                const count_t rbegin  = rp[row];
-                const idx_t*  row_col = &cidx[rbegin];
-                const count_t row_len = rp[row + 1] - rbegin;
+                const idx_t   row_node = ed[a][e];
+                const count_t rbegin   = rp[row_node];
+                const idx_t*  row      = &cidx[rbegin];
+                const int     lenrow   = static_cast<int>(rp[row_node + 1] - rbegin);
+
+                mortar_find_cols(targets, nxe, row, lenrow, ks);
+
+                real_t* const       rowvalues = &cvals[rbegin];
+                const real_t* const m_row     = &m[a * nxe];
 
                 for (int b = 0; b < nxe; ++b) {
-                    const idx_t   col   = ed[b][master];
-                    const idx_t*  found = std::lower_bound(row_col, row_col + row_len, col);
-                    const count_t pos   = rbegin + static_cast<count_t>(found - row_col);
-
+                    assert(ks[b] >= 0 && ks[b] < lenrow);
 #pragma omp atomic update
-                    cvals[pos] += m[a * nxe + b];
+                    rowvalues[ks[b]] += m_row[b];
                 }
             }
         }
     }
 }
 
-class ContactMortar final {
+void sum_diag(const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph,
+              const SharedBuffer<real_t>&                             values,
+              const SharedBuffer<real_t>&                             diag) {
+    auto rowptr = graph->rowptr()->data();
+    auto colidx = graph->colidx()->data();
+    auto vals   = values->data();
+    auto d      = diag->data();
+
+    const ptrdiff_t n = graph->rowptr()->size() - 1;
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        const count_t lenrow = rowptr[i + 1] - rowptr[i];
+        const real_t* values = &vals[rowptr[i]];
+
+        real_t sum = 0;
+        for (count_t j = 0; j < lenrow; j++) {
+            sum += values[j];
+        }
+        d[i] = sum;
+    }
+}
+
+void sum_postprocess_weighted_quantities(const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph,
+                                         const SharedBuffer<real_t>&                             values,
+                                         const SharedBuffer<real_t>&                             weighted_normals,
+                                         const SharedBuffer<real_t>&                             weighted_gap,
+                                         const SharedBuffer<real_t>&                             diag) {
+    auto rowptr = graph->rowptr()->data();
+    auto colidx = graph->colidx()->data();
+    auto vals   = values->data();
+    auto d      = diag->data();
+    auto wg     = weighted_gap->data();
+    auto wn     = weighted_normals->data();
+
+    const ptrdiff_t n = graph->rowptr()->size() - 1;
+
+    // Normalize the coupling weights row-wise by the mortar diagonal: M -> D^{-1} M.
+    // The diagonal d (== D) is left intact so it can be reused as the slave mass.
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (d[i] == 0) continue;
+
+        const count_t begin  = rowptr[i];
+        const count_t lenrow = rowptr[i + 1] - begin;
+        const real_t  inv_d  = real_t(1) / d[i];
+        for (count_t j = 0; j < lenrow; j++) {
+            vals[begin + j] *= inv_d;
+        }
+    }
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (d[i] == 0) continue;
+        wg[i] /= d[i];
+    }
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (d[i] == 0) continue;
+
+        real_t len_v = 0;
+        for (int d = 0; d < 3; d++) {
+            len_v += wn[i * 3 + d] * wn[i * 3 + d];
+        }
+
+        SMESH_ASSERT(len_v > 0);
+
+        len_v = sqrt(len_v);
+        for (int d = 0; d < 3; d++) {
+            wn[i * 3 + d] /= len_v;
+        }
+    }
+}
+
+// TODO complete the ContactMortar class implementation (using the functions above), create bas class for Contact (that has a
+// unique interface for ContactMortar and ContactNodeToSegment), hook up the code to use one or the other based on env switches
+
+class ContactMortar final : public Contact {
 public:
     ContactMortar(const std::shared_ptr<FunctionSpace>&  space,
                   const std::shared_ptr<smesh::Mesh>&    surface,
@@ -1304,49 +1459,147 @@ public:
           displacement_(displacement),
           margin_(margin),
           search_radius_sqr_(search_radius_sqr),
-          es_(es) {}
+          es_(es),
+          dim_(surface->spatial_dimension()),
+          npoints_(surface->n_nodes()),
+          nselements_(surface->n_elements()),
+          surface_elements_(surface->block(0)->elements()),
+          surface_element_type_(surface->block(0)->element_type()),
+          mass_vector_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
+          normals_(sfem::create_buffer<real_t>(surface->spatial_dimension(), surface->n_nodes(), es)),
+          distances_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
+          distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
+          directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
+          frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
-    void recompute() {
-        // TODO
-
-        auto et = surface_->block(0)->element_type();
-
-        auto   pc_ptr = create_buffer<ptrdiff_t>(surface_->block(0)->n_elements() + 1, es_);
-        idx_t* pc_idx = nullptr;
-        if (et == smesh::TRISHELL3) {
-            // TODO
-            // template <typename G, typename T, typename I, typename F>
-            // int potential_contact_triangles_bvh(const ptrdiff_t                nselements,
-            //                                     const I* const SSDF_RESTRICT   s0,
-            //                                     const I* const SSDF_RESTRICT   s1,
-            //                                     const I* const SSDF_RESTRICT   s2,
-            //                                     const ptrdiff_t                nspoints,
-            //                                     const G* const SSDF_RESTRICT   sx,
-            //                                     const G* const SSDF_RESTRICT   sy,
-            //                                     const G* const SSDF_RESTRICT   sz,
-            //                                     const T                        extrusion,
-            //                                     ptrdiff_t* const SSDF_RESTRICT pc_ptr,
-            //                                     F** const SSDF_RESTRICT        out_pc_idx);
-        } else if (et == smesh::QUADSHELL4) {
-            // TODO
-            // template <typename G, typename T, typename I, typename F>
-            // int potential_contact_quads_bvh(const ptrdiff_t                nselements,
-            //                                 const I* const SSDF_RESTRICT   s0,
-            //                                 const I* const SSDF_RESTRICT   s1,
-            //                                 const I* const SSDF_RESTRICT   s2,
-            //                                 const I* const SSDF_RESTRICT   s3,
-            //                                 const ptrdiff_t                nspoints,
-            //                                 const G* const SSDF_RESTRICT   sx,
-            //                                 const G* const SSDF_RESTRICT   sy,
-            //                                 const G* const SSDF_RESTRICT   sz,
-            //                                 const T                        extrusion,
-            //                                 ptrdiff_t* const SSDF_RESTRICT pc_ptr,
-            //                                 F** const SSDF_RESTRICT        out_pc_idx);
-
-        } else {
-            SFEM_ERROR("ContactMortar not implemented for element type %d\n", et);
+    void recompute() override {
+        if (surface_element_type_ != smesh::QUADSHELL4) {
+            SFEM_ERROR("ContactMortar is only implemented for QUADSHELL4 (got %d)\n", surface_element_type_);
+            return;
         }
+
+        auto blas = sfem::blas<real_t>(es_);
+
+        // 1) Current (displaced) surface configuration.
+        p1_ = smesh::astype<real_t>(surface_->points());
+        displace_points(surface_, displacement_, p1_);
+
+        // 2) Broad-phase: candidate master faces per slave face.
+        auto         pc_ptr      = create_host_buffer<ptrdiff_t>(nselements_ + 1);
+        auto         pc_ptr_data = pc_ptr->data();
+        idx_t*       raw_pc_idx  = nullptr;
+        const real_t extrusion   = std::sqrt(search_radius_sqr_) + margin_;
+
+        const int err = ssdf::potential_contact_quads_bvh<real_t, real_t, idx_t, idx_t>(nselements_,
+                                                                                        surface_elements_->data()[0],
+                                                                                        surface_elements_->data()[1],
+                                                                                        surface_elements_->data()[2],
+                                                                                        surface_elements_->data()[3],
+                                                                                        npoints_,
+                                                                                        p1_->data()[0],
+                                                                                        p1_->data()[1],
+                                                                                        p1_->data()[2],
+                                                                                        extrusion,
+                                                                                        pc_ptr_data,
+                                                                                        &raw_pc_idx);
+
+        if (err != 0) {
+            SFEM_ERROR("potential_contact_quads_bvh failed (%d)\n", err);
+            return;
+        }
+
+        const ptrdiff_t npairs = pc_ptr_data[nselements_];
+
+        // Adopt the BVH-owned (malloc'd) index array into a managed buffer, then release it.
+        auto pc_idx = create_host_buffer<idx_t>(std::max<ptrdiff_t>(npairs, 1));
+        if (npairs > 0 && raw_pc_idx) {
+            std::memcpy(pc_idx->data(), raw_pc_idx, static_cast<size_t>(npairs) * sizeof(idx_t));
+        }
+        std::free(raw_pc_idx);
+
+        // 3) Per-pair mortar M blocks + per-slave-node weighted normals/gap.
+        //    The gap is accumulated directly into the persistent distances buffer.
+        auto is_valid    = create_host_buffer<mask_t>(std::max<ptrdiff_t>(npairs, 1));
+        auto pair_values = create_host_buffer<real_t>(std::max<ptrdiff_t>(npairs, 1) * MORTAR_PAIR_STRIDE);
+        auto wnormals    = create_host_buffer<real_t>((ptrdiff_t)npoints_ * 3);
+        distances_       = sfem::create_buffer<real_t>(npoints_, es_);
+
+        {
+            auto iv = is_valid->data();
+#pragma omp parallel for
+            for (ptrdiff_t k = 0; k < npairs; ++k) {
+                iv[k] = 1;
+            }
+        }
+
+        assemble_mortar_matrices(surface_element_type_,
+                                 surface_elements_,
+                                 p1_,
+                                 pc_ptr,
+                                 pc_idx,
+                                 pair_values,
+                                 wnormals,
+                                 distances_,
+                                 is_valid);
+
+        // 4) Assemble the global slave->master coupling (mortar M) into CRS.
+        mortar_elemental_matrices_to_crs(surface_element_type_,
+                                         npoints_,
+                                         surface_elements_,
+                                         pc_ptr,
+                                         pc_idx,
+                                         pair_values,
+                                         is_valid,
+                                         graph_,
+                                         values_);
+
+        // 5) Mortar diagonal D (slave tributary measure) plays the role of the nodal mass.
+        mass_vector_ = sfem::create_buffer<real_t>(graph_->rowptr()->size() - 1, es_);
+        sum_diag(graph_, values_, mass_vector_);
+
+        // 6) Normalize: values -> D^{-1} M (partition of unity), gap -> D^{-1} gap, normals -> unit.
+        sum_postprocess_weighted_quantities(graph_, values_, wnormals, distances_, mass_vector_);
+
+        // 7) Convert interleaved weighted normals to SoA and fill the per-dof output fields.
+        auto       nrm = normals_->data();
+        const auto wn  = wnormals->data();
+        const auto d   = mass_vector_->data();
+        const auto gap = distances_->data();
+        auto       dw  = distances_whole_->data();
+        auto       dir = directors_->data();
+        const auto nm  = surface_->node_mapping()->data();
+
+        blas->values(space_->n_dofs(), 0, distances_whole_->data());
+        blas->values(space_->n_dofs(), 0, directors_->data());
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < npoints_; ++i) {
+            for (int c = 0; c < dim_; ++c) {
+                nrm[c][i] = wn[i * 3 + c];
+            }
+
+            if (d[i] == 0) {
+                continue;
+            }
+
+            const ptrdiff_t dof = (ptrdiff_t)nm[i] * dim_;
+            dw[dof]             = gap[i];
+            for (int c = 0; c < dim_; ++c) {
+                dir[dof + c] = -gap[i] * nrm[c][i];
+            }
+        }
+
+        blas->copy(space_->n_dofs(), displacement_->data(), frozen_displacement_->data());
     }
+
+    const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
+    smesh::SharedBuffer<real_t>&                            values() override { return values_; }
+    smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
+    smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
+    smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
+    smesh::SharedBuffer<real_t>&                            frozen_displacement() override { return frozen_displacement_; }
+    const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+    const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
 private:
     std::shared_ptr<FunctionSpace>  space_;
@@ -1355,7 +1608,45 @@ private:
     real_t                          margin_;
     real_t                          search_radius_sqr_;
     ExecutionSpace                  es_;
+    int                             dim_;
+    ptrdiff_t                       npoints_;
+    ptrdiff_t                       nselements_;
+    smesh::SharedBuffer<idx_t*>     surface_elements_;
+    smesh::ElemType                 surface_element_type_;
+
+    smesh::SharedBuffer<real_t*>                     p1_;
+    std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
+    smesh::SharedBuffer<real_t>                      values_;
+    smesh::SharedBuffer<real_t>                      mass_vector_;
+    smesh::SharedBuffer<real_t*>                     normals_;
+    smesh::SharedBuffer<real_t>                      distances_;
+    smesh::SharedBuffer<real_t>                      distances_whole_;
+    smesh::SharedBuffer<real_t>                      directors_;
+    smesh::SharedBuffer<real_t>                      frozen_displacement_;
 };
+
+// Select the contact strategy at runtime. SFEM_CONTACT = "nts" (default) | "mortar".
+std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
+                                        const std::shared_ptr<smesh::Mesh>&    surface,
+                                        const std::shared_ptr<Buffer<real_t>>& displacement,
+                                        const real_t                           margin,
+                                        const real_t                           search_radius_sqr,
+                                        const ExecutionSpace                   es) {
+    const char* const sel    = std::getenv("SFEM_CONTACT");
+    const std::string method = sel ? sel : "nts";
+
+    if (method == "mortar") {
+        printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
+        return std::make_shared<ContactMortar>(space, surface, displacement, margin, search_radius_sqr, es);
+    }
+
+    if (method != "nts") {
+        printf("[Contact] unknown SFEM_CONTACT='%s', falling back to node-to-segment\n", method.c_str());
+    } else {
+        printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
+    }
+    return std::make_shared<ContactNodeToSegment>(space, surface, displacement, margin, search_radius_sqr, es);
+}
 
 void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
     SFEM_TRACE_SCOPE("compute_macaulay_term");
@@ -1901,9 +2192,9 @@ int test_two_body_contact() {
     const real_t search_radius_sqr = search_radius * search_radius;
     const real_t margin            = env.margin;
 
-    ContactNodeToSegment contact_conditions(space, surface, displacement, margin, search_radius_sqr, es);
+    auto contact_conditions = create_contact(space, surface, displacement, margin, search_radius_sqr, es);
 
-    auto agumentation = sfem::create_buffer<real_t>(contact_conditions.mass_vector()->size(), es);
+    auto agumentation = sfem::create_buffer<real_t>(contact_conditions->mass_vector()->size(), es);
 
     real_t penalty          = env.penalty;
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -1918,22 +2209,22 @@ int test_two_body_contact() {
     const int outer_loops = env.outer_loops;
     const int inner_loops = env.inner_loops;
 
-    contact_conditions.recompute();
+    contact_conditions->recompute();
 
     out->write_time_step("disp", 0, displacement->data());
-    out->write_time_step("distance", 0, contact_conditions.distances_whole()->data());
-    out->write_time_step("directors", 0, contact_conditions.directors()->data());
+    out->write_time_step("distance", 0, contact_conditions->distances_whole()->data());
+    out->write_time_step("directors", 0, contact_conditions->directors()->data());
     out->write_time_step("lagr_mult_normal", 0, lagr_mult_normal->data());
     out->log_time(0);
 
     for (int outer = 0; outer < outer_loops; ++outer) {
         ContactData cd = {.surface             = surface,
-                          .graph               = contact_conditions.graph(),
-                          .values              = contact_conditions.values(),
-                          .mass_vector         = contact_conditions.mass_vector(),
-                          .normals             = contact_conditions.normals(),
-                          .distances           = contact_conditions.distances(),
-                          .frozen_displacement = contact_conditions.frozen_displacement(),
+                          .graph               = contact_conditions->graph(),
+                          .values              = contact_conditions->values(),
+                          .mass_vector         = contact_conditions->mass_vector(),
+                          .normals             = contact_conditions->normals(),
+                          .distances           = contact_conditions->distances(),
+                          .frozen_displacement = contact_conditions->frozen_displacement(),
                           .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
@@ -1944,9 +2235,9 @@ int test_two_body_contact() {
         {
             const idx_t* const  node_mapping          = surface->node_mapping()->data();
             const real_t* const lagr_mult             = agumentation->data();
-            const real_t* const normal_x              = contact_conditions.normals()->data()[0];
-            const real_t* const normal_y              = contact_conditions.normals()->data()[1];
-            const real_t* const normal_z              = contact_conditions.normals()->data()[2];
+            const real_t* const normal_x              = contact_conditions->normals()->data()[0];
+            const real_t* const normal_y              = contact_conditions->normals()->data()[1];
+            const real_t* const normal_z              = contact_conditions->normals()->data()[2];
             real_t* const       lagr_mult_normal_data = lagr_mult_normal->data();
             const ptrdiff_t     n                     = surface->node_mapping()->size();
 
@@ -1962,7 +2253,7 @@ int test_two_body_contact() {
 
         if (env.enable_ccd && ccd) {
             p0 = smesh::astype<real_t>(surface->points());
-            displace_points(surface, contact_conditions.frozen_displacement(), p0);
+            displace_points(surface, contact_conditions->frozen_displacement(), p0);
 
             p1 = smesh::astype<real_t>(surface->points());
             displace_points(surface, displacement, p1);
@@ -1972,7 +2263,7 @@ int test_two_body_contact() {
             printf("CCD TOI: %g\n", ccd_toi);
 
             if (ccd_toi < 1) {
-                const real_t* const u0 = contact_conditions.frozen_displacement()->data();
+                const real_t* const u0 = contact_conditions->frozen_displacement()->data();
                 real_t* const       u1 = displacement->data();
                 const ptrdiff_t     n  = space->n_dofs();
 
@@ -1983,11 +2274,11 @@ int test_two_body_contact() {
             }
         }
 
-        contact_conditions.recompute();
+        contact_conditions->recompute();
 
         out->write_time_step("disp", outer + 1, displacement->data());
-        out->write_time_step("distance", outer + 1, contact_conditions.distances_whole()->data());
-        out->write_time_step("directors", outer + 1, contact_conditions.directors()->data());
+        out->write_time_step("distance", outer + 1, contact_conditions->distances_whole()->data());
+        out->write_time_step("directors", outer + 1, contact_conditions->directors()->data());
         out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
         out->log_time(outer + 1);
     }
