@@ -837,6 +837,58 @@ namespace {
         phi[3]                   = one_minus_s * t;
     }
 
+
+    // TODO replace it with mass vector implemenetation is SFEM
+
+    // Lumped nodal areas of a (3D shell) bilinear quad: out[a] = integral over the full element of phi_a dA.
+    // By biorthogonality of the dual basis this equals the proper dual-mortar diagonal D_aa, which is strictly
+    // positive (phi_a >= 0, dA > 0) and hence a safe nodal mass / projection normalizer. 2x2 Gauss is exact
+    // for phi_a * |x_s x x_t| on a bilinear quad.
+    SFEM_INLINE void quad4_nodal_areas(const real_t* const SFEM_RESTRICT X,
+                                       const real_t* const SFEM_RESTRICT Y,
+                                       const real_t* const SFEM_RESTRICT Z,
+                                       real_t* const SFEM_RESTRICT       out_area) {
+        const real_t half_offset = real_t(0.5) / std::sqrt(real_t(3));
+        const real_t gp[2]       = {real_t(0.5) - half_offset, real_t(0.5) + half_offset};
+
+        out_area[0] = out_area[1] = out_area[2] = out_area[3] = real_t(0);
+
+        for (int is = 0; is < 2; ++is) {
+            for (int it = 0; it < 2; ++it) {
+                const real_t s = gp[is];
+                const real_t t = gp[it];
+
+                real_t phi[4];
+                quad4_shape(s, t, phi);
+
+                const real_t dphi_ds[4] = {-(real_t(1) - t), (real_t(1) - t), t, -t};
+                const real_t dphi_dt[4] = {-(real_t(1) - s), -s, s, (real_t(1) - s)};
+
+                real_t xs[3] = {0, 0, 0};
+                real_t xt[3] = {0, 0, 0};
+                for (int c = 0; c < 4; ++c) {
+                    xs[0] += dphi_ds[c] * X[c];
+                    xs[1] += dphi_ds[c] * Y[c];
+                    xs[2] += dphi_ds[c] * Z[c];
+                    xt[0] += dphi_dt[c] * X[c];
+                    xt[1] += dphi_dt[c] * Y[c];
+                    xt[2] += dphi_dt[c] * Z[c];
+                }
+
+                const real_t cx   = xs[1] * xt[2] - xs[2] * xt[1];
+                const real_t cy   = xs[2] * xt[0] - xs[0] * xt[2];
+                const real_t cz   = xs[0] * xt[1] - xs[1] * xt[0];
+                const real_t detJ = std::sqrt(cx * cx + cy * cy + cz * cz);
+
+                // 2x2 Gauss weight on [0,1]^2 is 0.25 per point.
+                const real_t wj = real_t(0.25) * detJ;
+                for (int a = 0; a < 4; ++a) {
+                    out_area[a] += wj * phi[a];
+                }
+            }
+        }
+    }
+
     // Degree-4 Strang triangle rule (6 points, weights sum to 1).
     static const real_t mortar_tri4_l1[MORTAR_TRI4_NQP] = {0.445948174109818469204897801127010,
                                                            0.445948174109818469204897801127010,
@@ -1559,11 +1611,56 @@ public:
                                          graph_,
                                          values_);
 
-        // 5) Mortar diagonal D (slave tributary measure) plays the role of the nodal mass.
-        mass_vector_ = sfem::create_buffer<real_t>(graph_->rowptr()->size() - 1, es_);
-        sum_diag(graph_, values_, mass_vector_);
+        // 5) Proper dual-mortar diagonal D: integrate the slave shape functions over the FULL slave
+        //    element (not the partial overlap). By biorthogonality this is the dual diagonal D_aa, and it
+        //    is strictly positive, so it is a safe nodal mass and projection normalizer. Integrating over
+        //    the partial overlap instead (e.g. sum_diag of the dual M) can go negative and destabilizes
+        //    the contact iteration. A node accumulates the contribution of every contacting slave element
+        //    it belongs to.
+        mass_vector_ = sfem::create_buffer<real_t>(npoints_, es_);
+        {
+            auto       mass = mass_vector_->data();
+            const auto ptr  = pc_ptr->data();
+            const auto iv   = is_valid->data();
+            const auto ed   = surface_elements_->data();
+            const auto px   = p1_->data()[0];
+            const auto py   = p1_->data()[1];
+            const auto pz   = p1_->data()[2];
 
-        // 6) Normalize: values -> D^{-1} M (partition of unity), gap -> D^{-1} gap, normals -> unit.
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < npoints_; ++i) {
+                mass[i] = 0;
+            }
+
+#pragma omp parallel for
+            for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                bool in_contact = false;
+                for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
+                    if (iv[k]) {
+                        in_contact = true;
+                        break;
+                    }
+                }
+                if (!in_contact) {
+                    continue;
+                }
+
+                const idx_t  v[4] = {ed[0][e], ed[1][e], ed[2][e], ed[3][e]};
+                const real_t X[4] = {px[v[0]], px[v[1]], px[v[2]], px[v[3]]};
+                const real_t Y[4] = {py[v[0]], py[v[1]], py[v[2]], py[v[3]]};
+                const real_t Z[4] = {pz[v[0]], pz[v[1]], pz[v[2]], pz[v[3]]};
+
+                real_t area[4];
+                quad4_nodal_areas(X, Y, Z, area);
+
+                for (int a = 0; a < 4; ++a) {
+#pragma omp atomic update
+                    mass[v[a]] += area[a];
+                }
+            }
+        }
+
+        // 6) Normalize: values -> D^{-1} M, gap -> D^{-1} gap, normals -> unit.
         sum_postprocess_weighted_quantities(graph_, values_, wnormals, distances_, mass_vector_);
 
         // 7) Convert interleaved weighted normals to SoA and fill the per-dof output fields.
