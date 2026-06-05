@@ -772,8 +772,12 @@ private:
 
 namespace {
 
-    constexpr int MORTAR_TRI4_NQP     = 6;
-    constexpr int MORTAR_MAX_TRIS     = 6;
+    constexpr int MORTAR_TRI4_NQP = 6;
+    // Capacity of the clipped intersection polygon. Two convex quads intersect in at most
+    // 8 vertices in exact arithmetic; the extra room absorbs floating-point degeneracies and
+    // bounds the Sutherland-Hodgman output (writes past this are dropped, see clipping loop).
+    constexpr int MORTAR_MAX_POLY     = 16;
+    constexpr int MORTAR_MAX_TRIS     = MORTAR_MAX_POLY - 2;
     constexpr int MORTAR_MAX_QP       = MORTAR_MAX_TRIS * MORTAR_TRI4_NQP;
     constexpr int MORTAR_NEWTON_ITERS = 5;
 
@@ -1026,9 +1030,9 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 // Project the candidate quad onto the active quad plane.
                 project_to_normal_plane(bx, by, bz, b_projected_x, b_projected_y);
 
-                real_t poly_x[16] = {a_projected_x[0], a_projected_x[1], a_projected_x[2], a_projected_x[3]};
-                real_t poly_y[16] = {a_projected_y[0], a_projected_y[1], a_projected_y[2], a_projected_y[3]};
-                int    poly_n     = 4;
+                real_t poly_x[MORTAR_MAX_POLY] = {a_projected_x[0], a_projected_x[1], a_projected_x[2], a_projected_x[3]};
+                real_t poly_y[MORTAR_MAX_POLY] = {a_projected_y[0], a_projected_y[1], a_projected_y[2], a_projected_y[3]};
+                int    poly_n                  = 4;
 
                 const real_t b_area2 = (b_projected_x[0] * b_projected_y[1] - b_projected_y[0] * b_projected_x[1]) +
                                        (b_projected_x[1] * b_projected_y[2] - b_projected_y[1] * b_projected_x[2]) +
@@ -1043,8 +1047,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                     const real_t edx       = b_projected_x[next_edge] - ex0;
                     const real_t edy       = b_projected_y[next_edge] - ey0;
 
-                    real_t clipped_x[16];
-                    real_t clipped_y[16];
+                    real_t clipped_x[MORTAR_MAX_POLY];
+                    real_t clipped_y[MORTAR_MAX_POLY];
                     int    clipped_n = 0;
 
                     real_t sx     = poly_x[poly_n - 1];
@@ -1058,14 +1062,16 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         const real_t e_dist = clip_sign * (edx * (ey - ey0) - edy * (ex - ex0));
                         const bool   e_in   = e_dist >= 0;
 
-                        if (e_in != s_in) {
+                        // Guard every push: degenerate/diverged geometry can otherwise inflate the
+                        // Sutherland-Hodgman output past the buffer capacity.
+                        if (e_in != s_in && clipped_n < MORTAR_MAX_POLY) {
                             const real_t alpha   = s_dist / (s_dist - e_dist);
                             clipped_x[clipped_n] = sx + alpha * (ex - sx);
                             clipped_y[clipped_n] = sy + alpha * (ey - sy);
                             clipped_n++;
                         }
 
-                        if (e_in) {
+                        if (e_in && clipped_n < MORTAR_MAX_POLY) {
                             clipped_x[clipped_n] = ex;
                             clipped_y[clipped_n] = ey;
                             clipped_n++;
