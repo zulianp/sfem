@@ -845,6 +845,9 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 const real_t by[4] = {y[bv[0]], y[bv[1]], y[bv[2]], y[bv[3]]};
                 const real_t bz[4] = {z[bv[0]], z[bv[1]], z[bv[2]], z[bv[3]]};
 
+                // TODO: Compute mid-point normal and discard pairs if the angle between the two normals are oriented the same
+                // and angle is greater than 60 degrees.
+
                 real_t b_projected_x[4];
                 real_t b_projected_y[4];
 
@@ -921,7 +924,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 // quadrature rule.
                 // 2) Project back from 2D plane to 3D (inverse of project_to_normal_plane also including the last coordinate)
                 // 3) Apply inverse transformation with respect to normal-based rotation of quadrature points onto the two quads
-                // 4) Compute inverse transformation onto the two quads reference elements (using a Newton iteration)
+                // 4) Compute inverse transformation (with projection) onto the two quads reference elements (using a Newton
+                // iteration)
             }
         }
     } else if (element_type == smesh::TRISHELL3) {
