@@ -860,6 +860,12 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
     auto pd  = points->data();
     auto ivd = is_valid->data();
 
+    // Per slave-node mortar quantities (indexed by surface point id).
+    //   weighted_normals: 3 interleaved components per node [node*3 + d] (caller normalizes).
+    //   weighted_gap:     one scalar per node.
+    auto wnorm = weighted_normals->data();
+    auto wgap  = weighted_gap->data();
+
     if (element_type == smesh::QUADSHELL4) {
         BiorthogonalQuad4Weights weights;
 
@@ -1079,6 +1085,11 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 //   M[a][b] = sum_q wq * psi_a(slave) * phi_b(master)
                 // where psi_a = sum_c W[a][c] * phi_c(slave) is the dual (biorthogonal) slave basis.
                 // The slave-slave block D is diagonal by construction of the dual basis and is not stored.
+                //
+                // Also accumulate the per slave-node mortar quantities (scattered with atomics since
+                // neighbouring slave elements share nodes):
+                //   weighted normal: n_bar_a = sum_q wq * phi_a(slave) * n   (n = slave element normal)
+                //   weighted gap:    g_bar_a = sum_q wq * psi_a(slave) * (x_master - x_slave) . n
                 real_t m_block[16] = {0};
 
                 for (int q = 0; q < nqp; q++) {
@@ -1099,6 +1110,36 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         for (int b = 0; b < 4; b++) {
                             m_block[a * 4 + b] += w_psi * phi_b[b];
                         }
+                    }
+
+                    // Physical slave and master points at this quadrature point.
+                    real_t xs[3] = {0, 0, 0};
+                    real_t xm[3] = {0, 0, 0};
+                    for (int c = 0; c < 4; c++) {
+                        xs[0] += phi_a[c] * ax[c];
+                        xs[1] += phi_a[c] * ay[c];
+                        xs[2] += phi_a[c] * az[c];
+                        xm[0] += phi_b[c] * bx[c];
+                        xm[1] += phi_b[c] * by[c];
+                        xm[2] += phi_b[c] * bz[c];
+                    }
+
+                    const real_t gap = (xm[0] - xs[0]) * anormal[0] + (xm[1] - xs[1]) * anormal[1] +
+                                       (xm[2] - xs[2]) * anormal[2];
+
+                    for (int a = 0; a < 4; a++) {
+                        const ptrdiff_t node  = av[a];
+                        const real_t    w_phi = w * phi_a[a];
+                        const real_t    w_psi = w * psi_a[a];
+
+#pragma omp atomic update
+                        wnorm[node * 3 + 0] += w_phi * anormal[0];
+#pragma omp atomic update
+                        wnorm[node * 3 + 1] += w_phi * anormal[1];
+#pragma omp atomic update
+                        wnorm[node * 3 + 2] += w_phi * anormal[2];
+#pragma omp atomic update
+                        wgap[node] += w_psi * gap;
                     }
                 }
 
