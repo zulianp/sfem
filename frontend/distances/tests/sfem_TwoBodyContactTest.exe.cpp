@@ -749,69 +749,83 @@ private:
 
 namespace {
 
-constexpr int MORTAR_TRI4_NQP   = 6;
-constexpr int MORTAR_MAX_TRIS   = 6;
-constexpr int MORTAR_MAX_QP     = MORTAR_MAX_TRIS * MORTAR_TRI4_NQP;
-constexpr int MORTAR_NEWTON_ITERS = 5;
+    constexpr int MORTAR_TRI4_NQP     = 6;
+    constexpr int MORTAR_MAX_TRIS     = 6;
+    constexpr int MORTAR_MAX_QP       = MORTAR_MAX_TRIS * MORTAR_TRI4_NQP;
+    constexpr int MORTAR_NEWTON_ITERS = 5;
 
-// Degree-4 Strang triangle rule (6 points, weights sum to 1).
-static const real_t mortar_tri4_l1[MORTAR_TRI4_NQP] = {0.445948174109818469204897801127010,
-                                                       0.445948174109818469204897801127010,
-                                                       0.108103018168070960085165291402836,
-                                                       0.091576213509771705118396573460019,
-                                                       0.816847572980327727169962891363187,
-                                                       0.091576213509771705118396573460019};
-static const real_t mortar_tri4_l2[MORTAR_TRI4_NQP] = {0.108103018168070960085165291402836,
-                                                       0.445948174109818469204897801127010,
-                                                       0.445948174109818469204897801127010,
-                                                       0.816847572980327727169962891363187,
-                                                       0.091576213509771705118396573460019,
-                                                       0.091576213509771705118396573460019};
-static const real_t mortar_tri4_qw[MORTAR_TRI4_NQP]  = {0.223381589678011143442532970975561,
-                                                        0.223381589678011143442532970975561,
-                                                        0.223381589678011143442532970975561,
-                                                        0.109951743655322763443642875337266,
-                                                        0.109951743655322763443642875337266,
-                                                        0.109951743655322763443642875337266};
+    // Per-pair output layout in the values buffer: M(4x4) = 16 reals.
+    // D (slave-slave) is diagonal by construction of the dual basis and is not stored.
+    constexpr int MORTAR_PAIR_STRIDE = 16;
 
-SFEM_INLINE void invert_quad4_plane(const real_t* SFEM_RESTRICT px,
-                                    const real_t* SFEM_RESTRICT py,
-                                    const real_t                target_x,
-                                    const real_t                target_y,
-                                    real_t* const               out_s,
-                                    real_t* const               out_t) {
-    real_t s = real_t(0.5);
-    real_t t = real_t(0.5);
-
-    for (int iter = 0; iter < MORTAR_NEWTON_ITERS; iter++) {
+    // QUADSHELL4 bilinear shape functions (node order: w0=(1-s)(1-t), w1=s(1-t), w2=st, w3=(1-s)t).
+    SFEM_INLINE void quad4_shape(const real_t s, const real_t t, real_t* const SFEM_RESTRICT phi) {
         const real_t one_minus_s = real_t(1) - s;
         const real_t one_minus_t = real_t(1) - t;
-        const real_t w0          = one_minus_s * one_minus_t;
-        const real_t w1          = s * one_minus_t;
-        const real_t w2          = s * t;
-        const real_t w3          = one_minus_s * t;
-
-        const real_t map_x = w0 * px[0] + w1 * px[1] + w2 * px[2] + w3 * px[3];
-        const real_t map_y = w0 * py[0] + w1 * py[1] + w2 * py[2] + w3 * py[3];
-
-        const real_t rx = map_x - target_x;
-        const real_t ry = map_y - target_y;
-
-        const real_t dsx = one_minus_t * (px[1] - px[0]) + t * (px[2] - px[3]);
-        const real_t dsy = one_minus_t * (py[1] - py[0]) + t * (py[2] - py[3]);
-        const real_t dtx = one_minus_s * (px[3] - px[0]) + s * (px[2] - px[1]);
-        const real_t dty = one_minus_s * (py[3] - py[0]) + s * (py[2] - py[1]);
-
-        const real_t det     = dsx * dty - dsy * dtx;
-        const real_t inv_det = real_t(1) / (det + (det >= 0 ? real_t(1e-30) : real_t(-1e-30)));
-
-        s -= (dty * rx - dtx * ry) * inv_det;
-        t -= (-dsy * rx + dsx * ry) * inv_det;
+        phi[0]                   = one_minus_s * one_minus_t;
+        phi[1]                   = s * one_minus_t;
+        phi[2]                   = s * t;
+        phi[3]                   = one_minus_s * t;
     }
 
-    *out_s = s;
-    *out_t = t;
-}
+    // Degree-4 Strang triangle rule (6 points, weights sum to 1).
+    static const real_t mortar_tri4_l1[MORTAR_TRI4_NQP] = {0.445948174109818469204897801127010,
+                                                           0.445948174109818469204897801127010,
+                                                           0.108103018168070960085165291402836,
+                                                           0.091576213509771705118396573460019,
+                                                           0.816847572980327727169962891363187,
+                                                           0.091576213509771705118396573460019};
+    static const real_t mortar_tri4_l2[MORTAR_TRI4_NQP] = {0.108103018168070960085165291402836,
+                                                           0.445948174109818469204897801127010,
+                                                           0.445948174109818469204897801127010,
+                                                           0.816847572980327727169962891363187,
+                                                           0.091576213509771705118396573460019,
+                                                           0.091576213509771705118396573460019};
+    static const real_t mortar_tri4_qw[MORTAR_TRI4_NQP] = {0.223381589678011143442532970975561,
+                                                           0.223381589678011143442532970975561,
+                                                           0.223381589678011143442532970975561,
+                                                           0.109951743655322763443642875337266,
+                                                           0.109951743655322763443642875337266,
+                                                           0.109951743655322763443642875337266};
+
+    SFEM_INLINE void invert_quad4_plane(const real_t* SFEM_RESTRICT px,
+                                        const real_t* SFEM_RESTRICT py,
+                                        const real_t                target_x,
+                                        const real_t                target_y,
+                                        real_t* const               out_s,
+                                        real_t* const               out_t) {
+        real_t s = real_t(0.5);
+        real_t t = real_t(0.5);
+
+        for (int iter = 0; iter < MORTAR_NEWTON_ITERS; iter++) {
+            const real_t one_minus_s = real_t(1) - s;
+            const real_t one_minus_t = real_t(1) - t;
+            const real_t w0          = one_minus_s * one_minus_t;
+            const real_t w1          = s * one_minus_t;
+            const real_t w2          = s * t;
+            const real_t w3          = one_minus_s * t;
+
+            const real_t map_x = w0 * px[0] + w1 * px[1] + w2 * px[2] + w3 * px[3];
+            const real_t map_y = w0 * py[0] + w1 * py[1] + w2 * py[2] + w3 * py[3];
+
+            const real_t rx = map_x - target_x;
+            const real_t ry = map_y - target_y;
+
+            const real_t dsx = one_minus_t * (px[1] - px[0]) + t * (px[2] - px[3]);
+            const real_t dsy = one_minus_t * (py[1] - py[0]) + t * (py[2] - py[3]);
+            const real_t dtx = one_minus_s * (px[3] - px[0]) + s * (px[2] - px[1]);
+            const real_t dty = one_minus_s * (py[3] - py[0]) + s * (py[2] - py[1]);
+
+            const real_t det     = dsx * dty - dsy * dtx;
+            const real_t inv_det = real_t(1) / (det + (det >= 0 ? real_t(1e-30) : real_t(-1e-30)));
+
+            s -= (dty * rx - dtx * ry) * inv_det;
+            t -= (-dsy * rx + dsx * ry) * inv_det;
+        }
+
+        *out_s = s;
+        *out_t = t;
+    }
 
 }  // namespace
 
@@ -821,6 +835,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                               const SharedBuffer<ptrdiff_t>& pc_ptr,
                               const SharedBuffer<idx_t>&     pc_idx,
                               const SharedBuffer<real_t>&    values,
+                              const SharedBuffer<real_t>&    weighted_normals,
+                              const SharedBuffer<real_t>&    weighted_gap,
                               const SharedBuffer<mask_t>&    is_valid) {
     auto ptr  = pc_ptr->data();
     auto idx  = pc_idx->data();
@@ -920,15 +936,13 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 const real_t bty = real_t(0.5) * (by[2] + by[3] - by[0] - by[1]);
                 const real_t btz = real_t(0.5) * (bz[2] + bz[3] - bz[0] - bz[1]);
 
-                real_t bnormal[3]  = {bsy * btz - bsz * bty, bsz * btx - bsx * btz, bsx * bty - bsy * btx};
-                const real_t bnormal_len =
-                        std::sqrt(bnormal[0] * bnormal[0] + bnormal[1] * bnormal[1] + bnormal[2] * bnormal[2]);
+                real_t       bnormal[3]  = {bsy * btz - bsz * bty, bsz * btx - bsx * btz, bsx * bty - bsy * btx};
+                const real_t bnormal_len = std::sqrt(bnormal[0] * bnormal[0] + bnormal[1] * bnormal[1] + bnormal[2] * bnormal[2]);
                 bnormal[0] /= bnormal_len;
                 bnormal[1] /= bnormal_len;
                 bnormal[2] /= bnormal_len;
 
-                const real_t face_dot =
-                        anormal[0] * bnormal[0] + anormal[1] * bnormal[1] + anormal[2] * bnormal[2];
+                const real_t face_dot = anormal[0] * bnormal[0] + anormal[1] * bnormal[1] + anormal[2] * bnormal[2];
                 if (face_dot > real_t(-0.5)) {
                     ivd[ptr[i] + j] = 0;
                     continue;
@@ -1013,7 +1027,6 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                 int    nqp = 0;
 
                 const int ntris = poly_n - 2;
-                real_t    overlap_area = 0;
 
                 for (int tri = 0; tri < ntris; tri++) {
                     const real_t v0x = poly_x[0];
@@ -1023,11 +1036,11 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                     const real_t v2x = poly_x[tri + 2];
                     const real_t v2y = poly_y[tri + 2];
 
-                    const real_t e1x = v1x - v0x;
-                    const real_t e1y = v1y - v0y;
-                    const real_t e2x = v2x - v0x;
-                    const real_t e2y = v2y - v0y;
-                    const real_t tri_area2 = e1x * e2y - e1y * e2x;
+                    const real_t e1x        = v1x - v0x;
+                    const real_t e1y        = v1y - v0y;
+                    const real_t e2x        = v2x - v0x;
+                    const real_t e2y        = v2y - v0y;
+                    const real_t tri_area2  = e1x * e2y - e1y * e2x;
                     const real_t area_scale = std::abs(tri_area2);
 
                     if (area_scale <= real_t(0)) {
@@ -1036,11 +1049,12 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
 
 #pragma omp simd
                     for (int q = 0; q < MORTAR_TRI4_NQP; q++) {
-                        const real_t l1 = mortar_tri4_l1[q];
-                        const real_t l2 = mortar_tri4_l2[q];
+                        const real_t l1   = mortar_tri4_l1[q];
+                        const real_t l2   = mortar_tri4_l2[q];
                         const real_t qp_x = v0x + l1 * e1x + l2 * e2x;
                         const real_t qp_y = v0y + l1 * e1y + l2 * e2y;
-                        const real_t w    = mortar_tri4_qw[q] * area_scale;
+                        // area_scale = |e1 x e2| = 2 * triangle_area; the 0.5 maps it to the physical area.
+                        const real_t w = mortar_tri4_qw[q] * area_scale * real_t(0.5);
 
                         real_t qs = 0;
                         real_t qt = 0;
@@ -1051,28 +1065,47 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         invert_quad4_plane(b_projected_x, b_projected_y, qp_x, qp_y, &rs, &rt);
 
                         const int idx = nqp + q;
-                        sa[idx]         = qs;
-                        ta[idx]         = qt;
-                        sb[idx]         = rs;
-                        tb[idx]         = rt;
-                        wq[idx]         = w;
+                        sa[idx]       = qs;
+                        ta[idx]       = qt;
+                        sb[idx]       = rs;
+                        tb[idx]       = rt;
+                        wq[idx]       = w;
                     }
 
                     nqp += MORTAR_TRI4_NQP;
-                    overlap_area += area_scale * real_t(0.5);
                 }
 
-                vals[ptr[i] + j] = overlap_area;
+                // Accumulate the local biorthogonal mortar block M (slave-master) over the intersection quadrature.
+                //   M[a][b] = sum_q wq * psi_a(slave) * phi_b(master)
+                // where psi_a = sum_c W[a][c] * phi_c(slave) is the dual (biorthogonal) slave basis.
+                // The slave-slave block D is diagonal by construction of the dual basis and is not stored.
+                real_t m_block[16] = {0};
 
-                // TODO (later): accumulate biorthogonal D (slave) and M (master) blocks using BiorthogonalQuad4Weights
-                // and the per-pair quadrature data (sa, ta, sb, tb, wq, nqp).
-                (void)weights;
-                (void)sa;
-                (void)ta;
-                (void)sb;
-                (void)tb;
-                (void)wq;
-                (void)nqp;
+                for (int q = 0; q < nqp; q++) {
+                    real_t phi_a[4];
+                    real_t phi_b[4];
+                    quad4_shape(sa[q], ta[q], phi_a);
+                    quad4_shape(sb[q], tb[q], phi_b);
+
+                    real_t psi_a[4];
+                    for (int a = 0; a < 4; a++) {
+                        const real_t* const w_row = &weights.values[a * 4];
+                        psi_a[a] = w_row[0] * phi_a[0] + w_row[1] * phi_a[1] + w_row[2] * phi_a[2] + w_row[3] * phi_a[3];
+                    }
+
+                    const real_t w = wq[q];
+                    for (int a = 0; a < 4; a++) {
+                        const real_t w_psi = w * psi_a[a];
+                        for (int b = 0; b < 4; b++) {
+                            m_block[a * 4 + b] += w_psi * phi_b[b];
+                        }
+                    }
+                }
+
+                real_t* const pair_out = &vals[(ptr[i] + j) * MORTAR_PAIR_STRIDE];
+                for (int a = 0; a < 16; a++) {
+                    pair_out[a] = m_block[a];
+                }
             }
         }
     } else if (element_type == smesh::TRISHELL3) {
