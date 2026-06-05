@@ -20,6 +20,30 @@
 
 using namespace sfem;
 
+struct BiorthogonalQuad4Weights {
+    real_t values[16] = {
+            // phi 0
+            4.0,
+            -2.0,
+            1.0,
+            -2.0,
+            // phi 1
+            -2.0,
+            4.0,
+            -2.0,
+            1.0,
+            // phi 2
+            1.0,
+            -2.0,
+            4.0,
+            -2.0,
+            // phi 3
+            -2.0,
+            1.0,
+            -2.0,
+            4.0};
+};
+
 struct EnvOptions {
     int             demo;
     real_t          margin;
@@ -753,6 +777,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
     auto ivd = is_valid->data();
 
     if (element_type == smesh::QUADSHELL4) {
+        BiorthogonalQuad4Weights weights;
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < nselements; i++) {
             const idx_t     av[4]       = {i0[i], i1[i], i2[i], i3[i]};
@@ -890,7 +916,12 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
 
                 ivd[ptr[i] + j] = 1;
 
-                // TODO: compute mortar integrals in the intersection polygon (implict triangulation)
+                // TODO:
+                // 1) generate quadrature points in the intersection polygon (implict triangulation), 4th order triangular
+                // quadrature rule.
+                // 2) Project back from 2D plane to 3D (inverse of project_to_normal_plane also including the last coordinate)
+                // 3) Apply inverse transformation with respect to normal-based rotation of quadrature points onto the two quads
+                // 4) Compute inverse transformation onto the two quads reference elements (using a Newton iteration)
             }
         }
     } else if (element_type == smesh::TRISHELL3) {
