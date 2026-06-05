@@ -1124,8 +1124,7 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         xm[2] += phi_b[c] * bz[c];
                     }
 
-                    const real_t gap = (xm[0] - xs[0]) * anormal[0] + (xm[1] - xs[1]) * anormal[1] +
-                                       (xm[2] - xs[2]) * anormal[2];
+                    const real_t gap = (xm[0] - xs[0]) * anormal[0] + (xm[1] - xs[1]) * anormal[1] + (xm[2] - xs[2]) * anormal[2];
 
                     for (int a = 0; a < 4; a++) {
                         const ptrdiff_t node  = av[a];
@@ -1153,6 +1152,142 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
         // TODO
     } else {
         SFEM_ERROR("assemble_mortar_matrices not implemented for element type %d\n", element_type);
+    }
+}
+
+void mortar_elemental_matrices_to_crs(const smesh::ElemType                             element_type,
+                                      const ptrdiff_t                                   n_nodes,
+                                      const SharedBuffer<idx_t*>&                       elements,
+                                      const SharedBuffer<ptrdiff_t>&                    pc_ptr,
+                                      const SharedBuffer<idx_t>&                        pc_idx,
+                                      const SharedBuffer<real_t>&                       values,
+                                      const SharedBuffer<mask_t>&                       is_valid,
+                                      std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& crs_graph,
+                                      SharedBuffer<real_t>&                             crs_values) {
+    if (element_type != smesh::QUADSHELL4 && element_type != smesh::TRISHELL3) {
+        SFEM_ERROR("mortar_elemental_matrices_to_crs not implemented for element type %d\n", element_type);
+        return;
+    }
+
+    const int       nxe        = elem_num_nodes(element_type);
+    const int       block      = nxe * nxe;
+    const ptrdiff_t n_elements = pc_ptr->size() - 1;
+
+    auto ptr   = pc_ptr->data();
+    auto pidx  = pc_idx->data();
+    auto ivd   = is_valid->data();
+    auto ed    = elements->data();
+    auto mvals = values->data();
+
+    // 1) Node-to-(master element) connectivity for slave nodes, built from the valid contact pairs only.
+    //    For each valid pair (slave element e, master element pidx[k]) every slave node of e couples to
+    //    that master element.
+    std::vector<count_t> n2e_ptr(n_nodes + 1, 0);
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
+            if (!ivd[k]) continue;
+            for (int a = 0; a < nxe; ++a) {
+                ++n2e_ptr[ed[a][e] + 1];
+            }
+        }
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+        n2e_ptr[i + 1] += n2e_ptr[i];
+    }
+
+    std::vector<idx_t>   n2e_idx(n2e_ptr[n_nodes]);
+    std::vector<count_t> book(n_nodes, 0);
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
+            if (!ivd[k]) continue;
+            const idx_t master = pidx[k];
+            for (int a = 0; a < nxe; ++a) {
+                const idx_t node                      = ed[a][e];
+                n2e_idx[n2e_ptr[node] + book[node]++] = master;
+            }
+        }
+    }
+
+    // 2) CRS graph: slave-node row -> unique master-node columns (union of the coupled master elements' nodes).
+    const auto gather_row = [&](const ptrdiff_t node, std::vector<idx_t>& buf) {
+        buf.clear();
+        for (count_t e = n2e_ptr[node]; e < n2e_ptr[node + 1]; ++e) {
+            const idx_t master = n2e_idx[e];
+            for (int b = 0; b < nxe; ++b) {
+                buf.push_back(ed[b][master]);
+            }
+        }
+        std::sort(buf.begin(), buf.end());
+        buf.erase(std::unique(buf.begin(), buf.end()), buf.end());
+    };
+
+    auto rowptr = sfem::create_host_buffer<count_t>(n_nodes + 1);
+    auto rp     = rowptr->data();
+    rp[0]       = 0;
+
+#pragma omp parallel
+    {
+        std::vector<idx_t> buf;
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+            gather_row(node, buf);
+            rp[node + 1] = static_cast<count_t>(buf.size());
+        }
+    }
+
+    for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+        rp[node + 1] += rp[node];
+    }
+
+    const ptrdiff_t nnz    = rp[n_nodes];
+    auto            colidx = sfem::create_host_buffer<idx_t>(nnz);
+    auto            cidx   = colidx->data();
+
+#pragma omp parallel
+    {
+        std::vector<idx_t> buf;
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+            gather_row(node, buf);
+            for (size_t i = 0; i < buf.size(); ++i) {
+                cidx[rp[node] + i] = buf[i];
+            }
+        }
+    }
+
+    crs_graph  = std::make_shared<smesh::CRSGraph<count_t, idx_t>>(rowptr, colidx);
+    crs_values = sfem::create_host_buffer<real_t>(nnz);
+    auto cvals = crs_values->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t k = 0; k < nnz; ++k) {
+        cvals[k] = 0;
+    }
+
+    // 3) Scatter-add the local M blocks into the global CRS coupling values.
+#pragma omp parallel for
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
+            if (!ivd[k]) continue;
+            const idx_t         master = pidx[k];
+            const real_t* const m      = &mvals[k * block];
+
+            for (int a = 0; a < nxe; ++a) {
+                const idx_t   row     = ed[a][e];
+                const count_t rbegin  = rp[row];
+                const idx_t*  row_col = &cidx[rbegin];
+                const count_t row_len = rp[row + 1] - rbegin;
+
+                for (int b = 0; b < nxe; ++b) {
+                    const idx_t   col   = ed[b][master];
+                    const idx_t*  found = std::lower_bound(row_col, row_col + row_len, col);
+                    const count_t pos   = rbegin + static_cast<count_t>(found - row_col);
+
+#pragma omp atomic update
+                    cvals[pos] += m[a * nxe + b];
+                }
+            }
+        }
     }
 }
 
