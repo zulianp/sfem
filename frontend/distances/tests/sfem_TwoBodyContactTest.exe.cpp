@@ -63,9 +63,11 @@ struct EnvOptions {
     bool            enable_augmentation;
     real_t          toi_scale;
     real_t          search_radius;
+    real_t          damping;
 
     static EnvOptions read() {
-        return {smesh::Env::read("SFEM_DEMO", int(1)),
+        return {
+                smesh::Env::read("SFEM_DEMO", int(1)),
                 smesh::Env::read("SFEM_MARGIN", real_t(0)),
                 smesh::Env::read("SFEM_OUTER_LOOPS", int(1)),
                 smesh::Env::read("SFEM_INNER_LOOPS", int(1000)),
@@ -77,7 +79,9 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4),
                 smesh::Env::read("SFEM_ENABLE_AUGMENTATION", false),
                 smesh::Env::read("SFEM_TOI_SCALE", real_t(1)),
-                smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1))};
+                smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1)),
+                smesh::Env::read("SFEM_DAMPING", real_t(1)),
+        };
     }
 
     void print(std::ostream& os) const {
@@ -1708,7 +1712,7 @@ public:
         sum_postprocess_weighted_quantities(graph_, values_, wnormals, distances_, mass_vector_);
 
         // 7) Convert interleaved weighted normals to SoA and fill the per-dof output fields.
-        auto       nrm = normals_->data();
+        auto       nrm                 = normals_->data();
         const auto wn                  = wnormals->data();
         const auto d                   = mass_vector_->data();
         const auto gap                 = distances_->data();
@@ -1731,9 +1735,9 @@ public:
                 continue;
             }
 
-            const ptrdiff_t dof = (ptrdiff_t)nm[i] * dim_;
-            const real_t director_gap = physical_gap_weight[i] != 0 ? physical_gap[i] / physical_gap_weight[i] : gap[i];
-            dw[dof]                   = director_gap;
+            const ptrdiff_t dof          = (ptrdiff_t)nm[i] * dim_;
+            const real_t    director_gap = physical_gap_weight[i] != 0 ? physical_gap[i] / physical_gap_weight[i] : gap[i];
+            dw[dof]                      = director_gap;
             for (int c = 0; c < dim_; ++c) {
                 dir[dof + c] = director_gap * nrm[c][i];
             }
@@ -2351,9 +2355,6 @@ int test_two_body_contact() {
     real_t penalty          = env.penalty;
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
-    f->apply_constraints(displacement->data());
-    f->apply_constraints(rhs->data());
-
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(smesh::Path("contact_output"));
@@ -2369,6 +2370,9 @@ int test_two_body_contact() {
     out->write_time_step("lagr_mult_normal", 0, lagr_mult_normal->data());
     out->log_time(0);
 
+    f->apply_constraints(displacement->data());
+    f->apply_constraints(rhs->data());
+
     for (int outer = 0; outer < outer_loops; ++outer) {
         ContactData cd = {.surface             = surface,
                           .graph               = contact_conditions->graph(),
@@ -2381,6 +2385,17 @@ int test_two_body_contact() {
                           .agumentation        = agumentation};
 
         nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol, env.enable_augmentation);
+
+        {
+            const real_t* const u0 = contact_conditions->frozen_displacement()->data();
+            real_t* const       u1 = displacement->data();
+            const ptrdiff_t     n  = space->n_dofs();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                u1[i] = u0[i] + env.damping * (u1[i] - u0[i]);
+            }
+        }
 
         if (env.enable_ccd && ccd) {
             p0 = smesh::astype<real_t>(surface->points());
