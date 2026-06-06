@@ -984,6 +984,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                               const SharedBuffer<real_t>&    values,
                               const SharedBuffer<real_t>&    weighted_normals,
                               const SharedBuffer<real_t>&    weighted_gap,
+                              const SharedBuffer<real_t>&    weighted_distance,
+                              const SharedBuffer<real_t>&    distance_weight,
                               const SharedBuffer<mask_t>&    is_valid) {
     auto ptr  = pc_ptr->data();
     auto idx  = pc_idx->data();
@@ -1010,9 +1012,12 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
 
     // Per slave-node mortar quantities (indexed by surface point id).
     //   weighted_normals: 3 interleaved components per node [node*3 + d] (caller normalizes).
-    //   weighted_gap:     one scalar per node.
-    auto wnorm = weighted_normals->data();
-    auto wgap  = weighted_gap->data();
+    //   weighted_gap:     dual-basis gap used by the weak contact equation.
+    //   weighted_distance: primal-basis physical gap used for exported distance/directors.
+    auto wnorm        = weighted_normals->data();
+    auto wgap         = weighted_gap->data();
+    auto wdist        = weighted_distance->data();
+    auto wdist_weight = distance_weight->data();
 
     if (element_type == smesh::QUADSHELL4) {
         BiorthogonalQuad4Weights weights;
@@ -1101,6 +1106,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                     ivd[ptr[i] + j] = 0;
                     continue;
                 }
+
+                const real_t outer_normal[3] = {anormal[0], anormal[1], anormal[2]};
 
                 real_t b_projected_x[4];
                 real_t b_projected_y[4];
@@ -1274,7 +1281,8 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         xm[2] += phi_b[c] * bz[c];
                     }
 
-                    const real_t gap = (xm[0] - xs[0]) * anormal[0] + (xm[1] - xs[1]) * anormal[1] + (xm[2] - xs[2]) * anormal[2];
+                    const real_t gap = (xm[0] - xs[0]) * outer_normal[0] + (xm[1] - xs[1]) * outer_normal[1] +
+                                       (xm[2] - xs[2]) * outer_normal[2];
 
                     for (int a = 0; a < 4; a++) {
                         const ptrdiff_t node  = av[a];
@@ -1282,13 +1290,17 @@ void assemble_mortar_matrices(const smesh::ElemType          element_type,
                         const real_t    w_psi = w * psi_a[a];
 
 #pragma omp atomic update
-                        wnorm[node * 3 + 0] += w_phi * anormal[0];
+                        wnorm[node * 3 + 0] += w_phi * outer_normal[0];
 #pragma omp atomic update
-                        wnorm[node * 3 + 1] += w_phi * anormal[1];
+                        wnorm[node * 3 + 1] += w_phi * outer_normal[1];
 #pragma omp atomic update
-                        wnorm[node * 3 + 2] += w_phi * anormal[2];
+                        wnorm[node * 3 + 2] += w_phi * outer_normal[2];
 #pragma omp atomic update
                         wgap[node] += w_psi * gap;
+#pragma omp atomic update
+                        wdist[node] += w_phi * gap;
+#pragma omp atomic update
+                        wdist_weight[node] += w_phi;
                     }
                 }
 
@@ -1607,10 +1619,17 @@ public:
 
         // 3) Per-pair mortar M blocks + per-slave-node weighted normals/gap.
         //    The gap is accumulated directly into the persistent distances buffer.
-        auto is_valid    = create_host_buffer<mask_t>(std::max<ptrdiff_t>(npairs, 1));
-        auto pair_values = create_host_buffer<real_t>(std::max<ptrdiff_t>(npairs, 1) * MORTAR_PAIR_STRIDE);
-        auto wnormals    = create_host_buffer<real_t>((ptrdiff_t)npoints_ * 3);
-        distances_       = sfem::create_buffer<real_t>(npoints_, es_);
+        auto is_valid     = create_host_buffer<mask_t>(std::max<ptrdiff_t>(npairs, 1));
+        auto pair_values  = create_host_buffer<real_t>(std::max<ptrdiff_t>(npairs, 1) * MORTAR_PAIR_STRIDE);
+        auto wnormals     = create_host_buffer<real_t>((ptrdiff_t)npoints_ * 3);
+        auto wdistance    = create_host_buffer<real_t>(npoints_);
+        auto wdist_weight = create_host_buffer<real_t>(npoints_);
+        distances_        = sfem::create_buffer<real_t>(npoints_, es_);
+
+        blas->values((ptrdiff_t)npoints_ * 3, 0, wnormals->data());
+        blas->values(npoints_, 0, wdistance->data());
+        blas->values(npoints_, 0, wdist_weight->data());
+        blas->values(npoints_, 0, distances_->data());
 
         {
             auto iv = is_valid->data();
@@ -1620,8 +1639,17 @@ public:
             }
         }
 
-        assemble_mortar_matrices(
-                surface_element_type_, surface_elements_, p1_, pc_ptr, pc_idx, pair_values, wnormals, distances_, is_valid);
+        assemble_mortar_matrices(surface_element_type_,
+                                 surface_elements_,
+                                 p1_,
+                                 pc_ptr,
+                                 pc_idx,
+                                 pair_values,
+                                 wnormals,
+                                 distances_,
+                                 wdistance,
+                                 wdist_weight,
+                                 is_valid);
 
         // 4) Assemble the global slave->master coupling (mortar M) into CRS.
         mortar_elemental_matrices_to_crs(
@@ -1681,12 +1709,14 @@ public:
 
         // 7) Convert interleaved weighted normals to SoA and fill the per-dof output fields.
         auto       nrm = normals_->data();
-        const auto wn  = wnormals->data();
-        const auto d   = mass_vector_->data();
-        const auto gap = distances_->data();
-        auto       dw  = distances_whole_->data();
-        auto       dir = directors_->data();
-        const auto nm  = surface_->node_mapping()->data();
+        const auto wn                  = wnormals->data();
+        const auto d                   = mass_vector_->data();
+        const auto gap                 = distances_->data();
+        const auto physical_gap        = wdistance->data();
+        const auto physical_gap_weight = wdist_weight->data();
+        auto       dw                  = distances_whole_->data();
+        auto       dir                 = directors_->data();
+        const auto nm                  = surface_->node_mapping()->data();
 
         blas->values(space_->n_dofs(), 0, distances_whole_->data());
         blas->values(space_->n_dofs(), 0, directors_->data());
@@ -1702,9 +1732,10 @@ public:
             }
 
             const ptrdiff_t dof = (ptrdiff_t)nm[i] * dim_;
-            dw[dof]             = gap[i];
+            const real_t director_gap = physical_gap_weight[i] != 0 ? physical_gap[i] / physical_gap_weight[i] : gap[i];
+            dw[dof]                   = director_gap;
             for (int c = 0; c < dim_; ++c) {
-                dir[dof + c] = gap[i] * nrm[c][i];
+                dir[dof + c] = director_gap * nrm[c][i];
             }
         }
 
@@ -2351,27 +2382,6 @@ int test_two_body_contact() {
 
         nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol, env.enable_augmentation);
 
-        blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
-
-        {
-            const idx_t* const  node_mapping          = surface->node_mapping()->data();
-            const real_t* const lagr_mult             = agumentation->data();
-            const real_t* const normal_x              = contact_conditions->normals()->data()[0];
-            const real_t* const normal_y              = contact_conditions->normals()->data()[1];
-            const real_t* const normal_z              = contact_conditions->normals()->data()[2];
-            real_t* const       lagr_mult_normal_data = lagr_mult_normal->data();
-            const ptrdiff_t     n                     = surface->node_mapping()->size();
-
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                const ptrdiff_t dof            = node_mapping[i] * 3;
-                const real_t    lm             = lagr_mult[i];
-                lagr_mult_normal_data[dof + 0] = lm * normal_x[i];
-                lagr_mult_normal_data[dof + 1] = lm * normal_y[i];
-                lagr_mult_normal_data[dof + 2] = lm * normal_z[i];
-            }
-        }
-
         if (env.enable_ccd && ccd) {
             p0 = smesh::astype<real_t>(surface->points());
             displace_points(surface, contact_conditions->frozen_displacement(), p0);
@@ -2396,6 +2406,27 @@ int test_two_body_contact() {
         }
 
         contact_conditions->recompute();
+
+        blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
+
+        {
+            const idx_t* const  node_mapping          = surface->node_mapping()->data();
+            const real_t* const lagr_mult             = agumentation->data();
+            const real_t* const normal_x              = contact_conditions->normals()->data()[0];
+            const real_t* const normal_y              = contact_conditions->normals()->data()[1];
+            const real_t* const normal_z              = contact_conditions->normals()->data()[2];
+            real_t* const       lagr_mult_normal_data = lagr_mult_normal->data();
+            const ptrdiff_t     n                     = surface->node_mapping()->size();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                const ptrdiff_t dof            = node_mapping[i] * 3;
+                const real_t    lm             = lagr_mult[i];
+                lagr_mult_normal_data[dof + 0] = lm * normal_x[i];
+                lagr_mult_normal_data[dof + 1] = lm * normal_y[i];
+                lagr_mult_normal_data[dof + 2] = lm * normal_z[i];
+            }
+        }
 
         out->write_time_step("disp", outer + 1, displacement->data());
         out->write_time_step("distance", outer + 1, contact_conditions->distances_whole()->data());
