@@ -24,27 +24,29 @@
 using namespace sfem;
 
 struct BiorthogonalQuad4Weights {
-    real_t values[16] = {
-            // phi 0
-            4.0,
-            -2.0,
-            1.0,
-            -2.0,
-            // phi 1
-            -2.0,
-            4.0,
-            -2.0,
-            1.0,
-            // phi 2
-            1.0,
-            -2.0,
-            4.0,
-            -2.0,
-            // phi 3
-            -2.0,
-            1.0,
-            -2.0,
-            4.0};
+    // real_t values[16] = {
+    //         // phi 0
+    //         4.0,
+    //         -2.0,
+    //         1.0,
+    //         -2.0,
+    //         // phi 1
+    //         -2.0,
+    //         4.0,
+    //         -2.0,
+    //         1.0,
+    //         // phi 2
+    //         1.0,
+    //         -2.0,
+    //         4.0,
+    //         -2.0,
+    //         // phi 3
+    //         -2.0,
+    //         1.0,
+    //         -2.0,
+    //         4.0};
+
+    real_t values[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 };
 
 struct EnvOptions {
@@ -58,6 +60,9 @@ struct EnvOptions {
     real_t          solver_tol;
     bool            enable_ccd;
     smesh::ElemType element_type;
+    bool            enable_augmentation;
+    real_t          toi_scale;
+    real_t          search_radius;
 
     static EnvOptions read() {
         return {smesh::Env::read("SFEM_DEMO", int(1)),
@@ -69,7 +74,27 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_PENALTY", real_t(10)),
                 smesh::Env::read("SFEM_SOLVER_TOL", real_t(1e-6)),
                 smesh::Env::read("SFEM_ENABLE_CCD", false),
-                smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4)};
+                smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4),
+                smesh::Env::read("SFEM_ENABLE_AUGMENTATION", false),
+                smesh::Env::read("SFEM_TOI_SCALE", real_t(1)),
+                smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1))};
+    }
+
+    void print(std::ostream& os) const {
+        os << "EnvOptions:" << std::endl;
+        os << "  demo: " << demo << std::endl;
+        os << "  margin: " << margin << std::endl;
+        os << "  outer_loops: " << outer_loops << std::endl;
+        os << "  inner_loops: " << inner_loops << std::endl;
+        os << "  nx: " << nx << std::endl;
+        os << "  ytop: " << ytop << std::endl;
+        os << "  penalty: " << penalty << std::endl;
+        os << "  solver_tol: " << solver_tol << std::endl;
+        os << "  enable_ccd: " << enable_ccd << std::endl;
+        os << "  element_type: " << element_type << std::endl;
+        os << "  enable_augmentation: " << enable_augmentation << std::endl;
+        os << "  toi_scale: " << toi_scale << std::endl;
+        os << "  search_radius: " << search_radius << std::endl;
     }
 };
 
@@ -494,14 +519,14 @@ public:
 
     virtual void recompute() = 0;
 
-    virtual const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const            = 0;
-    virtual smesh::SharedBuffer<real_t>&                            values()                  = 0;
-    virtual smesh::SharedBuffer<real_t>&                            mass_vector()             = 0;
-    virtual smesh::SharedBuffer<real_t*>&                           normals()                 = 0;
-    virtual smesh::SharedBuffer<real_t>&                            distances()               = 0;
-    virtual smesh::SharedBuffer<real_t>&                            frozen_displacement()     = 0;
-    virtual const smesh::SharedBuffer<real_t>&                      distances_whole() const   = 0;
-    virtual const smesh::SharedBuffer<real_t>&                      directors() const         = 0;
+    virtual const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const           = 0;
+    virtual smesh::SharedBuffer<real_t>&                            values()                = 0;
+    virtual smesh::SharedBuffer<real_t>&                            mass_vector()           = 0;
+    virtual smesh::SharedBuffer<real_t*>&                           normals()               = 0;
+    virtual smesh::SharedBuffer<real_t>&                            distances()             = 0;
+    virtual smesh::SharedBuffer<real_t>&                            frozen_displacement()   = 0;
+    virtual const smesh::SharedBuffer<real_t>&                      distances_whole() const = 0;
+    virtual const smesh::SharedBuffer<real_t>&                      directors() const       = 0;
 };
 
 class ContactNodeToSegment final : public Contact {
@@ -538,6 +563,8 @@ public:
     }
 
     void recompute() override {
+        SFEM_TRACE_SCOPE("ContactNodeToSegment::recompute");
+
         auto blas = sfem::blas<real_t>(es_);
 
         p1_ = smesh::astype<real_t>(surface_->points());
@@ -836,7 +863,6 @@ namespace {
         phi[2]                   = s * t;
         phi[3]                   = one_minus_s * t;
     }
-
 
     // TODO replace it with mass vector implemenetation is SFEM
 
@@ -1531,6 +1557,8 @@ public:
           frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
     void recompute() override {
+        SFEM_TRACE_SCOPE("ContactMortar::recompute");
+
         if (surface_element_type_ != smesh::QUADSHELL4) {
             SFEM_ERROR("ContactMortar is only implemented for QUADSHELL4 (got %d)\n", surface_element_type_);
             return;
@@ -1547,6 +1575,7 @@ public:
         auto         pc_ptr_data = pc_ptr->data();
         idx_t*       raw_pc_idx  = nullptr;
         const real_t extrusion   = std::sqrt(search_radius_sqr_) + margin_;
+        printf("extrusion: %g\n", extrusion);
 
         const int err = ssdf::potential_contact_quads_bvh<real_t, real_t, idx_t, idx_t>(nselements_,
                                                                                         surface_elements_->data()[0],
@@ -1567,6 +1596,7 @@ public:
         }
 
         const ptrdiff_t npairs = pc_ptr_data[nselements_];
+        printf("npairs: %ld\n", (long)npairs);
 
         // Adopt the BVH-owned (malloc'd) index array into a managed buffer, then release it.
         auto pc_idx = create_host_buffer<idx_t>(std::max<ptrdiff_t>(npairs, 1));
@@ -1590,26 +1620,12 @@ public:
             }
         }
 
-        assemble_mortar_matrices(surface_element_type_,
-                                 surface_elements_,
-                                 p1_,
-                                 pc_ptr,
-                                 pc_idx,
-                                 pair_values,
-                                 wnormals,
-                                 distances_,
-                                 is_valid);
+        assemble_mortar_matrices(
+                surface_element_type_, surface_elements_, p1_, pc_ptr, pc_idx, pair_values, wnormals, distances_, is_valid);
 
         // 4) Assemble the global slave->master coupling (mortar M) into CRS.
-        mortar_elemental_matrices_to_crs(surface_element_type_,
-                                         npoints_,
-                                         surface_elements_,
-                                         pc_ptr,
-                                         pc_idx,
-                                         pair_values,
-                                         is_valid,
-                                         graph_,
-                                         values_);
+        mortar_elemental_matrices_to_crs(
+                surface_element_type_, npoints_, surface_elements_, pc_ptr, pc_idx, pair_values, is_valid, graph_, values_);
 
         // 5) Proper dual-mortar diagonal D: integrate the slave shape functions over the FULL slave
         //    element (not the partial overlap). By biorthogonality this is the dual diagonal D_aa, and it
@@ -1688,7 +1704,7 @@ public:
             const ptrdiff_t dof = (ptrdiff_t)nm[i] * dim_;
             dw[dof]             = gap[i];
             for (int c = 0; c < dim_; ++c) {
-                dir[dof + c] = -gap[i] * nrm[c][i];
+                dir[dof + c] = gap[i] * nrm[c][i];
             }
         }
 
@@ -2009,7 +2025,8 @@ void nljacobi(ContactData&                                 cd,
               const std::shared_ptr<sfem::Buffer<real_t>>& x,
               const real_t                                 penalty,
               const int                                    n_loops,
-              const real_t                                 solver_tol) {
+              const real_t                                 solver_tol,
+              const bool                                   enable_augmentation) {
     SFEM_TRACE_SCOPE("nljacobi");
 
     auto      space = f->space();
@@ -2054,7 +2071,7 @@ void nljacobi(ContactData&                                 cd,
     blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
     f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
 
-    ptrdiff_t each = 1;
+    ptrdiff_t each = 20;
     for (int loop = 0; loop < n_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
 
@@ -2186,7 +2203,7 @@ void nljacobi(ContactData&                                 cd,
         }
 
         real_t* const aug = cd.agumentation->data();
-        if ((loop + 1) % each == 0) {
+        if ((loop + 1) % each == 0 && enable_augmentation) {
             compute_macaulay_term(cd, penalty, x->data(), macaulay->data());
 
             const real_t* const m = macaulay->data();
@@ -2235,7 +2252,8 @@ void nljacobi(ContactData&                                 cd,
 
 int test_two_body_contact() {
     const EnvOptions env = EnvOptions::read();
-    ptrdiff_t        nx  = env.nx;
+    env.print(std::cout);
+    ptrdiff_t nx = env.nx;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
@@ -2289,9 +2307,9 @@ int test_two_body_contact() {
     // SFEM_TEST_APPROXEQ(toi, 0.25, 1e-2);
 
     // toi *= 1.1;
-    blas->scal(space->n_dofs(), toi, displacement->data());
+    blas->scal(space->n_dofs(), env.toi_scale * toi, displacement->data());
 
-    const real_t search_radius     = 0.001;
+    const real_t search_radius     = env.search_radius;
     const real_t search_radius_sqr = search_radius * search_radius;
     const real_t margin            = env.margin;
 
@@ -2331,7 +2349,7 @@ int test_two_body_contact() {
                           .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
-        nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol);
+        nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol, env.enable_augmentation);
 
         blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 
