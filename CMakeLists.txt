@@ -122,6 +122,7 @@ list(APPEND SFEM_MODULES
 
 list(APPEND SFEM_MODULES 
     frontend
+    frontend/constraints
     frontend/ops
     frontend/mesh
 )
