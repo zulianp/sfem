@@ -64,6 +64,7 @@ struct EnvOptions {
     real_t          toi_scale;
     real_t          search_radius;
     real_t          damping;
+    int             output_frequency;
 
     static EnvOptions read() {
         return {
@@ -81,6 +82,7 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_TOI_SCALE", real_t(1)),
                 smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1)),
                 smesh::Env::read("SFEM_DAMPING", real_t(1)),
+                smesh::Env::read("SFEM_OUTPUT_FREQUENCY", int(10)),
         };
     }
 
@@ -132,18 +134,14 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
                     return y > (1.9 - 1e-4) && y < (1.9 + 1e-4);
                 });
 
-        // auto bottom_ss = sfem::Sideset::create_from_selector(
-        //         mesh,
-        //         [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (0.8 - 1e-4) && y < (0.8 +
-        //         1e-4);
-        //         });
+        auto left_ss = sfem::Sideset::create_from_selector(mesh, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool {
+            return x > (-1e-4) && x < (1e-4) && z > 0.45 && z < 0.55;
+        });
 
-        auto left_ss = sfem::Sideset::create_from_selector(
-                mesh, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (-1e-4) && x < (1e-4); });
-
-        auto right_ss = sfem::Sideset::create_from_selector(
-                mesh,
-                [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (1 - 1e-4) && x < (1 + 1e-4); });
+        auto right_ss =
+                sfem::Sideset::create_from_selector(mesh, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool {
+                    return x > (1 - 1e-4) && x < (1 + 1e-4) && z > 0.45 && z < 0.55;
+                });
 
         const int dim   = mesh->spatial_dimension();
         auto      space = FunctionSpace::create(mesh, dim);
@@ -154,15 +152,12 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
         auto f = Function::create(space);
         f->add_operator(op);
 
-        auto top_ns = smesh::create_nodeset_from_sidesets(mesh, top_ss);
-        // auto bottom_ns = smesh::create_nodeset_from_sidesets(mesh, bottom_ss);
+        auto top_ns   = smesh::create_nodeset_from_sidesets(mesh, top_ss);
         auto left_ns  = smesh::create_nodeset_from_sidesets(mesh, left_ss);
         auto right_ns = smesh::create_nodeset_from_sidesets(mesh, right_ss);
 
         assert(top_ns != nullptr);
-        // assert(bottom_ns != nullptr);
         assert(top_ns->size() > 0);
-        // assert(bottom_ns->size() > 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
         DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = opts.ytop, .component = 1};
@@ -176,13 +171,8 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
         DirichletConditions::Condition yright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 1};
         DirichletConditions::Condition zright{.sidesets = right_ss, .nodeset = right_ns, .value = 0, .component = 2};
 
-        // DirichletConditions::Condition xbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 0};
-        // DirichletConditions::Condition ybottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 1};
-        // DirichletConditions::Condition zbottom{.sidesets = bottom_ss, .nodeset = bottom_ns, .value = 0, .component = 2};
-
         auto conds =
                 sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xleft, yleft, zleft, xright, yright, zright}, es);
-        // auto conds = sfem::create_dirichlet_conditions(space, {xtop, ytop, ztop, xbottom, ybottom, zbottom}, es);
         f->add_constraint(conds);
 
         return f;
@@ -2443,11 +2433,13 @@ int test_two_body_contact() {
             }
         }
 
-        out->write_time_step("disp", outer + 1, displacement->data());
-        out->write_time_step("distance", outer + 1, contact_conditions->distances_whole()->data());
-        out->write_time_step("directors", outer + 1, contact_conditions->directors()->data());
-        out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
-        out->log_time(outer + 1);
+        if ((outer + 1) % env.output_frequency == 0) {
+            out->write_time_step("disp", outer + 1, displacement->data());
+            out->write_time_step("distance", outer + 1, contact_conditions->distances_whole()->data());
+            out->write_time_step("directors", outer + 1, contact_conditions->directors()->data());
+            out->write_time_step("lagr_mult_normal", outer + 1, lagr_mult_normal->data());
+            out->log_time(outer + 1);
+        }
     }
 
     return SFEM_TEST_SUCCESS;

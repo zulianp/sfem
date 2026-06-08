@@ -355,20 +355,15 @@ namespace sfem {
 
         return dc;
     }
-
+#ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                                               std::string                           yaml) {
+                                                                               const ryml::NodeRef                  &node) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
 
-#ifdef SFEM_ENABLE_RYAML
-        auto dc = std::make_unique<DirichletConditions>(space);
-
-        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
-        auto       conds = tree["dirichlet_conditions"];
-
         MPI_Comm comm = space->mesh_ptr()->comm()->get();
+        auto     dc   = std::make_unique<DirichletConditions>(space);
 
-        for (auto c : conds.children()) {
+        for (auto c : node.children()) {
             std::shared_ptr<Sideset>       sideset;
             std::shared_ptr<Buffer<idx_t>> nodeset;
 
@@ -464,6 +459,19 @@ namespace sfem {
         }
 
         return dc;
+    }
+#endif
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                               std::string                           yaml) {
+        SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
+
+#ifdef SFEM_ENABLE_RYAML
+
+        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       conds = tree["dirichlet_conditions"];
+        return create_from_yaml(space, conds);
+
 #else
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
