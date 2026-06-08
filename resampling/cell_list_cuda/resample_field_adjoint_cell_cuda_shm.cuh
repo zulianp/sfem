@@ -194,31 +194,33 @@ update_hex_field_shm_il(const cell_list_split_3d_2d_map_t *split_map,      // Ce
 // transfer_to_hex_field_cell_split_tet4_shm_il_kernel
 ////////////////////////////////////////////////////
 template <typename index_t = int>
-__global__ void                                       //
-transfer_to_hex_field_cell_split_tet4_shm_il_kernel(  //
-        const cell_list_split_3d_2d_map_t split_map,  // Cell list split map data structure
-        const boxes_interleaved_t         boxes,      // Interleaved boxes data structure
-        const mesh_tet_geom_device_t      mesh_geom,  // Mesh geometry data structure
-        const elems_tet4_device           mesh,       // Mesh: mesh_t struct
-        const index_t                     start_i,    // Starting i index for the grid points in the hex mesh
-        const index_t                     start_j,    // Starting j index for the grid points in the hex mesh
-        const index_t                     delta_i,    // Cell list jump in x direction.
-        const index_t                     delta_j,    // Cell list jump in y direction.
-        const index_t                     size_i,     // Number of grid points in x direction
-        const index_t                     size_j,     // Number of grid points in y direction
-        const index_t                     n0,         // SDF: n[3]
-        const index_t                     n1,         //
-        const index_t                     n2,         //
-        const index_t                     stride0,    // SDF: stride[3]
-        const index_t                     stride1,    //
-        const index_t                     stride2,    //
-        const geom_t                      origin0,    // SDF: origin[3]
-        const geom_t                      origin1,    //
-        const geom_t                      origin2,    //
-        const geom_t                      delta0,     // SDF: delta[3]
-        const geom_t                      delta1,     //
-        const geom_t                      delta2,     //
-        const real_t *const __restrict__ weighted_field, real_t *const __restrict__ hex_field) {
+__global__ void                                           //
+transfer_to_hex_field_cell_split_tet4_shm_il_kernel(      //
+        const cell_list_split_3d_2d_map_t split_map,      // Cell list split map data structure
+        const boxes_interleaved_t         boxes,          // Interleaved boxes data structure
+        const mesh_tet_geom_device_t      mesh_geom,      // Mesh geometry data structure
+        const elems_tet4_device           mesh,           // Mesh: mesh_t struct
+        const index_t                     start_i,        // Starting i index for the grid points in the hex mesh
+        const index_t                     start_j,        // Starting j index for the grid points in the hex mesh
+        const index_t                     delta_i,        // Cell list jump in x direction.
+        const index_t                     delta_j,        // Cell list jump in y direction.
+        const index_t                     size_i,         // Number of grid points in x direction
+        const index_t                     size_j,         // Number of grid points in y direction
+        const index_t                     n0,             // SDF: n[3]
+        const index_t                     n1,             //
+        const index_t                     n2,             //
+        const index_t                     stride0,        // SDF: stride[3]
+        const index_t                     stride1,        //
+        const index_t                     stride2,        //
+        const geom_t                      origin0,        // SDF: origin[3]
+        const geom_t                      origin1,        //
+        const geom_t                      origin2,        //
+        const geom_t                      delta0,         // SDF: delta[3]
+        const geom_t                      delta1,         //
+        const geom_t                      delta2,         //
+        const real_t *const __restrict__ weighted_field,  //
+        real_t *const __restrict__ hex_field) {           //
+
     const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
     const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
 
@@ -246,6 +248,6 @@ transfer_to_hex_field_cell_split_tet4_shm_il_kernel(  //
                                      delta2,
                                      weighted_field,
                                      hex_field);
-}
+}  // END Kernel: transfer_to_hex_field_cell_split_tet4_shm_il_kernel
 
-#endif  // RESAMPLE_FIELD_ADJOINT_CELL_CUDA_SH_CUH
+#endif  // RESAMPLE_FIELD_ADJOINT_CELL_CUDA_SHM_CUH

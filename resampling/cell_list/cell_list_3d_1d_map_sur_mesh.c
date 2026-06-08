@@ -459,11 +459,6 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_v(const cell_list_3d_1d_map_t *map,
         const int size_up        = (lower_bound_index > 1) ? num_boxes_local - (lower_bound_index - 2) : num_boxes_local;
         const int offset_up      = start_index_up - start_index;
 
-        // int upper_bound_index = upper_bound_float(
-        // &map->lower_bounds_y[start_index],
-        // (size_t)num_boxes_local,
-        // y);
-
         int upper_bound_index = upper_bound_float(     //
                 &map->lower_bounds_y[start_index_up],  //
                 size_up,                               //

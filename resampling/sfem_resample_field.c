@@ -1622,18 +1622,18 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             ////////////////////////////////////////////////////////////////////
             // HyTeG refinement adjoint — GPU test path
             ////////////////////////////////////////////////////////////////////
-            ret = tet4_resample_field_local_refine_adjoint_hyteg(0,                              //
-                                                                 mesh->nelements,                //
-                                                                 mesh->nnodes,                   //
-                                                                 (const idx_t**)mesh->elements,  //
-                                                                 (const geom_t**)mesh->points,   //
-                                                                 n,                              //
-                                                                 stride,                         //
-                                                                 origin,                         //
-                                                                 delta,                          //
-                                                                 g,                              //
-                                                                 mini_tet_parameters,            //
-                                                                 data);                          //
+            ret = tet4_resample_field_local_refine_adjoint_hyteg(0,                                        //
+                                                                 mesh->nelements,                          //
+                                                                 mesh->nnodes,                             //
+                                                                 (const idx_t**)mesh->elements,            //
+                                                                 (const geom_t**)mesh->points,             //
+                                                                 n,                                        //
+                                                                 stride,                                   //
+                                                                 origin,                                   //
+                                                                 delta,                                    //
+                                                                 g,                                        //
+                                                                 mini_tet_parameters.alpha_max_threshold,  //
+                                                                 data);                                    //
 #endif
 
             break;

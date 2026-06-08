@@ -223,13 +223,15 @@ int main_adjoint(int argc, char* argv[]) {
                           mesh_fun_XYZ,                 //
                           g);                           //
 
+#define SFEM_ENABLE_BONE_EDF_FIELD
 #ifdef SFEM_ENABLE_BONE_EDF_FIELD
         {
-            double* g_dbl = calloc(mesh.n_owned_nodes, sizeof(double));
+            float* g_dbl = calloc(mesh.n_owned_nodes, sizeof(float));
 
             mesh_read_nodal_field(&mesh,                                                                               //
-                                  "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
-                                  MPI_DOUBLE,                                                                          //
+                                //   "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
+                                  "/home/simone/git/sfem_d/sfem/workflows/resample/tet_on/point_data/on_edf.raw",      //
+                                  MPI_FLOAT,                                                                          //
                                   g_dbl);                                                                              //
 
             for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
@@ -314,6 +316,10 @@ int main_adjoint(int argc, char* argv[]) {
                 info.adjoint_refine_type = ADJOINT_BASE;
                 info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
                 info.adjoint_refine_type = ADJOINT_CELL_LIST;
+
+                // NOTE:
+                // export SFEM_CDF_RATIO=0.96
+                // Allow user to control the therholds for the two-scale cell list
 
                 mini_tet_parameters_t mini_tet_parameters;
                 {
