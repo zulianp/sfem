@@ -155,13 +155,11 @@ namespace sfem {
         public:
             ContactNodeToSurface(const std::shared_ptr<FunctionSpace>&  space,
                                  const std::shared_ptr<smesh::Mesh>&    surface,
-                                 const std::shared_ptr<Buffer<real_t>>& displacement,
                                  const real_t                           margin,
                                  const real_t                           search_radius_sqr,
                                  const ExecutionSpace                   es)
                 : space_(space),
                   surface_(surface),
-                  displacement_(displacement),
                   margin_(margin),
                   search_radius_sqr_(search_radius_sqr),
                   es_(es),
@@ -184,13 +182,13 @@ namespace sfem {
                 assemble_mass_vector();
             }
 
-            void recompute() override {
+            void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) override {
                 SFEM_TRACE_SCOPE("ContactNodeToSurface::recompute");
 
                 auto blas = sfem::blas<real_t>(es_);
 
                 p1_ = smesh::astype<real_t>(surface_->points());
-                displace_points(surface_, displacement_, p1_);
+                displace_points(surface_, displacement, p1_);
 
                 if (surface_element_type_ == smesh::TRISHELL3) {
                     ssdf::closest_within_radius_local_bvh(npoints_,
@@ -376,7 +374,7 @@ namespace sfem {
 
                 assemble_coupling_operator(
                         surface_element_type_, surface_elements_, closest_triangles_, closest_s_, closest_t_, *graph_, values_);
-                blas->copy(space_->n_dofs(), displacement_->data(), frozen_displacement_->data());
+                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -400,7 +398,6 @@ namespace sfem {
 
             std::shared_ptr<FunctionSpace>                   space_;
             std::shared_ptr<smesh::Mesh>                     surface_;
-            std::shared_ptr<Buffer<real_t>>                  displacement_;
             real_t                                           margin_;
             real_t                                           search_radius_sqr_;
             ExecutionSpace                                   es_;
@@ -1172,13 +1169,11 @@ namespace sfem {
         public:
             ContactMortar(const std::shared_ptr<FunctionSpace>&  space,
                           const std::shared_ptr<smesh::Mesh>&    surface,
-                          const std::shared_ptr<Buffer<real_t>>& displacement,
                           const real_t                           margin,
                           const real_t                           search_radius_sqr,
                           const ExecutionSpace                   es)
                 : space_(space),
                   surface_(surface),
-                  displacement_(displacement),
                   margin_(margin),
                   search_radius_sqr_(search_radius_sqr),
                   es_(es),
@@ -1194,7 +1189,7 @@ namespace sfem {
                   directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
                   frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
-            void recompute() override {
+            void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) override {
                 SFEM_TRACE_SCOPE("ContactMortar::recompute");
 
                 if (surface_element_type_ != smesh::QUADSHELL4) {
@@ -1206,7 +1201,7 @@ namespace sfem {
 
                 // 1) Current (displaced) surface configuration.
                 p1_ = smesh::astype<real_t>(surface_->points());
-                displace_points(surface_, displacement_, p1_);
+                displace_points(surface_, displacement, p1_);
 
                 // 2) Broad-phase: candidate master faces per slave face.
                 auto         pc_ptr      = create_host_buffer<ptrdiff_t>(nselements_ + 1);
@@ -1372,7 +1367,7 @@ namespace sfem {
                     }
                 }
 
-                blas->copy(space_->n_dofs(), displacement_->data(), frozen_displacement_->data());
+                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -1387,7 +1382,6 @@ namespace sfem {
         private:
             std::shared_ptr<FunctionSpace>  space_;
             std::shared_ptr<smesh::Mesh>    surface_;
-            std::shared_ptr<Buffer<real_t>> displacement_;
             real_t                          margin_;
             real_t                          search_radius_sqr_;
             ExecutionSpace                  es_;
@@ -1413,7 +1407,6 @@ namespace sfem {
     // Select the contact strategy at runtime. SFEM_CONTACT = "nts" (default) | "mortar".
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
                                             const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const std::shared_ptr<Buffer<real_t>>& displacement,
                                             const real_t                           margin,
                                             const real_t                           search_radius_sqr,
                                             const ExecutionSpace                   es) {
@@ -1422,7 +1415,7 @@ namespace sfem {
 
         if (method == "mortar") {
             printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
-            return std::make_shared<ContactMortar>(space, surface, displacement, margin, search_radius_sqr, es);
+            return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
         }
 
         if (method != "nts") {
@@ -1430,13 +1423,12 @@ namespace sfem {
         } else {
             printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
         }
-        return std::make_shared<ContactNodeToSurface>(space, surface, displacement, margin, search_radius_sqr, es);
+        return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
     }
 
 #ifdef SFEM_ENABLE_YAML
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
                                             const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const std::shared_ptr<Buffer<real_t>>& displacement,
                                             const ryml::ConstNodeRef&              node,
                                             ExecutionSpace                         es) {
         real_t margin        = 0;
@@ -1449,7 +1441,7 @@ namespace sfem {
             node["search_radius"] >> search_radius;
         }
 
-        return create_contact(space, surface, displacement, margin, search_radius * search_radius, es);
+        return create_contact(space, surface, margin, search_radius * search_radius, es);
     }
 #endif
 

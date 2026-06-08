@@ -16,7 +16,7 @@ namespace sfem {
     public:
         virtual ~Contact() = default;
 
-        virtual void recompute() = 0;
+        virtual void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) = 0;
 
         virtual const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const           = 0;
         virtual smesh::SharedBuffer<real_t>&                            values()                = 0;
@@ -30,7 +30,6 @@ namespace sfem {
 
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
                                             const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const std::shared_ptr<Buffer<real_t>>& displacement,
                                             real_t                                 margin,
                                             real_t                                 search_radius_sqr,
                                             ExecutionSpace                         es);
@@ -38,7 +37,6 @@ namespace sfem {
 #ifdef SFEM_ENABLE_YAML
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
                                             const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const std::shared_ptr<Buffer<real_t>>& displacement,
                                             const ryml::ConstNodeRef&              node,
                                             ExecutionSpace                         es);
 #endif

@@ -939,7 +939,7 @@ int test_two_body_contact() {
     const real_t search_radius_sqr = search_radius * search_radius;
     const real_t margin            = env.margin;
 
-    auto contact_conditions = create_contact(space, surface, displacement, margin, search_radius_sqr, es);
+    auto contact_conditions = create_contact(space, surface, margin, search_radius_sqr, es);
 
     auto agumentation = sfem::create_buffer<real_t>(contact_conditions->mass_vector()->size(), es);
 
@@ -953,7 +953,7 @@ int test_two_body_contact() {
     const int outer_loops = env.outer_loops;
     const int inner_loops = env.inner_loops;
 
-    contact_conditions->recompute();
+    contact_conditions->recompute(displacement);
 
     out->write_time_step("disp", 0, displacement->data());
     out->write_time_step("distance", 0, contact_conditions->distances_whole()->data());
@@ -1011,7 +1011,7 @@ int test_two_body_contact() {
             }
         }
 
-        contact_conditions->recompute();
+        contact_conditions->recompute(displacement);
 
         blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 
