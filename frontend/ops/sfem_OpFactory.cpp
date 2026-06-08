@@ -1,26 +1,26 @@
 #include "sfem_OpFactory.hpp"
 
-#include "sfem_LinearElasticity.hpp"
-#include "sfem_Laplacian.hpp"
-#include "sfem_Mass.hpp"
-#include "sfem_VectorLaplacian.hpp"
-#include "sfem_LumpedMass.hpp"
-#include "sfem_SemiStructuredEMLaplacian.hpp"
-#include "sfem_SpectralElementLaplacian.hpp"
+#include <map>
+#include "sfem_BoundaryMass.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
-#include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_PlugInOp.hpp"
-#include "sfem_BoundaryMass.hpp"
-#include "sfem_PackedLaplacian.hpp"
-#include "sfem_NeoHookeanOgdenPacked.hpp"
-#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
+#include "sfem_Laplacian.hpp"
+#include "sfem_LinearElasticity.hpp"
+#include "sfem_LumpedMass.hpp"
+#include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_Gradient.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
-#include <map>
+#include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_NeoHookeanOgdenPacked.hpp"
+#include "sfem_PackedLaplacian.hpp"
+#include "sfem_PlugInOp.hpp"
+#include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_SpectralElementLaplacian.hpp"
+#include "sfem_VectorLaplacian.hpp"
 
 namespace sfem {
 
@@ -129,4 +129,12 @@ namespace sfem {
 
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
-} // namespace sfem 
+    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                   const ryml::ConstNodeRef             &node,
+                                                   const ExecutionSpace                  es) {
+        std::string name;
+        node["type"] >> name;
+
+        return create_op(space, name.c_str(), es);
+    }
+}  // namespace sfem

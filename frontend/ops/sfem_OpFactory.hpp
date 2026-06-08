@@ -1,7 +1,7 @@
 /**
  * @file sfem_OpFactory.hpp
  * @brief Factory for creating finite element operators
- * 
+ *
  * This file defines the Factory class, which provides a centralized registry
  * and creation mechanism for all finite element operators in the SFEM library.
  * The factory supports both regular operators and boundary operators.
@@ -11,22 +11,26 @@
 
 #include "sfem_Op.hpp"
 
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif  // SFEM_ENABLE_RYAML
+
 namespace sfem {
 
     /**
      * @brief Factory for creating finite element operators
-     * 
+     *
      * The Factory class provides a centralized registry and creation mechanism
      * for all finite element operators. It uses a singleton pattern to maintain
      * a global registry of operator creation functions.
-     * 
+     *
      * The factory supports:
      * - Registration of operator creation functions
      * - Automatic operator creation by name
      * - Support for both regular and boundary operators
      * - GPU operator variants (with "gpu:" prefix)
      * - Semi-structured mesh operator variants (with "ss:" prefix)
-     * 
+     *
      * Usage example:
      * @code
      * auto op = Factory::create_op(space, "Laplacian");
@@ -41,53 +45,54 @@ namespace sfem {
          * @return Unique pointer to the created operator
          */
         using FactoryFunction = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
-        
+
         /**
          * @brief Function type for creating boundary operators
          * @param space Function space for the operator
          * @param boundary_elements Boundary element connectivity
          * @return Unique pointer to the created operator
          */
-        using FactoryFunctionBoundary = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
-        
+        using FactoryFunctionBoundary = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &,
+                                                                          const std::shared_ptr<Buffer<idx_t *>> &)>;
+
         /**
          * @brief Destructor
          */
         ~Factory();
-        
+
         /**
          * @brief Get the singleton instance of the factory
          * @return Reference to the factory instance
          */
         static Factory &instance();
-        
+
         /**
          * @brief Register an operator creation function
          * @param name Operator name
          * @param factory_function Function to create the operator
          */
         static void register_op(const std::string &name, FactoryFunction factory_function);
-        
+
         /**
          * @brief Create an operator by name
          * @param space Function space
          * @param name Operator name
          * @return Shared pointer to the created operator, or nullptr if not found
-         * 
+         *
          * The factory automatically adds "ss:" prefix for semi-structured meshes.
          */
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
-        
+
         /**
          * @brief Create a GPU operator by name
          * @param space Function space
          * @param name Operator name (without "gpu:" prefix)
          * @return Shared pointer to the created operator, or nullptr if not found
-         * 
+         *
          * This method automatically adds the "gpu:" prefix to the operator name.
          */
         static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name);
-        
+
         /**
          * @brief Create a boundary operator by name
          * @param space Function space
@@ -104,7 +109,7 @@ namespace sfem {
          * @brief Private constructor for singleton pattern
          */
         Factory();
-        
+
         /**
          * @brief Private registration method
          * @param name Operator name
@@ -126,4 +131,19 @@ namespace sfem {
      */
     std::string d_op_str(const std::string &name);
 
-} // namespace sfem 
+    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
+                                         const std::string                    &name,
+                                         const ExecutionSpace                  es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
+#endif  // SFEM_ENABLE_CUDA
+        return sfem::Factory::create_op(space, name.c_str());
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                   const ryml::ConstNodeRef             &node,
+                                                   const ExecutionSpace                  es);
+#endif  // SFEM_ENABLE_RYAML
+
+}  // namespace sfem

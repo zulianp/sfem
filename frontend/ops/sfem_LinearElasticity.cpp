@@ -12,6 +12,8 @@
 #include "smesh_mesh.hpp"
 #include "smesh_spaces.hpp"
 
+#include "sfem_ElasticityParameters.hpp"
+
 #include <assert.h>
 #include <functional>
 
@@ -38,6 +40,124 @@ namespace sfem {
                 it->second.parameters->set_value("lambda", lambda);
             }
         }
+
+#ifdef SFEM_ENABLE_RYAML
+        static bool yaml_read_real(const ryml::ConstNodeRef &node, const char *key, real_t &value) {
+            if (!node.has_child(key)) {
+                return false;
+            }
+
+            node[key] >> value;
+            return true;
+        }
+
+        static bool yaml_read_real_aliases(const ryml::ConstNodeRef &node,
+                                           const char *const         keys[],
+                                           const size_t              n_keys,
+                                           real_t                   &value) {
+            for (size_t i = 0; i < n_keys; i++) {
+                if (yaml_read_real(node, keys[i], value)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static std::string yaml_read_string(const ryml::ConstNodeRef &node) {
+            const auto v = node.val();
+            return std::string(v.str, v.len);
+        }
+
+        struct LinearElasticityParameters {
+            real_t mu;
+            real_t lambda;
+        };
+
+        static bool linear_elasticity_material_from_yaml(const ryml::ConstNodeRef        &node,
+                                                         const LinearElasticityParameters base,
+                                                         LinearElasticityParameters      &out) {
+            static constexpr const char *mu_keys[]     = {"mu", "shear_modulus", "lame_second_parameter"};
+            static constexpr const char *lambda_keys[] = {"lambda", "first_lame_parameter", "lame_first_parameter"};
+            static constexpr const char *E_keys[]      = {"E", "youngs_modulus"};
+            static constexpr const char *nu_keys[]     = {"nu", "poisson_ratio"};
+            static constexpr const char *K_keys[]      = {"K", "bulk_modulus"};
+
+            real_t mu = base.mu, lambda = base.lambda, E = 0, nu = 0, K = 0;
+
+            const bool has_mu = yaml_read_real_aliases(node, mu_keys, sizeof(mu_keys) / sizeof(mu_keys[0]), mu);
+            const bool has_lambda =
+                    yaml_read_real_aliases(node, lambda_keys, sizeof(lambda_keys) / sizeof(lambda_keys[0]), lambda);
+            const bool has_E  = yaml_read_real_aliases(node, E_keys, sizeof(E_keys) / sizeof(E_keys[0]), E);
+            const bool has_nu = yaml_read_real_aliases(node, nu_keys, sizeof(nu_keys) / sizeof(nu_keys[0]), nu);
+            const bool has_K  = yaml_read_real_aliases(node, K_keys, sizeof(K_keys) / sizeof(K_keys[0]), K);
+
+            if (has_mu && has_lambda) {
+                out = {mu, lambda};
+                return true;
+            }
+
+            if (has_E && has_nu) {
+                out = {ShearModulus(YoungsModulus(E), PoissonRatio(nu)).value,
+                       LameFirstParameter(YoungsModulus(E), PoissonRatio(nu)).value};
+                return true;
+            }
+
+            if (has_E && has_mu) {
+                out = {mu, LameFirstParameter(YoungsModulus(E), ShearModulus(mu)).value};
+                return true;
+            }
+
+            if (has_E && has_lambda) {
+                out = {ShearModulus(YoungsModulus(E), LameFirstParameter(lambda)).value, lambda};
+                return true;
+            }
+
+            if (has_nu && has_mu) {
+                out = {mu, LameFirstParameter(PoissonRatio(nu), ShearModulus(mu)).value};
+                return true;
+            }
+
+            if (has_nu && has_lambda) {
+                out = {ShearModulus(PoissonRatio(nu), LameFirstParameter(lambda)).value, lambda};
+                return true;
+            }
+
+            if (has_K && has_mu) {
+                out = {mu, LameFirstParameter(BulkModulus(K), ShearModulus(mu)).value};
+                return true;
+            }
+
+            if (has_K && has_lambda) {
+                out = {ShearModulus(BulkModulus(K), LameFirstParameter(lambda)).value, lambda};
+                return true;
+            }
+
+            if (has_K && has_E) {
+                out = {ShearModulus(YoungsModulus(E), BulkModulus(K)).value,
+                       LameFirstParameter(YoungsModulus(E), BulkModulus(K)).value};
+                return true;
+            }
+
+            if (has_K && has_nu) {
+                out = {ShearModulus(PoissonRatio(nu), BulkModulus(K)).value,
+                       LameFirstParameter(PoissonRatio(nu), BulkModulus(K)).value};
+                return true;
+            }
+
+            if (has_mu || has_lambda) {
+                out = {mu, lambda};
+                return true;
+            }
+
+            if (has_E || has_nu || has_K) {
+                SFEM_ERROR("LinearElasticity::create_from_yaml requires two elastic constants to compute mu and lambda\n");
+            }
+
+            out = base;
+            return false;
+        }
+#endif  // SFEM_ENABLE_RYAML
 
         smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
             for (size_t i = 0; i < mesh.n_blocks(); i++) {
@@ -205,7 +325,7 @@ namespace sfem {
 
     LinearElasticity::LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>(space)) {
         // Initialize with empty block names to include all blocks
-        initialize({});
+        // initialize({});
     }
 
     LinearElasticity::~LinearElasticity() = default;
@@ -446,5 +566,64 @@ namespace sfem {
     void LinearElasticity::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> LinearElasticity::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                           const ryml::ConstNodeRef             &node) {
+        auto ret = std::make_shared<LinearElasticity>(space);
+
+        std::vector<std::string> block_names;
+        if (node.has_child("blocks")) {
+            auto blocks = node["blocks"];
+            block_names.reserve(blocks.num_children());
+            for (auto block : blocks.children()) {
+                if (block.has_child("name")) {
+                    block_names.push_back(yaml_read_string(block["name"]));
+                }
+            }
+        }
+
+        if (ret->initialize(block_names) != SFEM_SUCCESS) {
+            return nullptr;
+        }
+
+        LinearElasticityParameters params{
+                ret->impl_->domains->domains().begin()->second.parameters->require_real_value("mu"),
+                ret->impl_->domains->domains().begin()->second.parameters->require_real_value("lambda")};
+
+        LinearElasticityParameters default_params = params;
+        if (linear_elasticity_material_from_yaml(node, params, default_params)) {
+            linear_elasticity_seed_material(*ret->impl_->domains, default_params.mu, default_params.lambda);
+        }
+
+        if (node.has_child("ASSUME_AFFINE")) {
+            int assume_affine = ret->impl_->use_affine_approximation ? 1 : 0;
+            node["ASSUME_AFFINE"] >> assume_affine;
+            ret->impl_->use_affine_approximation = assume_affine != 0;
+        } else if (node.has_child("assume_affine")) {
+            int assume_affine = ret->impl_->use_affine_approximation ? 1 : 0;
+            node["assume_affine"] >> assume_affine;
+            ret->impl_->use_affine_approximation = assume_affine != 0;
+        }
+
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (!block.has_child("name")) {
+                    continue;
+                }
+
+                const std::string block_name = yaml_read_string(block["name"]);
+
+                LinearElasticityParameters block_params = default_params;
+                if (linear_elasticity_material_from_yaml(block, default_params, block_params)) {
+                    ret->set_value_in_block(block_name, "mu", block_params.mu);
+                    ret->set_value_in_block(block_name, "lambda", block_params.lambda);
+                }
+            }
+        }
+
+        return ret;
+    }
+#endif  // SFEM_ENABLE_RYAML
 
 }  // namespace sfem

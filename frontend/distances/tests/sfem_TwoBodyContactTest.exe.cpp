@@ -23,6 +23,8 @@
 
 using namespace sfem;
 
+// TODO refactor Contact, ContactMortar, and ContactNodeToSurface into sfem_SelfContact.hpp/cpp
+
 struct BiorthogonalQuad4Weights {
     // real_t values[16] = {
     //         // phi 0
@@ -523,9 +525,9 @@ public:
     virtual const smesh::SharedBuffer<real_t>&                      directors() const       = 0;
 };
 
-class ContactNodeToSegment final : public Contact {
+class ContactNodeToSurface final : public Contact {
 public:
-    ContactNodeToSegment(const std::shared_ptr<FunctionSpace>&  space,
+    ContactNodeToSurface(const std::shared_ptr<FunctionSpace>&  space,
                          const std::shared_ptr<smesh::Mesh>&    surface,
                          const std::shared_ptr<Buffer<real_t>>& displacement,
                          const real_t                           margin,
@@ -557,7 +559,7 @@ public:
     }
 
     void recompute() override {
-        SFEM_TRACE_SCOPE("ContactNodeToSegment::recompute");
+        SFEM_TRACE_SCOPE("ContactNodeToSurface::recompute");
 
         auto blas = sfem::blas<real_t>(es_);
 
@@ -1534,7 +1536,7 @@ void sum_postprocess_weighted_quantities(const std::shared_ptr<smesh::CRSGraph<c
 }
 
 // TODO complete the ContactMortar class implementation (using the functions above), create bas class for Contact (that has a
-// unique interface for ContactMortar and ContactNodeToSegment), hook up the code to use one or the other based on env switches
+// unique interface for ContactMortar and ContactNodeToSurface), hook up the code to use one or the other based on env switches
 
 class ContactMortar final : public Contact {
 public:
@@ -1789,7 +1791,7 @@ std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  s
     } else {
         printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
     }
-    return std::make_shared<ContactNodeToSegment>(space, surface, displacement, margin, search_radius_sqr, es);
+    return std::make_shared<ContactNodeToSurface>(space, surface, displacement, margin, search_radius_sqr, es);
 }
 
 void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
