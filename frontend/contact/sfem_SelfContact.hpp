@@ -6,6 +6,10 @@
 
 #include <memory>
 
+#ifdef SFEM_ENABLE_YAML
+#include "smesh_forward_declarations.hpp"
+#endif
+
 namespace sfem {
 
     class Contact {
@@ -30,6 +34,14 @@ namespace sfem {
                                             real_t                                 margin,
                                             real_t                                 search_radius_sqr,
                                             ExecutionSpace                         es);
+
+#ifdef SFEM_ENABLE_YAML
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
+                                            const std::shared_ptr<smesh::Mesh>&    surface,
+                                            const std::shared_ptr<Buffer<real_t>>& displacement,
+                                            const ryml::ConstNodeRef&              node,
+                                            ExecutionSpace                         es);
+#endif
 
 }  // namespace sfem
 
