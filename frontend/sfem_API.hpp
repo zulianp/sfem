@@ -30,7 +30,6 @@
 #include "smesh_env.hpp"
 
 #include "sell.hpp"
-#include "smesh_semistructured.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
@@ -41,6 +40,7 @@
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 #include "smesh_glob.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
 
@@ -137,15 +137,6 @@ namespace sfem {
     // #endif  // SFEM_ENABLE_CUDA
     //         return sfem::create_host_buffer<T>(n);
     //     }
-
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
-                                         const std::string                    &name,
-                                         const ExecutionSpace                  es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::Factory::create_op(space, name.c_str());
-    }
 
     template <typename T>
     static std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {

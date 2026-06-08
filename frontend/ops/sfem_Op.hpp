@@ -9,10 +9,15 @@
 
 #pragma once
 
+#include "sfem_ForwardDeclarations.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_glob.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif  // SFEM_ENABLE_RYAML
 
 namespace sfem {
 
@@ -278,6 +283,16 @@ namespace sfem {
 
         virtual ptrdiff_t n_dofs_domain() const = 0;
         virtual ptrdiff_t n_dofs_image() const  = 0;
+
+#ifdef SFEM_ENABLE_RYAML
+        virtual std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                     const ryml::ConstNodeRef             &node) {
+            SMESH_UNUSED(space);
+            SMESH_UNUSED(node);
+            SFEM_ERROR("create_from_yaml not implemented for this operator");
+            return nullptr;
+        }
+#endif  // SFEM_ENABLE_RYAML
     };
 
     /**
@@ -304,6 +319,12 @@ namespace sfem {
         bool                is_no_op() const override { return true; }
         ptrdiff_t           n_dofs_domain() const override { return -1; };
         ptrdiff_t           n_dofs_image() const override { return -1; };
+
+#ifdef SFEM_ENABLE_RYAML
+        inline std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &, const ryml::ConstNodeRef &) override {
+            return std::make_shared<NoOp>();
+        }
+#endif  // SFEM_ENABLE_RYAML
     };
 
     /**

@@ -136,7 +136,7 @@ if(SFEM_ENABLE_SCCD)
 endif()
 
 if(SFEM_ENABLE_SSDF)
-    list(APPEND SFEM_MODULES frontend/distances)
+    list(APPEND SFEM_MODULES frontend/distances frontend/contact)
 endif()
 
 if(SFEM_ENABLE_CUDA)
