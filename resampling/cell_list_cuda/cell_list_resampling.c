@@ -214,9 +214,8 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
     /* Re-derive the same CDF thresholds used during box statistics so the GPU
      * cell list is built with identical split parameters. */
     {
-
         const char *cdf_ratio_env = getenv("SFEM_CDF_RATIO");
-        real_t cdf_ratio = 0.96;  // default
+        real_t      cdf_ratio     = 0.96;  // default
         if (cdf_ratio_env != NULL) {
             real_t parsed_value = (real_t)atof(cdf_ratio_env);
             // Validate that the value is mathematically valid for a CDF ratio (between 0 and 1)
@@ -225,7 +224,8 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
             }
         }  // END if (cdf_ratio_env != NULL)
 
-        const side_length_cdf_thresholds_t thresholds = calculate_cdf_thresholds(&cpu_data.histograms, cdf_ratio, cdf_ratio, cdf_ratio);
+        const side_length_cdf_thresholds_t thresholds =
+                calculate_cdf_thresholds(&cpu_data.histograms, cdf_ratio, cdf_ratio, cdf_ratio);
 
         const real_t x_min = (real_t)origin[0];
         const real_t y_min = (real_t)origin[1];
@@ -260,8 +260,15 @@ int tet4_resample_field_adjoint_cell_quad_gpu(const ptrdiff_t                   
     const double tick_transfer = MPI_Wtime();
 
 #ifdef BUILD_CELL_LIST_GPU
-    ret = tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map(
-            &cpu_data, &gpu_data, mesh, n, stride, origin, delta, weighted_field, data);
+    ret = tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map(&cpu_data,       //
+                                                                      &gpu_data,       //
+                                                                      mesh,            //
+                                                                      n,               //
+                                                                      stride,          //
+                                                                      origin,          //
+                                                                      delta,           //
+                                                                      weighted_field,  //
+                                                                      data);           //
 #else
     ret = tet4_resample_field_adjoint_cell_quad_gpu_launch(&cpu_data, mesh, n, stride, origin, delta, weighted_field, data);
 #endif /* BUILD_CELL_LIST_GPU */

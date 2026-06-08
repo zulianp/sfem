@@ -5,6 +5,7 @@
 #include "cell_build_tet_geom.cuh"
 #include "cell_list_cuda.cuh"
 #include "cell_list_resampling_gpu.h"
+#include "raster_cell_list_gpu.cuh"
 #include "resample_field_adjoint_cell_cuda.cuh"
 #include "resample_field_adjoint_cell_cuda_shm.cuh"
 
@@ -408,7 +409,7 @@ static int resample_adjoint_launch_common(const boxes_interleaved_t  *h_bboxes_i
         }
     }  // END for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++)
 
-    const double tock_kernel = MPI_Wtime();
+    const double tock_kernel    = MPI_Wtime();
     const double kernel_elapsed = tock_kernel - tick_kernel;
     printf("Raw Kernel Clock taken for kernel execution: %f seconds\n", kernel_elapsed);
     printf("Raw Kernel throughput: %e Mtet/s\n", (double)mesh->nelements / kernel_elapsed / 1e6);
@@ -597,8 +598,15 @@ tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map(                    
 
     /* The split map is already on the device — pass it directly to the kernel
      * dispatcher.  Ownership stays with gpu_data; we do NOT free it here. */
-    ret = resample_adjoint_launch_common(
-            cpu_data->bounding_boxes_interleaved, gpu_data->split_map, mesh, n, stride, origin, delta, weighted_field, data);
+    ret = resample_adjoint_launch_common(cpu_data->bounding_boxes_interleaved,  //
+                                         gpu_data->split_map,                   //
+                                         mesh,                                  //
+                                         n,                                     //
+                                         stride,                                //
+                                         origin,                                //
+                                         delta,                                 //
+                                         weighted_field,                        //
+                                         data);                                 //
 
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tet4_resample_field_adjoint_cell_quad_gpu_launch_device_map
