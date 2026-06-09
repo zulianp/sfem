@@ -1,4 +1,5 @@
 #ifndef __CELL_LIST_3D_1D_MAP_SUR_MESH_H__
+#define __CELL_LIST_3D_1D_MAP_SUR_MESH_H__
 
 #include <stdbool.h>
 #include "cell_arg_sort.h"

@@ -204,6 +204,97 @@ void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,
     d_split->map_upper = NULL;
 }
 
+cell_list_3d_1d_map_t                                                       //
+copy_cell_list_3d_1d_map_to_device(const cell_list_3d_1d_map_t *h_map,      //
+                                   cudaStream_t                 stream) {   //
+    cell_list_3d_1d_map_t d_map;
+
+    /* ── scalar fields ── */
+    d_map.total_num_dict_entries = h_map->total_num_dict_entries;
+    d_map.delta_x                = h_map->delta_x;
+    d_map.min_x                  = h_map->min_x;
+    d_map.num_cells_x            = h_map->num_cells_x;
+
+    /* ── sizes ── */
+    const size_t cell_ptr_bytes = (h_map->num_cells_x + 1) * sizeof(int);
+    const size_t dict_bytes     = h_map->total_num_dict_entries * sizeof(int);
+    const size_t bounds_bytes   = h_map->total_num_dict_entries * sizeof(real_t);
+
+    /* ── async allocate ── */
+    cudaMallocAsync((void **)&d_map.cell_ptr, cell_ptr_bytes, stream);
+    cudaMallocAsync((void **)&d_map.cell_dict, dict_bytes, stream);
+    cudaMallocAsync((void **)&d_map.lower_bounds_y, bounds_bytes, stream);
+    cudaMallocAsync((void **)&d_map.upper_bounds_y, bounds_bytes, stream);
+
+    cudaStreamSynchronize(stream);
+
+    /* ── async H→D copies ── */
+    cudaMemcpyAsync(d_map.cell_ptr, h_map->cell_ptr, cell_ptr_bytes, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_map.cell_dict, h_map->cell_dict, dict_bytes, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_map.lower_bounds_y, h_map->lower_bounds_y, bounds_bytes, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_map.upper_bounds_y, h_map->upper_bounds_y, bounds_bytes, cudaMemcpyHostToDevice, stream);
+
+    return d_map;
+}
+
+void free_cell_list_3d_1d_map_device(cell_list_3d_1d_map_t *d_map,  //
+                                     cudaStream_t           stream) { //
+    cudaFreeAsync(d_map->cell_ptr, stream);
+    cudaFreeAsync(d_map->cell_dict, stream);
+    cudaFreeAsync(d_map->lower_bounds_y, stream);
+    cudaFreeAsync(d_map->upper_bounds_y, stream);
+
+    d_map->cell_ptr       = NULL;
+    d_map->cell_dict      = NULL;
+    d_map->lower_bounds_y = NULL;
+    d_map->upper_bounds_y = NULL;
+}
+
+cell_list_split_3d_1d_map_t                                                              //
+copy_cell_list_split_3d_1d_map_to_device(const cell_list_split_3d_1d_map_t *h_split,    //
+                                         cudaStream_t                       stream) {   //
+    cell_list_split_3d_1d_map_t d_split;
+
+    /* ── scalar fields ── */
+    d_split.split_x = h_split->split_x;
+    d_split.split_y = h_split->split_y;
+
+    /* ── copy inner maps to device ── */
+    cell_list_3d_1d_map_t d_map_lower = copy_cell_list_3d_1d_map_to_device(h_split->map_lower, stream);
+    cell_list_3d_1d_map_t d_map_upper = copy_cell_list_3d_1d_map_to_device(h_split->map_upper, stream);
+
+    /* ── allocate device memory for the map structs themselves ── */
+    cudaMallocAsync((void **)&d_split.map_lower, sizeof(cell_list_3d_1d_map_t), stream);
+    cudaMallocAsync((void **)&d_split.map_upper, sizeof(cell_list_3d_1d_map_t), stream);
+
+    cudaStreamSynchronize(stream);
+
+    /* ── copy the map structs (with device pointers) to device ── */
+    cudaMemcpyAsync(d_split.map_lower, &d_map_lower, sizeof(cell_list_3d_1d_map_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_split.map_upper, &d_map_upper, sizeof(cell_list_3d_1d_map_t), cudaMemcpyHostToDevice, stream);
+
+    return d_split;
+}
+
+void free_cell_list_split_3d_1d_map_device(cell_list_split_3d_1d_map_t *d_split,  //
+                                           cudaStream_t                 stream) {  //
+    /* ── retrieve map structs back to host to access inner device pointers ── */
+    cell_list_3d_1d_map_t d_map_lower, d_map_upper;
+
+    cudaMemcpyAsync(&d_map_lower, d_split->map_lower, sizeof(cell_list_3d_1d_map_t), cudaMemcpyDeviceToHost, stream);
+    cudaMemcpyAsync(&d_map_upper, d_split->map_upper, sizeof(cell_list_3d_1d_map_t), cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+
+    free_cell_list_3d_1d_map_device(&d_map_lower, stream);
+    free_cell_list_3d_1d_map_device(&d_map_upper, stream);
+
+    cudaFreeAsync(d_split->map_lower, stream);
+    cudaFreeAsync(d_split->map_upper, stream);
+
+    d_split->map_lower = NULL;
+    d_split->map_upper = NULL;
+}
+
 /* ── copy to device ── */
 void cuda_allocate_mesh_tet_geom_device_async(mesh_tet_geom_device_t *d_geom,     //
                                               int                     nelements,  //
@@ -250,6 +341,35 @@ void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom, cudaStream_t stre
     d_geom->inv_Jacobian = NULL;
     d_geom->vetices_zero = NULL;
     d_geom->nelements    = 0;
+}
+
+mesh_tri3_geom_device_t copy_mesh_tri3_geom_to_device(const mesh_tri3_geom_t *h_geom,  //
+                                                      int                     nelements,  //
+                                                      cudaStream_t            stream) {  //
+    PRINT_CURRENT_FUNCTION;
+
+    mesh_tri3_geom_device_t d_geom;
+    d_geom.nelements      = nelements;
+    d_geom.element_coords = NULL;
+
+    if (h_geom->element_coords == NULL) {
+        fprintf(stderr, "Error: mesh_tri3_geom_t::element_coords must be precomputed before GPU upload\n");
+        RETURN_FROM_FUNCTION(d_geom);
+    }
+
+    const size_t ec_bytes = (size_t)nelements * 9 * sizeof(geom_t);
+
+    cudaMallocAsync((void **)&d_geom.element_coords, ec_bytes, stream);
+    cudaStreamSynchronize(stream);
+    cudaMemcpyAsync(d_geom.element_coords, h_geom->element_coords, ec_bytes, cudaMemcpyHostToDevice, stream);
+
+    RETURN_FROM_FUNCTION(d_geom);
+}
+
+void free_mesh_tri3_geom_device(mesh_tri3_geom_device_t *d_geom, cudaStream_t stream) {
+    cudaFreeAsync(d_geom->element_coords, stream);
+    d_geom->element_coords = NULL;
+    d_geom->nelements      = 0;
 }
 
 /* ── copy to device ── */
