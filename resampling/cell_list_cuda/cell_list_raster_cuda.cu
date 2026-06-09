@@ -55,45 +55,37 @@ tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data
     const ptrdiff_t i_size  = n[0];
     const ptrdiff_t j_size  = n[1];
 
-    /* ── Allocate per-block scratch buffer for tri3 z-intersections ──
-     * Each block processes one (i,j) column independently; allocate enough
-     * capacity for all concurrent blocks to avoid inter-block aliasing. */
-    const int       size_tri3_intersect    = 64;
-    const ptrdiff_t max_blocks_x           = i_size / delta_i + delta_i + 1;
-    const ptrdiff_t max_blocks_y           = j_size / delta_j + delta_j + 1;
-    const ptrdiff_t total_blocks           = max_blocks_x * max_blocks_y;
-    cudaStream_t    stream_intersect;
-    cudaStreamCreate(&stream_intersect);
-    real_t *tri3_intersect_z_device = NULL;
-    cudaMallocAsync((void **)&tri3_intersect_z_device,
-                    sizeof(real_t) * total_blocks * size_tri3_intersect,
-                    stream_intersect);
+    /* ── Scratch for z-intersections now lives in per-block shared memory ── */
+    const int    size_tri3_intersect = 64;
+    const size_t shm_bytes           = size_tri3_intersect * sizeof(real_t);
 
     cudaStreamSynchronize(stream_geom);
     cudaStreamSynchronize(stream_data);
-    cudaStreamSynchronize(stream_intersect);
 
 #define index_type int
 
-    printf("Launching raster kernel with GPU grid size (%d, %d, 1) and TB block size (1, 1, 1)\n",
+    /* 128 threads/block: thread 0 runs the query+sort, all threads walk k in parallel. */
+    const dim3 block_size(128, 1, 1);
+
+    printf("Launching raster kernel with GPU grid size (%d, %d, 1) and TB block size (%d, 1, 1)\n",
            (int)(i_size / delta_i + delta_i),
-           (int)(j_size / delta_j + delta_j));
+           (int)(j_size / delta_j + delta_j),
+           block_size.x);
 
     cudaStream_t stream_kernel;
     cudaStreamCreate(&stream_kernel);
 
+    /* The delta_i x delta_j launches write to disjoint (i,j) cells, so no sync between them. */
     for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++) {
         for (ptrdiff_t start_j = 0; start_j < delta_j; start_j++) {
-            dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
-            dim3 block_size(1, 1, 1);
+            const dim3 grid_size(i_size / delta_i + delta_i, j_size / delta_j + delta_j, 1);
 
-            raster_to_hex_field_tri3_kernel<index_type>  //
-                    <<<grid_size,                         //
-                       block_size,                        //
-                       0,                                 //
+            raster_to_hex_field_tri3_kernel<index_type>   //
+                    <<<grid_size,                          //
+                       block_size,                         //
+                       shm_bytes,                          //
                        stream_kernel>>>(split_map_device,                              //
                                         geom_device,                                  //
-                                        tri3_intersect_z_device,                      //
                                         size_tri3_intersect,                          //
                                         static_cast<index_type>(start_i),             //
                                         static_cast<index_type>(start_j),             //
@@ -109,15 +101,14 @@ tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data
                                         delta[1],                                     //
                                         delta[2],                                     //
                                         data_device_ptr);                             //
-
-            cudaStreamSynchronize(stream_kernel);
         }
     }  // END for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++)
+
+    cudaStreamSynchronize(stream_kernel);
 
     cudaMemcpyAsync(data, data_device_ptr, sizeof(real_t) * n[0] * n[1] * n[2], cudaMemcpyDeviceToHost, stream_data);
 
     /* ── Free device resources ── */
-    cudaFreeAsync(tri3_intersect_z_device, stream_intersect);
     free_mesh_tri3_geom_device(&geom_device, stream_geom);
 
     cudaStream_t stream_free;
@@ -125,9 +116,6 @@ tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data
     free_cell_list_split_3d_1d_map_device(&split_map_device, stream_free);
     cudaStreamSynchronize(stream_free);
     cudaStreamDestroy(stream_free);
-
-    cudaStreamSynchronize(stream_intersect);
-    cudaStreamDestroy(stream_intersect);
 
     cudaStreamSynchronize(stream_geom);
     cudaStreamDestroy(stream_geom);
