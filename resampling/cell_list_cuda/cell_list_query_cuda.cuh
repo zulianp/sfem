@@ -358,7 +358,7 @@ is_point_out_of_tet_cached_gpu(const real_t inv_J00,       //
 // Query the cell list for a given 3D point (x, y, z)
 // and return the corresponding tetrahedra in tets_array
 //////////////////////////////////////////////////////////
-__device__ int                                                                            //
+static __device__ int                                                                     //
 query_cell_list_3d_2d_map_mesh_given_xy_tet_gpu(const cell_list_3d_2d_map_t  *map,        //
                                                 const boxes_t                *boxes,      //
                                                 const mesh_tet_geom_device_t *mesh_geom,  //
@@ -459,7 +459,7 @@ query_cell_list_3d_2d_split_map_mesh_given_xy_gpu(     //
 // Query the cell list for a given 3D point (x, y, z)
 // and return the corresponding tetrahedra in tets_array
 //////////////////////////////////////////////////////////
-__device__ int                                                                               //
+static __device__ int                                                                        //
 query_cell_list_3d_2d_map_mesh_given_xy_tet_il_gpu(const cell_list_3d_2d_map_t  *map,        //
                                                    const boxes_interleaved_t    *boxes,      //
                                                    const mesh_tet_geom_device_t *mesh_geom,  //
@@ -596,7 +596,7 @@ get_cell_range_2d_gpu(const cell_list_3d_2d_map_t *__restrict__ map,            
 // Avoids repeating the 2D coord-to-cell lookup when
 // (x, y) is fixed across many z values.
 //////////////////////////////////////////////////////////
-__device__ int                                                                                          //
+static __device__ int                                                                                   //
 query_cell_list_z_given_range_il_gpu(const cell_list_3d_2d_map_t  *__restrict__ map,                   //
                                      const boxes_interleaved_t    *__restrict__ boxes,                 //
                                      const mesh_tet_geom_device_t *__restrict__ mesh_geom,             //
@@ -675,7 +675,7 @@ query_cell_list_z_given_range_il_gpu(const cell_list_3d_2d_map_t  *__restrict__ 
 // Query the cell list for a given 3D point (x, y, z)
 // and return the corresponding tetrahedra in tets_array
 //////////////////////////////////////////////////////////
-__device__ int                                         //
+static __device__ int                                  //
 query_cell_list_3d_2d_split_map_mesh_given_xy_il_gpu(  //
         const cell_list_split_3d_2d_map_t *map,        //
         const boxes_interleaved_t         *boxes,      //

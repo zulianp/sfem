@@ -12,6 +12,10 @@
 #include "sfem_raster_surface_mesh_1d_cell.h"
 #include "sfem_resample_field.h"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "cell_list_raster_gpu.h"
+#endif
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // find_mesh_bounds
@@ -278,8 +282,15 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
         delta[d]                   = 1.0 / nintervals;
     }  // END for (int d = 0; d < 3; d++)
 
-    if (print_mesh_info_and_coordinate_bounds(
-                comm, mpi_rank, &mesh, folder, local_min, local_max, global_min, global_max, scan_dim)) {
+    if (print_mesh_info_and_coordinate_bounds(comm,
+                                              mpi_rank,
+                                              &mesh,
+                                              folder,
+                                              local_min,  //
+                                              local_max,
+                                              global_min,
+                                              global_max,
+                                              scan_dim)) {
         fprintf(stderr, "Error: print_mesh_info_and_coordinate_bounds failed %s:%d\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
@@ -345,15 +356,30 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
 
     const double raster_tick_start = MPI_Wtime();
 
-    tri3_raster_mesh_cell_quad(0,               //
-                               mesh.nelements,  //
-                               &mesh,           //
-                               nlocal,          //
-                               stride,          //
-                               origin,          //
-                               delta,           //
-                               NULL,            //
-                               field);          //
+#ifdef SFEM_ENABLE_CUDA
+    if (info.use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA) {
+        tri3_raster_mesh_cell_quad_gpu(0,               //
+                                       mesh.nelements,  //
+                                       &mesh,           //
+                                       nlocal,          //
+                                       stride,          //
+                                       origin,          //
+                                       delta,           //
+                                       NULL,            //
+                                       field);          //
+    } else
+#endif
+    {
+        tri3_raster_mesh_cell_quad(0,               //
+                                   mesh.nelements,  //
+                                   &mesh,           //
+                                   nlocal,          //
+                                   stride,          //
+                                   origin,          //
+                                   delta,           //
+                                   NULL,            //
+                                   field);          //
+    }
 
     const double raster_tick_end = MPI_Wtime();
 
