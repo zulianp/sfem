@@ -1,7 +1,6 @@
 #include "sfem_test.hpp"
 
 #include "sfem_FunctionSpace.hpp"
-// #include "sfem_SelfCollisions.hpp"
 
 #include "integrations/smesh/sccd_smesh_CCD.hpp"
 
@@ -181,7 +180,6 @@ struct ContactData {
     SharedBuffer<mask_t>                             constraints_mask;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
-
 
 void remove_surface_elements_connected_to_constrained_nodes(const std::shared_ptr<smesh::Mesh>& surface,
                                                             const smesh::SharedBuffer<mask_t>&  constraints_mask,
@@ -373,7 +371,6 @@ void compute_macaulay_term_from_penetration(ContactData&        cd,
         macaulay[i] = std::max(penetration[i] + aug[i] / penalty, real_t(0));
     }
 }
-
 
 void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
                      const std::shared_ptr<Buffer<real_t>>&  displacement,
@@ -697,7 +694,7 @@ void nljacobi(ContactData&                                 cd,
     blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
     f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
 
-    ptrdiff_t each = 20;
+    ptrdiff_t each = std::min(n_loops, 1);
     for (int loop = 0; loop < n_loops; ++loop) {
         blas->values(ndofs, 0, material_grad->data());
 

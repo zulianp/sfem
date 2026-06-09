@@ -18,6 +18,12 @@
 #include <ryml.hpp>
 #endif
 
+// #define VIZ_DEBUG
+
+#ifdef VIZ_DEBUG
+#include "/Users/patrickzulian/Desktop/code/sviz/src/sviz_monitor_client.hpp"
+#endif
+
 namespace sfem {
 
     namespace {
@@ -153,11 +159,11 @@ namespace sfem {
 
         class ContactNodeToSurface final : public Contact {
         public:
-            ContactNodeToSurface(const std::shared_ptr<FunctionSpace>&  space,
-                                 const std::shared_ptr<smesh::Mesh>&    surface,
-                                 const real_t                           margin,
-                                 const real_t                           search_radius_sqr,
-                                 const ExecutionSpace                   es)
+            ContactNodeToSurface(const std::shared_ptr<FunctionSpace>& space,
+                                 const std::shared_ptr<smesh::Mesh>&   surface,
+                                 const real_t                          margin,
+                                 const real_t                          search_radius_sqr,
+                                 const ExecutionSpace                  es)
                 : space_(space),
                   surface_(surface),
                   margin_(margin),
@@ -611,7 +617,9 @@ namespace sfem {
                                       const SharedBuffer<real_t>&    weighted_gap,
                                       const SharedBuffer<real_t>&    weighted_distance,
                                       const SharedBuffer<real_t>&    distance_weight,
-                                      const SharedBuffer<mask_t>&    is_valid) {
+                                      const SharedBuffer<real_t>&    mass_vector,
+                                      const SharedBuffer<mask_t>&    is_valid,
+                                      const real_t                   max_gap) {
             auto ptr  = pc_ptr->data();
             auto idx  = pc_idx->data();
             auto vals = values->data();
@@ -644,8 +652,35 @@ namespace sfem {
             auto wdist        = weighted_distance->data();
             auto wdist_weight = distance_weight->data();
 
+            // blas->zeros(mass_vector->size(), mass_vector->data());
+            auto m = mass_vector->data();
+            {
+                ptrdiff_t n = mass_vector->size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    m[i] = real_t(0);
+                }
+            }
+
             if (element_type == smesh::QUADSHELL4) {
                 BiorthogonalQuad4Weights weights;
+
+#ifdef VIZ_DEBUG
+
+                {
+                    sviz::Message msg("assemble_mortar_matrices (surface)");
+                    msg.quad_mesh_soa(sviz::view(x, nspoints),
+                                      sviz::view(y, nspoints),
+                                      sviz::view(z, nspoints),
+                                      sviz::view(i0, nselements),
+                                      sviz::view(i1, nselements),
+                                      sviz::view(i2, nselements),
+                                      sviz::view(i3, nselements));
+
+                    sviz::Client().send(msg);
+                }
+                sviz::Message msg("assemble_mortar_matrices (gaps)");
+#endif  // VIZ_DEBUG
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < nselements; i++) {
@@ -875,6 +910,7 @@ namespace sfem {
                         //   weighted gap:    g_bar_a = sum_q wq * psi_a(slave) * (x_master - x_slave) . n
                         real_t m_block[16] = {0};
 
+                        bool hit = false;
                         for (int q = 0; q < nqp; q++) {
                             real_t phi_a[4];
                             real_t phi_b[4];
@@ -907,8 +943,39 @@ namespace sfem {
                                 xm[2] += phi_b[c] * bz[c];
                             }
 
+                            for (int a = 0; a < 4; a++) {
+                                const ptrdiff_t node  = av[a];
+                                const real_t    w_phi = w * phi_a[a];
+
+#pragma omp atomic update
+                                m[node] += w_phi;
+                            }
+
                             const real_t gap = (xm[0] - xs[0]) * outer_normal[0] + (xm[1] - xs[1]) * outer_normal[1] +
                                                (xm[2] - xs[2]) * outer_normal[2];
+
+                            if (gap * gap > max_gap * max_gap) {
+                                continue;
+                            }
+
+                            hit = true;
+
+#ifdef VIZ_DEBUG
+                            // sviz::Message msg("normal");
+                            real_t dx = outer_normal[0] * gap;
+                            real_t dy = outer_normal[1] * gap;
+                            real_t dz = outer_normal[2] * gap;
+
+                            msg.set_vector_scale(1).quivers_soa(sviz::view(xs, 1),
+                                                                sviz::view(xs + 1, 1),
+                                                                sviz::view(xs + 2, 1),
+                                                                sviz::view(&dx, 1),
+                                                                sviz::view(&dy, 1),
+                                                                sviz::view(&dz, 1));
+
+                            // sviz::Client().send(msg);
+
+#endif  // VIZ_DEBUG
 
                             for (int a = 0; a < 4; a++) {
                                 const ptrdiff_t node  = av[a];
@@ -930,12 +997,22 @@ namespace sfem {
                             }
                         }
 
+                        if (!hit) {
+                            ivd[ptr[i] + j] = false;
+                            continue;
+                        }
+
                         real_t* const pair_out = &vals[(ptr[i] + j) * MORTAR_PAIR_STRIDE];
                         for (int a = 0; a < 16; a++) {
                             pair_out[a] = m_block[a];
                         }
                     }
                 }
+
+#ifdef VIZ_DEBUG
+                sviz::Client().send(msg);
+#endif  // VIZ_DEBUG
+
             } else if (element_type == smesh::TRISHELL3) {
                 // TODO
             } else {
@@ -1149,14 +1226,16 @@ namespace sfem {
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; ++i) {
-                if (d[i] == 0) continue;
+                // if (d[i] == 0) continue;
 
                 real_t len_v = 0;
                 for (int d = 0; d < 3; d++) {
                     len_v += wn[i * 3 + d] * wn[i * 3 + d];
                 }
 
-                SMESH_ASSERT(len_v > 0);
+                if (len_v == 0) {
+                    continue;
+                }
 
                 len_v = sqrt(len_v);
                 for (int d = 0; d < 3; d++) {
@@ -1167,11 +1246,11 @@ namespace sfem {
 
         class ContactMortar final : public Contact {
         public:
-            ContactMortar(const std::shared_ptr<FunctionSpace>&  space,
-                          const std::shared_ptr<smesh::Mesh>&    surface,
-                          const real_t                           margin,
-                          const real_t                           search_radius_sqr,
-                          const ExecutionSpace                   es)
+            ContactMortar(const std::shared_ptr<FunctionSpace>& space,
+                          const std::shared_ptr<smesh::Mesh>&   surface,
+                          const real_t                          margin,
+                          const real_t                          search_radius_sqr,
+                          const ExecutionSpace                  es)
                 : space_(space),
                   surface_(surface),
                   margin_(margin),
@@ -1188,6 +1267,22 @@ namespace sfem {
                   distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
                   directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
                   frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
+
+            void assemble_mass_vector(const smesh::ElemType        element_type,
+                                      const SharedBuffer<idx_t*>&  elements,
+                                      const SharedBuffer<real_t*>& current_points,
+                                      const SharedBuffer<real_t>&  mass_vector) {
+                auto deformed = std::make_shared<smesh::Mesh>(
+                        surface_->comm(), element_type, elements, smesh::astype<geom_t>(current_points));
+
+                auto trace_space = std::make_shared<FunctionSpace>(deformed, 1);
+                auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+                bop->initialize();
+
+                auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
+                sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
+                bop->apply(nullptr, ones->data(), mass_vector->data());
+            }
 
             void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) override {
                 SFEM_TRACE_SCOPE("ContactMortar::recompute");
@@ -1270,7 +1365,9 @@ namespace sfem {
                                          distances_,
                                          wdistance,
                                          wdist_weight,
-                                         is_valid);
+                                         mass_vector_,
+                                         is_valid,
+                                         std::sqrt(search_radius_sqr_));
 
                 // 4) Assemble the global slave->master coupling (mortar M) into CRS.
                 mortar_elemental_matrices_to_crs(surface_element_type_,
@@ -1283,54 +1380,56 @@ namespace sfem {
                                                  graph_,
                                                  values_);
 
+                // assemble_mass_vector(surface_element_type_, surface_elements_, p1_, mass_vector_);
+
                 // 5) Proper dual-mortar diagonal D: integrate the slave shape functions over the FULL slave
                 //    element (not the partial overlap). By biorthogonality this is the dual diagonal D_aa, and it
                 //    is strictly positive, so it is a safe nodal mass and projection normalizer. Integrating over
                 //    the partial overlap instead (e.g. sum_diag of the dual M) can go negative and destabilizes
                 //    the contact iteration. A node accumulates the contribution of every contacting slave element
                 //    it belongs to.
-                mass_vector_ = sfem::create_buffer<real_t>(npoints_, es_);
-                {
-                    auto       mass = mass_vector_->data();
-                    const auto ptr  = pc_ptr->data();
-                    const auto iv   = is_valid->data();
-                    const auto ed   = surface_elements_->data();
-                    const auto px   = p1_->data()[0];
-                    const auto py   = p1_->data()[1];
-                    const auto pz   = p1_->data()[2];
+                //                 mass_vector_ = sfem::create_buffer<real_t>(npoints_, es_);
+                // {
+                //                     auto       mass = mass_vector_->data();
+                //                     const auto ptr  = pc_ptr->data();
+                //                     const auto iv   = is_valid->data();
+                //                     const auto ed   = surface_elements_->data();
+                //                     const auto px   = p1_->data()[0];
+                //                     const auto py   = p1_->data()[1];
+                //                     const auto pz   = p1_->data()[2];
 
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < npoints_; ++i) {
-                        mass[i] = 0;
-                    }
+                //                     // #pragma omp parallel for
+                //                     //                     for (ptrdiff_t i = 0; i < npoints_; ++i) {
+                //                     //                         mass[i] = 0;
+                //                     //                     }
 
-#pragma omp parallel for
-                    for (ptrdiff_t e = 0; e < nselements_; ++e) {
-                        bool in_contact = false;
-                        for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
-                            if (iv[k]) {
-                                in_contact = true;
-                                break;
-                            }
-                        }
-                        if (!in_contact) {
-                            continue;
-                        }
+                // #pragma omp parallel for
+                //                     for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                //                         bool in_contact = false;
+                //                         for (ptrdiff_t k = ptr[e]; k < ptr[e + 1]; ++k) {
+                //                             if (iv[k]) {
+                //                                 in_contact = true;
+                //                                 break;
+                //                             }
+                //                         }
+                //                         if (!in_contact) {
+                //                             continue;
+                //                         }
 
-                        const idx_t  v[4] = {ed[0][e], ed[1][e], ed[2][e], ed[3][e]};
-                        const real_t X[4] = {px[v[0]], px[v[1]], px[v[2]], px[v[3]]};
-                        const real_t Y[4] = {py[v[0]], py[v[1]], py[v[2]], py[v[3]]};
-                        const real_t Z[4] = {pz[v[0]], pz[v[1]], pz[v[2]], pz[v[3]]};
+                //                         const idx_t  v[4] = {ed[0][e], ed[1][e], ed[2][e], ed[3][e]};
+                //                         const real_t X[4] = {px[v[0]], px[v[1]], px[v[2]], px[v[3]]};
+                //                         const real_t Y[4] = {py[v[0]], py[v[1]], py[v[2]], py[v[3]]};
+                //                         const real_t Z[4] = {pz[v[0]], pz[v[1]], pz[v[2]], pz[v[3]]};
 
-                        real_t area[4];
-                        quad4_nodal_areas(X, Y, Z, area);
+                //                         real_t area[4];
+                //                         quad4_nodal_areas(X, Y, Z, area);
 
-                        for (int a = 0; a < 4; ++a) {
-#pragma omp atomic update
-                            mass[v[a]] += area[a];
-                        }
-                    }
-                }
+                //                         for (int a = 0; a < 4; ++a) {
+                // #pragma omp atomic update
+                //                             mass[v[a]] += area[a];
+                //                         }
+                //                     }
+                //                 }
 
                 // 6) Normalize: values -> D^{-1} M, gap -> D^{-1} gap, normals -> unit.
                 sum_postprocess_weighted_quantities(graph_, values_, wnormals, distances_, mass_vector_);
@@ -1380,16 +1479,16 @@ namespace sfem {
             const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
 
         private:
-            std::shared_ptr<FunctionSpace>  space_;
-            std::shared_ptr<smesh::Mesh>    surface_;
-            real_t                          margin_;
-            real_t                          search_radius_sqr_;
-            ExecutionSpace                  es_;
-            int                             dim_;
-            ptrdiff_t                       npoints_;
-            ptrdiff_t                       nselements_;
-            smesh::SharedBuffer<idx_t*>     surface_elements_;
-            smesh::ElemType                 surface_element_type_;
+            std::shared_ptr<FunctionSpace> space_;
+            std::shared_ptr<smesh::Mesh>   surface_;
+            real_t                         margin_;
+            real_t                         search_radius_sqr_;
+            ExecutionSpace                 es_;
+            int                            dim_;
+            ptrdiff_t                      npoints_;
+            ptrdiff_t                      nselements_;
+            smesh::SharedBuffer<idx_t*>    surface_elements_;
+            smesh::ElemType                surface_element_type_;
 
             smesh::SharedBuffer<real_t*>                     p1_;
             std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
@@ -1405,11 +1504,11 @@ namespace sfem {
     }  // namespace
 
     // Select the contact strategy at runtime. SFEM_CONTACT = "nts" (default) | "mortar".
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const real_t                           margin,
-                                            const real_t                           search_radius_sqr,
-                                            const ExecutionSpace                   es) {
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            const real_t                          margin,
+                                            const real_t                          search_radius_sqr,
+                                            const ExecutionSpace                  es) {
         const char* const sel    = std::getenv("SFEM_CONTACT");
         const std::string method = sel ? sel : "nts";
 
@@ -1427,10 +1526,10 @@ namespace sfem {
     }
 
 #ifdef SFEM_ENABLE_YAML
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const ryml::ConstNodeRef&              node,
-                                            ExecutionSpace                         es) {
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            const ryml::ConstNodeRef&             node,
+                                            ExecutionSpace                        es) {
         real_t margin        = 0;
         real_t search_radius = 1e-4;
 
