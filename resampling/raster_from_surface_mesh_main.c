@@ -323,8 +323,20 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
         field = calloc(n_zyx, sizeof(real_t));
     }
 
-    // X is contiguous
-    ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
+    ptrdiff_t stride[3] = {0, 0, 0};  // Will be set later based on nlocal
+
+    const bool contiguous_x = false;  // Set to true if X is the contiguous dimension
+    if (contiguous_x) {
+        // X is contiguous
+        stride[0] = 1;
+        stride[1] = nlocal[0];
+        stride[2] = nlocal[0] * nlocal[1];
+    } else {
+        // Z is contiguous
+        stride[0] = nlocal[1] * nlocal[2];
+        stride[1] = nlocal[2];
+        stride[2] = 1;
+    }
 
 #if SFEM_LOG_LEVEL >= 5
     printf("stride: %ld %ld %ld, %s:%d\n", stride[0], stride[1], stride[2], __FILE__, __LINE__);

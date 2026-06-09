@@ -78,6 +78,52 @@ intersection_point_triangle_xy_gpu(const real_t v0[3],    //
 }  // END Function: intersection_point_triangle_xy_gpu
 
 ////////////////////////////////////////////////////
+// intersect_and_z_tri3_gpu
+// Fused XY containment test + z-intersection solve.
+// Avoids recomputing edge vectors that both operations need.
+// Returns: 1 = inside + valid z, 0 = outside, -1 = degenerate (nz≈0)
+////////////////////////////////////////////////////
+__device__ __forceinline__ int                  //
+intersect_and_z_tri3_gpu(const real_t x0,       //
+                         const real_t y0,       //
+                         const real_t z0,       //
+                         const real_t x1,       //
+                         const real_t y1,       //
+                         const real_t z1,       //
+                         const real_t x2,       //
+                         const real_t y2,       //
+                         const real_t z2,       //
+                         const real_t qx,       //
+                         const real_t qy,       //
+                         real_t      *out_z) {  //
+
+    const real_t e1x = x1 - x0, e1y = y1 - y0, e1z = z1 - z0;
+    const real_t e2x = x2 - x0, e2y = y2 - y0, e2z = z2 - z0;
+
+    const real_t nx = e1y * e2z - e1z * e2y;
+    const real_t ny = e1z * e2x - e1x * e2z;
+    const real_t nz = e1x * e2y - e1y * e2x;  // = signed XY area * 2
+
+    // Point-in-triangle XY test via signed sub-areas.
+    // Identity: d0 + d1 + d2 = nz, so d2 = nz - d0 - d1 (saves one edge walk).
+    const real_t d0 = e1x * (qy - y0) - e1y * (qx - x0);
+    const real_t d1 = (e2x - e1x) * (qy - y1) - (e2y - e1y) * (qx - x1);
+    const real_t d2 = nz - d0 - d1;
+
+    const bool has_neg = (d0 < (real_t)0) | (d1 < (real_t)0) | (d2 < (real_t)0);
+    const bool has_pos = (d0 > (real_t)0) | (d1 > (real_t)0) | (d2 > (real_t)0);
+    if (has_neg & has_pos) return 0;
+
+    if (nz * nz < (real_t)1e-24) {
+        *out_z = z0;
+        return -1;
+    }
+
+    *out_z = z0 - (nx * (qx - x0) + ny * (qy - y0)) / nz;
+    return 1;
+}  // END Function: intersect_and_z_tri3_gpu
+
+////////////////////////////////////////////////////
 // sort_real_array_ascending_gpu
 ////////////////////////////////////////////////////
 __device__ __forceinline__ void                  //
@@ -148,9 +194,8 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t   *
 
     const int cell_index = ix;
 
-    const int start_index = map->cell_ptr[cell_index];
-    const int end_index   = map->cell_ptr[cell_index + 1];
-
+    const int start_index     = __ldg(&map->cell_ptr[cell_index]);
+    const int end_index       = __ldg(&map->cell_ptr[cell_index + 1]);
     const int num_boxes_local = end_index - start_index;
 
     int triangles_found = 0;
@@ -182,35 +227,33 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t   *
         const geom_t *const ec        = mesh_geom->element_coords;
 
         for (int i = lower_bound_index; i < upper_bound_index; i++) {
-            const int           box_index = cell_dict[i];
+            const int           box_index = __ldg(&cell_dict[i]);
             const geom_t *const row       = ec + box_index * 9;
 
-            const real_t x0 = row[0], y0 = row[1], z0 = row[2];
-            const real_t x1 = row[3], y1 = row[4], z1 = row[5];
-            const real_t x2 = row[6], y2 = row[7], z2 = row[8];
+            const real_t x0 = __ldg(&row[0]), y0 = __ldg(&row[1]), z0 = __ldg(&row[2]);
+            const real_t x1 = __ldg(&row[3]), y1 = __ldg(&row[4]), z1 = __ldg(&row[5]);
+            const real_t x2 = __ldg(&row[6]), y2 = __ldg(&row[7]), z2 = __ldg(&row[8]);
 
-            if (intersect_triangle_xy_gpu((real_t[3]){x0, y0, z0},  //
-                                          (real_t[3]){x1, y1, z1},  //
-                                          (real_t[3]){x2, y2, z2},  //
-                                          x,
-                                          y)) {
-                real_t intersection_z;
-
-                int f = intersection_point_triangle_xy_gpu((real_t[3]){x0, y0, z0},  //
-                                                           (real_t[3]){x1, y1, z1},  //
-                                                           (real_t[3]){x2, y2, z2},  //
-                                                           x,
-                                                           y,
-                                                           &intersection_z);
-                if (f == EXIT_SUCCESS) {
-                    if (triangles_found + start_index_tri3_array >= size_tri3_intersect) {
-                        return -1;  // buffer overflow: caller must pre-allocate a larger buffer
-                    }
-
-                    tri3_intersect_z[triangles_found + start_index_tri3_array] = intersection_z;
-                    triangles_found++;
-                }  // END if (f == EXIT_SUCCESS)
-            }  // END if (intersect_triangle_xy_gpu(...))
+            real_t    intersection_z;
+            const int hit = intersect_and_z_tri3_gpu(x0,
+                                                     y0,
+                                                     z0,  //
+                                                     x1,
+                                                     y1,
+                                                     z1,  //
+                                                     x2,
+                                                     y2,
+                                                     z2,  //
+                                                     x,
+                                                     y,  //
+                                                     &intersection_z);
+            if (hit == 1) {
+                if (triangles_found + start_index_tri3_array >= size_tri3_intersect) {
+                    return -1;  // buffer overflow
+                }
+                tri3_intersect_z[triangles_found + start_index_tri3_array] = intersection_z;
+                triangles_found++;
+            }  // END if (hit == 1)
         }  // END for (int i = lower_bound_index; i < upper_bound_index; i++)
 
     }  // END if (num_boxes_local > 0)
@@ -261,69 +304,70 @@ query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(const cell_list_split_3d_
 
 ////////////////////////////////////////////////////
 // raster_to_hex_field_tri3_kernel
+//
+// Each block handles one (i, j) column.
+// Thread 0 runs the cell-list query and sort into shared memory;
+// all threads then walk the k column in parallel (stride = blockDim.x).
+// Shared memory size (passed at launch): size_tri3_intersect * sizeof(real_t)
 ////////////////////////////////////////////////////
 template <typename index_t = int>
-__global__ void                                       //
-raster_to_hex_field_tri3_kernel(                      //
-        const cell_list_split_3d_1d_map_t split_map,  // Cell list split map data structure
-        const mesh_tri3_geom_device_t     mesh_geom,  // Mesh geometry data structure
-        real_t *const __restrict__ tri3_intersect_z,  // Per-block scratch: size = total_blocks * size_tri3_intersect
-        const int     size_tri3_intersect,            // Capacity per block
-        const index_t start_i,                        // Starting i index
-        const index_t start_j,                        // Starting j index
-        const index_t delta_i,                        // Cell list jump in x direction
-        const index_t delta_j,                        // Cell list jump in y direction
-        const index_t size_i,                         // Number of grid points in x direction
-        const index_t size_j,                         // Number of grid points in y direction
-        const index_t size_k,                         // Number of grid points in z direction
-        const geom_t  origin0,                        // Grid origin x
-        const geom_t  origin1,                        // Grid origin y
-        const geom_t  origin2,                        // Grid origin z
-        const geom_t  delta0,                         // Grid spacing x
-        const geom_t  delta1,                         // Grid spacing y
-        const geom_t  delta2,                         // Grid spacing z
-        real_t *const __restrict__ data) {            // Output: size_i * size_j * size_k
+__global__ void                                                 //
+raster_to_hex_field_tri3_kernel(                                //
+        const cell_list_split_3d_1d_map_t split_map,            //
+        const mesh_tri3_geom_device_t     mesh_geom,            //
+        const int                         size_tri3_intersect,  //
+        const index_t                     start_i,              //
+        const index_t                     start_j,              //
+        const index_t                     delta_i,              //
+        const index_t                     delta_j,              //
+        const index_t                     size_i,               //
+        const index_t                     size_j,               //
+        const index_t                     size_k,               //
+        const geom_t                      origin0,              //
+        const geom_t                      origin1,              //
+        const geom_t                      origin2,              //
+        const geom_t                      delta0,               //
+        const geom_t                      delta1,               //
+        const geom_t                      delta2,               //
+        real_t *const __restrict__ data) {                      //
+
+    extern __shared__ real_t shm_z[];  // size_tri3_intersect elements
+    __shared__ int           shm_count;
 
     const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
     const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
 
-    if (i_grid >= size_i || j_grid >= size_j) {
-        return;  // Out of bounds, exit the kernel
+    if (i_grid >= size_i || j_grid >= size_j) return;
+
+    // Thread 0 does the serial query + sort into shared memory.
+    if (threadIdx.x == 0) {
+        const int n = query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(  //
+                &split_map,                                                    //
+                &mesh_geom,                                                    //
+                origin0 + i_grid * delta0,                                     //
+                origin1 + j_grid * delta1,                                     //
+                size_tri3_intersect,                                           //
+                shm_z);                                                        //
+
+        if (n > 0 && n % 2 == 0) {
+            sort_real_array_ascending_gpu(shm_z, n);
+        } else if (n > 0 && n % 2 != 0) {
+            printf("Warning: Odd number of triangle intersections at (%d, %d): %d found.\n", i_grid, j_grid, n);
+        }
+        shm_count = n;
     }
 
-    // Each block gets its own slice of the scratch buffer to avoid inter-block aliasing.
-    const int block_linear_id              = blockIdx.y * gridDim.x + blockIdx.x;
-    real_t   *my_intersect_z               = tri3_intersect_z + block_linear_id * size_tri3_intersect;
+    __syncthreads();
 
-    const int num_tri3_intersect =
-            query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(&split_map,                 //
-                                                                   &mesh_geom,                 //
-                                                                   origin0 + i_grid * delta0,  //
-                                                                   origin1 + j_grid * delta1,  //
-                                                                   size_tri3_intersect,        //
-                                                                   my_intersect_z);            //
+    const int n = shm_count;
+    if (n <= 0 || n % 2 != 0) return;
 
-    if (num_tri3_intersect == 0) {
-        return;
-    }
-
-    if (num_tri3_intersect % 2 != 0) {
-        printf("Warning: Odd number of triangle intersections found at grid point (%d, %d). "
-               "\n*  %d intersecting triangles found.\n",
-               i_grid,
-               j_grid,
-               num_tri3_intersect);
-        return;
-    }
-
-    sort_real_array_ascending_gpu(my_intersect_z, num_tri3_intersect);
-
-    // Walk the k column and mark voxels whose z-center falls inside a [lo, hi] pair.
-    for (index_t k = 0; k < size_k; k++) {
+    // All threads walk the k column in parallel.
+    for (index_t k = static_cast<index_t>(threadIdx.x); k < size_k; k += static_cast<index_t>(blockDim.x)) {
         const geom_t z = origin2 + k * delta2;
-        for (int p = 0; p < num_tri3_intersect; p += 2) {
-            if (z >= my_intersect_z[p] && z <= my_intersect_z[p + 1]) {
-                data[i_grid + j_grid * size_i + k * size_i * size_j] = (real_t)1;
+        for (int p = 0; p < n; p += 2) {
+            if (z >= shm_z[p] && z <= shm_z[p + 1]) {
+                data[i_grid + j_grid * size_i + k * size_i * size_j] = (real_t)(1);
                 break;
             }
         }
