@@ -2,13 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "cell_build_tet_geom.cuh"
 #include "cell_list_cuda.cuh"
 #include "cell_list_raster_gpu.h"
 #include "cell_list_resampling_gpu.h"
 #include "raster_cell_list_gpu.cuh"
-#include "resample_field_adjoint_cell_cuda.cuh"
-#include "resample_field_adjoint_cell_cuda_shm.cuh"
 
 extern "C" int                                                                           //
 tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data,        //
@@ -49,9 +46,9 @@ tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data
     cudaStream_t stream_data;
     cudaStreamCreate(&stream_data);
     real_t *data_device_ptr = NULL;
-    cudaMallocAsync((void **)&data_device_ptr, sizeof(real_t) * n[0] * n[1], stream_data);
+    cudaMallocAsync((void **)&data_device_ptr, sizeof(real_t) * n[0] * n[1] * n[2], stream_data);
     cudaStreamSynchronize(stream_data);
-    cudaMemsetAsync(data_device_ptr, 0, sizeof(real_t) * n[0] * n[1], stream_data);
+    cudaMemsetAsync(data_device_ptr, 0, sizeof(real_t) * n[0] * n[1] * n[2], stream_data);
 
     const ptrdiff_t delta_i = 2;
     const ptrdiff_t delta_j = 2;
@@ -104,16 +101,20 @@ tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data
                                         static_cast<index_type>(delta_j),             //
                                         static_cast<index_type>(i_size),              //
                                         static_cast<index_type>(j_size),              //
+                                        static_cast<index_type>(n[2]),                //
                                         origin[0],                                    //
                                         origin[1],                                    //
+                                        origin[2],                                    //
                                         delta[0],                                     //
-                                        delta[1]);                                    //
+                                        delta[1],                                     //
+                                        delta[2],                                     //
+                                        data_device_ptr);                             //
 
             cudaStreamSynchronize(stream_kernel);
         }
     }  // END for (ptrdiff_t start_i = 0; start_i < delta_i; start_i++)
 
-    cudaMemcpyAsync(data, data_device_ptr, sizeof(real_t) * n[0] * n[1], cudaMemcpyDeviceToHost, stream_data);
+    cudaMemcpyAsync(data, data_device_ptr, sizeof(real_t) * n[0] * n[1] * n[2], cudaMemcpyDeviceToHost, stream_data);
 
     /* ── Free device resources ── */
     cudaFreeAsync(tri3_intersect_z_device, stream_intersect);

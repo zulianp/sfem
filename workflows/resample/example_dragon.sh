@@ -148,7 +148,7 @@ set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $mesh $field TET4 CUDA
 set +x
 
-PRECISION=float64
+PRECISION=float32
 raw_to_db.py $mesh out.vtk --point_data=$field  --point_data_type=$PRECISION
 
 # Function to create metadata and convert raw files to XDMF format

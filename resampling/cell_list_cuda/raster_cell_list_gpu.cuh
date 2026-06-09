@@ -267,36 +267,43 @@ __global__ void                                       //
 raster_to_hex_field_tri3_kernel(                      //
         const cell_list_split_3d_1d_map_t split_map,  // Cell list split map data structure
         const mesh_tri3_geom_device_t     mesh_geom,  // Mesh geometry data structure
-        real_t *const __restrict__ tri3_intersect_z,  // Intersection z-coordinate for tri3
-        const int     size_tri3_intersect,            // Number of intersecting tri3 elements
+        real_t *const __restrict__ tri3_intersect_z,  // Per-block scratch: size = total_blocks * size_tri3_intersect
+        const int     size_tri3_intersect,            // Capacity per block
         const index_t start_i,                        // Starting i index
         const index_t start_j,                        // Starting j index
         const index_t delta_i,                        // Cell list jump in x direction
         const index_t delta_j,                        // Cell list jump in y direction
         const index_t size_i,                         // Number of grid points in x direction
         const index_t size_j,                         // Number of grid points in y direction
+        const index_t size_k,                         // Number of grid points in z direction
         const geom_t  origin0,                        // Grid origin x
         const geom_t  origin1,                        // Grid origin y
+        const geom_t  origin2,                        // Grid origin z
         const geom_t  delta0,                         // Grid spacing x
-        const geom_t  delta1) {                       // Grid spacing y
+        const geom_t  delta1,                         // Grid spacing y
+        const geom_t  delta2,                         // Grid spacing z
+        real_t *const __restrict__ data) {            // Output: size_i * size_j * size_k
 
     const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
     const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
 
-    if (i_grid >= size_i - 1 || j_grid >= size_j - 1) {
+    if (i_grid >= size_i || j_grid >= size_j) {
         return;  // Out of bounds, exit the kernel
     }
 
-    const int num_tri3_intersect =                                                             //
+    // Each block gets its own slice of the scratch buffer to avoid inter-block aliasing.
+    const int block_linear_id              = blockIdx.y * gridDim.x + blockIdx.x;
+    real_t   *my_intersect_z               = tri3_intersect_z + block_linear_id * size_tri3_intersect;
+
+    const int num_tri3_intersect =
             query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(&split_map,                 //
                                                                    &mesh_geom,                 //
-                                                                   origin0 + i_grid * delta0,  // x coordinate of the grid point
-                                                                   origin1 + j_grid * delta1,  // y coordinate of the grid point
+                                                                   origin0 + i_grid * delta0,  //
+                                                                   origin1 + j_grid * delta1,  //
                                                                    size_tri3_intersect,        //
-                                                                   tri3_intersect_z);          //
+                                                                   my_intersect_z);            //
 
     if (num_tri3_intersect == 0) {
-        // No intersecting triangles found, assign a default value (e.g., 0.0) to the hex field at this grid point
         return;
     }
 
@@ -309,7 +316,18 @@ raster_to_hex_field_tri3_kernel(                      //
         return;
     }
 
-    sort_real_array_ascending_gpu(tri3_intersect_z, num_tri3_intersect);
+    sort_real_array_ascending_gpu(my_intersect_z, num_tri3_intersect);
+
+    // Walk the k column and mark voxels whose z-center falls inside a [lo, hi] pair.
+    for (index_t k = 0; k < size_k; k++) {
+        const geom_t z = origin2 + k * delta2;
+        for (int p = 0; p < num_tri3_intersect; p += 2) {
+            if (z >= my_intersect_z[p] && z <= my_intersect_z[p + 1]) {
+                data[i_grid + j_grid * size_i + k * size_i * size_j] = (real_t)1;
+                break;
+            }
+        }
+    }
 
 }  // END Kernel: raster_to_hex_field_tri3_kernel
 

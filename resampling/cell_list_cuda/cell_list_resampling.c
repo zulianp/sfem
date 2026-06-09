@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cell_list_3d_1d_map.h"
+#include "cell_list_3d_1d_map_sur_mesh.h"
+#include "cell_list_raster_gpu.h"
 #include "cell_list_resampling_gpu.h"
 
 //////////////////////////////////////////////////////////
@@ -292,3 +295,184 @@ cleanup:
 
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tet4_resample_field_adjoint_cell_quad_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_gpu_init_cpu_data
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static void  //
+tri3_raster_mesh_cell_quad_gpu_init_cpu_data(tri3_raster_cell_gpu_cpu_data_t *cpu_data) {
+    if (cpu_data == NULL) return;
+    cpu_data->bounding_boxes             = NULL;
+    cpu_data->bounding_boxes_interleaved = NULL;
+    cpu_data->geom                       = NULL;
+    cpu_data->split_map                  = NULL;
+    memset(&cpu_data->histograms, 0, sizeof(cpu_data->histograms));
+}  // END Function: tri3_raster_mesh_cell_quad_gpu_init_cpu_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_gpu_destroy_cpu_data
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static void  //
+tri3_raster_mesh_cell_quad_gpu_destroy_cpu_data(tri3_raster_cell_gpu_cpu_data_t *cpu_data) {
+    if (cpu_data == NULL) return;
+
+    if (cpu_data->split_map != NULL) {
+        free_cell_list_3d_1d_map(cpu_data->split_map->map_lower);
+        free_cell_list_3d_1d_map(cpu_data->split_map->map_upper);
+        free(cpu_data->split_map);
+        cpu_data->split_map = NULL;
+    }  // END if (cpu_data->split_map != NULL)
+
+    if (cpu_data->geom != NULL) {
+        mesh_tri3_geometry_free(cpu_data->geom);
+        cpu_data->geom = NULL;
+    }  // END if (cpu_data->geom != NULL)
+
+    if (cpu_data->bounding_boxes_interleaved != NULL) {
+        free_boxes_interleaved_t(cpu_data->bounding_boxes_interleaved);
+        cpu_data->bounding_boxes_interleaved = NULL;
+    }  // END if (cpu_data->bounding_boxes_interleaved != NULL)
+
+    if (cpu_data->bounding_boxes != NULL) {
+        free_boxes_t(cpu_data->bounding_boxes);
+        cpu_data->bounding_boxes = NULL;
+    }  // END if (cpu_data->bounding_boxes != NULL)
+
+    free_side_length_histograms(&cpu_data->histograms);
+    memset(&cpu_data->histograms, 0, sizeof(cpu_data->histograms));
+}  // END Function: tri3_raster_mesh_cell_quad_gpu_destroy_cpu_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_gpu_build_cpu_data
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static int                                                                                     //
+tri3_raster_mesh_cell_quad_gpu_build_cpu_data(const ptrdiff_t                  start_element,  //
+                                              const ptrdiff_t                  end_element,    //
+                                              const mesh_t                    *mesh,           //
+                                              tri3_raster_cell_gpu_cpu_data_t *cpu_data) {     //
+    int ret = 0;
+
+    if (mesh == NULL || cpu_data == NULL) {
+        fprintf(stderr, "Error: Invalid input to tri3_raster_mesh_cell_quad_gpu_build_cpu_data\n");
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (mesh == NULL || cpu_data == NULL)
+
+    const int fb_error = make_mesh_tri3_boxes(start_element,
+                                              end_element,
+                                              mesh->nnodes,
+                                              (const idx_t **)mesh->elements,
+                                              (const geom_t **)mesh->points,
+                                              &cpu_data->bounding_boxes);
+
+    if (fb_error != 0 || cpu_data->bounding_boxes == NULL) {
+        fprintf(stderr, "Error: make_mesh_tri3_boxes failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (fb_error != 0 || cpu_data->bounding_boxes == NULL)
+
+    {
+        bounding_box_statistics_t stats = calculate_bounding_box_statistics(cpu_data->bounding_boxes);
+        print_bounding_box_statistics(&stats);
+
+        cpu_data->histograms = calculate_side_length_histograms(cpu_data->bounding_boxes, &stats, 50);
+        print_side_length_histograms(&cpu_data->histograms);
+    }
+
+    cpu_data->bounding_boxes_interleaved = allocate_boxes_interleaved_t(cpu_data->bounding_boxes->num_boxes);
+    if (cpu_data->bounding_boxes_interleaved == NULL) {
+        fprintf(stderr, "Error: allocate_boxes_interleaved_t failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (cpu_data->bounding_boxes_interleaved == NULL)
+
+    copy_boxes_to_interleaved(cpu_data->bounding_boxes, cpu_data->bounding_boxes_interleaved);
+
+    cpu_data->geom = mesh_tri3_geometry_alloc(mesh);
+    if (cpu_data->geom == NULL) {
+        fprintf(stderr, "Error: mesh_tri3_geometry_alloc failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (cpu_data->geom == NULL)
+
+    mesh_tri3_geometry_compute_element_coords(cpu_data->geom);
+
+    ret = build_cell_list_split_3d_1d_map_mesh(&cpu_data->split_map, mesh, cpu_data->bounding_boxes);
+    if (ret != 0 || cpu_data->split_map == NULL) {
+        fprintf(stderr, "Error: build_cell_list_split_3d_1d_map_mesh failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (ret != 0 || cpu_data->split_map == NULL)
+
+    {
+        int64_t cell_list_mem_bytes = 0;
+        cell_list_mem_bytes += cell_list_3d_1d_map_bytes(cpu_data->split_map->map_lower);
+        cell_list_mem_bytes += cell_list_3d_1d_map_bytes(cpu_data->split_map->map_upper);
+        const double cell_list_MB = (double)cell_list_mem_bytes / (1024.0 * 1024.0);
+        printf("[tri3_raster_mesh_cell_quad_gpu] Cell list uses %ld bytes (%.2f MB).\n", cell_list_mem_bytes, cell_list_MB);
+    }
+
+exit:
+    RETURN_FROM_FUNCTION(ret);
+}  // END Function: tri3_raster_mesh_cell_quad_gpu_build_cpu_data
+
+///////////////////////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_gpu
+///////////////////////////////////////////////////////////////////////////
+int                                                                                  //
+tri3_raster_mesh_cell_quad_gpu(const ptrdiff_t                      start_element,   //
+                               const ptrdiff_t                      end_element,     //
+                               const mesh_t                        *mesh,            //
+                               const ptrdiff_t *const SFEM_RESTRICT n,               //
+                               const ptrdiff_t *const SFEM_RESTRICT stride,          //
+                               const geom_t *const SFEM_RESTRICT    origin,          //
+                               const geom_t *const SFEM_RESTRICT    delta,           //
+                               const real_t *const SFEM_RESTRICT    weighted_field,  //
+                               real_t *const SFEM_RESTRICT          data) {          //
+    int ret = 0;
+
+    PRINT_CURRENT_FUNCTION;
+
+    const double tick = MPI_Wtime();
+
+    tri3_raster_cell_gpu_cpu_data_t cpu_data;
+    tri3_raster_mesh_cell_quad_gpu_init_cpu_data(&cpu_data);
+
+    {
+        const double tick_build = MPI_Wtime();
+        ret                     = tri3_raster_mesh_cell_quad_gpu_build_cpu_data(start_element, end_element, mesh, &cpu_data);
+        const double tock_build = MPI_Wtime();
+        printf("[tri3_raster_mesh_cell_quad_gpu] build cpu data: %.6f s\n", tock_build - tick_build);
+    }
+
+    if (ret != 0) {
+        goto cleanup;
+    }  // END if (ret != 0)
+
+    {
+        const double tick_launch = MPI_Wtime();
+        ret = tri3_raster_cell_quad_gpu_launch(&cpu_data, mesh, n, stride, origin, delta, weighted_field, data);
+        const double tock_launch = MPI_Wtime();
+        printf("[tri3_raster_mesh_cell_quad_gpu] kernel launch: %.6f s\n", tock_launch - tick_launch);
+    }
+
+    if (ret != 0) {
+        fprintf(stderr, "Error: tri3_raster_cell_quad_gpu_launch failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto cleanup;
+    }  // END if (ret != 0)
+
+cleanup:
+    tri3_raster_mesh_cell_quad_gpu_destroy_cpu_data(&cpu_data);
+
+    const double tock = MPI_Wtime();
+    printf("[tri3_raster_mesh_cell_quad_gpu] total elapsed: %.6f s\n", tock - tick);
+
+    RETURN_FROM_FUNCTION(ret);
+}  // END Function: tri3_raster_mesh_cell_quad_gpu

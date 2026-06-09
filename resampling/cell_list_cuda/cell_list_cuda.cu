@@ -5,7 +5,6 @@
 #include "cell_build_tet_geom.cuh"
 #include "cell_list_cuda.cuh"
 #include "cell_list_resampling_gpu.h"
-#include "raster_cell_list_gpu.cuh"
 #include "resample_field_adjoint_cell_cuda.cuh"
 #include "resample_field_adjoint_cell_cuda_shm.cuh"
 
