@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 
+#include "cell_list_3d_1d_map_sur_mesh.h"
 #include "cell_list_3d_map.h"
 #include "sfem_mesh.h"
 
@@ -12,6 +13,12 @@ typedef struct {
     real_t *vetices_zero;
     int     nelements;
 } mesh_tet_geom_device_t;
+
+/* ── device-side tri3 geometry (AoS element_coords only; no host ref_mesh) ── */
+typedef struct {
+    geom_t *element_coords; /* device ptr, AoS: nelements * 9 geom_t [x0,y0,z0,x1,y1,z1,x2,y2,z2] */
+    int     nelements;
+} mesh_tri3_geom_device_t;
 
 /**
  * @brief Copies a cell_list_3d_2d_map_t from host to device, including device allocations and async copies for the arrays.
@@ -62,6 +69,32 @@ cell_list_split_3d_2d_map_t copy_cell_list_split_3d_2d_map_to_device(const cell_
  */
 void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,  //
                                            cudaStream_t                 stream);                  //
+
+/**
+ * @brief Copies a cell_list_3d_1d_map_t from host to device.
+ */
+cell_list_3d_1d_map_t                                                       //
+copy_cell_list_3d_1d_map_to_device(const cell_list_3d_1d_map_t *h_map,      //
+                                   cudaStream_t                 stream);     //
+
+/**
+ * @brief Frees device memory owned by a cell_list_3d_1d_map_t (array fields only).
+ */
+void free_cell_list_3d_1d_map_device(cell_list_3d_1d_map_t *d_map,  //
+                                     cudaStream_t           stream); //
+
+/**
+ * @brief Copies a cell_list_split_3d_1d_map_t (pair of 1D maps) from host to device.
+ */
+cell_list_split_3d_1d_map_t                                                              //
+copy_cell_list_split_3d_1d_map_to_device(const cell_list_split_3d_1d_map_t *h_split,    //
+                                         cudaStream_t                       stream);    //
+
+/**
+ * @brief Frees device memory owned by a cell_list_split_3d_1d_map_t.
+ */
+void free_cell_list_split_3d_1d_map_device(cell_list_split_3d_1d_map_t *d_split,  //
+                                           cudaStream_t                 stream);   //
 
 /**
  * @brief Builds a cell_list_split_3d_2d_map_t entirely on the GPU.
@@ -127,6 +160,26 @@ mesh_tet_geom_device_t copy_mesh_tet_geom_to_device(const mesh_tet_geom_t *h_geo
  */
 void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom,  //
                                cudaStream_t            stream);            //
+
+/**
+ * @brief Copies a mesh_tri3_geom_t from host to device.
+ *        h_geom->element_coords must be precomputed (non-NULL) before calling.
+ * @param h_geom Pointer to the host tri3 geometry.
+ * @param nelements Number of tri3 elements.
+ * @param stream CUDA stream for async operations.
+ * @return A mesh_tri3_geom_device_t with a device element_coords pointer.
+ */
+mesh_tri3_geom_device_t copy_mesh_tri3_geom_to_device(const mesh_tri3_geom_t *h_geom,  //
+                                                      int                     nelements,  //
+                                                      cudaStream_t            stream);    //
+
+/**
+ * @brief Frees device memory owned by a mesh_tri3_geom_device_t.
+ * @param d_geom Pointer to the device tri3 geometry to free.
+ * @param stream CUDA stream used for async frees.
+ */
+void free_mesh_tri3_geom_device(mesh_tri3_geom_device_t *d_geom,  //
+                                cudaStream_t             stream);  //
 
 /**
  * @brief Copies a boxes_interleaved_t from host to device, including async allocations and async H2D copy.

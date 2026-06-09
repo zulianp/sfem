@@ -134,15 +134,14 @@ raster_cell_list_3d_1d_split_map_mesh_given_xyz_tri3_gpu(  //
 //////////////////////////////////////////////////
 // query_cell_list_3d_1d_map_mesh_given_xy_tri3_v
 //////////////////////////////////////////////////
-__device__ int                                                                                         //
-query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t *map,                     //
-                                                 const boxes_t               *boxes,                   //
-                                                 const mesh_tri3_geom_t      *mesh_geom,               //
-                                                 const real_t                 x,                       //
-                                                 const real_t                 y,                       //
-                                                 const int                    start_index_tri3_array,  //
-                                                 const int                    size_tri3_intersect,     //
-                                                 real_t                      *tri3_intersect_z) {      //
+__device__ int                                                                                           //
+query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t   *map,                     //
+                                                 const mesh_tri3_geom_device_t *mesh_geom,               //
+                                                 const real_t                   x,                       //
+                                                 const real_t                   y,                       //
+                                                 const int                      start_index_tri3_array,  //
+                                                 const int                      size_tri3_intersect,     //
+                                                 real_t                        *tri3_intersect_z) {      //
 
     const int ix_tmp = coord_to_grid_index_gpu(x, map->min_x, map->delta_x);
     const int ix     = (ix_tmp < 0) ? 0 : (ix_tmp >= map->num_cells_x) ? map->num_cells_x - 1 : ix_tmp;
@@ -182,44 +181,13 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t *ma
         const int *const    cell_dict = &map->cell_dict[start_index];
         const geom_t *const ec        = mesh_geom->element_coords;
 
-        // Fallback pointers used only when element_coords is not precomputed
-        const mesh_t *const rmesh = (ec == NULL) ? mesh_geom->ref_mesh : NULL;
-        const idx_t *const  re0   = (ec == NULL) ? rmesh->elements[0] : NULL;
-        const idx_t *const  re1   = (ec == NULL) ? rmesh->elements[1] : NULL;
-        const idx_t *const  re2   = (ec == NULL) ? rmesh->elements[2] : NULL;
-        const geom_t *const rpx   = (ec == NULL) ? rmesh->points[0] : NULL;
-        const geom_t *const rpy   = (ec == NULL) ? rmesh->points[1] : NULL;
-        const geom_t *const rpz   = (ec == NULL) ? rmesh->points[2] : NULL;
-
         for (int i = lower_bound_index; i < upper_bound_index; i++) {
-            const int box_index = cell_dict[i];
+            const int           box_index = cell_dict[i];
+            const geom_t *const row       = ec + box_index * 9;
 
-            real_t x0, y0, z0, x1, y1, z1, x2, y2, z2;
-            if (ec != NULL) {
-                const geom_t *const row = ec + box_index * 9;
-                x0                      = row[0];
-                y0                      = row[1];
-                z0                      = row[2];
-                x1                      = row[3];
-                y1                      = row[4];
-                z1                      = row[5];
-                x2                      = row[6];
-                y2                      = row[7];
-                z2                      = row[8];
-            } else {
-                const idx_t ev0 = re0[box_index];
-                const idx_t ev1 = re1[box_index];
-                const idx_t ev2 = re2[box_index];
-                x0              = rpx[ev0];
-                y0              = rpy[ev0];
-                z0              = rpz[ev0];
-                x1              = rpx[ev1];
-                y1              = rpy[ev1];
-                z1              = rpz[ev1];
-                x2              = rpx[ev2];
-                y2              = rpy[ev2];
-                z2              = rpz[ev2];
-            }
+            const real_t x0 = row[0], y0 = row[1], z0 = row[2];
+            const real_t x1 = row[3], y1 = row[4], z1 = row[5];
+            const real_t x2 = row[6], y2 = row[7], z2 = row[8];
 
             if (intersect_triangle_xy_gpu((real_t[3]){x0, y0, z0},  //
                                           (real_t[3]){x1, y1, z1},  //
@@ -255,19 +223,17 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t *ma
 ////////////////////////////////////////////////////////////////
 __device__ int                                                                                                  //
 query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(const cell_list_split_3d_1d_map_t *map,                  //
-                                                       const boxes_t                     *boxes,                //
-                                                       const mesh_tri3_geom_t            *mesh_geom,            //
+                                                       const mesh_tri3_geom_device_t     *mesh_geom,            //
                                                        const real_t                       x,                    //
                                                        const real_t                       y,                    //
                                                        const int                          size_tri3_intersect,  //
                                                        real_t                            *tri3_intersect_z) {   //
 
-    if (map == NULL || boxes == NULL || mesh_geom == NULL) {
+    if (map == NULL || mesh_geom == NULL) {
         return -1;
     }
 
     const int num_found_lower = query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(map->map_lower,       //
-                                                                                 boxes,                //
                                                                                  mesh_geom,            //
                                                                                  x,                    //
                                                                                  y,                    //
@@ -276,7 +242,6 @@ query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(const cell_list_split_3d_
                                                                                  tri3_intersect_z);    //
 
     const int num_found_upper = query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(map->map_upper,       //
-                                                                                 boxes,                //
                                                                                  mesh_geom,            //
                                                                                  x,                    //
                                                                                  y,                    //
@@ -298,34 +263,22 @@ query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(const cell_list_split_3d_
 // raster_to_hex_field_tri3_kernel
 ////////////////////////////////////////////////////
 template <typename index_t = int>
-__global__ void                                           //
-raster_to_hex_field_tri3_kernel(                          //
-        const cell_list_split_3d_2d_map_t split_map,      // Cell list split map data structure
-        const boxes_interleaved_t         boxes,          // Interleaved boxes data structure
-        const mesh_tet_geom_device_t      mesh_geom,      // Mesh geometry data structure
-        const elems_tet4_device           mesh,           // Mesh: mesh_t struct
-        real_t *const __restrict__ tri3_intersect_z,      // Intersection z-coordinate for tri3
-        const int     size_tri3_intersect,                // Number of intersecting tri3 elements
-        const index_t start_i,                            // Starting i index for the grid points in the hex mesh
-        const index_t start_j,                            // Starting j index for the grid points in the hex mesh
-        const index_t delta_i,                            // Cell list jump in x direction.
-        const index_t delta_j,                            // Cell list jump in y direction.
-        const index_t size_i,                             // Number of grid points in x direction
-        const index_t size_j,                             // Number of grid points in y direction
-        const index_t n0,                                 // SDF: n[3]
-        const index_t n1,                                 //
-        const index_t n2,                                 //
-        const index_t stride0,                            // SDF: stride[3]
-        const index_t stride1,                            //
-        const index_t stride2,                            //
-        const geom_t  origin0,                            // SDF: origin[3]
-        const geom_t  origin1,                            //
-        const geom_t  origin2,                            //
-        const geom_t  delta0,                             // SDF: delta[3]
-        const geom_t  delta1,                             //
-        const geom_t  delta2,                             //
-        const real_t *const __restrict__ weighted_field,  //
-        real_t *const __restrict__ hex_field) {           //
+__global__ void                                       //
+raster_to_hex_field_tri3_kernel(                      //
+        const cell_list_split_3d_1d_map_t split_map,  // Cell list split map data structure
+        const mesh_tri3_geom_device_t     mesh_geom,  // Mesh geometry data structure
+        real_t *const __restrict__ tri3_intersect_z,  // Intersection z-coordinate for tri3
+        const int     size_tri3_intersect,            // Number of intersecting tri3 elements
+        const index_t start_i,                        // Starting i index
+        const index_t start_j,                        // Starting j index
+        const index_t delta_i,                        // Cell list jump in x direction
+        const index_t delta_j,                        // Cell list jump in y direction
+        const index_t size_i,                         // Number of grid points in x direction
+        const index_t size_j,                         // Number of grid points in y direction
+        const geom_t  origin0,                        // Grid origin x
+        const geom_t  origin1,                        // Grid origin y
+        const geom_t  delta0,                         // Grid spacing x
+        const geom_t  delta1) {                       // Grid spacing y
 
     const index_t i_grid = start_i + static_cast<index_t>(blockIdx.x) * delta_i;
     const index_t j_grid = start_j + static_cast<index_t>(blockIdx.y) * delta_j;
@@ -335,8 +288,7 @@ raster_to_hex_field_tri3_kernel(                          //
     }
 
     const int num_tri3_intersect =                                                             //
-            query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(split_map,                  //
-                                                                   &boxes,                     //
+            query_cell_list_3d_1d_split_map_mesh_given_xy_tri3_gpu(&split_map,                 //
                                                                    &mesh_geom,                 //
                                                                    origin0 + i_grid * delta0,  // x coordinate of the grid point
                                                                    origin1 + j_grid * delta1,  // y coordinate of the grid point
