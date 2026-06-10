@@ -18,15 +18,25 @@ typedef struct {
     side_length_histograms_t     histograms;
 } tri3_raster_cell_gpu_cpu_data_t;
 
-int                                                                                //
-tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data,  //
-                                 const mesh_t                          *mesh,      //
-                                 const ptrdiff_t *const SFEM_RESTRICT   n,         //
-                                 const ptrdiff_t *const SFEM_RESTRICT   stride,    //
-                                 const geom_t *const SFEM_RESTRICT      origin,    //
-                                 const geom_t *const SFEM_RESTRICT      delta,     //
+int                                                                                      //
+tri3_raster_cell_quad_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data,        //
+                                 const mesh_t                          *mesh,            //
+                                 const ptrdiff_t *const SFEM_RESTRICT   n,               //
+                                 const ptrdiff_t *const SFEM_RESTRICT   stride,          //
+                                 const geom_t *const SFEM_RESTRICT      origin,          //
+                                 const geom_t *const SFEM_RESTRICT      delta,           //
                                  const real_t *const SFEM_RESTRICT      weighted_field,  //
-                                 real_t *const SFEM_RESTRICT            data);     //
+                                 real_t *const SFEM_RESTRICT            data);           //
+
+int                                                                                         //
+tri3_raster_cell_quad_bl_gpu_launch(const tri3_raster_cell_gpu_cpu_data_t *cpu_data,        //
+                                    const mesh_t                          *mesh,            //
+                                    const ptrdiff_t *const SFEM_RESTRICT   n,               //
+                                    const ptrdiff_t *const SFEM_RESTRICT   stride,          //
+                                    const geom_t *const SFEM_RESTRICT      origin,          //
+                                    const geom_t *const SFEM_RESTRICT      delta,           //
+                                    const real_t *const SFEM_RESTRICT      weighted_field,  //
+                                    real_t *const SFEM_RESTRICT            data);           //
 
 int                                                                                  //
 tri3_raster_mesh_cell_quad_gpu(const ptrdiff_t                      start_element,   //
