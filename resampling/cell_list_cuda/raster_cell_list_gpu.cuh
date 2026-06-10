@@ -235,18 +235,18 @@ query_cell_list_3d_1d_map_mesh_given_xy_tri3_gpu(const cell_list_3d_1d_map_t   *
             const real_t x2 = __ldg(&row[6]), y2 = __ldg(&row[7]), z2 = __ldg(&row[8]);
 
             real_t    intersection_z;
-            const int hit = intersect_and_z_tri3_gpu(x0,
-                                                     y0,
-                                                     z0,  //
-                                                     x1,
-                                                     y1,
-                                                     z1,  //
-                                                     x2,
-                                                     y2,
-                                                     z2,  //
-                                                     x,
-                                                     y,  //
-                                                     &intersection_z);
+            const int hit = intersect_and_z_tri3_gpu(x0,                //
+                                                     y0,                //
+                                                     z0,                //
+                                                     x1,                //
+                                                     y1,                //
+                                                     z1,                //
+                                                     x2,                //
+                                                     y2,                //
+                                                     z2,                //
+                                                     x,                 //
+                                                     y,                 //
+                                                     &intersection_z);  //
             if (hit == 1) {
                 if (triangles_found + start_index_tri3_array >= size_tri3_intersect) {
                     return -1;  // buffer overflow
