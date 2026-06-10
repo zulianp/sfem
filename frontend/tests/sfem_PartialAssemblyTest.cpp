@@ -67,8 +67,8 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
         }
     }
 
-    auto mf  = sfem::create_linear_operator(MATRIX_FREE, f, u, es);
-    auto bsr = sfem::create_linear_operator(BSR, f, u, es);
+    auto mf  = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, u, es);
+    auto bsr = sfem::create_linear_operator(sfem::op_type::BSR, f, u, es);
     SFEM_TEST_ASSERT(mf && bsr);
 
     mf->apply(h->data(), y_mf->data());
@@ -164,8 +164,8 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
         }
     }
 
-    auto mf  = sfem::create_linear_operator(MATRIX_FREE, f, u, es);
-    auto bsr = sfem::create_linear_operator(BSR, f, u, es);
+    auto mf  = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, u, es);
+    auto bsr = sfem::create_linear_operator(sfem::op_type::BSR, f, u, es);
     SFEM_TEST_ASSERT(mf && bsr);
 
     mf->apply(h->data(), y_mf->data());

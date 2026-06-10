@@ -2,9 +2,9 @@
 #include "sfem_Function.hpp"
 
 #include "matrixio_array.h"
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
 
 #include "sfem_API.hpp"
@@ -78,63 +78,63 @@ typedef struct OpDesc {
 
 } OpDesc_t;
 
-void add_matrix_free_scalar_ops(smesh::ElemType                   element_type,
+void add_matrix_free_scalar_ops(smesh::ElemType                 element_type,
                                 const bool                      semi_structured,
                                 const enum sfem::ExecutionSpace es,
                                 std::vector<OpDesc_t>          &ops) {
-    ops.push_back({.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1});
+    ops.push_back({.name = "Laplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
 
     if (semi_structured) {
-        ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
+        ops.push_back({.name = "em:Laplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
     } else {
-        ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
+        ops.push_back({.name = "PackedLaplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
     }
 
     if (element_type == smesh::HEX8 && !semi_structured) {
-        ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+        ops.push_back({.name = "Mass", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
     }
 }
 
-void add_matrix_based_scalar_ops(smesh::ElemType                   element_type,
+void add_matrix_based_scalar_ops(smesh::ElemType                 element_type,
                                  const bool                      semi_structured,
                                  const enum sfem::ExecutionSpace es,
                                  std::vector<OpDesc_t>          &ops) {
     if (!semi_structured) {
-        ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = sfem::op_type::CRS, .block_size = 1});
         // ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
-        ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
-        ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
-        ops.push_back({.name = "Laplacian", .type = SELL, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = sfem::op_type::ALIGNEDCRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = sfem::op_type::SPLITDACRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = sfem::op_type::SELL, .block_size = 1});
     }
 }
 
 void add_matrix_free_vector_ops(const int                       dim,
-                                smesh::ElemType                   element_type,
+                                smesh::ElemType                 element_type,
                                 const bool                      semi_structured,
                                 const enum sfem::ExecutionSpace es,
                                 std::vector<OpDesc_t>          &ops) {
-    ops.push_back({.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim});
+    ops.push_back({.name = "LinearElasticity", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
 
     // if ((element_type == smesh::TET4 && !semi_structured) || element_type == smesh::HEX8) {
-    ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
+    ops.push_back({.name = "NeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
     // }
 
     if (!semi_structured && (element_type == smesh::HEX8 || element_type == smesh::TET10)) {
-        ops.push_back({.name = "NeoHookeanOgdenPacked", .type = MATRIX_FREE, .block_size = dim});
+        ops.push_back({.name = "NeoHookeanOgdenPacked", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
     }
 }
 
 void add_matrix_based_vector_ops(const int                       dim,
-                                 smesh::ElemType                   element_type,
+                                 smesh::ElemType                 element_type,
                                  const bool                      semi_structured,
                                  const enum sfem::ExecutionSpace es,
                                  std::vector<OpDesc_t>          &ops) {
     if (element_type == smesh::TET10 || semi_structured) return;
-    ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
+    ops.push_back({.name = "LinearElasticity", .type = sfem::op_type::BSR, .block_size = dim});
 
     if (element_type == smesh::HEX8) {
-        ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim});  // FIXME
-        ops.push_back({.name = "NeoHookeanOgden", .type = BSR, .block_size = dim});
+        ops.push_back({.name = "LinearElasticity", .type = sfem::op_type::BSR_SYM, .block_size = dim});  // FIXME
+        ops.push_back({.name = "NeoHookeanOgden", .type = sfem::op_type::BSR, .block_size = dim});
     }
 }
 
@@ -202,9 +202,6 @@ int main(int argc, char *argv[]) {
         } else {
             packed_mesh = sfem::FunctionSpace::PackedMesh::create(m, {}, true);
         }
-
-        
-
 
         int dim = m->spatial_dimension();
         add_matrix_free_scalar_ops(m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);

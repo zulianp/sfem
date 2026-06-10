@@ -7,7 +7,7 @@
 #include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_crs_SpMV.hpp"
+#include "sfem_CRS.hpp"
 #include "spmv.hpp"
 
 #include "matrixio_array.h"
@@ -62,8 +62,8 @@ int main(int argc, char *argv[]) {
     auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     const char *SFEM_OPERATOR       = "Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = sfem::op_type::MATRIX_FREE;
 
     int    SFEM_BLOCK_SIZE            = 1;
     int    SFEM_USE_PRECONDITIONER    = 0;

@@ -12,12 +12,12 @@
 namespace sfem {
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    class CRSSpMV : public Operator<T> {
+    class CRS : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
 
         int apply(const T* const x, T* const y) override {
-            SFEM_TRACE_SCOPE("CRSSpMV::apply");
+            SFEM_TRACE_SCOPE("CRS::apply");
 
             apply_(x, y);
             return 0;
@@ -38,7 +38,7 @@ namespace sfem {
 
         void print(std::ostream& os = std::cout) const {
             if (execution_space_ == EXECUTION_SPACE_HOST) {
-                os << "CRSSpMV (" << rows() << " rows, " << cols() << " cols)\n";
+                os << "CRS (" << rows() << " rows, " << cols() << " cols)\n";
 
                 const ptrdiff_t nrows = row_ptr->size() - 1;
                 for (ptrdiff_t i = 0; i < nrows; i++) {
@@ -55,13 +55,13 @@ namespace sfem {
     };
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<CRSSpMV<R, C, TStorage, T>> h_crs_spmv(const ptrdiff_t        rows,
+    std::shared_ptr<CRS<R, C, TStorage, T>> h_crs_spmv(const ptrdiff_t        rows,
                                                  const ptrdiff_t        cols,
                                                  const SharedBuffer<R>& rowptr,
                                                  const SharedBuffer<C>& colidx,
                                                  const SharedBuffer<TStorage>& values,
                                                  const T                scale_output) {
-        auto ret     = std::make_shared<CRSSpMV<R, C, TStorage, T>>();
+        auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values  = values;

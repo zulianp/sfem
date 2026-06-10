@@ -11,7 +11,7 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_d
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
 
     int    SFEM_MAX_IT             = smesh::Env::read<int>("SFEM_MAX_IT", 20000);
@@ -116,7 +116,7 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->initialize_packed_mesh();
 
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    auto op = sfem::create_op(fs, sfem::op_type::MATRIX_FREE, es);
     op->initialize();
 
     auto sideset0 = sfem::Sideset::create_from_selector(
