@@ -1,13 +1,13 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -15,7 +15,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -29,11 +29,11 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         return SFEM_FAILURE;
     }
 
-    const char *mesh_path             = argv[1];
-    const char *sdf_path              = argv[2];
-    const char *dirichlet_path        = argv[3];
-    const char *contact_boundary_path = argv[4];
-    std::string output_path           = argv[5];
+    smesh::Path mesh_path{argv[1]};
+    smesh::Path sdf_path{argv[2]};
+    smesh::Path dirichlet_path{argv[3]};
+    smesh::Path contact_boundary_path{argv[4]};
+    smesh::Path output_path{argv[5]};
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
 
@@ -48,16 +48,16 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         const char *SFEM_EXECUTION_SPACE{nullptr};
         SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
         if (SFEM_EXECUTION_SPACE) {
-            es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+            es = smesh::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
     }
 
-    auto      mesh       = sfem::Mesh::create_from_file(comm, mesh_path);
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
+    }
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
-
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA
@@ -71,8 +71,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 #endif
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-    auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    auto f                    = sfem::Function::create(fs);
+    auto op                   = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
@@ -85,8 +85,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         f->add_constraint(dirichlet_conditions);
     }
 
-    auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
-    auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
+    auto sdf              = smesh::Grid<geom_t>::create_from_file(comm, sdf_path);
+    auto contact_boundary = smesh::Sideset::create_from_file(comm, contact_boundary_path);
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -117,18 +117,18 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
 
     // Output to disk
-    sfem::create_directory(output_path.c_str());
+    smesh::create_directory(output_path);
 
-    fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
-    fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
+    fs->mesh_ptr()->write(output_path / "coarse_mesh");
+    smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
 
     auto out = f->output();
 
-    out->set_output_dir((output_path + "/out").c_str());
+    out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
 
-    out->write("rhs", sfem::to_host(rhs)->data());
-    out->write("disp", sfem::to_host(x)->data());
+    out->write("rhs", smesh::to_host(rhs)->data());
+    out->write("disp", smesh::to_host(x)->data());
 
     if (es != sfem::EXECUTION_SPACE_DEVICE) {
         // FIXME

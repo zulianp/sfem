@@ -65,7 +65,7 @@ static const double prony_g_original[] = {
     1.795e-5    // tau = 10^2
 };
 
-static const double prony_tau[] = {
+static const real_t prony_tau[] = {
     1e-7, 1e-6, 1e-5, 1e-4, 1e-3,
     1e-2, 1e-1, 1e0,  1e1,  1e2
 };
@@ -74,7 +74,7 @@ static const double prony_tau[] = {
 static const double G_INF_PAPER = 0.0225;
 
 // Normalized g_i values (will be computed)
-static double prony_g_normalized[NUM_PRONY];
+static real_t prony_g_normalized[NUM_PRONY];
 
 // ============================================================================
 // Test strain rates from Fig. 16

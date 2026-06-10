@@ -1,12 +1,12 @@
 
 #include <stdio.h>
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
 
-#include "stencil3.h"
-#include "sshex8_skeleton_stencil.h"
-#include "hex8_laplacian_inline_cpu.h"
+#include "stencil3.hpp"
+#include "sshex8_skeleton_stencil.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
 
 
 bool verbose{true};
@@ -106,7 +106,7 @@ int test_stencil3_against_original() {
     
     double tack = MPI_Wtime();
 
-    sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
+    smesh::sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
     
     double tock = MPI_Wtime();
 

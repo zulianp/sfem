@@ -1,14 +1,12 @@
 #ifndef SFEM_SSMGC_HPP
 #define SFEM_SSMGC_HPP
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_ContactConditions.hpp"
-#include "sfem_Function.hpp"
-#include "sfem_Input.hpp"
 #include "sfem_ShiftedPenalty.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-
-#include <memory>
+#include "sfem_Function.hpp"
+#include "sfem_Input.hpp"
 
 namespace sfem {
 

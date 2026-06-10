@@ -8,12 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "operators/div.h"
+#include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "operators/div.hpp"
+
+
 
 #include "sfem_API.hpp"
 
@@ -75,13 +75,13 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *volumes = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
     memset(volumes, 0, mesh->n_elements() * sizeof(real_t));
 
     geom_t ** xyz = mesh->points()->data();
-    auto elements = mesh->elements()->data();
+    auto elements = mesh->elements(0)->data();
 
     for (ptrdiff_t i = 0; i < mesh->n_elements(); ++i) {
         const idx_t i0 = elements[0][i];

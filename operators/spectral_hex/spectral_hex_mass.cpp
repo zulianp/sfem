@@ -1,16 +1,16 @@
-#include "spectral_hex_mass.h"
+#include "spectral_hex_mass.hpp"
 
-#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_laplacian_inline_cpu.hpp"
 #include "lagrange.hpp"
-#include "line_quadrature.h"
-#include "sfem_base.h"
-#include "sfem_macros.h"
-#include "sshex8.h"
+#include "line_quadrature.hpp"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
+#include "sshex8.hpp"
 
 #include "lagrange_hex_interpolate_inline.hpp"
 #include "lagrange_hex_laplacian_inline.hpp"
 
-#include "sfem_Tracer.hpp"
+
 
 #include <cassert>
 #include <cstdio>

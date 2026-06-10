@@ -1,6 +1,6 @@
 #include "sfem_ssgmg.hpp"
 
-#include "sfem_hex8_mesh_graph.h"
+//
 
 #include "sfem_API.hpp"
 
@@ -17,10 +17,10 @@ namespace sfem {
         }
 
         auto      fs     = f->space();
-        auto     &ssmesh = f->space()->semi_structured_mesh();
-        const int L      = ssmesh.level();
+        auto     &ssmesh = f->space()->mesh();
+        const int L      = smesh::semistructured_level(ssmesh);
 
-        std::vector<int> levels = ssmesh.derefinement_levels();
+        std::vector<int> levels = smesh::derefinement_levels(ssmesh);
 
         // Order from finest to coarsest!
         std::reverse(levels.begin(), levels.end());
@@ -30,12 +30,18 @@ namespace sfem {
         functions.push_back(f);
 
         for (int l = 1; l < nlevels; l++) {
-            printf("Derefine %d -> %d\n", levels[l - 1], levels[l]);
             auto f_prev  = functions.back();
             auto fs_prev = f_prev->space();
             auto fs_next = fs_prev->derefine(levels[l]);
-            fs_next->n_dofs();
+
+            printf("Derefine %d (%s) -> %d (%s)\n",
+                   levels[l - 1],
+                   type_to_string(f_prev->space()->element_type()),
+                   levels[l],
+                   type_to_string(fs_next->element_type()));
             printf("fs_next->n_dofs() = %ld\n", (long)fs_next->n_dofs());
+            fflush(stdout);
+
             functions.push_back(f_prev->derefine(fs_next, true));
         }
 
@@ -86,7 +92,7 @@ namespace sfem {
 
         for (int i = 0; i < nlevels; i++) {
             auto s = functions[i]->space();
-            printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? s->semi_structured_mesh().level() : 1);
+            printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
 
             functions[i]->describe(std::cout);
         }

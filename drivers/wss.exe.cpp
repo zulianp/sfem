@@ -8,12 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "read_mesh.h"
+#include "sfem_base.hpp"
 
-#include "tet4_grad.h"
+
+
+#include "tet4_grad.hpp"
 
 #include "sfem_API.hpp"
 
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *shear_6[6];
     ptrdiff_t shear_size_local, shear_size_global;
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
 
     wss_mag_3(mesh->n_elements(),
               mesh->n_nodes(),
-              mesh->elements()->data(),
+              mesh->elements(0)->data(),
               mesh->points()->data(),
               shear_6[0],
               shear_6[1],

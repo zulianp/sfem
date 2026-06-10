@@ -586,7 +586,7 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
         content = []
         content.append(f"#ifndef {guard}")
         content.append(f"#define {guard}")
-        content.append("\n#include \"sfem_macros.h\"\n")
+        content.append("\n#include \"sfem_macros.hpp\"\n")
         if not self.metric_tensor_only:
             content.append("")
             content.append(sigF)

@@ -1,25 +1,36 @@
 #include "sfem_API.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_Env.hpp"
-#include "sfem_base.h"
+#include "sfem_aliases.hpp"
+#include "smesh_env.hpp"
+#include "sfem_base.hpp"
+#include "smesh_mesh_reorder.hpp"
 
 int main(int argc, char *argv[]) {
-    sfem::Context context(argc, argv);
-    auto          comm = context.communicator();
+    using namespace sfem;
+    Context context(argc, argv);
+    auto    comm = context.communicator();
 
     if (comm->size() > 1) {
         SFEM_ERROR("Parallel execution not supported!\n");
     }
 
-    const int base_resolution = sfem::Env::read("SFEM_BASE_RESOLUTION", 64);
-    const int warmup          = sfem::Env::read("SFEM_WARMUP", 3);
-    const int repeat          = sfem::Env::read("SFEM_REPEAT", 20);
+    const int base_resolution = smesh::Env::read("SFEM_BASE_RESOLUTION", 64);
+    const int warmup          = smesh::Env::read("SFEM_WARMUP", 3);
+    const int repeat          = smesh::Env::read("SFEM_REPEAT", 20);
 
-    auto mesh = sfem::Mesh::create_cube(comm, TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
-    auto fs   = sfem::FunctionSpace::create(mesh, 1);
+    auto mesh = Mesh::create_cube(
+            comm, smesh::TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
 
-    auto op = sfem::create_op(fs, "Gradient", sfem::EXECUTION_SPACE_HOST);
+    if (smesh::Env::read("SFEM_USE_SFC", false)) {
+        auto sfc = smesh::SFC::create_from_env();
+        sfc->reorder(*mesh);
+    }
+
+    FunctionSpace::PackedMesh::create(mesh, {}, true);
+
+    auto fs = FunctionSpace::create(mesh, 1);
+
+    auto op = create_op(fs, "Gradient", EXECUTION_SPACE_HOST);
 
     const double setup_t0 = MPI_Wtime();
     op->initialize();
@@ -28,8 +39,8 @@ int main(int argc, char *argv[]) {
     const ptrdiff_t n_in  = op->n_dofs_domain();
     const ptrdiff_t n_out = op->n_dofs_image();
 
-    auto h_buf   = sfem::create_buffer<real_t>(n_in, sfem::EXECUTION_SPACE_HOST);
-    auto out_buf = sfem::create_buffer<real_t>(n_out, sfem::EXECUTION_SPACE_HOST);
+    auto h_buf   = create_buffer<real_t>(n_in, EXECUTION_SPACE_HOST);
+    auto out_buf = create_buffer<real_t>(n_out, EXECUTION_SPACE_HOST);
 
     real_t *const h   = h_buf->data();
     real_t *const out = out_buf->data();
@@ -43,14 +54,14 @@ int main(int argc, char *argv[]) {
         op->apply(nullptr, h, out);
     }
 
-    sfem::device_synchronize();
+    device_synchronize();
     const double t0 = MPI_Wtime();
 
     for (int r = 0; r < repeat; r++) {
         op->apply(nullptr, h, out);
     }
 
-    sfem::device_synchronize();
+    device_synchronize();
     const double t1 = MPI_Wtime();
 
     const double elapsed = (t1 - t0) / repeat;
@@ -62,7 +73,7 @@ int main(int argc, char *argv[]) {
     volatile real_t sink = out[0];
 
     printf("op Gradient\n");
-    printf("element_type %s\n", type_to_string(mesh->element_type()));
+    printf("element_type %s\n", type_to_string(mesh->element_type(0)));
     printf("#elements %ld\n", (long)mesh->n_elements());
     printf("#nodes %ld\n", (long)mesh->n_nodes());
     printf("setup %g [s]\n", setup_t1 - setup_t0);

@@ -7,16 +7,16 @@
 #include <cstdio>
 
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_config.h"
 
 #ifdef SFEM_ENABLE_AMG
 
-#include "partitioner.h"
+#include "partitioner.hpp"
 #include "sfem_pwc_interpolator.hpp"
-#include "smoother.h"
+#include "smoother.hpp"
 
 #endif
 
@@ -152,7 +152,7 @@ namespace sfem {
 
         auto bdy_dofs_buff = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
         auto bdy_dofs = bdy_dofs_buff->data();
-        f_coarse->constaints_mask(bdy_dofs_buff->data());
+        f_coarse->constraints_mask(bdy_dofs_buff->data());
         auto fine_mat = sfem::h_coosym<idx_t, real_t>(
                 bdy_dofs_buff, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
         // END TODO. function could be fs -> symcoo

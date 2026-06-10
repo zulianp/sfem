@@ -11,25 +11,25 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
-#include "sortreduce.h"
 
-#include "mass.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
+#include "sortreduce.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "mass.hpp"
 
-#include "laplacian.h"
-#include "read_mesh.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
+
+#include "laplacian.hpp"
+
 
 #include "isolver_lsolve.h"
 
-#include "spmv.h"
+#include "spmv.hpp"
 
 //////////////////////////////////////////////
 
@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = rowptr[mesh.nnodes];
     system_matrix = (real_t*)calloc(nnz, sizeof(real_t));
 
-    laplacian_crs(mesh.element_type,
+    laplacian_crs(static_cast<smesh::ElemType>(mesh.element_type),
                                mesh.nelements,
                                mesh.nnodes,
                                mesh.elements,
