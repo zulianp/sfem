@@ -299,6 +299,7 @@ namespace sfem {
 
         if (space->has_semi_structured_mesh() && sfem::is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LinearElasticity>(space);
+            ret->initialize({});
             linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
             ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
             return ret;
@@ -307,6 +308,7 @@ namespace sfem {
         if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type()) &&
             !sfem::is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LinearElasticity>(space);
+            ret->initialize({});
             linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
             ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
             assert(space->n_blocks() == 1);
