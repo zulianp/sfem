@@ -10,7 +10,7 @@
 
 #include "sfem_Op.hpp"
 #include "sfem_Parameters.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include <map>
 #include <string>
@@ -28,7 +28,8 @@ namespace sfem {
      */
     struct OpDomain {
     public:
-        enum ElemType    element_type;  ///< Element type for this domain
+        using SharedBlock = std::shared_ptr<smesh::Mesh::Block>;
+        smesh::ElemType    element_type;  ///< Element type for this domain
         SharedBlock      block;         ///< Reference to the mesh block
         SharedParameters parameters;     ///< Domain-specific parameters
         std::shared_ptr<void> user_data; ///< User data for the domain
@@ -69,7 +70,7 @@ namespace sfem {
          * @brief Override element types for all domains
          * @param element_types Vector of element types (must match domain count)
          */
-        void override_element_types(const std::vector<enum ElemType> &element_types);
+        void override_element_types(const std::vector<smesh::ElemType> &element_types);
 
         /**
          * @brief Create a low-order-refinement (LOR) version

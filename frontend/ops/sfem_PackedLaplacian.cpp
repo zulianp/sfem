@@ -1,31 +1,43 @@
 #include "sfem_PackedLaplacian.hpp"
-#include "sfem_Tracer.hpp"
 
-#include "sfem_Env.hpp"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
 
-#include "hex8_fff.h"
-#include "hex8_laplacian_inline_cpu.h"
-#include "laplacian.h"
-#include "tet10_laplacian_inline_cpu.h"
-#include "tet4_inline_cpu.h"
-#include "tet4_laplacian_inline_cpu.h"
+#include "smesh_env.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
+
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "laplacian.hpp"
+#include "tet10_laplacian_inline_cpu.hpp"
+#include "tet4_inline_cpu.hpp"
+#include "tet4_laplacian_inline_cpu.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "sfem_CRSGraph.hpp"
+namespace {
+    smesh::block_idx_t block_id_for_packed(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
+        for (size_t i = 0; i < mesh.n_blocks(); i++) {
+            if (mesh.block(i).get() == &block) {
+                return static_cast<smesh::block_idx_t>(i);
+            }
+        }
+        SFEM_ERROR("PackedLaplacian: mesh block not found");
+        return 0;
+    }
+}  // namespace
+
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_kernel_data.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_spaces.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
-#include "sfem_Packed.hpp"
+
 #include "sfem_Parameters.hpp"
 
 #ifdef _OPENMP
@@ -456,7 +468,7 @@ struct Tet10MicroKernel {
 };
 
 template <typename pack_idx_t>
-static int packed_laplacian_apply(enum ElemType                         element_type,
+static int packed_laplacian_apply(smesh::ElemType                         element_type,
                                   const ptrdiff_t                       n_packs,
                                   const ptrdiff_t                       n_elements_per_pack,
                                   const ptrdiff_t                       n_elements,
@@ -471,7 +483,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                   real_t *const SFEM_RESTRICT           values,
                                   PackedLaplacianScratch               &scratch) {
     switch (element_type) {
-        case TET4:
+        case smesh::TET4:
             return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel<PackedIdxType>>::apply(n_packs,
                                                                                                  n_elements_per_pack,
                                                                                                  n_elements,
@@ -485,7 +497,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                                                  u,
                                                                                                  values,
                                                                                                  scratch);
-        case HEX8:
+        case smesh::HEX8:
             return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel<PackedIdxType>>::apply(n_packs,
                                                                                                  n_elements_per_pack,
                                                                                                  n_elements,
@@ -499,7 +511,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                                                  u,
                                                                                                  values,
                                                                                                  scratch);
-        case TET10:
+        case smesh::TET10:
             return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel<PackedIdxType>>::apply(n_packs,
                                                                                                    n_elements_per_pack,
                                                                                                    n_elements,
@@ -526,7 +538,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>                       space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp>                       domains;
-        std::shared_ptr<Packed<PackedIdxType>>               packed;
+        std::shared_ptr<FunctionSpace::PackedMesh>          packed;
         std::vector<SharedBuffer<jacobian_t>>                fff;
         std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
 
@@ -576,17 +588,13 @@ namespace sfem {
             domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
 
-            if (domain->second.element_type == HEX8 || domain->second.element_type == SSHEX8) {
-                hex8_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
-            } else {
-                tet4_fff_fill(domain->second.block->n_elements(),
-                              domain->second.block->elements()->data(),
-                              impl_->space->mesh_ptr()->points()->data(),
-                              impl_->fff[b]->data());
+            auto mesh_ptr = impl_->space->mesh_ptr();
+            auto fff_src  = smesh::FFF::create_AoS(mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
+            if (!fff_src) {
+                return SFEM_FAILURE;
             }
+            const size_t nbytes = (size_t)domain->second.block->n_elements() * 6u * sizeof(jacobian_t);
+            memcpy(impl_->fff[b]->data(), fff_src->fff_AoS()->data(), nbytes);
         }
 
         return SFEM_SUCCESS;
@@ -766,7 +774,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void PackedLaplacian::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void PackedLaplacian::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem

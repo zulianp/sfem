@@ -1,39 +1,33 @@
 #include "sfem_ContactConditions.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
-#include "sfem_prolongation_restriction.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
-
-#include "node_interpolate.h"
-#include "sfem_resample_gap.h"
 
 #include "sfem_API.hpp"
 
-#include "adj_table.h"
-#include "obstacle.h"
-#include "sfem_hex8_mesh_graph.h"
-#include "sfem_sshex8_skin.h"
-#include "sshex8_mesh.h"
+#include "obstacle.hpp"
+// 
 
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_resample_gap.hpp"
+
+#include "smesh_restriction.hpp"
 
 #include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_obstacle.h"
+#include "cu_obstacle.hpp"
 #include "sfem_cuda_blas.hpp"
 #endif
 
@@ -71,10 +65,10 @@ namespace sfem {
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                                        const bool                            as_zero) const {
         auto space = impl_->space;
-        auto et    = (enum ElemType)space->element_type();
+        auto et    = (smesh::ElemType)space->element_type();
 
-        const ptrdiff_t max_coarse_idx =
-                max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements()->data());
+        const ptrdiff_t max_coarse_idx = max_node_id(
+                coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -85,7 +79,7 @@ namespace sfem {
             ptrdiff_t coarse_local_size = 0;
             idx_t    *coarse_indices    = nullptr;
             real_t   *coarse_values     = nullptr;
-            hierarchical_create_coarse_indices(max_coarse_idx,
+            smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
                                                impl_->conditions[i].local_size,
                                                impl_->conditions[i].idx,
                                                &coarse_local_size,
@@ -94,7 +88,7 @@ namespace sfem {
             if (!as_zero && impl_->conditions[i].values) {
                 coarse_values = (real_t *)malloc(coarse_local_size * sizeof(real_t));
 
-                hierarchical_collect_coarse_values(max_coarse_idx,
+                smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
                                                    impl_->conditions[i].local_size,
                                                    impl_->conditions[i].idx,
                                                    impl_->conditions[i].values,
@@ -288,7 +282,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t *>>      normals;
         std::shared_ptr<Buffer<real_t>>        mass_vector;
         bool                                   debug{false};
-        bool                                   variational{true};
+        bool                                   variational{false};
         enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
         std::shared_ptr<BLAS_Tpl<real_t>>      blas_;
 
@@ -299,17 +293,14 @@ namespace sfem {
 
             contact_surface->reset_points();
 
-            auto st           = contact_surface->element_type();
-            auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->comm(),
-                                                       space->mesh_ptr()->spatial_dimension(),
-                                                       st,
-                                                       contact_surface->elements()->extent(1),
-                                                       contact_surface->elements(),
-                                                       contact_surface->points()->extent(1),
-                                                       contact_surface->points());
+            auto st = contact_surface->element_type();
+            auto surface_mesh =
+                    std::make_shared<Mesh>(space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
 
+            // surface_mesh->print();
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+            bop->initialize();
 
             mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
 
@@ -339,7 +330,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == execution_space) {
-                mass_vector = sfem::to_device(mass_vector);
+                mass_vector = smesh::to_device(mass_vector);
             }
 #endif
 
@@ -363,7 +354,7 @@ namespace sfem {
     ContactConditions::~ContactConditions() = default;
 
     std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace>        &space,
-                                                                 const std::shared_ptr<Grid<geom_t>>         &sdf,
+                                                                 const std::shared_ptr<smesh::Grid<geom_t>>         &sdf,
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
@@ -375,7 +366,7 @@ namespace sfem {
             cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        cc->impl_->normals         = create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
+        cc->impl_->normals         = smesh::create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
         cc->impl_->execution_space = es;
         cc->impl_->blas_           = sfem::blas<real_t>(es);
         cc->impl_->assemble_mass_vector();
@@ -403,7 +394,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        auto sideset = Sideset::create_from_file(mesh->comm(), path_surface.c_str());
+        auto sideset = smesh::Sideset::create_from_file(mesh->comm(), smesh::Path(path_surface));
 
         std::string path_sdf;
         in->require("sdf", path_sdf);
@@ -412,7 +403,7 @@ namespace sfem {
             path_sdf = path + "/" + path_sdf;
         }
 
-        auto sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
+        auto sdf = smesh::Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
         return create(space, std::move(sdf), {sideset}, es);
     }

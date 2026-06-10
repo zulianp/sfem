@@ -9,17 +9,16 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mesh_write.h"
 
-#include "sortreduce.h"
 
-#include "extract_sharp_features.h"
-#include "mesh_utils.h"
-#include "sfem_glob.hpp"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+
+
+#include "sortreduce.hpp"
+
+#include "smesh_extractions.hpp"
+#include "smesh_glob.hpp"
 
 #include "sfem_API.hpp"
 
@@ -48,7 +47,7 @@ int main(int argc, char *argv[]) {
     }
 
     double tick = MPI_Wtime();
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -56,11 +55,11 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    if (shell_type(mesh->element_type()) != TRISHELL3) {
+    if (shell_type(mesh->element_type(0)) != smesh::TRISHELL3) {
         fprintf(stderr, "%s this driver only supports triangle meshes", argv[0]);
         return EXIT_FAILURE;
     }
@@ -69,50 +68,15 @@ int main(int argc, char *argv[]) {
     // Build graphs
     ///////////////////////////////////////////////////////////////////////////////
 
-    ptrdiff_t n_sharp_edges = 0;
-    idx_t *e0 = 0;
-    idx_t *e1 = 0;
+    auto sharp_edges = smesh::extract_sharp_edges(*mesh, angle_threshold);
+    auto disconnected_elements = smesh::extract_disconnected_faces(*mesh, sharp_edges);
+    auto corners = smesh::extract_sharp_corners(n_nodes, sharp_edges, true);
 
-    {  // Extract sharp edges!
-        count_t *rowptr = 0;
-        idx_t *colidx = 0;
-        build_crs_graph_for_elem_type(
-            mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), &rowptr, &colidx);
-
-        extract_sharp_edges(mesh->element_type(),
-                            n_elements,
-                            n_nodes,
-                            mesh->elements()->data(),
-                            mesh->points()->data(),
-                            // CRS-graph (node to node)
-                            rowptr,
-                            colidx,
-                            angle_threshold,
-                            &n_sharp_edges,
-                            &e0,
-                            &e1);
-
-        free(rowptr);
-        free(colidx);
-    }
-
-    ptrdiff_t n_disconnected_elements = 0;
-    element_idx_t *disconnected_elements = 0;
-
-    extract_disconnected_faces(mesh->element_type(),
-                               n_elements,
-                               n_nodes,
-                               mesh->elements()->data(),
-                               n_sharp_edges,
-                               e0,
-                               e1,
-                               &n_disconnected_elements,
-                               &disconnected_elements);
-
-    ptrdiff_t n_corners = 0;
-    idx_t *corners = 0;
-    n_sharp_edges =
-        extract_sharp_corners(n_nodes, n_sharp_edges, e0, e1, &n_corners, &corners, 1);
+    const ptrdiff_t n_sharp_edges = sharp_edges->extent(1);
+    const ptrdiff_t n_disconnected_elements = disconnected_elements->size();
+    const ptrdiff_t n_corners = corners->size();
+    auto e0 = sharp_edges->data()[0];
+    auto e1 = sharp_edges->data()[1];
 
     {
         char path[1024 * 10];
@@ -124,39 +88,34 @@ int main(int argc, char *argv[]) {
 
         snprintf(path, sizeof(path), "%s/corners", output_folder);
 
-        sfem::create_directory(path);
+        smesh::create_directory(path);
 
         snprintf(path, sizeof(path), "%s/corners/i0.raw", output_folder);
-        array_write(comm, path, SFEM_MPI_COUNT_T, corners, n_corners, n_corners);
+        array_write(comm, path, SFEM_MPI_COUNT_T, corners->data(), n_corners, n_corners);
 
         snprintf(path, sizeof(path), "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
         array_write(comm,
                     path,
                     SFEM_MPI_ELEMENT_IDX_T,
-                    disconnected_elements,
+                    disconnected_elements->data(),
                     n_disconnected_elements,
                     n_disconnected_elements);
 
         {
-            const int nxe = elem_num_nodes(mesh->element_type());
-            idx_t **delems = allocate_elements(nxe, n_disconnected_elements);
-            select_elements(
-                nxe, n_disconnected_elements, disconnected_elements, mesh->elements()->data(), delems);
-
-            snprintf(path, sizeof(path), "%s/disconnected", output_folder);
-            sfem::create_directory(path);
+            const int nxe = elem_num_nodes(mesh->element_type(0));
+            auto delems = sfem::create_host_buffer<idx_t>(nxe, n_disconnected_elements);
+            auto src = mesh->elements(0)->data();
 
             for (int d = 0; d < nxe; d++) {
-                snprintf(path, sizeof(path), "%s/disconnected/i%d.raw", output_folder, d);
-                array_write(comm,
-                            path,
-                            SFEM_MPI_IDX_T,
-                            delems[d],
-                            n_disconnected_elements,
-                            n_disconnected_elements);
+                for (ptrdiff_t i = 0; i < n_disconnected_elements; i++) {
+                    delems->data()[d][i] = src[d][disconnected_elements->data()[i]];
+                }
             }
 
-            free_elements(nxe, delems);
+            snprintf(path, sizeof(path), "%s/disconnected", output_folder);
+            smesh::create_directory(path);
+
+            delems->to_files(smesh::Path(std::string(output_folder) + "/disconnected/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
         }
     }
 
@@ -172,11 +131,6 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
     // Free Resources
     ///////////////////////////////////////////////////////////////////////////////
-
-    free(e0);
-    free(e1);
-    free(disconnected_elements);
-    free(corners);
 
     double tock = MPI_Wtime();
     if (!rank) {

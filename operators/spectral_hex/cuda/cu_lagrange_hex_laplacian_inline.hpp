@@ -1,7 +1,7 @@
 #ifndef CU_LAGRANGE_HEX_LAPLACIAN_INLINE_H
 #define CU_LAGRANGE_HEX_LAPLACIAN_INLINE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <int N, int Q, typename T>
 inline __host__ __device__ void cu_lagrange_hex_triad_interpolate(

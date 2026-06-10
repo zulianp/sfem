@@ -8,15 +8,14 @@
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_cuda_blas.h"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 int  SFEM_REPEAT = 10;
 void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op,
@@ -143,20 +142,20 @@ int main(int argc, char* argv[]) {
 
         auto y1 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
         auto y2 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
-        auto x  = sfem::to_device(x_host);
+        auto x  = smesh::to_device(x_host);
 
         // CSR buffers device
-        auto colidx = sfem::to_device(colidx_host);
-        auto rowidx = sfem::to_device(rowidx_host);
-        auto rowptr = sfem::to_device(rowptr_host);
-        auto values = sfem::to_device(values_host);
+        auto colidx = smesh::to_device(colidx_host);
+        auto rowidx = smesh::to_device(rowidx_host);
+        auto rowptr = smesh::to_device(rowptr_host);
+        auto values = smesh::to_device(values_host);
 
         // Diagonal sparse matrix buffers device
-        auto diag_values    = sfem::to_device(diag_values_host);
-        auto offdiag_values = sfem::to_device(offdiag_values_host);
-        auto offdiag_colidx = sfem::to_device(offdiag_colidx_host);
-        auto offdiag_rowidx = sfem::to_device(offdiag_rowidx_host);
-        auto offdiag_rowptr = sfem::to_device(offdiag_rowptr_host);
+        auto diag_values    = smesh::to_device(diag_values_host);
+        auto offdiag_values = smesh::to_device(offdiag_values_host);
+        auto offdiag_colidx = smesh::to_device(offdiag_colidx_host);
+        auto offdiag_rowidx = smesh::to_device(offdiag_rowidx_host);
+        auto offdiag_rowptr = smesh::to_device(offdiag_rowptr_host);
 
         // TODO
         // GPU: coo, csr sym, bsr, bsr sym
@@ -194,8 +193,8 @@ int main(int argc, char* argv[]) {
         time_operator_gpu(crs_gpu, "csr", x->data(), y2->data());
         time_operator_gpu(coo_sym_gpu, "coo sym", x->data(), y1->data());
 
-        auto y1_tocpu = sfem::to_host(y1);
-        auto y2_tocpu = sfem::to_host(y2);
+        auto y1_tocpu = smesh::to_host(y1);
+        auto y2_tocpu = smesh::to_host(y2);
 
         gpu_blas->axpy(ndofs, -1, y2->data(), y1->data());
         auto norm_y1 = gpu_blas->norm2(ndofs, y1->data());

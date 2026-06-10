@@ -15,6 +15,7 @@ real_t = "scalar_t"
 def c_log(expr):
     console.print(expr)
 
+
 def perp(e):
     return sp.Matrix(2, 1, [-e[1], e[0]])
 
@@ -228,14 +229,12 @@ def c_gen(expr, dump=False, optimizations="basic"):
     # code_string = f'//{cost}\n' + code_string
     # code_string = f'//TODO COST\n' + code_string
 
-    
-    op_cost =(
-            """
+    op_cost = """
 // mundane ops: %d divs: %d sqrts: %d 
 // total ops: %d
-"""
-            % (tuple(opcounts) + (flopcount(opcounts),))
-        )
+""" % (
+        tuple(opcounts) + (flopcount(opcounts),)
+    )
 
     code_string = op_cost + code_string
 
@@ -647,3 +646,17 @@ def add_assign_matrix(name, mat):
             var = sp.symbols(f"{name}[{i*cols + j}]")
             expr.append(ast.AddAugmentedAssignment(var, mat[i, j]))
     return expr
+
+
+def diag_matrix(vec):
+    print(vec.shape)
+    if vec.shape[1] == 1:
+        ret = sp.zeros(vec.shape[0], vec.shape[0])
+        for i in range(0, vec.shape[0]):
+            ret[i, i] = vec[i, 0]
+        return ret
+    else:
+        ret = sp.zeros(vec.shape[1], vec.shape[1])
+        for i in range(0, vec.shape[1]):
+            ret[i, i] = vec[0, i]
+        return ret

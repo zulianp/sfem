@@ -7,28 +7,28 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "boundary_condition_incore_cuda.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 #include "matrixio_array.h"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
 #include "laplacian_incore_cuda.h"
 
-#include "read_mesh.h"
+
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 
 #include <vector>
 
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 
 template <typename T>
 void sfem_cuda_init_solver(sfem::ConjugateGradient<T> &cg) {
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
         destroy_conditions(n_dirichlet_conditions, h_dirichlet_conditions);
     }
 
-    enum ElemType elem_type = (ElemType)mesh.element_type;
+    smesh::ElemType elem_type = (smesh::ElemType)mesh.element_type;
 
     if (SFEM_USE_MACRO) {
         elem_type = macro_type_variant(elem_type);

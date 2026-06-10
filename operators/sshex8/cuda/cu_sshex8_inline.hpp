@@ -1,9 +1,9 @@
 #ifndef SFEM_SSHEX8_INLINE_HPP
 #define SFEM_SSHEX8_INLINE_HPP
 
-#include "sfem_base.h"
-#include "sfem_macros.h"
-#include "sfem_cuda_base.h"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
+#include "sfem_cuda_base.hpp"
 
 template <typename scalar_t>
 static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t                          stride,

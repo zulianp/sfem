@@ -4,10 +4,10 @@
 #include <cstddef>
 #include <functional>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #define SFEM_N_WARPS_PER_BLOCK 8
 

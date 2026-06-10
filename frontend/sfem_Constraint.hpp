@@ -2,9 +2,9 @@
 #define SFEM_CONSTRAINT_HPP
 
 #include <memory>
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mask.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mask.hpp"
 #include "sfem_FunctionSpace.hpp"
 
 namespace sfem {

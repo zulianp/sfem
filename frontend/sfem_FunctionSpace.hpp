@@ -2,8 +2,11 @@
 #define SFEM_FUNCTIONSPACE_HPP
 
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_defs.h"
-#include "sfem_Buffer.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_aliases.hpp"
+#include "smesh_semistructured.hpp"
+
+#include "smesh_packed_mesh.hpp"
 
 #include <memory>
 #include <string>
@@ -15,20 +18,18 @@ namespace sfem {
     public:
         using PackedIdxType = uint16_t;
         // using PackedIdxType = uint8_t;
-        using PackedMesh = Packed<PackedIdxType>;
+        using PackedMesh = smesh::PackedMesh<PackedIdxType>;
 
-        FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const enum ElemType element_type = INVALID);
+        FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const smesh::ElemType element_type = smesh::INVALID);
         ~FunctionSpace();
-
-        int promote_to_semi_structured(const int level);
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
                                                      const int                    block_size   = 1,
-                                                     const enum ElemType          element_type = INVALID) {
+                                                     const smesh::ElemType          element_type = smesh::INVALID) {
             return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
+        // static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<PackedMesh> &mesh, const int block_size = 1);
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
@@ -45,7 +46,6 @@ namespace sfem {
         std::shared_ptr<Mesh> mesh_ptr() const;
 
         bool                has_semi_structured_mesh() const;
-        SemiStructuredMesh &semi_structured_mesh();
 
         
         // using PackedIdxType = uint8_t;
@@ -58,8 +58,8 @@ namespace sfem {
         int       block_size() const;
         ptrdiff_t n_dofs() const;
 
-        enum ElemType element_type(const int block = 0) const;
-        std::vector<enum ElemType> element_types() const;
+        smesh::ElemType element_type(const int block = 0) const;
+        std::vector<smesh::ElemType> element_types() const;
 
         std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
         std::shared_ptr<FunctionSpace> lor() const;

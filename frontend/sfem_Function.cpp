@@ -5,17 +5,17 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
 
-#include "dirichlet.h"
-#include "integrate_values.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "integrate_values.hpp"
+#include "neumann.hpp"
 
 #include <sys/stat.h>
 // #include <sys/wait.h>
@@ -30,21 +30,17 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.h"
-#include "hex8_fff.h"
-#include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
-#include "sshex8.h"
-#include "sshex8_mesh.h"
 
-// Multigrid
-#include "sfem_prolongation_restriction.h"
+#include "hex8_fff.hpp"
+#include "hex8_jacobian.hpp"
+//
 
-// C++ includes
-#include "sfem_CRSGraph.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_semistructured.hpp"
+
+#include "smesh_common.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_restriction.hpp"
+#include "smesh_sshex8.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -74,11 +70,12 @@ namespace sfem {
 
     class Output::Impl {
     public:
+        std::shared_ptr<smesh::Output> smesh_output;
         std::shared_ptr<FunctionSpace> space;
         bool                           AoS_to_SoA{false};
-        std::string                    output_dir{"."};
-        std::string                    file_format{"%s/%s.raw"};
-        std::string                    time_dependent_file_format{"%s/%s.%09d.raw"};
+        smesh::Path                    output_dir{smesh::Path(".")};
+        std::string                    file_format{"%s/%s.%s"};
+        std::string                    time_dependent_file_format{"%s/%s.%09d.%s"};
         size_t                         export_counter{0};
         logger_t                       time_logger;
         Impl() { log_init(&time_logger); }
@@ -92,20 +89,25 @@ namespace sfem {
 
         const char *SFEM_OUTPUT_DIR = ".";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
-        impl_->output_dir = SFEM_OUTPUT_DIR;
+        impl_->output_dir = smesh::Path(SFEM_OUTPUT_DIR);
+
+        impl_->smesh_output = smesh::Output::create(space->mesh_ptr(), smesh::Path(impl_->output_dir));
     }
 
     Output::~Output() = default;
 
     void Output::clear() { impl_->export_counter = 0; }
 
-    void Output::set_output_dir(const char *path) { impl_->output_dir = path; }
+    void Output::set_output_dir(const smesh::Path &path) {
+        impl_->smesh_output = smesh::Output::create(impl_->space->mesh_ptr(), smesh::Path(path));
+        impl_->output_dir   = path;
+    }
 
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
         MPI_Comm comm = impl_->space->mesh_ptr()->comm()->get();
-        sfem::create_directory(impl_->output_dir.c_str());
+        smesh::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
         if (impl_->AoS_to_SoA && block_size > 1) {
@@ -122,18 +124,11 @@ namespace sfem {
 
                 char b_name[1024];
                 snprintf(b_name, sizeof(b_name), "%s.%d", name, b);
-                snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
-                if (array_write(comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
-                    return SFEM_FAILURE;
-                }
+                impl_->smesh_output->write_nodal(b_name, smesh::TypeToEnum<real_t>::value(), bb, 1);
             }
 
         } else {
-            char path[2048];
-            snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
-            if (array_write(comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
-                return SFEM_FAILURE;
-            }
+            impl_->smesh_output->write_nodal(name, smesh::TypeToEnum<real_t>::value(), x, impl_->space->block_size());
         }
 
         return SFEM_SUCCESS;
@@ -156,7 +151,7 @@ namespace sfem {
         auto      mesh       = space->mesh_ptr();
         const int block_size = space->block_size();
 
-        sfem::create_directory(impl_->output_dir.c_str());
+        smesh::create_directory(impl_->output_dir.c_str());
 
         char path[2048];
 
@@ -178,8 +173,10 @@ namespace sfem {
                          impl_->time_dependent_file_format.c_str(),
                          impl_->output_dir.c_str(),
                          b_name,
-                         impl_->export_counter++);
+                         impl_->export_counter++,
+                         smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
+                //  TODO
                 if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
@@ -191,7 +188,8 @@ namespace sfem {
                      impl_->time_dependent_file_format.c_str(),
                      impl_->output_dir.c_str(),
                      name,
-                     impl_->export_counter++);
+                     impl_->export_counter++,
+                     smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
             if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;
@@ -254,14 +252,15 @@ namespace sfem {
 
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
-    int Function::constaints_mask(mask_t *mask) {
-        SFEM_TRACE_SCOPE("Function::constaints_mask");
+    int Function::constraints_mask(mask_t *mask) {
+        SFEM_TRACE_SCOPE("Function::constraints_mask");
 
+        int err = SFEM_SUCCESS;
         for (auto &c : impl_->constraints) {
-            c->mask(mask);
+            err += c->mask(mask);
         }
 
-        return SFEM_FAILURE;
+        return err == SFEM_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
@@ -522,7 +521,7 @@ namespace sfem {
 
     int Function::initial_guess(real_t *const x) { return SFEM_SUCCESS; }
 
-    int Function::set_output_dir(const char *path) {
+    int Function::set_output_dir(const smesh::Path &path) {
         impl_->output->set_output_dir(path);
         return SFEM_SUCCESS;
     }
@@ -594,7 +593,7 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
-        auto files   = sfem::find_files(pattern);
+        auto files   = smesh::find_files(pattern);
         int  n_files = files.size();
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));

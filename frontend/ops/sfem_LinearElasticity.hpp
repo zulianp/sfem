@@ -29,33 +29,29 @@ namespace sfem {
      * - f is the body force
      *
      * The operator supports:
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Multiple matrix formats (CRS, BSR, diagonal)
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
      * - Multi-domain operations via MultiDomainOp
+     * - Semi-structured Proteus hex (same paths as former @c ss:LinearElasticity): @c apply /
+     *   @c gradient / @c hessian_bsr / @c hessian_diag / @c hessian_block_diag_sym when
+     *   @c has_semi_structured_mesh() and @c is_semistructured_type(element_type).
      */
     class LinearElasticity final : public Op {
     public:
         const char *name() const override { return "LinearElasticity"; }
         inline bool is_linear() const override { return true; }
-        ptrdiff_t  n_dofs_domain() const override;
-        ptrdiff_t  n_dofs_image() const override;
-
-        // Accessors for compatibility with semi-structured wrappers
-        real_t get_mu() const;
-        void   set_mu(real_t val);
-        real_t get_lambda() const;
-        void   set_lambda(real_t val);
+        ptrdiff_t   n_dofs_domain() const override;
+        ptrdiff_t   n_dofs_image() const override;
 
         /**
          * @brief Create a LinearElasticity operator
          * @param space Function space
          * @return Unique pointer to the operator
          *
-         * The operator reads material parameters from environment variables:
-         * - SFEM_SHEAR_MODULUS: Shear modulus μ (default: 1.0)
-         * - SFEM_FIRST_LAME_PARAMETER: First Lamé parameter λ (default: 1.0)
+         * Reads @c SFEM_HEX8_ASSUME_AFFINE for the affine-adjugate apply flag. Lamé parameters are set in
+         * initialize() from @c SFEM_SHEAR_MODULUS and @c SFEM_FIRST_LAME_PARAMETER.
          */
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -79,8 +75,12 @@ namespace sfem {
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          *
          * Sets up the MultiDomainOp for multi-block operations.
-         * For HEX8 elements, this precomputes Jacobian determinants and adjugates
-         * to optimize matrix-vector products.
+         * For HEX8 and semistructured (Proteus) hex element types, builds
+         * smesh::JacobianAdjugateAndDeterminant (macro corners for semistructured Proteus hex)
+         * so apply()/gradient() use the affine optimized path (linear_elasticity_apply_adjugate_aos).
+         * Without cached Jacobians, apply uses isoparametric linear_elasticity_apply_aos from mesh points.
+         * Writes @c "mu" and @c "lambda" on every domain from @c SFEM_SHEAR_MODULUS and
+         * @c SFEM_FIRST_LAME_PARAMETER (defaults 1.0); override per block with set_value_in_block().
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
@@ -129,7 +129,15 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
-        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
+
+        /// @c "ASSUME_AFFINE" is kept for API compatibility (stored; apply path is adjugate iff Jacobian cache exists).
+        void set_option(const std::string &name, bool val) override;
+
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif  // SFEM_ENABLE_RYAML
 
     private:
         class Impl;
