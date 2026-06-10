@@ -94,7 +94,7 @@ Cite SFEM if you use it for your work:
 
 ```bibtex
 @misc{sfemgit,
-	author = {Zulian, Patrick and Riva, Simone},
+	author = {Zulian, Patrick and Riva, Simone and Yang, Haoyu},
 	title = {{SFEM}: Simple {FEM}},
 	url = {https://bitbucket.org/zulianp/sfem},
 	howpublished = {https://bitbucket.org/zulianp/sfem},
@@ -103,6 +103,8 @@ Cite SFEM if you use it for your work:
 ```
 
 # AI Generated docs
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zulianp/sfem)
 
 https://deepwiki.com/zulianp/sfem
 
