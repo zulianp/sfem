@@ -457,14 +457,14 @@ tri3_raster_mesh_cell_quad_gpu(const ptrdiff_t                      start_elemen
 
     {
         const double tick_launch = MPI_Wtime();
-        ret                      = tri3_raster_cell_quad_gpu_launch(&cpu_data,  //
-                                                                    mesh,       //
-                                                                    n,
-                                                                    stride,
-                                                                    origin,
-                                                                    delta,
-                                                                    weighted_field,
-                                                                    data);
+        ret                      = tri3_raster_cell_quad_bl_gpu_launch(&cpu_data,       //
+                                                                       mesh,            //
+                                                                       n,               //
+                                                                       stride,          //
+                                                                       origin,          //
+                                                                       delta,           //
+                                                                       weighted_field,  //
+                                                                       data);           //
         const double tock_launch = MPI_Wtime();
         printf("[tri3_raster_mesh_cell_quad_gpu] kernel launch: %.6f s\n", tock_launch - tick_launch);
     }
