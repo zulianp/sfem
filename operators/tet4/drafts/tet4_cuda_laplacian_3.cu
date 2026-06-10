@@ -1,4 +1,4 @@
-// #include "laplacian.h"
+// #include "laplacian.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -7,16 +7,16 @@
 #include <cstddef>
 
 extern "C" {
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
-#include "crs_graph.h"
-#include "cuda_crs.h"
-#include "sfem_base.h"
-#include "sfem_vec.h"
-#include "sortreduce.h"
+
+#include "cuda_crs.hpp"
+#include "sfem_base.hpp"
+#include "sfem_vec.hpp"
+#include "sortreduce.hpp"
 }
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

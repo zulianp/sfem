@@ -3,7 +3,7 @@
 
 #include <cuda_runtime.h>
 #include <stdio.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // Struct for the elements
 typedef struct {

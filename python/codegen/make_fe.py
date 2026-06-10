@@ -189,7 +189,7 @@ f = open("generated_tet4.c", "w")
 
 f.write(
     """
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include <math.h>
 """
 )

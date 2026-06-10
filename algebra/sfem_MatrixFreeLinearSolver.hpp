@@ -2,12 +2,12 @@
 #define SFEM_MATRIX_FREE_LINEAR_SOLVER_HPP
 
 // C includes
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // C++ includes
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
-#include "sfem_Tracer.hpp"
+
 
 // STL includes
 #include <cassert>

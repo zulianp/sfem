@@ -2,32 +2,34 @@
 #define SFEM_API_HPP
 
 // C includes
-#include "adj_table.h"
-#include "crs_graph.h"
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
-#include "sfem_mask.h"
-#include "sfem_mesh.h"
-#include "sfem_prolongation_restriction.h"
-#include "sshex8.h"
-#include "sshex8_interpolate.h"
-#include "ssquad4.h"
+#include "matrixio_array.h"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
+// #include "sfem_mask.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_prolongation.hpp"
+#include "smesh_restrict.hpp"
+#include "smesh_restriction.hpp"
+#include "smesh_sideset.hpp"
+#include "smesh_sshex8.hpp"
+#include "smesh_sshex8_prolongation.hpp"
+#include "smesh_sshex8_restriction.hpp"
+#include "smesh_ssquad4.hpp"
 
 // C++ includes
 #include "acrs.hpp"
 #include "scrs.hpp"
 #include "sdacrs.hpp"
-#include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
-#include "sfem_Context.hpp"
+
 #include "sfem_CooSym.hpp"
-#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
-#include "sfem_Restrict.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+#include "smesh_env.hpp"
+
+#include "sell.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
@@ -36,22 +38,24 @@
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
-#include "sell.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_semistructured.hpp"
+
+#include "smesh_glob.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_sshex8_interpolate.h"
-#include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftableJacobi.hpp"
-#include "sfem_cuda_blas.h"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_solver.hpp"
+#include "smesh_sshex8_prolongation.cuh"
+#include "smesh_sshex8_restriction.cuh"
+#include "smesh_tet4_prolongation_restriction.cuh"
 #else
 namespace sfem {
     static void device_synchronize() {}
@@ -102,46 +106,37 @@ namespace sfem {
                 es);
     }
 
-    template <typename T>
-    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::create_host_buffer<T>(n0, n1);
-    }
+    //     template <typename T>
+    //     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n0, n1);
+    //     }
 
-    template <typename T>
-    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::create_host_buffer<T>(n0, n1);
-    }
+    //     template <typename T>
+    //     static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n0, n1);
+    //     }
 
-    template <typename T>
-    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::create_host_buffer<T>(n);
-    }
+    //     template <typename T>
+    //     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n);
+    //     }
 
-    template <typename T>
-    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::create_host_buffer<T>(n);
-    }
-
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
-                                         const std::string                    &name,
-                                         const ExecutionSpace                  es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::Factory::create_op(space, name.c_str());
-    }
+    //     template <typename T>
+    //     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
+    // #ifdef SFEM_ENABLE_CUDA
+    //         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
+    // #endif  // SFEM_ENABLE_CUDA
+    //         return sfem::create_host_buffer<T>(n);
+    //     }
 
     template <typename T>
     static std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
@@ -327,7 +322,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -341,7 +336,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -355,7 +350,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -368,7 +363,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::to_device(conds);
+            return to_device(conds);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -379,15 +374,15 @@ namespace sfem {
         const ptrdiff_t rows        = crs_graph.n_nodes();
         auto            p2_vertices = create_host_buffer<idx_t>(crs_graph.nnz());
 
-        build_p1_to_p2_edge_map(rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
+        smesh::build_p1_to_p2_edge_map(rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
 
         return p2_vertices;
     }
 
     static std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space) {
-        auto et        = (enum ElemType)space.element_type();
+        auto et        = (smesh::ElemType)space.element_type();
         auto coarse_et = macro_base_elem(et);
-        auto crs_graph = space.mesh().create_node_to_node_graph(coarse_et);
+        auto crs_graph = space.mesh().create_node_to_node_graph(static_cast<smesh::ElemType>(coarse_et));
         return crs_graph;
     }
 
@@ -399,7 +394,7 @@ namespace sfem {
             auto elements = to_space->device_elements();
             if (!elements) {
                 elements = create_device_elements(to_space, to_space->element_type());
-                from_space->set_device_elements(elements);
+                to_space->set_device_elements(elements);
             }
 
             if (to_space->has_semi_structured_mesh()) {
@@ -416,24 +411,27 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
 
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
+                                auto &from_ssm = from_space->mesh();
+                                auto &to_ssm   = to_space->mesh();
 
-                                cu_sshex8_prolongate(from_ssm.n_elements(),
-                                                     from_ssm.level(),
-                                                     1,
-                                                     from_elements->data(),
-                                                     to_ssm.level(),
-                                                     1,
-                                                     elements->data(),
-                                                     from_space->block_size(),
-                                                     SFEM_REAL_DEFAULT,
-                                                     1,
-                                                     from,
-                                                     SFEM_REAL_DEFAULT,
-                                                     1,
-                                                     to,
-                                                     SFEM_DEFAULT_STREAM);
+                                int to_level   = smesh::semistructured_level(to_ssm);
+                                int from_level = smesh::semistructured_level(from_ssm);
+
+                                smesh::cu_sshex8_prolongate(from_ssm.n_elements(),
+                                                            from_level,
+                                                            1,
+                                                            from_elements->data(),
+                                                            to_level,
+                                                            1,
+                                                            elements->data(),
+                                                            from_space->block_size(),
+                                                            smesh::SMESH_DEFAULT,
+                                                            1,
+                                                            from,
+                                                            smesh::SMESH_DEFAULT,
+                                                            1,
+                                                            to,
+                                                            SFEM_DEFAULT_STREAM);
                             },
                             es);
 
@@ -444,18 +442,19 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
 
-                                auto &ssm = to_space->semi_structured_mesh();
-                                cu_sshex8_hierarchical_prolongation(ssm.level(),
-                                                                    ssm.n_elements(),
-                                                                    elements->data(),
-                                                                    from_space->block_size(),
-                                                                    SFEM_REAL_DEFAULT,
-                                                                    1,
-                                                                    from,
-                                                                    SFEM_REAL_DEFAULT,
-                                                                    1,
-                                                                    to,
-                                                                    SFEM_DEFAULT_STREAM);
+                                auto     &ssm   = to_space->mesh();
+                                const int level = smesh::semistructured_level(ssm);
+                                smesh::cu_sshex8_hierarchical_prolongation(level,
+                                                                           ssm.n_elements(),
+                                                                           elements->data(),
+                                                                           from_space->block_size(),
+                                                                           smesh::SMESH_DEFAULT,
+                                                                           1,
+                                                                           from,
+                                                                           smesh::SMESH_DEFAULT,
+                                                                           1,
+                                                                           to,
+                                                                           SFEM_DEFAULT_STREAM);
                             },
                             es);
                 }
@@ -464,18 +463,18 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_prolongation_element_based");
+                            SFEM_TRACE_SCOPE("smesh::cu_macrotet4_to_tet4_prolongation_element_based");
 
-                            cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
-                                                                            elements->data(),
-                                                                            from_space->block_size(),
-                                                                            SFEM_REAL_DEFAULT,
-                                                                            1,
-                                                                            from,
-                                                                            SFEM_REAL_DEFAULT,
-                                                                            1,
-                                                                            to,
-                                                                            SFEM_DEFAULT_STREAM);
+                            smesh::cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
+                                                                                   elements->data(),
+                                                                                   from_space->block_size(),
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   from,
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   to,
+                                                                                   SFEM_DEFAULT_STREAM);
                         },
                         es);
             }
@@ -491,13 +490,17 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
 
-                                auto &ssm = to_space->semi_structured_mesh();
-                                sshex8_hierarchical_prolongation(
-                                        ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
+                                auto &ssm = to_space->mesh();
+                                smesh::sshex8_hierarchical_prolongation(smesh::semistructured_level(ssm),
+                                                                        ssm.n_elements(),
+                                                                        ssm.elements(0)->data(),
+                                                                        from_space->block_size(),
+                                                                        from,
+                                                                        to);
                             },
                             EXECUTION_SPACE_HOST);
                 } else {
-                    assert(from_space->semi_structured_mesh().level() > 1);
+                    assert(smesh::semistructured_level(from_space->mesh()) > 1);
 
                     return make_op<real_t>(
                             to_space->n_dofs(),
@@ -505,19 +508,19 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_prolongate");
 
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
+                                auto &from_ssm = from_space->mesh();
+                                auto &to_ssm   = to_space->mesh();
 
-                                sshex8_prolongate(from_ssm.n_elements(),     // nelements,
-                                                  from_ssm.level(),          // from_level
-                                                  1,                         // from_level_stride
-                                                  from_ssm.element_data(),   // from_elements
-                                                  to_ssm.level(),            // to_level
-                                                  1,                         // to_level_stride
-                                                  to_ssm.element_data(),     // to_elements
-                                                  from_space->block_size(),  // vec_size
-                                                  from,
-                                                  to);
+                                smesh::sshex8_prolongate(from_ssm.n_elements(),                  // nelements,
+                                                         smesh::semistructured_level(from_ssm),  // from_level
+                                                         1,                                      // from_level_stride
+                                                         from_ssm.elements(0)->data(),           // from_elements
+                                                         smesh::semistructured_level(to_ssm),    // to_level
+                                                         1,                                      // to_level_stride
+                                                         to_ssm.elements(0)->data(),             // to_elements
+                                                         from_space->block_size(),               // vec_size
+                                                         from,
+                                                         to);
                             },
                             EXECUTION_SPACE_HOST);
                 }
@@ -528,23 +531,36 @@ namespace sfem {
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("hierarchical_prolongation");
 
-                            hierarchical_prolongation(from_space->element_type(),
-                                                      to_space->element_type(),
-                                                      to_space->mesh().n_elements(),
-                                                      to_space->mesh().elements()->data(),
-                                                      from_space->block_size(),
-                                                      from,
-                                                      to);
+                            smesh::hierarchical_prolongation(from_space->element_type(),
+                                                             to_space->element_type(),
+                                                             to_space->mesh().n_elements(),
+                                                             to_space->mesh().elements(0)->data(),
+                                                             from_space->block_size(),
+                                                             from,
+                                                             to);
                         },
                         EXECUTION_SPACE_HOST);
             }
         }
     }
 
+    static std::shared_ptr<Operator<real_t>> make_op(const std::shared_ptr<smesh::AbstractRestrict<real_t>> &op) {
+        return make_op<real_t>(
+                op->rows(),
+                op->cols(),
+                [=](const real_t *const from, real_t *const to) { op->apply(from, to); },
+                op->execution_space());
+    }
+
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(const std::shared_ptr<FunctionSpace> &from_space,
                                                                              const std::shared_ptr<FunctionSpace> &to_space,
                                                                              const ExecutionSpace                  es) {
-        return sfem::Restrict<real_t>::create(from_space, to_space, es, from_space->block_size());
+        auto op = smesh::Restrict<real_t>::create(from_space->mesh_ptr(), to_space->mesh_ptr(), es, from_space->block_size());
+        return make_op<real_t>(
+                from_space->n_dofs(),
+                to_space->n_dofs(),
+                [=](const real_t *const from, real_t *const to) { op->apply(from, to); },
+                op->execution_space());
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
@@ -560,24 +576,24 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto d_edges     = to_device(edges);
-            auto d_crs_graph = to_device(crs_graph);
+            auto d_edges     = smesh::to_device(edges);
+            auto d_crs_graph = smesh::to_device(crs_graph);
 
             return make_op<real_t>(
                     rows,
                     cols,
                     [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
-                        cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
-                                                         d_crs_graph->rowptr()->data(),
-                                                         d_crs_graph->colidx()->data(),
-                                                         d_edges->data(),
-                                                         block_size,
-                                                         SFEM_REAL_DEFAULT,
-                                                         from,
-                                                         SFEM_REAL_DEFAULT,
-                                                         to,
-                                                         SFEM_DEFAULT_STREAM);
+                        smesh::cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
+                                                                d_crs_graph->rowptr()->data(),
+                                                                d_crs_graph->colidx()->data(),
+                                                                d_edges->data(),
+                                                                block_size,
+                                                                smesh::SMESH_DEFAULT,
+                                                                from,
+                                                                smesh::SMESH_DEFAULT,
+                                                                to,
+                                                                SFEM_DEFAULT_STREAM);
                     },
                     EXECUTION_SPACE_DEVICE);
         }
@@ -587,13 +603,13 @@ namespace sfem {
                 rows,
                 cols,
                 [=](const real_t *const from, real_t *const to) {
-                    ::hierarchical_restriction_with_edge_map(n_coarse_nodes,
-                                                             crs_graph->rowptr()->data(),
-                                                             crs_graph->colidx()->data(),
-                                                             edges->data(),
-                                                             block_size,
-                                                             from,
-                                                             to);
+                    smesh::hierarchical_restriction_with_edge_map(n_coarse_nodes,
+                                                                  crs_graph->rowptr()->data(),
+                                                                  crs_graph->colidx()->data(),
+                                                                  edges->data(),
+                                                                  block_size,
+                                                                  from,
+                                                                  to);
                 },
                 EXECUTION_SPACE_HOST);
     }
@@ -625,9 +641,9 @@ namespace sfem {
                                                           d_crs_graph->colidx()->data(),
                                                           d_edges->data(),
                                                           block_size,
-                                                          SFEM_REAL_DEFAULT,
+                                                          smesh::SMESH_DEFAULT,
                                                           from,
-                                                          SFEM_REAL_DEFAULT,
+                                                          smesh::SMESH_DEFAULT,
                                                           to,
                                                           SFEM_DEFAULT_STREAM);
 
@@ -642,13 +658,13 @@ namespace sfem {
                 rows,
                 cols,
                 [=](const real_t *const from, real_t *const to) {
-                    ::hierarchical_prolongation_with_edge_map(n_coarse_nodes,
-                                                              crs_graph->rowptr()->data(),
-                                                              crs_graph->colidx()->data(),
-                                                              edges->data(),
-                                                              block_size,
-                                                              from,
-                                                              to);
+                    smesh::hierarchical_prolongation_with_edge_map(n_coarse_nodes,
+                                                                   crs_graph->rowptr()->data(),
+                                                                   crs_graph->colidx()->data(),
+                                                                   edges->data(),
+                                                                   block_size,
+                                                                   from,
+                                                                   to);
 
                     function->apply_zero_constraints(to);
                 },
@@ -707,7 +723,7 @@ namespace sfem {
     static auto hessian_crs(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
             f.hessian_crs(nullptr, d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
@@ -736,7 +752,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
             f->hessian_crs(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
@@ -777,37 +793,37 @@ namespace sfem {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
         auto      crs_graph  = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
-        int       prec       = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int       prec       = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
         // FIXME: there is a memory leak here!
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
             auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
             switch (prec) {
-            // FIXME: mixed precision not yet supported for BSR
-            //     case 2:
-            //         return compose_constraints_op(f,
-            //                                       sfem::d_bsr_spmv<count_t, idx_t, half_t, real_t>(d_crs_graph->n_nodes(),
-            //                                                                                        d_crs_graph->n_nodes(),
-            //                                                                                        block_size,
-            //                                                                                        d_crs_graph->rowptr(),
-            //                                                                                        d_crs_graph->colidx(),
-            //                                                                                        astype<half_t>(values),
-            //                                                                                        (real_t)1));
-            //     case 4:
-            //         return compose_constraints_op(f,
-            //                                       sfem::d_bsr_spmv<count_t, idx_t, float, real_t>(d_crs_graph->n_nodes(),
-            //                                                                                       d_crs_graph->n_nodes(),
-            //                                                                                       block_size,
-            //                                                                                       d_crs_graph->rowptr(),
-            //                                                                                       d_crs_graph->colidx(),
-            //                                                                                       astype<float>(values),
-            //                                                                                       (real_t)1));
-            // default:
+                // FIXME: mixed precision not yet supported for BSR
+                //     case 2:
+                //         return compose_constraints_op(f,
+                //                                       sfem::d_bsr_spmv<count_t, idx_t, half_t, real_t>(d_crs_graph->n_nodes(),
+                //                                                                                        d_crs_graph->n_nodes(),
+                //                                                                                        block_size,
+                //                                                                                        d_crs_graph->rowptr(),
+                //                                                                                        d_crs_graph->colidx(),
+                //                                                                                        astype<half_t>(values),
+                //                                                                                        (real_t)1));
+                //     case 4:
+                //         return compose_constraints_op(f,
+                //                                       sfem::d_bsr_spmv<count_t, idx_t, float, real_t>(d_crs_graph->n_nodes(),
+                //                                                                                       d_crs_graph->n_nodes(),
+                //                                                                                       block_size,
+                //                                                                                       d_crs_graph->rowptr(),
+                //                                                                                       d_crs_graph->colidx(),
+                //                                                                                       astype<float>(values),
+                //                                                                                       (real_t)1));
+                // default:
                 return compose_constraints_op(f,
                                               sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
                                                                d_crs_graph->n_nodes(),
@@ -873,7 +889,7 @@ namespace sfem {
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
 
-        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
         SharedBuffer<real_t *> diag_values;
         SharedBuffer<real_t *> off_diag_values;
@@ -951,7 +967,7 @@ namespace sfem {
         std::shared_ptr<sfem::Operator<real_t>> spmv;
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto d_crs_graph = smesh::to_device(crs_graph);
 
             f->hessian_crs_sym(x_data,
                                d_crs_graph->rowptr()->data(),
@@ -961,7 +977,7 @@ namespace sfem {
 
             auto h_row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), sfem::EXECUTION_SPACE_HOST);
             crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), h_row_idx->data());
-            auto row_idx = sfem::to_device(h_row_idx);
+            auto row_idx = smesh::to_device(h_row_idx);
 
             spmv = sfem::d_sym_coo_spmv(fs->n_dofs(), row_idx, crs_graph->colidx(), off_diag_values, diag_values, 1);
 
@@ -977,7 +993,7 @@ namespace sfem {
             auto row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
             crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
             // auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-            // f->constaints_mask(mask->data());
+            // f->constraints_mask(mask->data());
 
             spmv = sfem::h_coosym<idx_t, real_t>(nullptr, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
         }
@@ -1052,7 +1068,7 @@ namespace sfem {
                                                                   const sfem::ExecutionSpace             es) {
         auto crs = hessian_crs(f, x, es);
 
-        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         switch (prec) {
             case 2:
                 return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, half_t>(
@@ -1068,7 +1084,7 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_acrs(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
@@ -1084,7 +1100,7 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_scrs(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
@@ -1101,15 +1117,17 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_sell(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
-        int  slice_height = sfem::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
+        int prec         = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int slice_height = smesh::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
 
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
-                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(
+                        temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
             case 4:
-                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(
+                        temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
             default:
                 return sfem::sell_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
         }
@@ -1139,7 +1157,7 @@ namespace sfem {
     }
 
     static int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
-        sfem::create_directory(path.c_str());
+        smesh::create_directory(path.c_str());
         crs_t crs_out;
         crs_out.rowptr      = (char *)graph.rowptr()->data();
         crs_out.colidx      = (char *)graph.colidx()->data();
@@ -1188,7 +1206,7 @@ namespace sfem {
             }
 
             // FIXME: This is a hack to support mixed precision
-            int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+            int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
             auto crs  = sfem::hessian_crs(f, u, es);
             switch (prec) {
                 case 2:
@@ -1228,8 +1246,9 @@ namespace sfem {
             for (int zi = 0; zi <= to_level; zi++) {
                 for (int yi = 0; yi <= to_level; yi++) {
                     for (int xi = 0; xi <= to_level; xi++) {
-                        const int from_lidx = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
-                        const int to_lidx   = sshex8_lidx(to_level, xi, yi, zi);
+                        const int from_lidx =
+                                smesh::sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const int to_lidx = smesh::sshex8_lidx(to_level, xi, yi, zi);
 
                         assert(from_lidx < elements->extent(0));
                         assert(to_lidx < host_dev_ptrs.size());
@@ -1266,8 +1285,8 @@ namespace sfem {
         for (int zi = 0; zi <= to_level; zi++) {
             for (int yi = 0; yi <= to_level; yi++) {
                 for (int xi = 0; xi <= to_level; xi++) {
-                    const int from_lidx = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
-                    const int to_lidx   = sshex8_lidx(to_level, xi, yi, zi);
+                    const int from_lidx = smesh::sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                    const int to_lidx   = smesh::sshex8_lidx(to_level, xi, yi, zi);
                     d[to_lidx]          = elems[from_lidx];
                 }
             }
@@ -1295,8 +1314,8 @@ namespace sfem {
 
         for (int yi = 0; yi <= to_level; yi++) {
             for (int xi = 0; xi <= to_level; xi++) {
-                const int from_lidx   = ssquad4_lidx(from_level, xi * step_factor, yi * step_factor);
-                const int to_lidx     = ssquad4_lidx(to_level, xi, yi);
+                const int from_lidx   = smesh::ssquad4_lidx(from_level, xi * step_factor, yi * step_factor);
+                const int to_lidx     = smesh::ssquad4_lidx(to_level, xi, yi);
                 view->data()[to_lidx] = elements->data()[from_lidx];
             }
         }
@@ -1326,8 +1345,8 @@ namespace sfem {
 
         if (extract_skin_sideset(mesh->n_elements(),
                                  mesh->n_nodes(),
-                                 mesh->element_type(),
-                                 mesh->elements()->data(),
+                                 mesh->element_type(0),
+                                 mesh->elements(0)->data(),
                                  &n_surf_elements,
                                  &parent,
                                  &side_idx) != SFEM_SUCCESS) {

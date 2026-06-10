@@ -21,10 +21,12 @@ option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_MPI "Enable MPI support" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
-option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
+option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
 option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
-
+option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
+option(SFEM_ENABLE_SSDF "Enable SSDF library" OFF)
+option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -34,7 +36,7 @@ endif()
 
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
-option(SFEM_ENABLE_RESAMPLING "Enable resampling features" ON)
+option(SFEM_ENABLE_RESAMPLING "Enable resampling features" OFF)
 option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
@@ -109,7 +111,6 @@ if(SFEM_ENABLE_AVX2)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
 endif()
-
 
 
 

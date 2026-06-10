@@ -1,6 +1,6 @@
 #include "sfem_Input.hpp"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <cassert>
 #include <cstdio>

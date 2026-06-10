@@ -1,7 +1,7 @@
 #ifndef SFEM_LAGRANGE_HPP
 #define SFEM_LAGRANGE_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <typename scalar_t>
 int lagrange_eval(const int order, const int Q,

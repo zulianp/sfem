@@ -1,15 +1,16 @@
 #include "sfem_MultiDomainOp.hpp"
 
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_logger.h"
+#include "smesh_mesh.hpp"
+#include "sfem_logger.hpp"
 
 namespace sfem {
 
     MultiDomainOp::MultiDomainOp(const std::shared_ptr<FunctionSpace> &space, const std::vector<std::string> &block_names) {
         if (block_names.empty()) {
             for (auto &block : space->mesh_ptr()->blocks()) {
-                domains_[block->name()] = OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
+                domains_[block->name()] =
+                        OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
             }
         } else {
             for (auto &block_name : block_names) {
@@ -17,7 +18,8 @@ namespace sfem {
                 if (!block) {
                     SFEM_ERROR("Block %s not found", block_name.c_str());
                 }
-                domains_[block_name] = OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
+                domains_[block_name] =
+                        OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
             }
         }
     }
@@ -32,7 +34,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    void MultiDomainOp::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void MultiDomainOp::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         size_t i = 0;
         for (auto &domain : domains_) {
             assert(i < element_types.size());

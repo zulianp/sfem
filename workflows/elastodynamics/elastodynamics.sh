@@ -8,21 +8,13 @@ then
 	exit 1
 fi
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
-export PATH=$SFEM_PATH:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
-export PATH=$SCRIPTPATH/../../workflows/mech:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SFEM_PATH/bin:$PATH
 
 export SFEM_EXECUTION_SPACE=device
 export SFEM_ELEMENT_REFINE_LEVEL=8
 export SFEM_DT=0.25
 export SFEM_T_END=9.75
 export SFEM_ATOL=1e-7
-
 
 HERE=$PWD
 
@@ -32,13 +24,12 @@ then
 	mkdir -p domain
 	cd domain
 
-	MESH_FACTOR=4
-	pos=21
-	box_mesh.py box --cell_type=hex8 -x $((2 * MESH_FACTOR)) -y $((2 * MESH_FACTOR)) -z $((2 * MESH_FACTOR)) --width=40 --height=40 --depth=40 --tx=$pos --ty=$pos --tz=$pos
+	MESH_FACTOR=2
+	cube HEX8 $((2 * MESH_FACTOR)) $((2 * MESH_FACTOR)) $((2 * MESH_FACTOR)) 21 21 21 61 61 61 box
 	surf_type=quad4
 	
 	skin box skin_box
-	raw_to_db.py skin_box skin_box.vtk
+	raw_to_db skin_box skin_box.vtk
 
 	cd $HERE
 fi
@@ -49,18 +40,12 @@ zc=64
 obs=obs
 out=dynamic_contact/out
 
-
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
 rm -rf dynamic_contact
 
 export SFEM_COARSE_OP_TYPE=MF
-# export SFEM_USE_SPMG=0
 
-
-
-$LAUNCH elastodynamics domain/box obs dirichlet.yaml domain/skin_box/sidesets dynamic_contact
-raw_to_db.py dynamic_contact/mesh dynamic_contact.xdmf -p "$out/disp.0.*.raw,$out/disp.1.*.raw,$out/disp.2.*.raw,$out/velocity.0.*.raw,$out/velocity.1.*.raw,$out/velocity.2.*.raw,$out/acceleration.0.*.raw,$out/acceleration.1.*.raw,$out/acceleration.2.*.raw,$out/gap.0.*.raw,$out/gap.1.*.raw,$out/gap.2.*.raw" --transient  --time_whole_txt=dynamic_contact/out/time.txt
-
-# $out/contact_stress.0.*.raw,$out/contact_stress.1.*.raw,$out/contact_stress.2.*.raw,
+$LAUNCH elastodynamics domain/box obs dirichlet.yaml domain/skin_box/parent_sideset dynamic_contact
+raw_to_db dynamic_contact/mesh dynamic_contact.xdmf -p "$out/disp.0.*.*,$out/disp.1.*.*,$out/disp.2.*.*,$out/velocity.0.*.*,$out/velocity.1.*.*,$out/velocity.2.*.*,$out/acceleration.0.*.*,$out/acceleration.1.*.*,$out/acceleration.2.*.*,$out/gap.0.*.*,$out/gap.1.*.*,$out/gap.2.*.*" --transient  --time_whole_txt=dynamic_contact/out/time.txt

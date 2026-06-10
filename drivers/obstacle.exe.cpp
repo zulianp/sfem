@@ -2,7 +2,7 @@
 
 #include "sfem_ShiftedPenalty.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
@@ -11,20 +11,19 @@
 #include <cstdio>
 #include <vector>
 
-#include "sshex8.h"
-#include "sshex8_laplacian.h"
-#include "sshex8_linear_elasticity.h"
 #include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.h"
+#include "sshex8.hpp"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_linear_elasticity.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
 
 #include "matrixio_array.h"
 
 #include "sfem_SSMultigrid.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -94,19 +93,19 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    sfem::create_directory(output_path);
+    smesh::create_directory(output_path);
 
     double tick = MPI_Wtime();
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -119,8 +118,8 @@ int main(int argc, char *argv[]) {
 #endif
 
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
-    auto f = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, SFEM_USE_ELASTICITY ? "LinearElasticity" : "Laplacian", es);
+    auto f     = sfem::Function::create(fs);
+    auto op    = sfem::create_op(fs, SFEM_USE_ELASTICITY ? "LinearElasticity" : "Laplacian", es);
     op->initialize();
     f->add_constraint(conds);
     f->add_operator(op);
@@ -128,8 +127,8 @@ int main(int argc, char *argv[]) {
     auto contact_conds = sfem::create_contact_conditions_from_env(fs, es);
 
     ptrdiff_t ndofs = fs->n_dofs();
-    auto x = sfem::create_buffer<real_t>(ndofs, es);
-    auto rhs = sfem::create_buffer<real_t>(ndofs, es);
+    auto      x     = smesh::create_buffer<real_t>(ndofs, es);
+    auto      rhs   = smesh::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
@@ -149,16 +148,13 @@ int main(int argc, char *argv[]) {
     if (SFEM_EXPORT_CRS_MATRIX) {
         auto crs_graph = f->crs_graph();
 
-        auto values = sfem::create_buffer<real_t>(crs_graph->colidx()->size(), es);
+        auto values = smesh::create_buffer<real_t>(crs_graph->colidx()->size(), es);
 
-        f->hessian_crs(x->data(),
-                       crs_graph->rowptr()->data(),
-                       crs_graph->colidx()->data(),
-                       values->data());
+        f->hessian_crs(x->data(), crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         char path[2048];
         snprintf(path, sizeof(path), "%s/crs_matrix", output_path);
-        write_crs(path, *crs_graph, *values);
+        sfem::write_crs(path, *crs_graph, *values);
     }
 
     auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
@@ -171,7 +167,7 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef SFEM_ENABLE_CUDA
-    auto upper_bound = sfem::to_device(h_upper_bound);
+    auto upper_bound = smesh::to_device(h_upper_bound);
 #else
     auto upper_bound = h_upper_bound;
 #endif
@@ -179,7 +175,7 @@ int main(int argc, char *argv[]) {
     contact_conds->apply(upper_bound->data());
 
 #ifdef SFEM_ENABLE_CUDA
-    h_upper_bound = sfem::to_host(upper_bound);
+    h_upper_bound = smesh::to_host(upper_bound);
 #endif
 
     char path[2048];
@@ -189,8 +185,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
-    if (SFEM_USE_SHIFTED_PENALTY)
-    {
+    if (SFEM_USE_SHIFTED_PENALTY) {
         int SFEM_USE_STEEPEST_DESCENT = 0;
         SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
 
@@ -205,7 +200,7 @@ int main(int argc, char *argv[]) {
         cg->set_atol(1e-12);
         cg->set_rtol(1e-4);
         cg->set_max_it(8000);
-        cg->verbose = false;
+        cg->verbose        = false;
         sp->linear_solver_ = cg;
         sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
 
@@ -238,7 +233,7 @@ int main(int argc, char *argv[]) {
         spmg->set_max_it(30);
         spmg->set_atol(1e-8);
         spmg->set_upper_bound(upper_bound);
-            
+
         // Uncomment to check if fine level is working on its own
         // spmg->set_nlsmooth_steps(100);
         // spmg->skip_coarse = true;
@@ -266,13 +261,8 @@ int main(int argc, char *argv[]) {
     solver->apply(rhs->data(), x->data());
     double solve_tock = MPI_Wtime();
 
-#ifdef SFEM_ENABLE_CUDA
-    auto h_x = sfem::to_host(x);
-    auto h_rhs = sfem::to_host(rhs);
-#else
-    auto h_x = x;
-    auto h_rhs = rhs;
-#endif
+    auto h_x   = smesh::to_host(x);
+    auto h_rhs = smesh::to_host(rhs);
 
     snprintf(path, sizeof(path), "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
@@ -287,8 +277,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes =
-            fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().n_nodes() : m->n_nodes();
+    ptrdiff_t nnodes    = fs->mesh().n_nodes();
 
     if (!rank) {
         printf("----------------------------------------\n");

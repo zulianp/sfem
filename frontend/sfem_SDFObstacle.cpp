@@ -1,16 +1,16 @@
 #include "sfem_SDFObstacle.hpp"
 
-#include "sfem_resample_gap.h"
+#include "sfem_resample_gap.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_resample_gap.h"
+#include "cu_resample_gap.hpp"
 #endif
 
 namespace sfem {
 
     class SDFObstacle::Impl {
     public:
-        std::shared_ptr<Grid<geom_t>> sdf;
+        std::shared_ptr<smesh::Grid<geom_t>> sdf;
         bool                          variational{true};
         enum ExecutionSpace           execution_space { EXECUTION_SPACE_HOST };
     };
@@ -18,10 +18,10 @@ namespace sfem {
     std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(const std::shared_ptr<Communicator> &comm,
                                                                const std::string                   &path,
                                                                const enum ExecutionSpace            es) {
-        return create(Grid<geom_t>::create_from_file(comm, path.c_str()), es);
+        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), es);
     }
 
-    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf,
+    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                                                      const enum ExecutionSpace            execution_space) {
         auto obs = std::make_shared<SDFObstacle>();
 #ifdef SFEM_ENABLE_CUDA
@@ -41,7 +41,7 @@ namespace sfem {
 
     void SDFObstacle::set_variational(const bool enabled) { impl_->variational = enabled; }
 
-    int SDFObstacle::sample(enum ElemType                element_type,
+    int SDFObstacle::sample(smesh::ElemType              element_type,
                             const ptrdiff_t              nelements,
                             const ptrdiff_t              nnodes,
                             idx_t **const SFEM_RESTRICT  elements,
@@ -90,7 +90,7 @@ namespace sfem {
                 normals[2]);
     }
 
-    int SDFObstacle::sample_normals(enum ElemType                element_type,
+    int SDFObstacle::sample_normals(smesh::ElemType              element_type,
                                     const ptrdiff_t              nelements,
                                     const ptrdiff_t              nnodes,
                                     idx_t **const SFEM_RESTRICT  elements,
@@ -136,7 +136,7 @@ namespace sfem {
                 normals[2]);
     }
 
-    int SDFObstacle::sample_value(enum ElemType                element_type,
+    int SDFObstacle::sample_value(smesh::ElemType              element_type,
                                   const ptrdiff_t              nelements,
                                   const ptrdiff_t              nnodes,
                                   idx_t **const SFEM_RESTRICT  elements,

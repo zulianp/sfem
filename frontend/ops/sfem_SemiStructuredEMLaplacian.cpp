@@ -1,15 +1,15 @@
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 
 // C includes
-#include "sshex8_laplacian.h"
-#include "sshex8_stencil_element_matrix_apply.h"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_stencil_element_matrix_apply.hpp"
 
 // C++ includes
 #include "sfem_Laplacian.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_mesh.hpp"
+
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -24,9 +24,9 @@ namespace sfem {
             return nullptr;
         }
 
-        assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(space->element_type()));  // REMOVEME once generalized approach
         auto ret          = std::make_unique<SemiStructuredEMLaplacian>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
         return ret;
     }
 
@@ -36,7 +36,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   space->semi_structured_mesh().level(),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -45,8 +45,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        fprintf(stderr, "[Error] SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
-        assert(false);
+        SMESH_ERROR("SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
@@ -73,13 +72,13 @@ namespace sfem {
     const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm      = space->semi_structured_mesh();
-        auto  mesh     = space->mesh_ptr();
+        auto &ssm  = space->mesh();
+        auto  mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
-        return sshex8_laplacian_element_matrix(ssm.level(),
+        return sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
                                                mesh->n_elements(),
                                                mesh->n_nodes(),
-                                               mesh->elements()->data(),
+                                               mesh->elements(0)->data(),
                                                mesh->points()->data(),
                                                element_matrix->data());
     }
@@ -93,11 +92,11 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::hessian_diag(const real_t *const, real_t *const out) {
-        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
+        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         return affine_sshex8_laplacian_diag(
-                ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), out);
+                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), ssm.points()->data(), out);
     }
 
     int SemiStructuredEMLaplacian::gradient(const real_t *const x, real_t *const out) {
@@ -108,14 +107,14 @@ namespace sfem {
     int SemiStructuredEMLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::apply");
 
-        assert(element_type == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
 
         double tick = MPI_Wtime();
 
         int err = sshex8_stencil_element_matrix_apply(
-                ssm.level(), ssm.n_elements(), ssm.element_data(), element_matrix->data(), h, out);
+                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), element_matrix->data(), h, out);
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);

@@ -1,13 +1,16 @@
 #include "sfem_ssmgc.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
-#include "ssquad4_interpolate.h"
+#include "smesh_env.hpp"
+#include "smesh_ssquad4_prolongation.hpp"
+#include "smesh_ssquad4_restriction.hpp"
 
-#include "lumped_ptdp.h"
+#include "lumped_ptdp.hpp"
+
+#include "smesh_device_buffer.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_ssquad4_interpolate.h"
+// #include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
@@ -46,11 +49,10 @@ namespace sfem {
         cg->verbose = false;
         auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
         auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        
-        f->constaints_mask(mask->data());
 
-        
-        if(f->hessian_block_diag_sym(nullptr, diag->data()) == SFEM_SUCCESS) {
+        f->constraints_mask(mask->data());
+
+        if (f->hessian_block_diag_sym(nullptr, diag->data()) == SFEM_SUCCESS) {
             auto sj = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
             cg->set_preconditioner_op(sj);
         }
@@ -140,11 +142,11 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SPMG::init_discretization");
 
             auto            fs             = f->space();
-            auto           &ssmesh         = f->space()->semi_structured_mesh();
-            const int       L              = ssmesh.level();
+            auto           &ssmesh         = f->space()->mesh();
+            const int       L              = smesh::semistructured_level(ssmesh);
             const ptrdiff_t sym_block_size = (fs->block_size() == 3 ? 6 : 3);
 
-            std::vector<int> levels = ssmesh.derefinement_levels();
+            std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();
 
             // Order from finest to coarsest!
@@ -176,7 +178,7 @@ namespace sfem {
                 // FIXME avoid copies from/to device
 
                 auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
-                auto hdisp = sfem::to_host(wdisp);
+                auto hdisp = smesh::to_host(wdisp);
 
                 contact_conds->update(hdisp->data());
 
@@ -208,7 +210,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == es) {
-                upper_bound = sfem::to_device(upper_bound);
+                upper_bound = smesh::to_device(upper_bound);
             }
 #endif
 
@@ -227,8 +229,8 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
                 if (EXECUTION_SPACE_DEVICE == es) {
-                    fine->sbv   = sfem::to_device(fine->sbv);
-                    fine->sides = sfem::to_device(fine->sides);
+                    fine->sbv   = to_device(fine->sbv);
+                    fine->sides = smesh::to_device(fine->sides);
                 }
 #endif
             }
@@ -238,10 +240,10 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = fine_space->semi_structured_mesh().level();
+                const int level        = smesh::semistructured_level(fine_space->mesh());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? coarse_space->semi_structured_mesh().level() : 1;
+                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
 
                 auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
                 coarse->sides     = coarse_sides;
@@ -255,40 +257,40 @@ namespace sfem {
                 coarse->sbv = sfem::create_sparse_block_vector(coarse->mapping, coarse_normal_prod);
 
                 fine->count = sfem::create_host_buffer<uint16_t>(fine->mapping->size());
-                ssquad4_element_node_incidence_count(
+                smesh::ssquad4_element_node_incidence_count(
                         level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
 
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
-                    fine->count   = sfem::to_device(fine->count);
-                    coarse->sides = sfem::to_device(coarse->sides);
-                    coarse->sbv   = sfem::to_device(coarse->sbv);
+                    fine->count   = smesh::to_device(fine->count);
+                    coarse->sides = smesh::to_device(coarse->sides);
+                    coarse->sbv   = to_device(coarse->sbv);
                 }
 #endif
 
-                restrict_sbv.push_back(SurfaceRestrict<real_t>::create(level,
-                                                                       fine_space->element_type(),
-                                                                       fine->mapping->size(),
-                                                                       fine->sides,
-                                                                       fine->count,
-                                                                       coarse_level,
-                                                                       coarse_space->element_type(),
-                                                                       coarse->mapping->size(),
-                                                                       coarse->sides,
-                                                                       es,
-                                                                       sym_block_size));
+                restrict_sbv.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
+                                                                                      fine_space->element_type(),
+                                                                                      fine->mapping->size(),
+                                                                                      fine->sides,
+                                                                                      fine->count,
+                                                                                      coarse_level,
+                                                                                      coarse_space->element_type(),
+                                                                                      coarse->mapping->size(),
+                                                                                      coarse->sides,
+                                                                                      es,
+                                                                                      sym_block_size)));
 
-                restrict_penalization.push_back(SurfaceRestrict<real_t>::create(level,
-                                                                                fine_space->element_type(),
-                                                                                fine->mapping->size(),
-                                                                                fine->sides,
-                                                                                fine->count,
-                                                                                coarse_level,
-                                                                                coarse_space->element_type(),
-                                                                                coarse->mapping->size(),
-                                                                                coarse->sides,
-                                                                                es,
-                                                                                1));
+                restrict_penalization.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
+                                                                                               fine_space->element_type(),
+                                                                                               fine->mapping->size(),
+                                                                                               fine->sides,
+                                                                                               fine->count,
+                                                                                               coarse_level,
+                                                                                               coarse_space->element_type(),
+                                                                                               coarse->mapping->size(),
+                                                                                               coarse->sides,
+                                                                                               es,
+                                                                                               1)));
             }
         }
 
@@ -309,32 +311,33 @@ namespace sfem {
             bool coarse_solver_verbose          = false;
             bool debug                          = false;
             bool enable_shift                   = true;
-            bool enable_line_search             = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
+            bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
             bool project_coarse_correction      = false;
 
-            int SFEM_ENABLE_NL_OBSTACLE       = sfem::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
-            int coarse_linear_smoothing_steps = sfem::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
-            int linear_smoothing_steps        = sfem::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
+            int SFEM_ENABLE_NL_OBSTACLE       = smesh::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
+            int coarse_linear_smoothing_steps = smesh::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
+            int linear_smoothing_steps        = smesh::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
 
-            int    max_inner_it         = sfem::Env::read("SFEM_MAX_INNER_IT", 40);
-            int    max_it               = sfem::Env::read("SFEM_MAX_IT", 15);
-            int    nlsmooth_steps       = sfem::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = sfem::Env::read("SFEM_MAX_COARSE_IT", 40000);
-            real_t omega_factor         = sfem::Env::read("SFEM_OMEGA_FACTOR", 100.);
-            real_t stagnation_threshold = sfem::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
+            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 40);
+            int    max_it               = smesh::Env::read("SFEM_MAX_IT", 15);
+            int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
+            real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
+            real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
             static constexpr bool is_double = std::is_same<real_t, double>::value;
 
-            real_t atol              = sfem::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
-            real_t max_penalty_param = sfem::Env::read(
+            real_t atol              = smesh::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
+            real_t max_penalty_param = smesh::Env::read(
                     "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
-            real_t penalty_param          = sfem::Env::read("SFEM_PENALTY_PARAM", 1e4);
+            real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 1e4);
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
-            std::string coarse_op_type = sfem::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
-            std::string debug_folder   = "debug_ssmgc";
-            std::string fine_op_type   = MATRIX_FREE;
+            std::string coarse_op_type =
+                    smesh::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
+            std::string debug_folder = "debug_ssmgc";
+            std::string fine_op_type = MATRIX_FREE;
 
             if (in) {
                 printf("SPMG: Reading Input\n");
@@ -383,7 +386,7 @@ namespace sfem {
                 auto diag = sfem::create_buffer<real_t>(fsi->n_dofs() / fsi->block_size() * sym_block_size, es);
                 auto mask = sfem::create_buffer<mask_t>(mask_count(fsi->n_dofs()), es);
 
-                fi->constaints_mask(mask->data());
+                fi->constraints_mask(mask->data());
                 fi->hessian_block_diag_sym(nullptr, diag->data());
 
                 std::shared_ptr<sfem::Operator<real_t>> sj;
@@ -430,7 +433,7 @@ namespace sfem {
                 f_coarse->hessian_block_diag_sym(nullptr, diag->data());
 
                 auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
-                f_coarse->constaints_mask(mask->data());
+                f_coarse->constraints_mask(mask->data());
 
                 std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
                 if (enable_mixed_precision) {
@@ -447,7 +450,7 @@ namespace sfem {
 
             for (int i = 0; i < nlevels; i++) {
                 auto s = levels[i]->function->space();
-                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? s->semi_structured_mesh().level() : 1);
+                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
 
                 levels[i]->function->describe(std::cout);
             }

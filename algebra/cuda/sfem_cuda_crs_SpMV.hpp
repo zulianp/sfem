@@ -5,7 +5,7 @@
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 namespace sfem {
     std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(const ptrdiff_t              rows,
