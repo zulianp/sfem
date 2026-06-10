@@ -129,6 +129,7 @@ namespace sfem {
 
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
+#ifdef SFEM_ENABLE_RYAML
     static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                    const ryml::ConstNodeRef             &node,
                                                    const ExecutionSpace                  es) {
@@ -137,4 +138,5 @@ namespace sfem {
 
         return create_op(space, name.c_str(), es);
     }
+#endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
