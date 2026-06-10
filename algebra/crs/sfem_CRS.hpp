@@ -4,10 +4,8 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
-
-
+#include "sfem_aliases.hpp"
 
 namespace sfem {
 
@@ -27,10 +25,10 @@ namespace sfem {
 
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
-        SharedBuffer<R> row_ptr;
-        SharedBuffer<C> col_idx;
+        SharedBuffer<R>        row_ptr;
+        SharedBuffer<C>        col_idx;
         SharedBuffer<TStorage> values;
-        ptrdiff_t       cols_{0};
+        ptrdiff_t              cols_{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
@@ -54,13 +52,16 @@ namespace sfem {
         }
     };
 
+    // CRS matrix product here: https://github.com/zhen-xie/IA-SpGEMM/blob/master/IA-SPGEMM-CPU_release/detail/csr/common_csr.h
+    // https://dl.acm.org/doi/pdf/10.1145/3330345.3330354
+
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<CRS<R, C, TStorage, T>> h_crs_spmv(const ptrdiff_t        rows,
-                                                 const ptrdiff_t        cols,
-                                                 const SharedBuffer<R>& rowptr,
-                                                 const SharedBuffer<C>& colidx,
-                                                 const SharedBuffer<TStorage>& values,
-                                                 const T                scale_output) {
+    std::shared_ptr<CRS<R, C, TStorage, T>> h_crs_spmv(const ptrdiff_t               rows,
+                                                       const ptrdiff_t               cols,
+                                                       const SharedBuffer<R>&        rowptr,
+                                                       const SharedBuffer<C>&        colidx,
+                                                       const SharedBuffer<TStorage>& values,
+                                                       const T                       scale_output) {
         auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
