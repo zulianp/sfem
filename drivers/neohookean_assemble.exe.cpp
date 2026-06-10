@@ -8,13 +8,13 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "neohookean_ogden.h"
-#include "tet4_neohookean.h"
+#include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "neohookean_ogden.hpp"
+#include "tet4_neohookean.hpp"
+
+
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

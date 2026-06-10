@@ -1,5 +1,5 @@
 #include "sfem_pwc_interpolator.hpp"
-#include "coo_sort.h"
+#include "coo_sort.hpp"
 
 /*
 void piecewise_constant(const idx_t *partition, const real_t *near_null,

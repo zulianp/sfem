@@ -1,0 +1,8 @@
+# dirichlet.yaml
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: geometry/mesh/sidesets/bottom 
+    value: [0, 0, 0]
+    component: [0, 1, 2]
+

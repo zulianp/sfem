@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -35,15 +35,14 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
                                           1.,
                                           1.);
 
-    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
+    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
+
     auto f = sfem::Function::create(fs);
-    
+
     auto left_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
@@ -83,6 +82,7 @@ std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shar
 
     auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto mass            = sfem::create_op(fs, "LumpedMass", es);
+    assert(mass != nullptr);
     mass->initialize();
     mass->hessian_diag(nullptr, inv_mass_vector->data());
     f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
@@ -98,24 +98,25 @@ std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<s
 
     auto mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto mass        = sfem::create_op(fs, "LumpedMass", es);
+    assert(mass != nullptr);
     mass->initialize();
     mass->hessian_diag(nullptr, mass_vector->data());
     f->set_value_to_constrained_dofs(1, mass_vector->data());
     return mass_vector;
 }
 
-std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto fs = f->space();
 
-    sfem::create_directory(output_dir.c_str());
+    smesh::create_directory(output_dir);
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+    output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
     } else {
-        fs->mesh_ptr()->write(output_dir.c_str());
+        fs->mesh_ptr()->write(output_dir);
     }
     return output;
 }
@@ -123,7 +124,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
 int test_explicit_euler() {
     auto f               = create_elasticity_function();
     auto inv_mass_vector = create_inverse_mass_vector(f);
-    auto output          = create_output(f, "explicit_euler");
+    auto output          = create_output(f, smesh::Path("explicit_euler"));
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();
@@ -180,7 +181,7 @@ int test_explicit_euler() {
 int test_newmark() {
     auto f           = create_elasticity_function();
     auto mass_vector = create_mass_vector(f);
-    auto output      = create_output(f, "test_newmark");
+    auto output      = create_output(f, smesh::Path("test_newmark"));
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();

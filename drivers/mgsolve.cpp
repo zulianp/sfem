@@ -4,11 +4,11 @@
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_GaussSeidel.hpp"
 #include "sfem_Multigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -16,7 +16,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *output_path = argv[2];
+    smesh::Path output_path{argv[2]};
 
     double tick = MPI_Wtime();
 
@@ -59,27 +59,27 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    const char *SFEM_OPERATOR = "Laplacian";
-    const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_OPERATOR       = "Laplacian";
+    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
     const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
 
-    int SFEM_BLOCK_SIZE = 1;
-    int SFEM_USE_PRECONDITIONER = 0;
-    int SFEM_USE_CHEB = 0;
-    int SFEM_DEBUG = 0;
-    int SFEM_MG = 0;
-    int SFEM_MAX_IT = 4000;
-    int SFEM_SMOOTHER_SWEEPS = 3;
-    int SFEM_USE_MG_PRECONDITIONER = 0;
-    int SFEM_WRITE_OUTPUT = 1;
-    float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
-    float SFEM_TOL = 1e-9;
-    double SFEM_COARSE_TOL = 1e-10;
-    double SFEM_CHEB_EIG_TOL = 1e-5;
-    int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    int SFEM_VERBOSITY_LEVEL = 1;
+    int    SFEM_BLOCK_SIZE            = 1;
+    int    SFEM_USE_PRECONDITIONER    = 0;
+    int    SFEM_USE_CHEB              = 0;
+    int    SFEM_DEBUG                 = 0;
+    int    SFEM_MG                    = 0;
+    int    SFEM_MAX_IT                = 4000;
+    int    SFEM_SMOOTHER_SWEEPS       = 3;
+    int    SFEM_USE_MG_PRECONDITIONER = 0;
+    int    SFEM_WRITE_OUTPUT          = 1;
+    float  SFEM_CHEB_EIG_MAX_SCALE    = 1.02;
+    float  SFEM_TOL                   = 1e-9;
+    double SFEM_COARSE_TOL            = 1e-10;
+    double SFEM_CHEB_EIG_TOL          = 1e-5;
+    int    SFEM_ELEMENT_REFINE_LEVEL  = 0;
+    int    SFEM_VERBOSITY_LEVEL       = 1;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
@@ -101,7 +101,6 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-    
 
     printf("SFEM_OPERATOR: %s\n"
            "SFEM_FINE_OP_TYPE: %s\n"
@@ -138,11 +137,8 @@ int main(int argc, char *argv[]) {
     sfem::register_device_ops();
 #endif
 
+    m       = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -155,20 +151,17 @@ int main(int argc, char *argv[]) {
 #endif
 
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
-    auto f = sfem::Function::create(fs);
+    auto f     = sfem::Function::create(fs);
 
     printf("Running %s\n", argv[0]);
-    printf("#elements %ld #nodes %ld #dofs %ld\n",
-           (long)m->n_elements(),
-           (long)m->n_nodes(),
-           (long)fs->n_dofs());
+    printf("#elements %ld #nodes %ld #dofs %ld\n", (long)m->n_elements(), (long)m->n_nodes(), (long)fs->n_dofs());
 
     fflush(stderr);
     fflush(stdout);
 
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto x    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
@@ -176,14 +169,14 @@ int main(int argc, char *argv[]) {
     f->add_operator(op);
 
     double compute_tick = MPI_Wtime();
-    double init_tick = MPI_Wtime();
+    double init_tick    = MPI_Wtime();
     double init_tock;
     double solve_tick, solve_tock;
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    std::shared_ptr<sfem::Operator<real_t>> linear_op;
+    std::shared_ptr<sfem::Operator<real_t>>               linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
     linear_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, x, es);
@@ -214,14 +207,14 @@ int main(int argc, char *argv[]) {
 
         //  Coarse level
         auto fs_coarse = fs->derefine();
-        auto f_coarse = f->derefine(fs_coarse, true);
+        auto f_coarse  = f->derefine(fs_coarse, true);
 
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
         linear_op_coarse = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
-        auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
-        auto r_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
-        auto diag_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto c_coarse      = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto r_coarse      = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto diag_coarse   = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
@@ -240,9 +233,9 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+        auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
         auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-        auto prolongation = sfem::make_op<real_t>(
+        auto prolongation     = sfem::make_op<real_t>(
                 prolong_unconstr->rows(),
                 prolong_unconstr->cols(),
                 [=](const real_t *const from, real_t *const to) {
@@ -255,7 +248,7 @@ int main(int argc, char *argv[]) {
         f->apply_constraints(rhs->data());
 
         // Multigrid
-        auto mg = sfem::create_mg<real_t>(es);
+        auto mg   = sfem::create_mg<real_t>(es);
         mg->debug = SFEM_DEBUG;
         mg->add_level(linear_op, smoother, nullptr, restriction);
         mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
@@ -270,10 +263,10 @@ int main(int argc, char *argv[]) {
         solve_tick = MPI_Wtime();
 
         if (SFEM_USE_MG_PRECONDITIONER) {
-            auto linear_op = sfem::make_linear_op(f);
-            auto ksp = sfem::create_cg<real_t>(linear_op, es);
+            auto linear_op  = sfem::make_linear_op(f);
+            auto ksp        = sfem::create_cg<real_t>(linear_op, es);
             ksp->check_each = 1;
-            ksp->verbose = true;
+            ksp->verbose    = true;
             mg->set_max_it(1);
             mg->set_atol(0);
             mg->verbose = false;
@@ -305,7 +298,7 @@ int main(int argc, char *argv[]) {
 
         solver->set_op(linear_op);
 
-        init_tock = MPI_Wtime();
+        init_tock  = MPI_Wtime();
         solve_tick = MPI_Wtime();
         solver->apply(rhs->data(), x->data());
         solve_tock = MPI_Wtime();
@@ -313,7 +306,7 @@ int main(int argc, char *argv[]) {
 
     double compute_tock = MPI_Wtime();
 
-    auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto   r   = smesh::create_buffer<real_t>(fs->n_dofs(), es);
     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
 
     // -------------------------------
@@ -321,13 +314,13 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
 #ifdef SFEM_ENABLE_CUDA
-    auto h_x = sfem::to_host(x);
-    auto h_rhs = sfem::to_host(rhs);
-    auto h_r = sfem::to_host(r);
+    auto h_x   = smesh::to_host(x);
+    auto h_rhs = smesh::to_host(rhs);
+    auto h_r   = smesh::to_host(r);
 #else
-    auto h_x = x;
+    auto h_x   = x;
     auto h_rhs = rhs;
-    auto h_r = r;
+    auto h_r   = r;
 #endif
 
     if (SFEM_WRITE_OUTPUT) {
@@ -341,10 +334,7 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
         printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #dofs %ld\n",
-               (long)m->n_elements(),
-               (long)m->n_nodes(),
-               (long)fs->n_dofs());
+        printf("#elements %ld #nodes %ld #dofs %ld\n", (long)m->n_elements(), (long)m->n_nodes(), (long)fs->n_dofs());
         printf("TTS:\t\t%g [s], compute %g [s] (solve: %g [s], init: %g [s])\n",
                tock - tick,
                compute_tock - compute_tick,

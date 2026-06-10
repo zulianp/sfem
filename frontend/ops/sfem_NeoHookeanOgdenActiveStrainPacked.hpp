@@ -50,7 +50,7 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
-        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
         // Set external fields (e.g., active strain)
         void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &v, const int component) override;

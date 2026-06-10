@@ -25,26 +25,26 @@ enum TestMode {
 };
 
 // Marc Short Term parameters (from TRS dialog)
-static const double MARC_C10 = 112.622;   // MPa (Short Term / Instantaneous)
-static const double MARC_C01 = 130.108;   // MPa (Short Term / Instantaneous)
-static const double MARC_K = 10000.0;     // MPa
+static const real_t MARC_C10 = 112.622;   // MPa (Short Term / Instantaneous)
+static const real_t MARC_C01 = 130.108;   // MPa (Short Term / Instantaneous)
+static const real_t MARC_K = 10000.0;     // MPa
 
 // WLF (Williams-Landel-Ferry) time-temperature superposition parameters
-static const double WLF_C1 = 16.6253;    // WLF constant C1
-static const double WLF_C2 = 47.4781;    // WLF constant C2 (°C)
-static const double WLF_TREF = -54.29;   // Reference temperature (°C), glass transition Tg
-static const double TEST_TEMPERATURE = 20.0;  // Test temperature (°C), room temperature
+static const real_t WLF_C1 = 16.6253;    // WLF constant C1
+static const real_t WLF_C2 = 47.4781;    // WLF constant C2 (°C)
+static const real_t WLF_TREF = -54.29;   // Reference temperature (°C), glass transition Tg
+static const real_t TEST_TEMPERATURE = 20.0;  // Test temperature (°C), room temperature
 
 // Prony series (22 terms) from Marc
 static const int NUM_PRONY = 22;
-static const double prony_g[] = {
+static const real_t prony_g[] = {
     0.0454189, 0.057786, 0.0274103, 0.0332453, 0.0392706,
     0.0616845, 0.0830202, 0.092219, 0.127385, 0.167648,
     0.148495, 0.0713242, 0.0233417, 0.00873872, 0.00350295,
     0.00129547, 0.00112219, 0.000507792, 0.000563496, 0.000651711,
     0.000491131, 0.000443556
 };
-static const double prony_tau[] = {
+static const real_t prony_tau[] = {
     1.43258e-09, 2.9412e-08, 4.32385e-07, 2.74649e-06, 1.76249e-05,
     0.000192535, 0.00192973, 0.0117959, 0.0499424, 0.216842,
     0.951674, 4.92406, 37.247, 285.168, 2669.89,

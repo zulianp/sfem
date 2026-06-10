@@ -1,13 +1,13 @@
 # SFEMBuildTypes.cmake
 
 include(cmake/SFEMSanitizer.cmake)
-include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
 
 option(SFEM_CPU_ARCH "CPU architecture" OFF)
 set(SFEM_MARCH_SWITCH "-march=")
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    check_c_compiler_flag("-mcpu=apple-m1" APPLE_M1)
+    check_cxx_compiler_flag("-mcpu=apple-m1" APPLE_M1)
     if(APPLE_M1)
         set(SFEM_MARCH_SWITCH "-mcpu=")
         set(SFEM_CPU_ARCH "apple-m1")

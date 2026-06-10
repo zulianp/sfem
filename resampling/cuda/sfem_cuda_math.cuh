@@ -1,7 +1,7 @@
 #ifndef __SFEM_CUDA_MATH_CUH__
 #define __SFEM_CUDA_MATH_CUH__
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_config.h"
 
 

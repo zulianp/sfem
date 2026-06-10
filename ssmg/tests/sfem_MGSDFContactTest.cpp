@@ -1,13 +1,13 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -15,7 +15,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -67,35 +67,37 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * fs->semi_structured_mesh().level();
-    auto      sdf = sfem::create_sdf(comm,
-                                n * resolution_ratio * 2,
-                                n * 1 * 2,
-                                n * resolution_ratio * 2,
-                                -0.1,
-                                -0.2,
-                                -0.1,
-                                1.1,
-                                y_top * 0.5,
-                                1.1,
-                                [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    // Half-sphere
-                                    geom_t cx = 0.5, cy = -0.5, cz = 0.5;
-                                    geom_t radius = 0.5;
+    assert(bottom_ss[0]->size() > 0);
 
-                                    geom_t dx = cx - x;
-                                    geom_t dy = cy - y;
-                                    geom_t dz = cz - z;
+    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    auto      sdf = smesh::create_sdf(comm,
+                                 n * resolution_ratio * 2,
+                                 n * 1 * 2,
+                                 n * resolution_ratio * 2,
+                                 -0.1,
+                                 -0.2,
+                                 -0.1,
+                                 1.1,
+                                 y_top * 0.5,
+                                 1.1,
+                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                     // Half-sphere
+                                     geom_t cx = 0.5, cy = -0.5, cz = 0.5;
+                                     geom_t radius = 0.5;
 
-                                    geom_t dd = radius - sqrt(dx * dx + dy * dy + dz * dz);
-                                    return dd;
-                                });
+                                     geom_t dx = cx - x;
+                                     geom_t dy = cy - y;
+                                     geom_t dz = cz - z;
+
+                                     geom_t dd = radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                     return dd;
+                                 });
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
 
@@ -136,44 +138,44 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * fs->semi_structured_mesh().level();
-    auto      sdf = sfem::create_sdf(comm,
-                                n * resolution_ratio * 2,
-                                n * 1 * 2,
-                                n * resolution_ratio * 2,
-                                0.1,
-                                -0.2,
-                                0.1,
-                                0.9,
-                                y_top * 0.5,
-                                0.9,
-                                [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    // High-freq surface
-                                    const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
-                                    const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
+    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    auto      sdf = smesh::create_sdf(comm,
+                                 n * resolution_ratio * 2,
+                                 n * 1 * 2,
+                                 n * resolution_ratio * 2,
+                                 0.1,
+                                 -0.2,
+                                 0.1,
+                                 0.9,
+                                 y_top * 0.5,
+                                 0.9,
+                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                     // High-freq surface
+                                     const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
+                                     const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
 
-                                    geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
-                                    geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
-                                    fx += 0.005 * cos(cx * 3.14 * 32);
-                                    fz += 0.005 * cos(cz * 3.14 * 32);
-                                    fx += 0.0025 * cos(cx * 3.14 * 64);
-                                    fz += 0.0025 * cos(cz * 3.14 * 64);
+                                     geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
+                                     geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
+                                     fx += 0.005 * cos(cx * 3.14 * 32);
+                                     fz += 0.005 * cos(cz * 3.14 * 32);
+                                     fx += 0.0025 * cos(cx * 3.14 * 64);
+                                     fz += 0.0025 * cos(cz * 3.14 * 64);
 
-                                    fx += 0.001 * cos(3.14 + cx * 3.14 * 128);
-                                    fz += 0.001 * cos(3.14 + cz * 3.14 * 128);
-                                    fx += 0.001 * cos(cx * 3.14 * 256);
-                                    fz += 0.001 * cos(cz * 3.14 * 256);
+                                     fx += 0.001 * cos(3.14 + cx * 3.14 * 128);
+                                     fz += 0.001 * cos(3.14 + cz * 3.14 * 128);
+                                     fx += 0.001 * cos(cx * 3.14 * 256);
+                                     fz += 0.001 * cos(cz * 3.14 * 256);
 
-                                    fx += 0.001 * cos(cx * 3.14 * 512);
-                                    fz += 0.001 * cos(cz * 3.14 * 512);
+                                     fx += 0.001 * cos(cx * 3.14 * 512);
+                                     fz += 0.001 * cos(cz * 3.14 * 512);
 
-                                    const geom_t obstacle = -0.1 - fx - fz;
-                                    return obstacle - y;
-                                });
+                                     const geom_t obstacle = -0.1 - fx - fz;
+                                     return obstacle - y;
+                                 });
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
@@ -216,45 +218,45 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n              = base_resolution * fs->semi_structured_mesh().level();
+    const int n              = base_resolution * smesh::semistructured_level(fs->mesh());
     int       SFEM_N_SPHERES = 2;
     SFEM_READ_ENV(SFEM_N_SPHERES, atoi);
-    auto sdf = sfem::create_sdf(comm,
-                                n * 5 * 2,
-                                n * 1 * 2,
-                                n * 5 * 2,
-                                -0.1,
-                                -0.2,
-                                -0.1,
-                                1.1,
-                                y_top * 0.5,
-                                1.1,
-                                [SFEM_N_SPHERES](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    geom_t       dd = 1000000;
-                                    const geom_t hx = 1. / (SFEM_N_SPHERES + 1);
-                                    const geom_t hz = 1. / (SFEM_N_SPHERES + 1);
-                                    const geom_t hy = 1. / (SFEM_N_SPHERES + 1);
+    auto sdf = smesh::create_sdf(comm,
+                                 n * 5 * 2,
+                                 n * 1 * 2,
+                                 n * 5 * 2,
+                                 -0.1,
+                                 -0.2,
+                                 -0.1,
+                                 1.1,
+                                 y_top * 0.5,
+                                 1.1,
+                                 [SFEM_N_SPHERES](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                     geom_t       dd = 1000000;
+                                     const geom_t hx = 1. / (SFEM_N_SPHERES + 1);
+                                     const geom_t hz = 1. / (SFEM_N_SPHERES + 1);
+                                     const geom_t hy = 1. / (SFEM_N_SPHERES + 1);
 
-                                    for (int i = 0; i < SFEM_N_SPHERES; i++) {
-                                        for (int j = 0; j < SFEM_N_SPHERES; j++) {
-                                            geom_t cx = hx + i * hx, cy = -0.1, cz = hz + j * hz;
-                                            geom_t radius = 1. / (8 + SFEM_N_SPHERES);
+                                     for (int i = 0; i < SFEM_N_SPHERES; i++) {
+                                         for (int j = 0; j < SFEM_N_SPHERES; j++) {
+                                             geom_t cx = hx + i * hx, cy = -0.1, cz = hz + j * hz;
+                                             geom_t radius = 1. / (8 + SFEM_N_SPHERES);
 
-                                            const geom_t dx = cx - x;
-                                            const geom_t dy = cy - y;
-                                            const geom_t dz = cz - z;
+                                             const geom_t dx = cx - x;
+                                             const geom_t dy = cy - y;
+                                             const geom_t dz = cz - z;
 
-                                            const geom_t ddij = radius - sqrt(dx * dx + dy * dy + dz * dz);
-                                            dd                = fabs(ddij) < fabs(dd) ? ddij : dd;
-                                        }
-                                    }
+                                             const geom_t ddij = radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                             dd                = fabs(ddij) < fabs(dd) ? ddij : dd;
+                                         }
+                                     }
 
-                                    return dd;
-                                });
+                                     return dd;
+                                 });
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
@@ -266,7 +268,7 @@ int test_contact() {
     int comm_size;
     MPI_Comm_size(comm, &comm_size);
 
-    if(comm_size > 1) {
+    if (comm_size > 1) {
         SFEM_ERROR("test_contact() can only be run in serial!\n");
     }
 
@@ -285,26 +287,23 @@ int test_contact() {
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
-                                          SFEM_BASE_RESOLUTION * resolution_ratio,
-                                          SFEM_BASE_RESOLUTION * 1,
-                                          SFEM_BASE_RESOLUTION * resolution_ratio,
-                                          0,
-                                          0,
-                                          0,
-                                          1,
-                                          y_top,
-                                          1);
-
-    const int block_size = mesh->spatial_dimension();
-
-    auto fs = sfem::FunctionSpace::create(mesh, block_size);
+                                             SFEM_BASE_RESOLUTION * resolution_ratio,
+                                             SFEM_BASE_RESOLUTION * 1,
+                                             SFEM_BASE_RESOLUTION * resolution_ratio,
+                                             0,
+                                             0,
+                                             0,
+                                             1,
+                                             y_top,
+                                             1);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
 
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    mesh                 = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
+    const int block_size = mesh->spatial_dimension();
+    auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -322,7 +321,7 @@ int test_contact() {
 
     f->add_operator(op);
 
-    if (SFEM_ENABLE_OUTPUT) sfem::create_directory("test_contact");
+    if (SFEM_ENABLE_OUTPUT) smesh::create_directory("test_contact");
 
     const char *SFEM_CONTACT_CASE = "sphere";
     SFEM_READ_ENV(SFEM_CONTACT_CASE, );
@@ -370,11 +369,10 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        mesh->write("test_contact/coarse_mesh");
-        fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
+        smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("test_contact/mesh"));
 
         auto out = f->output();
-        out->set_output_dir("test_contact/out");
+        out->set_output_dir(smesh::Path("test_contact/out"));
         out->enable_AoS_to_SoA(true);
 
         if (es != sfem::EXECUTION_SPACE_DEVICE) {
@@ -382,15 +380,8 @@ int test_contact() {
             out->write("gap", gap->data());
         }
 
-#ifdef SFEM_ENABLE_CUDA
-        out->write("rhs", sfem::to_host(rhs)->data());
-#else
-        out->write("rhs", rhs->data());
-#endif
-
-#ifdef SFEM_ENABLE_CUDA
-        x = sfem::to_host(x);
-#endif
+        out->write("rhs", smesh::to_host(rhs)->data());
+        x = smesh::to_host(x);
 
         out->write("disp", x->data());
 

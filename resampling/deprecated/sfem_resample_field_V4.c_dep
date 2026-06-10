@@ -1,11 +1,11 @@
-#include "sfem_resample_field.h"
+#include "sfem_resample_field.hpp"
 
-#include "sfem_resample_V.h"
+#include "sfem_resample_V.hpp"
 
 #include "mass.h"
 // #include "read_mesh.h"
 #include "matrixio_array.h"
-#include "sfem_resample_field_vec.h"
+#include "sfem_resample_field_vec.hpp"
 
 #include <math.h>
 #include <stddef.h>

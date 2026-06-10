@@ -1,16 +1,16 @@
 #include "sfem_SpectralElementLaplacian.hpp"
 
 // C includes
-#include "spectral_hex_laplacian.h"
+#include "spectral_hex_laplacian.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_mesh.hpp"
+
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -25,9 +25,9 @@ namespace sfem {
             return nullptr;
         }
 
-        assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(space->element_type()));  // REMOVEME once generalized approach
         auto ret          = std::make_unique<SpectralElementLaplacian>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
 
         return ret;
     }
@@ -38,7 +38,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   space->semi_structured_mesh().level(),
+                   smesh::semistructured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -47,8 +47,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        fprintf(stderr, "[Error] SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
-        assert(false);
+        SMESH_ERROR("SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
@@ -95,14 +94,19 @@ namespace sfem {
     int SpectralElementLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("SpectralElementLaplacian::apply");
 
-        assert(element_type == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
 
         double tick = MPI_Wtime();
 
-        int err = spectral_hex_laplacian_apply(
-                ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+        int err = spectral_hex_laplacian_apply(smesh::semistructured_level(ssm),
+                                               ssm.n_elements(),
+                                               smesh::semistructured_interior_start(ssm),
+                                               ssm.elements(0)->data(),
+                                               ssm.points()->data(),
+                                               h,
+                                               out);
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);

@@ -1,8 +1,8 @@
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function.hpp"
 
-#include "boundary_condition.h"
-#include "cu_boundary_condition.h"
+#include "boundary_condition.hpp"
+#include "cu_boundary_condition.hpp"
 
 namespace sfem {
 

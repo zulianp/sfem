@@ -7,21 +7,21 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 #include "matrixio_array.h"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
-#include "macro_tet4_laplacian.h"
+#include "macro_tet4_laplacian.hpp"
 
-#include "read_mesh.h"
+
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 
@@ -82,8 +82,13 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_USE_OPT, atoi);
     SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
-    if(SFEM_USE_OPT) {
-        SFEM_USE_OPT = laplacian_is_opt(SFEM_USE_OPT);
+    smesh::ElemType elem_type = static_cast<smesh::ElemType>(mesh.element_type);
+    if (SFEM_USE_MACRO) {
+        elem_type = macro_type_variant(elem_type);
+    }
+
+    if (SFEM_USE_OPT) {
+        SFEM_USE_OPT = laplacian_is_opt(elem_type);
     }
 
     if (rank == 0) {
@@ -114,12 +119,6 @@ int main(int argc, char *argv[]) {
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
-    enum ElemType elem_type = (ElemType)mesh.element_type;
-
-    if (SFEM_USE_MACRO) {
-        elem_type = macro_type_variant(elem_type);
-    }
-
     // using Solver_t = sfem::ConjugateGradient<real_t>;
     using Solver_t = sfem::BiCGStab<real_t>;
 
@@ -139,7 +138,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_USE_PRECONDITIONER) {
         diag.resize(mesh.nnodes, 0);
 
-        laplacian_diag(elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,diag.data());
+        laplacian_diag(elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, diag.data());
 
         solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
 
@@ -158,8 +157,13 @@ int main(int argc, char *argv[]) {
         if (SFEM_USE_OPT) {
             laplacian_apply_opt(elem_type, fff.nelements, fff.elements, fff.data, x, y);
         } else {
-            laplacian_apply(
-                    elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+            laplacian_apply(elem_type,
+                            mesh.nelements,
+                            mesh.nnodes,
+                            mesh.elements,
+                            mesh.points,
+                            x,
+                            y);
         }
 
         copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, 1, x, y);
@@ -181,7 +185,7 @@ int main(int argc, char *argv[]) {
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    if (elem_type == MACRO_TET4) {
+    if (elem_type == smesh::MACRO_TET4) {
         tet4_fff_destroy(&fff);
     }
 

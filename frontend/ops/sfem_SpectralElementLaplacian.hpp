@@ -5,7 +5,7 @@ namespace sfem {
 class SpectralElementLaplacian : public Op {
 public:
     std::shared_ptr<FunctionSpace> space;
-    enum ElemType element_type { INVALID };
+    smesh::ElemType element_type { smesh::INVALID };
     long calls{0};
     double total_time{0};
     ~SpectralElementLaplacian();

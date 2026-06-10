@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 static SFEM_INLINE void normalize(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -139,14 +139,14 @@ int main(int argc, char* argv[]) {
     const ptrdiff_t nlayers       = atol(argv[3]);
     const char*     output_folder = argv[4];
 
-    auto quad_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), input_folder);
+    auto quad_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(input_folder));
 
     auto hex8_elements = sfem::create_host_buffer<idx_t>(8, quad_mesh->n_elements() * nlayers);
     auto hex8_points   = sfem::create_host_buffer<geom_t>(3, quad_mesh->n_nodes() * (nlayers + 1));
 
     extrude(quad_mesh->n_elements(),
             quad_mesh->n_nodes(),
-            quad_mesh->elements()->data(),
+            quad_mesh->elements(0)->data(),
             quad_mesh->points()->data(),
             nlayers,
             height,
@@ -169,15 +169,13 @@ int main(int argc, char* argv[]) {
                hex8_points->data()[1],
                hex8_points->data()[2]);
 
-    sfem::create_directory(output_folder);
+    smesh::create_directory(output_folder);
 
-    std::string path_output_format = output_folder;
-    path_output_format += "/i%d.raw";
-    hex8_elements->to_files(path_output_format.c_str());
+    std::string path_output_format = std::string(output_folder) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value());
+    hex8_elements->to_files(smesh::Path(path_output_format));
 
-    path_output_format = output_folder;
-    path_output_format += "/x%d.raw";
-    hex8_points->to_files(path_output_format.c_str());
+    path_output_format = std::string(output_folder) + "/x%d." + std::string(smesh::TypeToString<geom_t>::value());
+    hex8_points->to_files(smesh::Path(path_output_format));
 
     return MPI_Finalize();
 }

@@ -1,4 +1,4 @@
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <cmath>
 #include <complex>
@@ -147,7 +147,7 @@ static SFEM_INLINE void principal_strain_kernel(const double px0,
 }
 
 
-extern "C" void principal_strains(const ptrdiff_t nelements,
+void principal_strains(const ptrdiff_t nelements,
            const ptrdiff_t nnodes,
            idx_t **const SFEM_RESTRICT elems,
            geom_t **const SFEM_RESTRICT xyz,
@@ -219,4 +219,3 @@ extern "C" void principal_strains(const ptrdiff_t nelements,
         strain_e2[i] = element_strain[2];
     }
 }
-

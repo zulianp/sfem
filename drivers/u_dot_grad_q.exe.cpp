@@ -8,12 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
 
-#include "operators/div.h"
+#include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "operators/div.hpp"
+
+
 
 #include "sfem_API.hpp"
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *u[3];
 
@@ -64,9 +64,9 @@ int main(int argc, char *argv[]) {
     memset(div_u, 0, mesh->n_nodes() * sizeof(real_t));
 
     if(nu_p0_or_p1 == mesh->n_elements()) {
-        p0_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
+        p0_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     } else {
-        p1_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
+        p1_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     }
 
     real_t SFEM_SCALE = 1;

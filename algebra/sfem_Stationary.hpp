@@ -5,7 +5,7 @@
 #include <functional>
 #include <memory>
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_LpSmoother.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"

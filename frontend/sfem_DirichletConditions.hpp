@@ -8,14 +8,17 @@
 #include <string>
 #include <vector>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mask.h"
-#include "sfem_Buffer.hpp"
-#include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_Sideset.hpp"
 #include "sfem_Constraint.hpp"
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mask.hpp"
+#include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif
 
 namespace sfem {
 
@@ -23,10 +26,10 @@ namespace sfem {
     public:
         struct Condition {
             std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe undefined in certain cases
-            SharedBuffer<idx_t>      nodeset;
-            SharedBuffer<real_t>     values;
-            real_t                   value{0};
-            int                      component{0};
+            SharedBuffer<idx_t>                   nodeset;
+            SharedBuffer<real_t>                  values;
+            real_t                                value{0};
+            int                                   component{0};
         };
 
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
@@ -37,9 +40,14 @@ namespace sfem {
 
         static std::shared_ptr<DirichletConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
         static std::shared_ptr<DirichletConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
-                                                                     const std::string &path);
+                                                                     const std::string                    &path);
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                                      std::string                           yaml);
+
+#ifdef SFEM_ENABLE_RYAML
+        static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const ryml::NodeRef                  &node);
+#endif
 
         static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                            const std::vector<struct Condition>  &conditions);
@@ -51,7 +59,11 @@ namespace sfem {
 
         int value(const real_t *const x, real_t *const out) override;
 
-        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 
@@ -77,7 +89,7 @@ namespace sfem {
                            const int       component,
                            real_t *const   values);
 
-        int   n_conditions() const;
+        int n_conditions() const;
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                              const bool                            as_zero) const override;
@@ -88,6 +100,8 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-} // namespace sfem
+    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
 
-#endif // SFEM_DIRICHLET_CONDITIONS_HPP 
+}  // namespace sfem
+
+#endif  // SFEM_DIRICHLET_CONDITIONS_HPP

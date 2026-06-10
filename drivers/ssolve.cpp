@@ -2,15 +2,15 @@
 #include "isolver_lsolve.h"
 
 extern "C" {
-#include "crs_graph.h"
-#include "dirichlet.h"
 
-#include "laplacian.h"
+#include "dirichlet.hpp"
+
+#include "laplacian.hpp"
 #include "matrixio_array.h"
-#include "neumann.h"
-#include "read_mesh.h"
-#include "sfem_mesh.h"
-#include "sfem_mesh_write.h"
+#include "neumann.hpp"
+
+#include "smesh_mesh.hpp"
+
 }
 
 #include <yaml-cpp/yaml.h>
@@ -134,9 +134,14 @@ int main(int argc, char *argv[]) {
     crs_matrix_t matrix;
     create_crs_matrix(&mesh, &matrix, 1);
 
-    laplacian_crs(
-        mesh.element_type,
-        mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, matrix.rowptr, matrix.colidx, matrix.values);
+    laplacian_crs(static_cast<smesh::ElemType>(mesh.element_type),
+                  mesh.nelements,
+                  mesh.nnodes,
+                  mesh.elements,
+                  mesh.points,
+                  matrix.rowptr,
+                  matrix.colidx,
+                  matrix.values);
 
     std::vector<real_t> x(mesh.nnodes, 0);
 
