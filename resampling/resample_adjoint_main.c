@@ -2,9 +2,12 @@
 
 #include "resample_adjoint_main.h"
 
+#include <dirent.h>
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #include "resampling_utils.h"
 #include "sfem_base.h"
@@ -226,18 +229,98 @@ int main_adjoint(int argc, char* argv[]) {
 #define SFEM_ENABLE_BONE_EDF_FIELD
 #ifdef SFEM_ENABLE_BONE_EDF_FIELD
         {
-            float* g_dbl = calloc(mesh.n_owned_nodes, sizeof(float));
+            /* Locate the nodal EDF field belonging to the target mesh.
+             * SFEM_ADJOINT_EDF_FIELD overrides; otherwise the first
+             * "*_edf.raw" file inside <mesh folder>/point_data is used. */
+            char edf_path[1024] = {0};
 
-            mesh_read_nodal_field(&mesh,                                                                               //
-                                //   "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
-                                  "/home/simone/git/sfem_d/sfem/workflows/resample/tet_on/point_data/on_edf.raw",      //
-                                  MPI_FLOAT,                                                                          //
-                                  g_dbl);                                                                              //
+            const char* env_edf_path = getenv("SFEM_ADJOINT_EDF_FIELD");
+            if (env_edf_path != NULL && strlen(env_edf_path) > 0) {
+                snprintf(edf_path, sizeof(edf_path), "%s", env_edf_path);
+            } else {
+                char point_data_dir[768];
+                snprintf(point_data_dir, sizeof(point_data_dir), "%s/point_data", folder);
 
-            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-                g[i] = (real_t)(g_dbl[i]);
-            }
-            free(g_dbl);
+                DIR* point_data = opendir(point_data_dir);
+                if (point_data != NULL) {
+                    const char     suffix[]   = "_edf.raw";
+                    const size_t   suffix_len = strlen(suffix);
+                    struct dirent* entry      = NULL;
+                    while ((entry = readdir(point_data)) != NULL) {
+                        const size_t name_len = strlen(entry->d_name);
+                        if (name_len > suffix_len && strcmp(entry->d_name + name_len - suffix_len, suffix) == 0) {
+                            snprintf(edf_path, sizeof(edf_path), "%s/%s", point_data_dir, entry->d_name);
+                            break;
+                        }  // END if (name ends with "_edf.raw")
+                    }  // END while ((entry = readdir(point_data)) != NULL)
+                    closedir(point_data);
+                }  // END if (point_data != NULL)
+            }  // END if (env_edf_path != NULL && strlen(env_edf_path) > 0)
+
+            if (edf_path[0] == '\0') {
+                fprintf(stderr,
+                        "Error: no nodal EDF field found in %s/point_data "
+                        "(set SFEM_ADJOINT_EDF_FIELD to override) %s:%d\n",
+                        folder,
+                        __FILE__,
+                        __LINE__);
+                return EXIT_FAILURE;
+            }  // END if (edf_path[0] == '\0')
+
+            /* The field file must match the mesh node count exactly: a shorter
+             * file silently zero-pads g, which truncates the resampled output
+             * (e.g. a mesh ordered by z appears compressed along the z axis). */
+            long n_owned_local  = (long)mesh.n_owned_nodes;
+            long n_owned_global = 0;
+            MPI_Allreduce(&n_owned_local, &n_owned_global, 1, MPI_LONG, MPI_SUM, comm);
+
+            struct stat edf_stat;
+            if (stat(edf_path, &edf_stat) != 0) {
+                fprintf(stderr, "Error: cannot stat %s %s:%d\n", edf_path, __FILE__, __LINE__);
+                return EXIT_FAILURE;
+            }  // END if (stat(edf_path, &edf_stat) != 0)
+
+            MPI_Datatype edf_mpi_type;
+
+            if ((long long)edf_stat.st_size == (long long)n_owned_global * (long long)sizeof(double)) {
+                edf_mpi_type = MPI_DOUBLE;
+            } else if ((long long)edf_stat.st_size == (long long)n_owned_global * (long long)sizeof(float)) {
+                edf_mpi_type = MPI_FLOAT;
+            } else {
+                fprintf(stderr,
+                        "Error: %s holds %lld bytes, expected %lld (float64) or %lld (float32) "
+                        "for the %ld mesh nodes %s:%d\n",
+                        edf_path,
+                        (long long)edf_stat.st_size,
+                        (long long)n_owned_global * (long long)sizeof(double),
+                        (long long)n_owned_global * (long long)sizeof(float),
+                        n_owned_global,
+                        __FILE__,
+                        __LINE__);
+                return EXIT_FAILURE;
+            }  // END if-else chain on edf_stat.st_size
+
+            if (mpi_rank == 0) {
+                printf("Reading adjoint EDF field: %s (%s)\n",
+                       edf_path,
+                       (edf_mpi_type == MPI_DOUBLE) ? "float64" : "float32");
+            }  // END if (mpi_rank == 0)
+
+            if (edf_mpi_type == MPI_DOUBLE) {
+                double* g_in = calloc(mesh.n_owned_nodes, sizeof(double));
+                mesh_read_nodal_field(&mesh, edf_path, MPI_DOUBLE, g_in);
+                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                    g[i] = (real_t)(g_in[i]);
+                }
+                free(g_in);
+            } else {
+                float* g_in = calloc(mesh.n_owned_nodes, sizeof(float));
+                mesh_read_nodal_field(&mesh, edf_path, MPI_FLOAT, g_in);
+                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                    g[i] = (real_t)(g_in[i]);
+                }
+                free(g_in);
+            }  // END if (edf_mpi_type == MPI_DOUBLE)
         }
 #endif  // SFEM_ENABLE_BONE_EDF_FIELD
 
