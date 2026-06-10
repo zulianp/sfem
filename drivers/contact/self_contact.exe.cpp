@@ -6,7 +6,7 @@
 
 // #include "sfem_aliases.hpp"
 // #include "sfem_base.hpp"
-// #include "sfem_crs_SpMV.hpp"
+// #include "sfem_CRS.hpp"
 // #include "spmv.hpp"
 
 // #include "matrixio_array.h"

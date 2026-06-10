@@ -497,6 +497,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             if (c.values) {
                 constraint_nodes_to_values_vec(
                         c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x);
@@ -564,6 +565,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::gradient");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             if (c.values) {
                 constraint_gradient_nodes_to_values_vec(
                         c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x, g);
@@ -592,6 +594,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::copy_constrained_dofs");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             constraint_nodes_copy_vec(c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, src, dest);
         }
 
@@ -631,6 +634,8 @@ namespace sfem {
 
         const int block_size = impl_->space->block_size();
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
+
             auto nodeset = c.nodeset->data();
             for (ptrdiff_t node = 0; node < c.nodeset->size(); node++) {
                 const ptrdiff_t idx = nodeset[node] * block_size + c.component;

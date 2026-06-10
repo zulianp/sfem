@@ -59,7 +59,7 @@ namespace sfem {
         }
     }
 
-    class CRSSpMVImpl {
+    class CRSImpl {
     public:
         cusparseSpMatDescr_t matrix;
         cusparseIndexType_t csrRowOffsetsType{SFEM_CUSPARSE_COMPAT_COUNT_T};
@@ -88,7 +88,7 @@ namespace sfem {
 
         std::shared_ptr<Buffer<cu_compat_count_t>> rowptr_compat;
 
-        CRSSpMVImpl(const ptrdiff_t rows, const ptrdiff_t cols,
+        CRSImpl(const ptrdiff_t rows, const ptrdiff_t cols,
                     const std::shared_ptr<Buffer<count_t>>& rowptr,
                     const std::shared_ptr<Buffer<idx_t>>& colidx,
                     const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
@@ -137,7 +137,7 @@ namespace sfem {
             CHECK_CUDA(cudaPeekAtLastError());
         }
 
-        ~CRSSpMVImpl() {
+        ~CRSImpl() {
             CHECK_CUDA(cudaFree(dBuffer));
             CHECK_CUSPARSE(cusparseDestroySpMat(matrix));
             CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
@@ -166,19 +166,19 @@ namespace sfem {
         }
     };
 
-    std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(
+    std::shared_ptr<CRS<count_t, idx_t, real_t>> d_crs_spmv(
             const ptrdiff_t rows, const ptrdiff_t cols,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
-        auto ret = std::make_shared<CRSSpMV<count_t, idx_t, real_t>>();
+        auto ret = std::make_shared<CRS<count_t, idx_t, real_t>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values = values;
         ret->cols_ = cols;
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
-        auto impl = std::make_shared<CRSSpMVImpl>(rows, cols, rowptr, colidx, values, scale_output);
+        auto impl = std::make_shared<CRSImpl>(rows, cols, rowptr, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) { impl->apply(x, y); };
         return ret;
     }
@@ -487,7 +487,7 @@ namespace sfem {
 #warning "No CUSPARSE installation!"
 
 namespace sfem {
-    std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(
+    std::shared_ptr<CRS<count_t, idx_t, real_t>> d_crs_spmv(
             const ptrdiff_t rows, const ptrdiff_t cols,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,

@@ -50,7 +50,7 @@ namespace sfem {
 
         for (int i = 0; i < nlevels - 1; i++) {
             auto fi        = functions[i];
-            auto linear_op = sfem::create_linear_operator(MATRIX_FREE, fi, nullptr, es);
+            auto linear_op = sfem::create_linear_operator(op_type::MATRIX_FREE, fi, nullptr, es);
             operators.push_back(linear_op);
 
             auto d = sfem::create_buffer<real_t>(fi->space()->n_dofs(), es);
@@ -67,7 +67,7 @@ namespace sfem {
 
         // Coarse level
         auto fi        = functions.back();
-        auto linear_op = sfem::create_linear_operator(MATRIX_FREE, fi, nullptr, es);
+        auto linear_op = sfem::create_linear_operator(op_type::MATRIX_FREE, fi, nullptr, es);
         operators.push_back(linear_op);
 
         // Coarse-grid solver

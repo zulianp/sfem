@@ -36,7 +36,7 @@
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_crs_SpMV.hpp"
+#include "sfem_CRS.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 #include "smesh_glob.hpp"
@@ -1178,7 +1178,7 @@ namespace sfem {
                                                                           const std::shared_ptr<sfem::Function>       &f,
                                                                           const std::shared_ptr<sfem::Buffer<real_t>> &u,
                                                                           enum sfem::ExecutionSpace                    es) {
-        if (format == MATRIX_FREE) {
+        if (format == op_type::MATRIX_FREE) {
             return sfem::make_op<real_t>(
                     f->space()->n_dofs(),
                     f->space()->n_dofs(),
@@ -1187,21 +1187,21 @@ namespace sfem {
         }
 
         if (f->space()->block_size() == 1) {
-            if (format == CRS_SYM)
+            if (format == op_type::CRS_SYM)
                 return sfem::hessian_crs_sym(f, u, es);
-            else if (format == COO_SYM)
+            else if (format == op_type::COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
-            else if (format == SPLITCRS) {
+            else if (format == op_type::SPLITCRS) {
                 return sfem::hessian_scrs(f, u, es);
-            } else if (format == ALIGNEDCRS) {
+            } else if (format == op_type::ALIGNEDCRS) {
                 return hessian_acrs(f, u, es);
-            } else if (format == SPLITDACRS) {
+            } else if (format == op_type::SPLITDACRS) {
                 return sfem::hessian_sdacrs(f, u, es);
-            } else if (format == SELL) {
+            } else if (format == op_type::SELL) {
                 return sfem::hessian_sell(f, u, es);
             }
 
-            if (format != CRS) {
+            if (format != op_type::CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
@@ -1222,8 +1222,8 @@ namespace sfem {
             }
         }
 
-        if (format == BSR) return sfem::hessian_bsr(f, u, es);
-        if (format != BSR_SYM) {
+        if (format == op_type::BSR) return sfem::hessian_bsr(f, u, es);
+        if (format != op_type::BSR_SYM) {
             fprintf(stderr, "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n", format.c_str());
         }
 

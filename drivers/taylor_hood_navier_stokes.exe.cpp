@@ -31,7 +31,7 @@
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_context.hpp"
-#include "sfem_crs_SpMV.hpp"
+#include "sfem_CRS.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_output.hpp"
 #include "spmv.hpp"

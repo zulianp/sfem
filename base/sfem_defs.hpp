@@ -9,7 +9,11 @@
 #include <assert.h>
 
 
+namespace sfem {
+
 typedef const char* OperatorType;
+
+namespace op_type {
 static OperatorType MATRIX_FREE = "MF";
 static OperatorType CRS = "CRS";
 static OperatorType SPLITCRS = "SPLITCRS";
@@ -20,6 +24,7 @@ static OperatorType BSR_SYM = "BSR_SYM";
 static OperatorType COO_SYM = "COO_SYM";
 static OperatorType SPLITDACRS = "SPLITDACRS";
 static OperatorType SELL = "SELL";
+}
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
 
@@ -39,6 +44,7 @@ typedef enum {
 } AdjointRefineType;
 
 static void* SFEM_DEFAULT_STREAM = 0;
+}
 
 namespace sfem {
 using smesh::crs_to_coo;

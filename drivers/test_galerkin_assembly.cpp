@@ -1,9 +1,9 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
 
 #include "matrixio_array.h"
@@ -70,8 +70,8 @@ int main(int argc, char *argv[]) {
     int         SFEM_ELEMENT_REFINE_LEVEL = 0;
     int         SFEM_PRINT_VECTORS        = 0;
     int         SFEM_SKIP_VERIFICATION    = 0;
-    const char *SFEM_FINE_OP_TYPE         = MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE       = MATRIX_FREE;
+    const char *SFEM_FINE_OP_TYPE         = sfem::op_type::MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE       = sfem::op_type::MATRIX_FREE;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);

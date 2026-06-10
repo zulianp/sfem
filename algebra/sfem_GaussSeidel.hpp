@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_crs_SpMV.hpp"
+#include "sfem_CRS.hpp"
 
 #include "sfem_openmp_blas.hpp"
 
@@ -136,7 +136,7 @@ namespace sfem {
     };
 
     template <typename R, typename C, typename T>
-    std::shared_ptr<Smoother<T>> h_gauss_seidel(const std::shared_ptr<CRSSpMV<R, C, T>>& crs,
+    std::shared_ptr<Smoother<T>> h_gauss_seidel(const std::shared_ptr<CRS<R, C, T>>& crs,
                                                 const T* d) {
         auto gs = std::make_shared<Smoother<T>>();
         gs->set_op(crs);

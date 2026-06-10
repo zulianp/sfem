@@ -35,7 +35,7 @@ namespace sfem {
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
 
-        auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+        auto linear_op = sfem::create_linear_operator(op_type::MATRIX_FREE, f, nullptr, es);
         sp->set_op(linear_op);
         sp->default_init();
 
@@ -335,9 +335,9 @@ namespace sfem {
             real_t coarse_rtol            = 1e-6;
 
             std::string coarse_op_type =
-                    smesh::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
+                    smesh::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? op_type::BSR : op_type::MATRIX_FREE);
             std::string debug_folder = "debug_ssmgc";
-            std::string fine_op_type = MATRIX_FREE;
+            std::string fine_op_type = op_type::MATRIX_FREE;
 
             if (in) {
                 printf("SPMG: Reading Input\n");

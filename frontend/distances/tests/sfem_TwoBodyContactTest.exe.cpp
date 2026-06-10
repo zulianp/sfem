@@ -6,8 +6,11 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_context.hpp"
+#include "smesh_adjacency.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sort.hpp"
+#include "smesh_sshex8_graph.hpp"
+#include "smesh_ssquad4_mesh.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_SelfContact.hpp"
@@ -18,6 +21,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -101,7 +105,11 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
 
         printf("Bulk: #nodes %zu #elements %zu\n", mesh->n_nodes(), mesh->n_elements());
 
-        mesh->write(smesh::Path("contact_mesh"));
+        if (smesh::is_semistructured_type(mesh->element_type(0))) {
+            smesh::semistructured_export_as_standard(mesh, smesh::Path("contact_mesh"));
+        } else {
+            mesh->write(smesh::Path("contact_mesh"));
+        }
 
         auto top_ss =
                 sfem::Sideset::create_from_selector(mesh, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
@@ -132,6 +140,12 @@ std::shared_ptr<Function> create_function(const EnvOptions& opts, const Executio
 
         assert(top_ns != nullptr);
         assert(top_ns->size() > 0);
+
+        assert(left_ns != nullptr);
+        assert(left_ns->size() >= 0);
+
+        assert(right_ns != nullptr);
+        assert(right_ns->size() >= 0);
 
         DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
         DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = opts.ytop, .component = 1};
@@ -180,6 +194,17 @@ struct ContactData {
     SharedBuffer<mask_t>                             constraints_mask;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
+
+static std::shared_ptr<smesh::Mesh> create_contact_skin(const std::shared_ptr<smesh::Mesh>& mesh) {
+    auto surface = smesh::skin(mesh);
+    if (!smesh::is_semistructured_type(mesh->element_type(0))) {
+        return surface;
+    }
+
+    auto ret = smesh::ssquad_to_quad4(surface);
+    ret->block(0)->set_element_type(smesh::QUADSHELL4);
+    return ret;
+}
 
 void remove_surface_elements_connected_to_constrained_nodes(const std::shared_ptr<smesh::Mesh>& surface,
                                                             const smesh::SharedBuffer<mask_t>&  constraints_mask,
@@ -886,7 +911,7 @@ int test_two_body_contact() {
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
 
-    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto solver    = sfem::create_cg<real_t>(linear_op, es);
     solver->set_op(linear_op);
     solver->set_max_it(10000);
@@ -909,7 +934,7 @@ int test_two_body_contact() {
 
     solver->apply(rhs->data(), displacement->data());
 
-    auto surface = skin(mesh);
+    auto surface = create_contact_skin(mesh);
     remove_surface_elements_connected_to_constrained_nodes(surface, constraints_mask, dim);
     surface->write(smesh::Path("contact_surface"));
 
