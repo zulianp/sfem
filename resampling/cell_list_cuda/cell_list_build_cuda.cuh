@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 
+#include "cell_list_3d_1d_map_sur_mesh.h"
 #include "cell_list_3d_map.h"
 #include "sfem_gpu_math.cuh"
 
@@ -386,5 +387,222 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
                                     const real_t  z_min,                    //
                                     const real_t  z_max,                    //
                                     cudaStream_t  stream);                   //
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * 1-D (x-binned) split map — GPU build kernels for cell_list_split_3d_1d_map_t
+ *
+ * The 1-D map partitions the domain along x only; the per-entry range bounds
+ * are the box y-intervals (lower_bounds_y / upper_bounds_y).  The phases mirror
+ * the 2-D build above and the CPU builder fill_cell_lists_3d_1d_split_map():
+ * the split criterion is dx < split_x (x extent only).
+ * ═════════════════════════════════════════════════════════════════════════════ */
+
+/* Compact 1-D grid parameters (no device pointers → safe to pass by value). */
+typedef struct {
+    real_t min_x;
+    real_t inv_delta_x;
+    int    num_cells_x;
+} cell_list_grid_params_1d_gpu_t;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Device helper: x-cell index range overlapped by a box, with the same
+ * clamping as the CPU builder (lower clamp on ix_min, upper clamp on ix_max;
+ * an out-of-domain box yields an empty range).
+ * ───────────────────────────────────────────────────────────────────────────── */
+__device__ __forceinline__ void                                                //
+compute_cell_range_for_box_1d_gpu(const real_t                         bmin_x,  //
+                                  const real_t                         bmax_x,  //
+                                  const cell_list_grid_params_1d_gpu_t params,  //
+                                  int                                 *ix_min,  //
+                                  int                                 *ix_max) {  //
+
+    if (params.num_cells_x <= 0) {
+        *ix_min = 0;
+        *ix_max = -1;
+        return;
+    }
+
+    *ix_min = (int)((bmin_x - params.min_x) * params.inv_delta_x);
+    *ix_max = (int)((bmax_x - params.min_x) * params.inv_delta_x);
+
+    if (*ix_min < 0) *ix_min = 0;
+    if (*ix_max >= params.num_cells_x) *ix_max = params.num_cells_x - 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Phase 1 (1-D) – Reduce max x extent per split group.
+ * d_max_dx_lower / d_max_dx_upper are single-element arrays, pre-zeroed.
+ * ───────────────────────────────────────────────────────────────────────────── */
+__global__ void                                                          //
+reduce_max_dx_split_1d_kernel(const real_t *__restrict__ box_min_x,      //
+                              const real_t *__restrict__ box_max_x,      //
+                              const int                  num_boxes,      //
+                              const real_t               split_x,        //
+                              real_t *__restrict__       d_max_dx_lower,  // [1]
+                              real_t *__restrict__       d_max_dx_upper)  // [1]
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_boxes) return;
+
+    const real_t dx = fabs(box_max_x[idx] - box_min_x[idx]);
+
+    if (dx < split_x) {
+        atomicMax_real_gpu(d_max_dx_lower, dx);
+    } else {
+        atomicMax_real_gpu(d_max_dx_upper, dx);
+    }
+}  // END Kernel: reduce_max_dx_split_1d_kernel
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Phase 3 (1-D) – Count how many dict entries each x-cell accumulates.
+ * cell_ptr_lower / cell_ptr_upper must be pre-zeroed (size num_cells_x + 1).
+ * ───────────────────────────────────────────────────────────────────────────── */
+__global__ void                                                              //
+count_cell_overlaps_split_1d_kernel(const real_t *__restrict__ box_min_x,    //
+                                    const real_t *__restrict__ box_max_x,    //
+                                    const int                  num_boxes,    //
+                                    const real_t               split_x,      //
+                                    cell_list_grid_params_1d_gpu_t lower,     //
+                                    cell_list_grid_params_1d_gpu_t upper,     //
+                                    int *__restrict__ cell_ptr_lower,         //
+                                    int *__restrict__ cell_ptr_upper)         //
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_boxes) return;
+
+    const real_t bmin_x = box_min_x[idx];
+    const real_t bmax_x = box_max_x[idx];
+
+    const real_t dx = fabs(bmax_x - bmin_x);
+
+    int                            ix_min, ix_max;
+    cell_list_grid_params_1d_gpu_t params;
+    int                           *cell_ptr;
+
+    if (dx < split_x) {
+        params   = lower;
+        cell_ptr = cell_ptr_lower;
+    } else {
+        params   = upper;
+        cell_ptr = cell_ptr_upper;
+    }
+
+    compute_cell_range_for_box_1d_gpu(bmin_x, bmax_x, params, &ix_min, &ix_max);
+
+    for (int ix = ix_min; ix <= ix_max; ix++) {
+        atomicAdd(&cell_ptr[ix + 1], 1);
+    }
+}  // END Kernel: count_cell_overlaps_split_1d_kernel
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Phase 5 (1-D) – Fill cell dictionaries.
+ * For every overlapped x-cell each box claims a slot (atomicAdd on temp_count)
+ * and writes its index plus its y-interval:
+ *   cell_dict[slot]      = box index
+ *   lower_bounds_y[slot] = box_min_y
+ *   upper_bounds_y[slot] = box_max_y
+ * temp_count_lower / temp_count_upper must be pre-zeroed (size num_cells_x).
+ * ───────────────────────────────────────────────────────────────────────────── */
+__global__ void                                                             //
+fill_cell_dict_split_1d_kernel(const real_t *__restrict__ box_min_x,        //
+                               const real_t *__restrict__ box_max_x,        //
+                               const real_t *__restrict__ box_min_y,        //
+                               const real_t *__restrict__ box_max_y,        //
+                               const int                  num_boxes,        //
+                               const real_t               split_x,          //
+                               cell_list_grid_params_1d_gpu_t lower,         //
+                               cell_list_grid_params_1d_gpu_t upper,         //
+                               /* lower map output arrays */
+                               const int *__restrict__ cell_ptr_lower,       //
+                               int *__restrict__       cell_dict_lower,      //
+                               real_t *__restrict__    lower_y_lower,        //
+                               real_t *__restrict__    upper_y_lower,        //
+                               int *__restrict__       temp_count_lower,     //
+                               /* upper map output arrays */
+                               const int *__restrict__ cell_ptr_upper,       //
+                               int *__restrict__       cell_dict_upper,      //
+                               real_t *__restrict__    lower_y_upper,        //
+                               real_t *__restrict__    upper_y_upper,        //
+                               int *__restrict__       temp_count_upper)     //
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_boxes) return;
+
+    const real_t bmin_x = box_min_x[idx];
+    const real_t bmax_x = box_max_x[idx];
+    const real_t bmin_y = box_min_y[idx];
+    const real_t bmax_y = box_max_y[idx];
+
+    const real_t dx = fabs(bmax_x - bmin_x);
+
+    int                            ix_min, ix_max;
+    cell_list_grid_params_1d_gpu_t params;
+    const int                     *cell_ptr;
+    int                           *cell_dict;
+    real_t                        *lower_y;
+    real_t                        *upper_y;
+    int                           *temp_count;
+
+    if (dx < split_x) {
+        params     = lower;
+        cell_ptr   = cell_ptr_lower;
+        cell_dict  = cell_dict_lower;
+        lower_y    = lower_y_lower;
+        upper_y    = upper_y_lower;
+        temp_count = temp_count_lower;
+    } else {
+        params     = upper;
+        cell_ptr   = cell_ptr_upper;
+        cell_dict  = cell_dict_upper;
+        lower_y    = lower_y_upper;
+        upper_y    = upper_y_upper;
+        temp_count = temp_count_upper;
+    }
+
+    compute_cell_range_for_box_1d_gpu(bmin_x, bmax_x, params, &ix_min, &ix_max);
+
+    for (int ix = ix_min; ix <= ix_max; ix++) {
+        const int slot = cell_ptr[ix] + atomicAdd(&temp_count[ix], 1);
+
+        cell_dict[slot] = idx;
+        lower_y[slot]   = bmin_y;
+        upper_y[slot]   = bmax_y;
+    }
+}  // END Kernel: fill_cell_dict_split_1d_kernel
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Host API
+ *
+ * build_cell_list_split_3d_1d_map_on_device
+ *   Builds a cell_list_split_3d_1d_map_t entirely on the GPU.
+ *   All box arrays must reside in device memory (d_box_min_z / d_box_max_z are
+ *   accepted for signature symmetry but the 1-D map does not read them).
+ *   The returned struct has the same device-memory layout as the one produced
+ *   by copy_cell_list_split_3d_1d_map_to_device() and must be freed with
+ *   free_cell_list_split_3d_1d_map_device().
+ *
+ *   The per-cell entries are sorted by lower_bounds_y and upper_bounds_y is
+ *   made non-decreasing per cell (prefix max), matching the CPU builder.
+ *
+ * NOTE: Performs several cudaStreamSynchronize() calls internally (needed to
+ *       read back scalar values from the device).
+ * ───────────────────────────────────────────────────────────────────────────── */
+cell_list_split_3d_1d_map_t                                                       //
+build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,              //
+                                          const real_t *d_box_min_y,              //
+                                          const real_t *d_box_min_z,              //
+                                          const real_t *d_box_max_x,              //
+                                          const real_t *d_box_max_y,              //
+                                          const real_t *d_box_max_z,              //
+                                          const int     num_boxes,                //
+                                          const real_t  split_x,                  //
+                                          const real_t  split_y,                  //
+                                          const real_t  x_min,                    //
+                                          const real_t  x_max,                    //
+                                          const real_t  y_min,                    //
+                                          const real_t  y_max,                    //
+                                          const real_t  z_min,                    //
+                                          const real_t  z_max,                    //
+                                          cudaStream_t  stream);                   //
 
 #endif  // __CELL_LIST_BUILD_CUDA_CUH__

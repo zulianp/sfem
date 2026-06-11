@@ -483,3 +483,177 @@ cleanup:
 
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tri3_raster_mesh_cell_quad_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_full_gpu_init_device_data
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+/* Zero-initialise the device data so that destroy is safe to call even if the
+ * build is never reached (e.g. when an earlier step fails). */
+static void  //
+tri3_raster_mesh_cell_quad_full_gpu_init_device_data(tri3_raster_cell_gpu_device_data_t *gpu_data) {
+    if (gpu_data == NULL) return;
+    gpu_data->split_map.split_x   = (real_t)0;
+    gpu_data->split_map.split_y   = (real_t)0;
+    gpu_data->split_map.map_lower = NULL;
+    gpu_data->split_map.map_upper = NULL;
+    gpu_data->element_coords_device = NULL;
+    gpu_data->nelements             = 0;
+}  // END Function: tri3_raster_mesh_cell_quad_full_gpu_init_device_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_full_gpu_build_cpu_data
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+/* CPU-side inputs for the full-GPU path: bounding boxes, their statistics and
+ * histograms, and the tri3 element coordinates.  The split cell list itself is
+ * NOT built here — it is assembled directly on the GPU. */
+static int                                                                                          //
+tri3_raster_mesh_cell_quad_full_gpu_build_cpu_data(const ptrdiff_t                  start_element,  //
+                                                   const ptrdiff_t                  end_element,    //
+                                                   const mesh_t                    *mesh,           //
+                                                   tri3_raster_cell_gpu_cpu_data_t *cpu_data,       //
+                                                   bounding_box_statistics_t       *stats) {        //
+    int ret = 0;
+
+    if (mesh == NULL || cpu_data == NULL || stats == NULL) {
+        fprintf(stderr, "Error: Invalid input to tri3_raster_mesh_cell_quad_full_gpu_build_cpu_data\n");
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (mesh == NULL || cpu_data == NULL || stats == NULL)
+
+    const int fb_error = make_mesh_tri3_boxes(start_element,
+                                              end_element,
+                                              mesh->nnodes,
+                                              (const idx_t **)mesh->elements,
+                                              (const geom_t **)mesh->points,
+                                              &cpu_data->bounding_boxes);
+
+    if (fb_error != 0 || cpu_data->bounding_boxes == NULL) {
+        fprintf(stderr, "Error: make_mesh_tri3_boxes failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (fb_error != 0 || cpu_data->bounding_boxes == NULL)
+
+    *stats = calculate_bounding_box_statistics(cpu_data->bounding_boxes);
+    print_bounding_box_statistics(stats);
+
+    cpu_data->histograms = calculate_side_length_histograms(cpu_data->bounding_boxes, stats, 50);
+    print_side_length_histograms(&cpu_data->histograms);
+
+    cpu_data->geom = mesh_tri3_geometry_alloc(mesh);
+    if (cpu_data->geom == NULL) {
+        fprintf(stderr, "Error: mesh_tri3_geometry_alloc failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto exit;
+    }  // END if (cpu_data->geom == NULL)
+
+    mesh_tri3_geometry_compute_element_coords(cpu_data->geom);
+
+exit:
+    RETURN_FROM_FUNCTION(ret);
+}  // END Function: tri3_raster_mesh_cell_quad_full_gpu_build_cpu_data
+
+///////////////////////////////////////////////////////////////////////////
+// tri3_raster_mesh_cell_quad_full_gpu
+// Same functionality as tri3_raster_mesh_cell_quad_gpu, but the cell list
+// used for the rasterization is assembled directly on the GPU.
+///////////////////////////////////////////////////////////////////////////
+int                                                                                       //
+tri3_raster_mesh_cell_quad_full_gpu(const ptrdiff_t                      start_element,   //
+                                    const ptrdiff_t                      end_element,     //
+                                    const mesh_t                        *mesh,            //
+                                    const ptrdiff_t *const SFEM_RESTRICT n,               //
+                                    const ptrdiff_t *const SFEM_RESTRICT stride,          //
+                                    const geom_t *const SFEM_RESTRICT    origin,          //
+                                    const geom_t *const SFEM_RESTRICT    delta,           //
+                                    const real_t *const SFEM_RESTRICT    weighted_field,  //
+                                    real_t *const SFEM_RESTRICT          data) {          //
+    int ret = 0;
+
+    PRINT_CURRENT_FUNCTION;
+
+    const double tick = MPI_Wtime();
+
+    tri3_raster_cell_gpu_cpu_data_t cpu_data;
+    tri3_raster_mesh_cell_quad_gpu_init_cpu_data(&cpu_data);
+
+    tri3_raster_cell_gpu_device_data_t gpu_data;
+    tri3_raster_mesh_cell_quad_full_gpu_init_device_data(&gpu_data);
+
+    bounding_box_statistics_t stats;
+    memset(&stats, 0, sizeof(stats));
+
+    {
+        const double tick_build = MPI_Wtime();
+        ret = tri3_raster_mesh_cell_quad_full_gpu_build_cpu_data(start_element, end_element, mesh, &cpu_data, &stats);
+        const double tock_build = MPI_Wtime();
+        printf("[tri3_raster_mesh_cell_quad_full_gpu] build cpu data: %.6f s\n", tock_build - tick_build);
+    }
+
+    if (ret != 0) {
+        goto cleanup;
+    }  // END if (ret != 0)
+
+    {
+        /* Same CDF ratio (0.6) used by build_cell_list_split_3d_1d_map_mesh on
+         * the CPU path, so the GPU cell list is built with identical split
+         * parameters. */
+        const side_length_cdf_thresholds_t thresholds = calculate_cdf_thresholds(&cpu_data.histograms, 0.6, 0.6, 0.6);
+
+        const double tick_device = MPI_Wtime();
+        ret = tri3_raster_mesh_cell_quad_full_gpu_build_device_data(cpu_data.bounding_boxes,  //
+                                                                    cpu_data.geom,            //
+                                                                    mesh->nelements,          //
+                                                                    thresholds.threshold_x,   //
+                                                                    thresholds.threshold_y,   //
+                                                                    stats.min_x,              //
+                                                                    stats.max_x,              //
+                                                                    stats.min_y,              //
+                                                                    stats.max_y,              //
+                                                                    stats.min_z,              //
+                                                                    stats.max_z,              //
+                                                                    &gpu_data);               //
+        const double tock_device = MPI_Wtime();
+        printf("[tri3_raster_mesh_cell_quad_full_gpu] build device data: %.6f s (%f Mtris/s)\n",
+               tock_device - tick_device,
+               (double)cpu_data.bounding_boxes->num_boxes / (tock_device - tick_device) / 1e6);
+    }
+
+    if (ret != 0) {
+        fprintf(stderr, "Error: tri3_raster_mesh_cell_quad_full_gpu_build_device_data failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto cleanup;
+    }  // END if (ret != 0)
+
+    {
+        const double tick_launch = MPI_Wtime();
+        ret                      = tri3_raster_cell_quad_bl_full_gpu_launch(&gpu_data,       //
+                                                                            mesh,            //
+                                                                            n,               //
+                                                                            stride,          //
+                                                                            origin,          //
+                                                                            delta,           //
+                                                                            weighted_field,  //
+                                                                            data);           //
+        const double tock_launch = MPI_Wtime();
+        printf("[tri3_raster_mesh_cell_quad_full_gpu] kernel launch: %.6f s\n", tock_launch - tick_launch);
+    }
+
+    if (ret != 0) {
+        fprintf(stderr, "Error: tri3_raster_cell_quad_bl_full_gpu_launch failed %s:%d\n", __FILE__, __LINE__);
+        ret = EXIT_FAILURE;
+        goto cleanup;
+    }  // END if (ret != 0)
+
+cleanup:
+    tri3_raster_mesh_cell_quad_full_gpu_destroy_device_data(&gpu_data);
+    tri3_raster_mesh_cell_quad_gpu_destroy_cpu_data(&cpu_data);
+
+    const double tock = MPI_Wtime();
+    printf("[tri3_raster_mesh_cell_quad_full_gpu] total elapsed: %.6f s\n", tock - tick);
+
+    RETURN_FROM_FUNCTION(ret);
+}  // END Function: tri3_raster_mesh_cell_quad_full_gpu
