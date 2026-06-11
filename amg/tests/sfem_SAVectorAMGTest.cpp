@@ -94,6 +94,18 @@ namespace {
                 sfem::EXECUTION_SPACE_HOST);
     }
 
+    std::shared_ptr<sfem::Operator<real_t>> inverse_diagonal_preconditioner(const sfem::SharedBuffer<real_t>& inv_diag) {
+        return sfem::make_op<real_t>(
+                inv_diag->size(),
+                inv_diag->size(),
+                [=](const real_t* const x, real_t* const y) {
+                    for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(inv_diag->size()); ++i) {
+                        y[i] = inv_diag->data()[i] * x[i];
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
 }  // namespace
 
 int test_linear_elasticity_sa_vector_amg() {
@@ -115,7 +127,8 @@ int test_linear_elasticity_sa_vector_amg() {
                                         1,
                                         1,
                                         1);
-    auto fs   = sfem::FunctionSpace::create(mesh, 3);
+
+    auto fs = sfem::FunctionSpace::create(mesh, 3);
 
     auto left = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < static_cast<geom_t>(1e-8); });
@@ -132,14 +145,18 @@ int test_linear_elasticity_sa_vector_amg() {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    const ptrdiff_t ndofs = fs->n_dofs();
-    auto            x     = sfem::create_host_buffer<real_t>(ndofs);
-    auto            rhs   = sfem::create_host_buffer<real_t>(ndofs);
-    auto            work  = sfem::create_host_buffer<real_t>(ndofs);
+    const ptrdiff_t ndofs  = fs->n_dofs();
+    auto            x      = sfem::create_host_buffer<real_t>(ndofs);
+    auto            x_diag = sfem::create_host_buffer<real_t>(ndofs);
+    auto            x_sa   = sfem::create_host_buffer<real_t>(ndofs);
+    auto            rhs    = sfem::create_host_buffer<real_t>(ndofs);
+    auto            work   = sfem::create_host_buffer<real_t>(ndofs);
 
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        x->data()[i]   = 0;
-        rhs->data()[i] = 0;
+        x->data()[i]      = 0;
+        x_diag->data()[i] = 0;
+        x_sa->data()[i]   = 0;
+        rhs->data()[i]    = 0;
     }
 
     auto points = fs->points();
@@ -151,7 +168,11 @@ int test_linear_elasticity_sa_vector_amg() {
     }
 
     f->apply_constraints(x->data());
+    f->apply_constraints(x_diag->data());
+    f->apply_constraints(x_sa->data());
     f->apply_constraints(rhs->data());
+
+    const double common_setup_start = smesh::time_seconds();
 
     auto graph  = fs->node_to_node_graph();
     auto values = sfem::create_host_buffer<real_t>(graph->nnz() * 9);
@@ -180,12 +201,16 @@ int test_linear_elasticity_sa_vector_amg() {
         }
     }
 
+    const double common_setup_time = smesh::time_seconds() - common_setup_start;
+
+    const double sa_setup_start = smesh::time_seconds();
+
     auto boundary_nodes = sfem::create_host_buffer<sfem::mask_t>(mesh->n_nodes());
     for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
         boundary_nodes->data()[node] = points->data()[0][node] < static_cast<geom_t>(1e-8);
     }
 
-    const int max_aggregate_size = 80;
+    const int max_aggregate_size = 120;
     auto      level              = sfem::h_sa_vector_amg_level<sfem::count_t, sfem::idx_t, real_t, geom_t, real_t>(
             a_bsr, const_cast<const geom_t* const*>(points->data()), 3, boundary_nodes, max_aggregate_size);
 
@@ -201,27 +226,71 @@ int test_linear_elasticity_sa_vector_amg() {
     SFEM_TEST_ASSERT(level.aggregates.n_aggregates <= mesh->n_nodes() / 2);
     SFEM_TEST_ASSERT(level.coarse_a->rows() < a_bsr->rows());
 
-    auto solve_op = zeroing_op(a_bsr);
-    auto precond  = additive_sa_preconditioner(level, inv_diag);
+    auto solve_op   = zeroing_op(a_bsr);
+    auto sa_precond = additive_sa_preconditioner(level, inv_diag);
+
+    auto sa_solver     = sfem::create_cg<real_t>(solve_op, es);
+    sa_solver->verbose = true;
+    sa_solver->set_preconditioner_op(sa_precond);
+    sa_solver->set_rtol(1e-8);
+    sa_solver->set_atol(1e-10);
+    sa_solver->set_max_it(1000);
+
+    const double sa_setup_time = smesh::time_seconds() - sa_setup_start;
+
+    const double diag_setup_start = smesh::time_seconds();
+
+    auto diag_precond = inverse_diagonal_preconditioner(inv_diag);
+
+    auto diag_solver     = sfem::create_cg<real_t>(solve_op, es);
+    diag_solver->verbose = false;
+    diag_solver->set_preconditioner_op(diag_precond);
+    diag_solver->set_rtol(1e-8);
+    diag_solver->set_atol(1e-10);
+    diag_solver->set_max_it(40000);
+
+    const double diag_setup_time = smesh::time_seconds() - diag_setup_start;
 
     const real_t initial_residual = residual_norm(solve_op, rhs, x, work);
     SFEM_TEST_ASSERT(initial_residual > 0);
 
-    auto solver     = sfem::create_cg<real_t>(solve_op, es);
-    solver->verbose = true;
-    solver->set_preconditioner_op(precond);
-    solver->set_rtol(1e-8);
-    solver->set_atol(1e-10);
-    solver->set_max_it(300);
+    const double diag_solve_start = smesh::time_seconds();
+    SFEM_TEST_ASSERT(diag_solver->apply(rhs->data(), x_diag->data()) == SFEM_SUCCESS);
+    const double diag_solve_time = smesh::time_seconds() - diag_solve_start;
 
-    SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+    const double sa_solve_start = smesh::time_seconds();
+    SFEM_TEST_ASSERT(sa_solver->apply(rhs->data(), x_sa->data()) == SFEM_SUCCESS);
+    const double sa_solve_time = smesh::time_seconds() - sa_solve_start;
+
+    printf("diag_preconditioner_iterations: %d, sa_preconditioner_iterations: %d\n",
+           diag_solver->iterations(),
+           sa_solver->iterations());
+    printf("common_setup_time_seconds: %g\n", common_setup_time);
+    printf("diag_setup_time_seconds: %g, diag_solve_time_seconds: %g, diag_total_time_seconds: %g\n",
+           diag_setup_time,
+           diag_solve_time,
+           common_setup_time + diag_setup_time + diag_solve_time);
+    printf("sa_setup_time_seconds: %g, sa_solve_time_seconds: %g, sa_total_time_seconds: %g\n",
+           sa_setup_time,
+           sa_solve_time,
+           common_setup_time + sa_setup_time + sa_solve_time);
+    SFEM_TEST_ASSERT(sa_solver->iterations() <= diag_solver->iterations());
 
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
         work->data()[i] = 0;
+        x->data()[i]    = x_sa->data()[i];
     }
 
-    const real_t final_residual = residual_norm(solve_op, rhs, x, work);
+    const real_t final_residual = residual_norm(solve_op, rhs, x_sa, work);
     SFEM_TEST_ASSERT(final_residual < initial_residual * static_cast<real_t>(1e-4));
+
+    smesh::create_directory("amg");
+    mesh->write(smesh::Path("amg/mesh"));
+    auto out = f->output();
+    out->enable_AoS_to_SoA(true);
+    out->set_output_dir(smesh::Path("amg/out"));
+    SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
