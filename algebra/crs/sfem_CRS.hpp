@@ -13,6 +13,8 @@
 #include "sfem_aliases.hpp"
 #include "smesh_types.hpp"
 
+// TODO: have a look at this paper for the MM https://dl.acm.org/doi/10.1145/3721145.3725773
+
 namespace sfem {
 
     template <typename R, typename C, typename T>
@@ -60,11 +62,11 @@ namespace sfem {
         }
 
         for (ptrdiff_t i = 0; i < rows; i++) {
-            const C                       b_j     = static_cast<C>(i);
-            const R                       a_begin = a_rowptr[i];
-            const R                       a_end   = a_rowptr[i + 1];
-            const C* const SFEM_RESTRICT  a_cols  = &a_colidx[a_begin];
-            const T* const SFEM_RESTRICT  a_vals  = &a_values[a_begin];
+            const C                      b_j     = static_cast<C>(i);
+            const R                      a_begin = a_rowptr[i];
+            const R                      a_end   = a_rowptr[i + 1];
+            const C* const SFEM_RESTRICT a_cols  = &a_colidx[a_begin];
+            const T* const SFEM_RESTRICT a_vals  = &a_values[a_begin];
 
             for (R a_k = 0, a_len = a_end - a_begin; a_k < a_len; a_k++) {
                 const C b_i    = a_cols[a_k];
@@ -252,15 +254,8 @@ namespace sfem {
 
         auto next_workspace = create_host_buffer<R>(columns);
 
-        crs_transpose_apply(rows,
-                            columns,
-                            d_a_rowptr,
-                            d_a_colidx,
-                            d_a_values,
-                            d_b_rowptr,
-                            d_b_colidx,
-                            d_b_values,
-                            next_workspace->data());
+        crs_transpose_apply(
+                rows, columns, d_a_rowptr, d_a_colidx, d_a_values, d_b_rowptr, d_b_colidx, d_b_values, next_workspace->data());
 
         return SFEM_SUCCESS;
     }
@@ -343,9 +338,137 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
+    void crs_mv(const ptrdiff_t                     rows,
+                const R* const SFEM_RESTRICT        rowptr,
+                const C* const SFEM_RESTRICT        colidx,
+                const TStorage* const SFEM_RESTRICT values,
+                const T* const SFEM_RESTRICT        x,
+                T* const SFEM_RESTRICT              y,
+                const T                             scale_output) {
+        if (scale_output == 0) {
+#pragma omp parallel for  // nowait
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                const R row_begin = rowptr[i];
+                const R row_end   = rowptr[i + 1];
+
+                T val = 0;
+                for (R k = row_begin; k < row_end; k++) {
+                    const C j   = colidx[k];
+                    const T aij = values[k];
+
+                    val += aij * x[j];
+                }
+
+                y[i] = val;
+            }
+        } else if (scale_output == 1) {
+#if 0
+#pragma omp parallel for  // nowait
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                const R row_begin = rowptr[i];
+                const R row_end   = rowptr[i + 1];
+
+                T val = y[i];
+                for (R k = row_begin; k < row_end; k++) {
+                    const C j   = colidx[k];
+                    const T aij = values[k];
+
+                    val += aij * x[j];
+                }
+
+                y[i] = val;
+            }
+#else                     // 20-27% faster on M1
+#pragma omp parallel for  // nowait
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                const R row_begin = rowptr[i];
+                const R extent    = rowptr[i + 1] - row_begin;
+
+                const auto* const SFEM_RESTRICT cols = &colidx[row_begin];
+                const auto* const SFEM_RESTRICT vals = &values[row_begin];
+
+                T val = y[i];
+
+                const static int BLOCK_SIZE       = 8;
+                const R          n_blocks         = extent / BLOCK_SIZE;
+                const R          b_extent         = n_blocks * BLOCK_SIZE;
+                T                buff[BLOCK_SIZE] = {0};
+
+                for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
+#pragma unroll(BLOCK_SIZE)
+                    for (int b = 0; b < BLOCK_SIZE; b++) {
+                        buff[b] += vals[k + b] * x[cols[k + b]];
+                    }
+                }
+
+                if (b_extent) {
+                    for (int b = 0; b < BLOCK_SIZE; b++) {
+                        val += buff[b];
+                    }
+                }
+
+                for (R k = b_extent; k < extent; k++) {
+                    const C j   = cols[k];
+                    const T aij = vals[k];
+
+                    val += aij * x[j];
+                }
+
+                y[i] = val;
+            }
+#endif
+        } else {
+#pragma omp parallel for  // nowait
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                const R row_begin = rowptr[i];
+                const R row_end   = rowptr[i + 1];
+
+                T val = scale_output * y[i];
+                for (R k = row_begin; k < row_end; k++) {
+                    const C j   = colidx[k];
+                    const T aij = values[k];
+
+                    val += aij * x[j];
+                }
+
+                y[i] = val;
+            }
+        }
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
     class CRS : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
+
+        std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
+            auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
+            ret->row_ptr = create_host_buffer<R>(0);
+            ret->col_idx = create_host_buffer<C>(0);
+            ret->values  = create_host_buffer<TStorage>(0);
+
+            crs_transpose(cols_, row_ptr, col_idx, values, ret->row_ptr, ret->col_idx, ret->values);
+
+            const ptrdiff_t ret_rows        = cols_;
+            ret->cols_                      = rows();
+            ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
+            ret->execution_space_           = EXECUTION_SPACE_HOST;
+
+            ret->apply_ = [=](const T* const x, T* const y) {
+                auto rowptr_ = ret->row_ptr->data();
+                auto colidx_ = ret->col_idx->data();
+                auto values_ = ret->values->data();
+
+                crs_mv(ret_rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
+            };
+
+            return ret;
+        }
+
+        // std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
+        //     // TODO: implement this using crs_mm
+        //     return ret;
+        // }
 
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("CRS::apply");
@@ -362,6 +485,7 @@ namespace sfem {
         SharedBuffer<C>        col_idx;
         SharedBuffer<TStorage> values;
         ptrdiff_t              cols_{0};
+        T                      uniform_pre_output_scaling{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
@@ -394,12 +518,13 @@ namespace sfem {
                                                        const SharedBuffer<R>&        rowptr,
                                                        const SharedBuffer<C>&        colidx,
                                                        const SharedBuffer<TStorage>& values,
-                                                       const T                       scale_output) {
-        auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
-        ret->row_ptr = rowptr;
-        ret->col_idx = colidx;
-        ret->values  = values;
-        ret->cols_   = cols;
+                                                       const T                       uniform_pre_output_scaling) {
+        auto ret                        = std::make_shared<CRS<R, C, TStorage, T>>();
+        ret->row_ptr                    = rowptr;
+        ret->col_idx                    = colidx;
+        ret->values                     = values;
+        ret->cols_                      = cols;
+        ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
@@ -408,96 +533,7 @@ namespace sfem {
             auto colidx_ = ret->col_idx->data();
             auto values_ = ret->values->data();
 
-            if (scale_output == 0) {
-
-#pragma omp parallel for  // nowait
-                for (ptrdiff_t i = 0; i < rows; i++) {
-                    const R row_begin = rowptr_[i];
-                    const R row_end   = rowptr_[i + 1];
-
-                    T val = 0;
-                    for (R k = row_begin; k < row_end; k++) {
-                        const C j   = colidx_[k];
-                        const T aij = values_[k];
-
-                        val += aij * x[j];
-                    }
-
-                    y[i] = val;
-                }
-            } else if (scale_output == 1) {
-#if 0
-#pragma omp parallel for  // nowait
-                for (ptrdiff_t i = 0; i < rows; i++) {
-                    const R row_begin = rowptr_[i];
-                    const R row_end   = rowptr_[i + 1];
-
-                    T val = y[i];
-                    for (R k = row_begin; k < row_end; k++) {
-                        const C j   = colidx_[k];
-                        const T aij = values_[k];
-
-                        val += aij * x[j];
-                    }
-
-                    y[i] = val;
-                }
-#else                     // 20-27% faster on M1
-#pragma omp parallel for  // nowait
-                for (ptrdiff_t i = 0; i < rows; i++) {
-                    const R row_begin = rowptr_[i];
-                    const R extent    = rowptr_[i + 1] - row_begin;
-
-                    const auto* const SFEM_RESTRICT cols = &colidx_[row_begin];
-                    const auto* const SFEM_RESTRICT vals = &values_[row_begin];
-
-                    T val = y[i];
-
-                    const static int BLOCK_SIZE       = 8;
-                    const R          n_blocks         = extent / BLOCK_SIZE;
-                    const R          b_extent         = n_blocks * BLOCK_SIZE;
-                    T                buff[BLOCK_SIZE] = {0};
-
-                    for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
-#pragma unroll(BLOCK_SIZE)
-                        for (int b = 0; b < BLOCK_SIZE; b++) {
-                            buff[b] += vals[k + b] * x[cols[k + b]];
-                        }
-                    }
-
-                    if (b_extent) {
-                        for (int b = 0; b < BLOCK_SIZE; b++) {
-                            val += buff[b];
-                        }
-                    }
-
-                    for (R k = b_extent; k < extent; k++) {
-                        const C j   = cols[k];
-                        const T aij = vals[k];
-
-                        val += aij * x[j];
-                    }
-
-                    y[i] = val;
-                }
-#endif
-            } else {
-#pragma omp parallel for  // nowait
-                for (ptrdiff_t i = 0; i < rows; i++) {
-                    const R row_begin = rowptr_[i];
-                    const R row_end   = rowptr_[i + 1];
-
-                    T val = scale_output * y[i];
-                    for (R k = row_begin; k < row_end; k++) {
-                        const C j   = colidx_[k];
-                        const T aij = values_[k];
-
-                        val += aij * x[j];
-                    }
-
-                    y[i] = val;
-                }
-            }
+            crs_mv(rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
         };
 
         return ret;
