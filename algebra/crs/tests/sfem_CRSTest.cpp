@@ -85,11 +85,52 @@ int test_crs_transpose_rectangular() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_crs_rap() {
+    using R = sfem::count_t;
+    using C = sfem::idx_t;
+    using T = sfem::real_t;
+
+    auto r_rowptr = make_buffer<R>({0, 2, 4});
+    auto r_colidx = make_buffer<C>({0, 1, 1, 2});
+    auto r_values = make_buffer<T>({1, 0.5, 0.5, 1});
+
+    auto a_rowptr = make_buffer<R>({0, 2, 5, 7});
+    auto a_colidx = make_buffer<C>({0, 1, 0, 1, 2, 1, 2});
+    auto a_values = make_buffer<T>({4, 1, 1, 3, 2, 2, 5});
+
+    auto p_rowptr = make_buffer<R>({0, 1, 3, 4});
+    auto p_colidx = make_buffer<C>({0, 0, 1, 1});
+    auto p_values = make_buffer<T>({1, 0.5, 0.5, 1});
+
+    auto r = sfem::h_crs_spmv<R, C, T>(2, 3, r_rowptr, r_colidx, r_values, 0);
+    auto a = sfem::h_crs_spmv<R, C, T>(3, 3, a_rowptr, a_colidx, a_values, 0);
+    auto p = sfem::h_crs_spmv<R, C, T>(3, 2, p_rowptr, p_colidx, p_values, 0);
+    auto c = sfem::rap(r, a, p);
+
+    SFEM_TEST_EQ(c->rows(), static_cast<ptrdiff_t>(2));
+    SFEM_TEST_EQ(c->cols(), static_cast<ptrdiff_t>(2));
+
+    std::vector<T> dense(4, 0);
+    for (ptrdiff_t i = 0; i < c->rows(); ++i) {
+        for (R k = c->row_ptr->data()[i]; k < c->row_ptr->data()[i + 1]; ++k) {
+            const C col = c->col_idx->data()[k];
+            SFEM_TEST_ASSERT(col >= 0 && col < c->cols());
+            dense[static_cast<size_t>(i) * c->cols() + col] = c->values->data()[k];
+        }
+    }
+
+    const T expected_dense[] = {5.75, 2.25, 2.25, 7.75};
+    SFEM_ASSERT_ARRAY_APPROX_EQ(4, dense.data(), expected_dense, 1e-6);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_crs_mm_rectangular);
     SFEM_RUN_TEST(test_crs_transpose_rectangular);
+    SFEM_RUN_TEST(test_crs_rap);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

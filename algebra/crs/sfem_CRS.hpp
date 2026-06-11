@@ -442,6 +442,12 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_;
 
         std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
+            if (execution_space() != EXECUTION_SPACE_HOST) {
+                // TODO: Implement device version
+                SFEM_ERROR("Transpose is not supported for non-host execution space");
+                return nullptr;
+            }
+
             auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
             ret->row_ptr = create_host_buffer<R>(0);
             ret->col_idx = create_host_buffer<C>(0);
@@ -465,14 +471,47 @@ namespace sfem {
             return ret;
         }
 
-        // std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
-        //     // TODO: implement this using crs_mm
-        //     return ret;
-        // }
+        std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
+            if (execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
+                // TODO: Implement device version
+                SFEM_ERROR("Matrix multiplication is not supported for non-host execution space");
+                return nullptr;
+            }
+
+            auto ret     = std::make_shared<CRS<R, C, TStorage, T>>();
+            ret->row_ptr = create_host_buffer<R>(0);
+            ret->col_idx = create_host_buffer<C>(0);
+            ret->values  = create_host_buffer<TStorage>(0);
+
+            crs_mm(other->cols_,
+                   row_ptr,
+                   col_idx,
+                   values,
+                   other->row_ptr,
+                   other->col_idx,
+                   other->values,
+                   ret->row_ptr,
+                   ret->col_idx,
+                   ret->values);
+
+            const ptrdiff_t ret_rows        = rows();
+            ret->cols_                      = other->cols_;
+            ret->uniform_pre_output_scaling = 0;
+            ret->execution_space_           = EXECUTION_SPACE_HOST;
+
+            ret->apply_ = [=](const T* const x, T* const y) {
+                auto rowptr_ = ret->row_ptr->data();
+                auto colidx_ = ret->col_idx->data();
+                auto values_ = ret->values->data();
+
+                crs_mv(ret_rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
+            };
+
+            return ret;
+        }
 
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("CRS::apply");
-
             apply_(x, y);
             return 0;
         }
@@ -537,6 +576,18 @@ namespace sfem {
         };
 
         return ret;
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<CRS<R, C, TStorage, T>> rap(const std::shared_ptr<CRS<R, C, TStorage, T>>& r,
+                                                const std::shared_ptr<CRS<R, C, TStorage, T>>& a,
+                                                const std::shared_ptr<CRS<R, C, TStorage, T>>& p) {
+        // Compute D = A P
+        auto d = a->mm(p);
+
+        // Compute G = R D
+        auto g = r->mm(d);
+        return g;
     }
 
 }  // namespace sfem

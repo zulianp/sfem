@@ -18,7 +18,7 @@
 #include <ryml.hpp>
 #endif
 
-#define VIZ_DEBUG
+// #define VIZ_DEBUG
 
 #ifdef VIZ_DEBUG
 #include "/Users/patrickzulian/Desktop/code/sviz/src/sviz_monitor_client.hpp"
@@ -677,7 +677,11 @@ namespace sfem {
                                       sviz::view(i2, nselements),
                                       sviz::view(i3, nselements));
 
-                    sviz::Client().send(msg);
+                    try {
+                        sviz::Client().send(msg);
+                    } catch (const std::exception&) {
+                        // printf("Error sending message to sviz: %s\n", e.what());
+                    }
                 }
                 sviz::Message msg("assemble_mortar_matrices (gaps)");
 #endif  // VIZ_DEBUG
@@ -1010,7 +1014,11 @@ namespace sfem {
                 }
 
 #ifdef VIZ_DEBUG
-                sviz::Client().send(msg);
+                try {
+                    sviz::Client().send(msg);
+                } catch (const std::exception&) {
+                    // printf("Error sending message to sviz: %s\n", e.what());
+                }
 #endif  // VIZ_DEBUG
 
             } else if (element_type == smesh::TRISHELL3) {

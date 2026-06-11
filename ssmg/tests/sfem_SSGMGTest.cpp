@@ -153,7 +153,7 @@ int test_ssgmg_linear_elasticity_cube() {
     auto fs         = sfem::FunctionSpace::create(m, block_size);
 
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, sfem::op_type::MATRIX_FREE, es);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
