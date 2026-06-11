@@ -56,10 +56,40 @@ int test_crs_mm_rectangular() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_crs_transpose_rectangular() {
+    using R = sfem::count_t;
+    using C = sfem::idx_t;
+    using T = sfem::real_t;
+
+    auto a_rowptr = make_buffer<R>({0, 2, 3, 5});
+    auto a_colidx = make_buffer<C>({0, 2, 1, 0, 3});
+    auto a_values = make_buffer<T>({1, 2, 3, 4, 5});
+
+    auto b_rowptr = sfem::create_host_buffer<R>(0);
+    auto b_colidx = sfem::create_host_buffer<C>(0);
+    auto b_values = sfem::create_host_buffer<T>(0);
+
+    SFEM_TEST_ASSERT(sfem::crs_transpose(5, a_rowptr, a_colidx, a_values, b_rowptr, b_colidx, b_values) == SFEM_SUCCESS);
+
+    const R expected_rowptr[] = {0, 2, 3, 4, 5, 5};
+    const C expected_colidx[] = {0, 2, 1, 0, 2};
+    const T expected_values[] = {1, 4, 3, 2, 5};
+
+    SFEM_TEST_EQ(b_rowptr->size(), static_cast<size_t>(6));
+    SFEM_TEST_EQ(b_colidx->size(), static_cast<size_t>(5));
+    SFEM_TEST_EQ(b_values->size(), static_cast<size_t>(5));
+    SFEM_ASSERT_ARRAY_EQ(6, b_rowptr->data(), expected_rowptr);
+    SFEM_ASSERT_ARRAY_EQ(5, b_colidx->data(), expected_colidx);
+    SFEM_ASSERT_ARRAY_APPROX_EQ(5, b_values->data(), expected_values, 1e-6);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_crs_mm_rectangular);
+    SFEM_RUN_TEST(test_crs_transpose_rectangular);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

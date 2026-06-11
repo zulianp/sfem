@@ -5,15 +5,266 @@
 #include <limits>
 #include <memory>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
 
-    // TODO: Refactor this into two function crs_mm_sym (count and fill the rowptr of C, no inner allocations), and crs_mm_apply
-    // where the matrix product is applied. call these functions from crs_mm. crs_mm_sym and crs_mm_apply should have a pure array
-    // interface and no inner allocations
+    template <typename R, typename C, typename T>
+    int crs_transpose_sym(const ptrdiff_t              rows,
+                          const ptrdiff_t              columns,
+                          const R* const SFEM_RESTRICT a_rowptr,
+                          const C* const SFEM_RESTRICT a_colidx,
+                          const T* const SFEM_RESTRICT a_values,
+                          R* const SFEM_RESTRICT       b_rowptr) {
+        (void)a_values;
+
+        for (ptrdiff_t i = 0; i <= columns; i++) {
+            b_rowptr[i] = 0;
+        }
+
+        for (ptrdiff_t i = 0; i < rows; i++) {
+            const R                      a_begin = a_rowptr[i];
+            const R                      a_end   = a_rowptr[i + 1];
+            const C* const SFEM_RESTRICT a_cols  = &a_colidx[a_begin];
+
+            for (R a_k = 0, a_len = a_end - a_begin; a_k < a_len; a_k++) {
+                b_rowptr[a_cols[a_k] + 1]++;
+            }
+        }
+
+        for (ptrdiff_t i = 0; i < columns; i++) {
+            b_rowptr[i + 1] += b_rowptr[i];
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    template <typename R, typename C, typename T>
+    void crs_transpose_apply(const ptrdiff_t              rows,
+                             const ptrdiff_t              columns,
+                             const R* const SFEM_RESTRICT a_rowptr,
+                             const C* const SFEM_RESTRICT a_colidx,
+                             const T* const SFEM_RESTRICT a_values,
+                             const R* const SFEM_RESTRICT b_rowptr,
+                             C* const SFEM_RESTRICT       b_colidx,
+                             T* const SFEM_RESTRICT       b_values,
+                             R* const SFEM_RESTRICT       next_workspace) {
+        for (ptrdiff_t i = 0; i < columns; i++) {
+            next_workspace[i] = b_rowptr[i];
+        }
+
+        for (ptrdiff_t i = 0; i < rows; i++) {
+            const C                       b_j     = static_cast<C>(i);
+            const R                       a_begin = a_rowptr[i];
+            const R                       a_end   = a_rowptr[i + 1];
+            const C* const SFEM_RESTRICT  a_cols  = &a_colidx[a_begin];
+            const T* const SFEM_RESTRICT  a_vals  = &a_values[a_begin];
+
+            for (R a_k = 0, a_len = a_end - a_begin; a_k < a_len; a_k++) {
+                const C b_i    = a_cols[a_k];
+                const R offset = next_workspace[b_i]++;
+
+                b_colidx[offset] = b_j;
+                b_values[offset] = a_vals[a_k];
+            }
+        }
+    }
+
+    template <typename R, typename C>
+    void crs_mm_sym(const ptrdiff_t              rows,
+                    const ptrdiff_t              c_columns,
+                    const R* const SFEM_RESTRICT a_rowptr,
+                    const C* const SFEM_RESTRICT a_colidx,
+                    const R* const SFEM_RESTRICT b_rowptr,
+                    const C* const SFEM_RESTRICT b_colidx,
+                    R* const SFEM_RESTRICT       c_rowptr,
+                    R* const SFEM_RESTRICT       mask_workspace,
+                    const int                    n_workspaces) {
+        const R unseen = smesh::invalid_idx<R>();
+
+        c_rowptr[0] = 0;
+
+#pragma omp parallel num_threads(n_workspaces)
+        {
+#ifdef _OPENMP
+            const int tid = omp_get_thread_num();
+#else
+            const int tid = 0;
+#endif
+            R* const SFEM_RESTRICT mask = &mask_workspace[tid * c_columns];
+
+            for (ptrdiff_t i = 0; i < c_columns; i++) {
+                mask[i] = unseen;
+            }
+
+#pragma omp for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                R nnz = 0;
+
+                const R                      a_begin = a_rowptr[i];
+                const R                      a_end   = a_rowptr[i + 1];
+                const C* const SFEM_RESTRICT a_cols  = &a_colidx[a_begin];
+
+                for (R a_k = 0, a_len = a_end - a_begin; a_k < a_len; a_k++) {
+                    const C a_j = a_cols[a_k];
+
+                    const R                      b_begin = b_rowptr[a_j];
+                    const R                      b_end   = b_rowptr[a_j + 1];
+                    const C* const SFEM_RESTRICT b_cols  = &b_colidx[b_begin];
+
+                    for (R b_k = 0, b_len = b_end - b_begin; b_k < b_len; b_k++) {
+                        const C b_j = b_cols[b_k];
+
+                        if (mask[b_j] != i) {
+                            mask[b_j] = i;
+                            nnz++;
+                        }
+                    }
+                }
+
+                c_rowptr[i + 1] = nnz;
+            }
+        }
+
+        for (ptrdiff_t c_i = 0; c_i < rows; c_i++) {
+            c_rowptr[c_i + 1] += c_rowptr[c_i];
+        }
+    }
+
+    template <typename R, typename C, typename T>
+    void crs_mm_apply(const ptrdiff_t              rows,
+                      const ptrdiff_t              c_columns,
+                      const R* const SFEM_RESTRICT a_rowptr,
+                      const C* const SFEM_RESTRICT a_colidx,
+                      const T* const SFEM_RESTRICT a_values,
+                      const R* const SFEM_RESTRICT b_rowptr,
+                      const C* const SFEM_RESTRICT b_colidx,
+                      const T* const SFEM_RESTRICT b_values,
+                      const R* const SFEM_RESTRICT c_rowptr,
+                      C* const SFEM_RESTRICT       c_colidx,
+                      T* const SFEM_RESTRICT       c_values,
+                      R* const SFEM_RESTRICT       next_workspace,
+                      T* const SFEM_RESTRICT       acc_workspace,
+                      const int                    n_workspaces) {
+        const R init   = std::numeric_limits<R>::max();
+        const R unseen = smesh::invalid_idx<R>();
+
+#pragma omp parallel num_threads(n_workspaces)
+        {
+#ifdef _OPENMP
+            const int tid = omp_get_thread_num();
+#else
+            const int tid = 0;
+#endif
+            R* const SFEM_RESTRICT next = &next_workspace[tid * c_columns];
+            T* const SFEM_RESTRICT acc  = &acc_workspace[tid * c_columns];
+
+            for (ptrdiff_t i = 0; i < c_columns; i++) {
+                next[i] = unseen;
+            }
+
+#pragma omp for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                R head = init;
+                R len  = 0;
+
+                const R                      a_begin = a_rowptr[i];
+                const R                      a_end   = a_rowptr[i + 1];
+                const C* const SFEM_RESTRICT a_cols  = &a_colidx[a_begin];
+                const T* const SFEM_RESTRICT a_vals  = &a_values[a_begin];
+
+                for (R a_k = 0, a_len = a_end - a_begin; a_k < a_len; a_k++) {
+                    const C a_j = a_cols[a_k];
+                    const T aij = a_vals[a_k];
+
+                    const R                      b_begin = b_rowptr[a_j];
+                    const R                      b_end   = b_rowptr[a_j + 1];
+                    const C* const SFEM_RESTRICT b_cols  = &b_colidx[b_begin];
+                    const T* const SFEM_RESTRICT b_vals  = &b_values[b_begin];
+
+                    for (R b_k = 0, b_len = b_end - b_begin; b_k < b_len; b_k++) {
+                        const C b_j = b_cols[b_k];
+                        const T bij = b_vals[b_k];
+
+                        if (next[b_j] == unseen) {
+                            next[b_j] = head;
+                            head      = b_j;
+                            acc[b_j]  = aij * bij;
+                            len++;
+                        } else {
+                            acc[b_j] += aij * bij;
+                        }
+                    }
+                }
+
+                R offset = c_rowptr[i];
+                for (R k = 0; k < len; k++) {
+                    c_colidx[offset] = head;
+                    c_values[offset] = acc[head];
+                    offset++;
+
+                    const R temp = head;
+                    head         = next[head];
+                    next[temp]   = unseen;
+                }
+            }
+        }
+    }
+
+    template <typename R, typename C, typename T>
+    int crs_transpose(const ptrdiff_t        columns,
+                      const SharedBuffer<R>& a_rowptr,
+                      const SharedBuffer<C>& a_colidx,
+                      const SharedBuffer<T>& a_values,
+                      SharedBuffer<R>&       b_rowptr,
+                      SharedBuffer<C>&       b_colidx,
+                      SharedBuffer<T>&       b_values) {
+        const ptrdiff_t rows = a_rowptr->size() - 1;
+
+        if (b_rowptr->size() != columns + 1) {
+            b_rowptr = create_host_buffer<R>(columns + 1);
+        }
+
+        const R* const SFEM_RESTRICT d_a_rowptr = a_rowptr->data();
+        const C* const SFEM_RESTRICT d_a_colidx = a_colidx->data();
+        const T* const SFEM_RESTRICT d_a_values = a_values->data();
+
+        R* const SFEM_RESTRICT d_b_rowptr = b_rowptr->data();
+
+        crs_transpose_sym(rows, columns, d_a_rowptr, d_a_colidx, d_a_values, d_b_rowptr);
+
+        if (b_colidx->size() != d_b_rowptr[columns]) {
+            b_colidx = create_host_buffer<C>(d_b_rowptr[columns]);
+        }
+
+        if (b_values->size() != d_b_rowptr[columns]) {
+            b_values = create_host_buffer<T>(d_b_rowptr[columns]);
+        }
+
+        C* const SFEM_RESTRICT d_b_colidx = b_colidx->data();
+        T* const SFEM_RESTRICT d_b_values = b_values->data();
+
+        auto next_workspace = create_host_buffer<R>(columns);
+
+        crs_transpose_apply(rows,
+                            columns,
+                            d_a_rowptr,
+                            d_a_colidx,
+                            d_a_values,
+                            d_b_rowptr,
+                            d_b_colidx,
+                            d_b_values,
+                            next_workspace->data());
+
+        return SFEM_SUCCESS;
+    }
+
     template <typename R, typename C, typename T>
     int crs_mm(const ptrdiff_t        c_columns,
                const SharedBuffer<R>& a_rowptr,
@@ -40,48 +291,23 @@ namespace sfem {
 
         R* const SFEM_RESTRICT d_c_rowptr = c_rowptr->data();
 
-        d_c_rowptr[0] = 0;
+#ifdef _OPENMP
+        const int n_workspaces = omp_get_max_threads();
+#else
+        const int n_workspaces = 1;
+#endif
 
-#pragma omp parallel
-        {
-            auto mask_buff = create_host_buffer<R>(c_columns);
-            auto mask      = mask_buff->data();
+        auto mask_workspace = create_host_buffer<R>(n_workspaces * c_columns);
 
-            for (ptrdiff_t i = 0; i < c_columns; i++) {
-                mask[i] = smesh::invalid_idx<R>();
-            }
-
-#pragma omp for schedule(static)
-            for (ptrdiff_t i = 0; i < rows; i++) {
-                const R                      a_len  = d_a_rowptr[i + 1] - d_a_rowptr[i];
-                const C* const SFEM_RESTRICT a_cols = &d_a_colidx[d_a_rowptr[i]];
-
-                R nnz = 0;
-
-                for (R a_k = 0; a_k < a_len; a_k++) {
-                    const C a_j = a_cols[a_k];
-
-                    const R                      b_len  = d_b_rowptr[a_j + 1] - d_b_rowptr[a_j];
-                    const C* const SFEM_RESTRICT b_cols = &d_b_colidx[d_b_rowptr[a_j]];
-
-                    for (R b_k = 0; b_k < b_len; b_k++) {
-                        const C b_j = b_cols[b_k];
-
-                        if (mask[b_j] != i) {
-                            mask[b_j] = i;
-                            nnz++;
-                        }
-                    }
-                }
-
-                d_c_rowptr[i + 1] = nnz;
-            }
-        }
-
-        // cumulative sum
-        for (ptrdiff_t c_i = 0; c_i < rows; c_i++) {
-            d_c_rowptr[c_i + 1] += d_c_rowptr[c_i];
-        }
+        crs_mm_sym(rows,
+                   c_columns,
+                   d_a_rowptr,
+                   d_a_colidx,
+                   d_b_rowptr,
+                   d_b_colidx,
+                   d_c_rowptr,
+                   mask_workspace->data(),
+                   n_workspaces);
 
         // Allocate column indices
         if (c_colidx->size() != d_c_rowptr[rows]) {
@@ -95,66 +321,23 @@ namespace sfem {
         C* const SFEM_RESTRICT d_c_colidx = c_colidx->data();
         T* const SFEM_RESTRICT d_c_values = c_values->data();
 
-        const R init   = std::numeric_limits<R>::max();
-        const R unseen = smesh::invalid_idx<R>();
+        auto next_workspace = create_host_buffer<R>(n_workspaces * c_columns);
+        auto acc_workspace  = create_host_buffer<T>(n_workspaces * c_columns);
 
-#pragma omp parallel
-        {
-            auto                   next_buff = create_host_buffer<R>(c_columns);
-            R* const SFEM_RESTRICT next      = next_buff->data();
-            auto                   acc_buff  = create_host_buffer<T>(c_columns);
-            T* const SFEM_RESTRICT acc       = acc_buff->data();
-
-            for (ptrdiff_t i = 0; i < c_columns; i++) {
-                next[i] = unseen;
-            }
-
-#pragma omp for schedule(static)
-            for (ptrdiff_t i = 0; i < rows; i++) {
-                R head = init;
-                R len  = 0;
-
-                const R                      a_len  = d_a_rowptr[i + 1] - d_a_rowptr[i];
-                const C* const SFEM_RESTRICT a_cols = &d_a_colidx[d_a_rowptr[i]];
-                const T* const SFEM_RESTRICT a_vals = &d_a_values[d_a_rowptr[i]];
-
-                for (R a_k = 0; a_k < a_len; a_k++) {
-                    const C a_j = a_cols[a_k];
-                    const T aij = a_vals[a_k];
-
-                    const R                      b_len  = d_b_rowptr[a_j + 1] - d_b_rowptr[a_j];
-                    const C* const SFEM_RESTRICT b_cols = &d_b_colidx[d_b_rowptr[a_j]];
-                    const T* const SFEM_RESTRICT b_vals = &d_b_values[d_b_rowptr[a_j]];
-
-                    for (R b_k = 0; b_k < b_len; b_k++) {
-                        const C b_j = b_cols[b_k];
-                        const T bij = b_vals[b_k];
-
-                        acc[b_j] += aij * bij;
-
-                        if (next[b_j] == unseen) {
-                            next[b_j] = head;
-                            head      = b_j;
-                            len++;
-                        }
-                    }
-                }
-
-                R offset = d_c_rowptr[i];
-                for (R k = 0; k < len; k++) {
-                    d_c_colidx[offset] = head;
-                    d_c_values[offset] = acc[head];
-                    offset++;
-
-                    R temp = head;
-                    head   = next[head];
-
-                    // Clear
-                    next[temp] = unseen;
-                    acc[temp]  = 0;
-                }
-            }
-        }
+        crs_mm_apply(rows,
+                     c_columns,
+                     d_a_rowptr,
+                     d_a_colidx,
+                     d_a_values,
+                     d_b_rowptr,
+                     d_b_colidx,
+                     d_b_values,
+                     d_c_rowptr,
+                     d_c_colidx,
+                     d_c_values,
+                     next_workspace->data(),
+                     acc_workspace->data(),
+                     n_workspaces);
 
         return SFEM_SUCCESS;
     }
