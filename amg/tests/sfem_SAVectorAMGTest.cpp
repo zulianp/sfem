@@ -104,9 +104,18 @@ int test_linear_elasticity_sa_vector_amg() {
     ptrdiff_t SFEM_MESH_RESOLUTION = 10;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto mesh = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_MESH_RESOLUTION, SFEM_MESH_RESOLUTION, SFEM_MESH_RESOLUTION, 0, 0, 0, 1, 1, 1);
-    auto fs = sfem::FunctionSpace::create(mesh, 3);
+    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::wrap(comm),
+                                        smesh::TET4,
+                                        SFEM_MESH_RESOLUTION,
+                                        SFEM_MESH_RESOLUTION,
+                                        SFEM_MESH_RESOLUTION,
+                                        0,
+                                        0,
+                                        0,
+                                        1,
+                                        1,
+                                        1);
+    auto fs   = sfem::FunctionSpace::create(mesh, 3);
 
     auto left = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < static_cast<geom_t>(1e-8); });
@@ -176,13 +185,21 @@ int test_linear_elasticity_sa_vector_amg() {
         boundary_nodes->data()[node] = points->data()[0][node] < static_cast<geom_t>(1e-8);
     }
 
-    auto level = sfem::h_sa_vector_amg_level<sfem::count_t, sfem::idx_t, real_t, geom_t, real_t>(
-            a_bsr, const_cast<const geom_t* const*>(points->data()), 3, boundary_nodes, 8);
+    const int max_aggregate_size = 80;
+    auto      level              = sfem::h_sa_vector_amg_level<sfem::count_t, sfem::idx_t, real_t, geom_t, real_t>(
+            a_bsr, const_cast<const geom_t* const*>(points->data()), 3, boundary_nodes, max_aggregate_size);
+
+    printf("max_aggregate_size: %d, aggregates: %ld, coarse rows: %ld\n",
+           max_aggregate_size,
+           level.aggregates.n_aggregates,
+           level.coarse_a->rows());
 
     SFEM_TEST_EQ(level.n_rigid_body_modes, 6);
     SFEM_TEST_ASSERT(level.coarse_a != nullptr);
     SFEM_TEST_EQ(level.coarse_a->block_size(), 6);
     SFEM_TEST_EQ(level.coarse_a->rows(), level.aggregates.n_aggregates * 6);
+    SFEM_TEST_ASSERT(level.aggregates.n_aggregates <= mesh->n_nodes() / 2);
+    SFEM_TEST_ASSERT(level.coarse_a->rows() < a_bsr->rows());
 
     auto solve_op = zeroing_op(a_bsr);
     auto precond  = additive_sa_preconditioner(level, inv_diag);
