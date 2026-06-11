@@ -161,7 +161,7 @@ if(SFEM_ENABLE_CUDA)
     )
 
     if(SFEM_ENABLE_AMG)
-        list(APPEND SFEM_MODULES amg/cuda)
+        list(APPEND SFEM_MODULES amg/cuda amg/vector_amg)
     endif()
 endif()
 
