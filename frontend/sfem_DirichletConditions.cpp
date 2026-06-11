@@ -130,6 +130,10 @@ namespace sfem {
 
         std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
         for (size_t i = 0; i < conds.size(); i++) {
+            if (conds[i].nodeset->size() == 0) {
+                continue;
+            }
+
             ptrdiff_t coarse_num_nodes = 0;
             idx_t    *coarse_nodeset   = nullptr;
 
@@ -583,6 +587,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply_value");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             constraint_nodes_to_value_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, value, x);
         }
@@ -608,6 +613,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_crs");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             crs_constraint_nodes_to_identity_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }
@@ -622,6 +628,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_bsr");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
+
             bsr_constraint_nodes_to_identity_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }

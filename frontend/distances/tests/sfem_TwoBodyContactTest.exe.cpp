@@ -15,6 +15,7 @@
 #include "sfem_API.hpp"
 #include "sfem_SelfContact.hpp"
 #include "sfem_mask.hpp"
+#include "sfem_ssgmg.hpp"
 
 #include "bvh/bvh.hpp"
 
@@ -43,6 +44,9 @@ struct EnvOptions {
     real_t          search_radius;
     real_t          damping;
     int             output_frequency;
+    int             linear_max_it;
+    real_t          linear_rtol;
+    bool            linear_verbose;
 
     static EnvOptions read() {
         return {
@@ -61,6 +65,9 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1)),
                 smesh::Env::read("SFEM_DAMPING", real_t(1)),
                 smesh::Env::read("SFEM_OUTPUT_FREQUENCY", int(10)),
+                smesh::Env::read("SFEM_LINEAR_MAX_IT", int(10000)),
+                smesh::Env::read("SFEM_LINEAR_RTOL", real_t(1e-4)),
+                smesh::Env::read("SFEM_LINEAR_VERBOSE", false),
         };
     }
 
@@ -911,13 +918,6 @@ int test_two_body_contact() {
     auto      mesh  = space->mesh_ptr();
     const int dim   = mesh->spatial_dimension();
 
-    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
-    auto solver    = sfem::create_cg<real_t>(linear_op, es);
-    solver->set_op(linear_op);
-    solver->set_max_it(10000);
-    solver->set_rtol(1e-4);
-    solver->set_verbose(false);
-
     auto displacement     = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto rhs              = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
@@ -932,7 +932,19 @@ int test_two_body_contact() {
     f->apply_constraints(displacement->data());
     f->apply_constraints(rhs->data());
 
-    solver->apply(rhs->data(), displacement->data());
+    if (space->has_semi_structured_mesh()) {
+        auto solver = create_ssgmg(f, f->execution_space());
+        solver->set_max_it(1);
+        solver->apply(rhs->data(), displacement->data());
+    } else {
+        auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
+        auto solver    = sfem::create_cg<real_t>(linear_op, es);
+        solver->set_op(linear_op);
+        solver->set_max_it(env.linear_max_it);
+        solver->set_rtol(env.linear_rtol);
+        solver->set_verbose(env.linear_verbose);
+        solver->apply(rhs->data(), displacement->data());
+    }
 
     auto surface = create_contact_skin(mesh);
     remove_surface_elements_connected_to_constrained_nodes(surface, constraints_mask, dim);
