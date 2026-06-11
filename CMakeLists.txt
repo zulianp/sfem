@@ -365,6 +365,7 @@ if(SFEM_ENABLE_TESTING)
     enable_testing()
 
     list(APPEND SFEM_UNIT_TESTS
+        algebra/crs/tests
         operators/ssquad4/tests
         operators/sshex8/tests
         operators/stencil/tests
