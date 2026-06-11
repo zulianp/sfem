@@ -95,18 +95,27 @@ namespace sfem {
         const C* const ci = colidx->data();
         const mask_t* const bdy = boundary_nodes ? boundary_nodes->data() : nullptr;
 
+        std::vector<C> frontier;
+        frontier.reserve(std::max(1, max_aggregate_size));
+
         for (ptrdiff_t i = 0; i < block_rows; ++i) {
             if (a[i] >= 0) continue;
 
             const C agg = static_cast<C>(n_aggregates++);
             a[i]        = agg;
-            int size    = 1;
 
-            for (R k = rp[i]; k < rp[i + 1] && size < max_aggregate_size; ++k) {
-                const C j = ci[k];
-                if (j < 0 || static_cast<ptrdiff_t>(j) >= block_rows || a[j] >= 0 || (bdy && bdy[j])) continue;
-                a[j] = agg;
-                ++size;
+            frontier.clear();
+            frontier.push_back(static_cast<C>(i));
+
+            for (size_t head = 0; head < frontier.size() && static_cast<int>(frontier.size()) < max_aggregate_size; ++head) {
+                const C current = frontier[head];
+                for (R k = rp[current]; k < rp[current + 1] && static_cast<int>(frontier.size()) < max_aggregate_size; ++k) {
+                    const C j = ci[k];
+                    if (j < 0 || static_cast<ptrdiff_t>(j) >= block_rows || a[j] >= 0 || (bdy && bdy[j])) continue;
+
+                    a[j] = agg;
+                    frontier.push_back(j);
+                }
             }
         }
 
