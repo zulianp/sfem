@@ -294,3 +294,280 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
 
     return d_split;
 }  // END Function: build_cell_list_split_map_on_device
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * build_cell_list_split_3d_1d_map_on_device
+ *
+ * Builds a cell_list_split_3d_1d_map_t entirely on the GPU in six phases,
+ * mirroring the CPU builder fill_cell_lists_3d_1d_split_map():
+ *
+ *   1. Reduce max box x-extent per split group (dx < split_x → lower)
+ *   2. Compute number of x-cells on host
+ *   3. Count overlaps for both maps in one pass
+ *   4. Prefix-sum each cell_ptr array
+ *   5. Fill cell dictionaries (entry payload is the box y-interval)
+ *   6. Sort each cell by lower_bounds_y + prefix-max upper_bounds_y
+ *
+ * The returned struct matches the layout of
+ * copy_cell_list_split_3d_1d_map_to_device() and is freed with
+ * free_cell_list_split_3d_1d_map_device().
+ * ───────────────────────────────────────────────────────────────────────────── */
+cell_list_split_3d_1d_map_t                                                       //
+build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,              //
+                                          const real_t *d_box_min_y,              //
+                                          const real_t *d_box_min_z,              //
+                                          const real_t *d_box_max_x,              //
+                                          const real_t *d_box_max_y,              //
+                                          const real_t *d_box_max_z,              //
+                                          const int     num_boxes,                //
+                                          const real_t  split_x,                  //
+                                          const real_t  split_y,                  //
+                                          const real_t  x_min,                    //
+                                          const real_t  x_max,                    //
+                                          const real_t  y_min,                    //
+                                          const real_t  y_max,                    //
+                                          const real_t  z_min,                    //
+                                          const real_t  z_max,                    //
+                                          cudaStream_t  stream)                    //
+{
+    (void)d_box_min_z; /* the 1-D map stores y-intervals only */
+    (void)d_box_max_z;
+
+    cell_list_split_3d_1d_map_t d_split;
+    d_split.split_x   = split_x;
+    d_split.split_y   = split_y;
+    d_split.map_lower = NULL;
+    d_split.map_upper = NULL;
+
+    const int block_size = 256;
+    const int grid_boxes = ceildiv(num_boxes, block_size);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 1 – Reduce max x extent per split group
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    real_t *d_max_dx_lower = NULL; /* [1]: max dx — lower group */
+    real_t *d_max_dx_upper = NULL; /* [1]: max dx — upper group */
+
+    cudaMallocAsync((void **)&d_max_dx_lower, sizeof(real_t), stream);
+    cudaMallocAsync((void **)&d_max_dx_upper, sizeof(real_t), stream);
+    cudaMemsetAsync(d_max_dx_lower, 0, sizeof(real_t), stream);
+    cudaMemsetAsync(d_max_dx_upper, 0, sizeof(real_t), stream);
+    cudaStreamSynchronize(stream);
+
+    if (grid_boxes > 0) {
+        reduce_max_dx_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
+                d_box_min_x, d_box_max_x, num_boxes, split_x,
+                d_max_dx_lower, d_max_dx_upper);
+    }
+
+    real_t h_max_dx_lower = (real_t)0;
+    real_t h_max_dx_upper = (real_t)0;
+
+    cudaMemcpyAsync(&h_max_dx_lower, d_max_dx_lower, sizeof(real_t), cudaMemcpyDeviceToHost, stream);
+    cudaMemcpyAsync(&h_max_dx_upper, d_max_dx_upper, sizeof(real_t), cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+
+    cudaFreeAsync(d_max_dx_lower, stream);
+    cudaFreeAsync(d_max_dx_upper, stream);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 2 – Compute grid dimensions on host
+     *
+     * An empty group (max dx == 0) gets a single empty cell with a positive
+     * delta so that queries stay well-defined (clamped ix → cell 0 → 0 entries).
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    const real_t domain_dx = (x_max > x_min) ? (x_max - x_min) : (real_t)1;
+
+    const real_t delta_lower = (h_max_dx_lower > (real_t)0) ? h_max_dx_lower : domain_dx;
+    const real_t delta_upper = (h_max_dx_upper > (real_t)0) ? h_max_dx_upper : domain_dx;
+
+    const real_t inv_delta_lower = (real_t)1.0 / delta_lower;
+    const real_t inv_delta_upper = (real_t)1.0 / delta_upper;
+
+    int ncx_lower = (int)ceil((double)(x_max - x_min) / (double)delta_lower);
+    int ncx_upper = (int)ceil((double)(x_max - x_min) / (double)delta_upper);
+
+    if (ncx_lower < 1) ncx_lower = 1;
+    if (ncx_upper < 1) ncx_upper = 1;
+
+    const cell_list_grid_params_1d_gpu_t lower_params = {x_min, inv_delta_lower, ncx_lower};
+    const cell_list_grid_params_1d_gpu_t upper_params = {x_min, inv_delta_upper, ncx_upper};
+
+    printf("[build_cell_list_split_3d_1d_map_on_device] lower grid: %d  upper grid: %d\n", ncx_lower, ncx_upper);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 3 – Count overlaps (both maps in one kernel pass)
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    int *d_cell_ptr_lower = NULL;
+    int *d_cell_ptr_upper = NULL;
+
+    cudaMallocAsync((void **)&d_cell_ptr_lower, (size_t)(ncx_lower + 1) * sizeof(int), stream);
+    cudaMallocAsync((void **)&d_cell_ptr_upper, (size_t)(ncx_upper + 1) * sizeof(int), stream);
+    cudaMemsetAsync(d_cell_ptr_lower, 0, (size_t)(ncx_lower + 1) * sizeof(int), stream);
+    cudaMemsetAsync(d_cell_ptr_upper, 0, (size_t)(ncx_upper + 1) * sizeof(int), stream);
+    cudaStreamSynchronize(stream);
+
+    if (grid_boxes > 0) {
+        count_cell_overlaps_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
+                d_box_min_x, d_box_max_x,
+                num_boxes, split_x,
+                lower_params, upper_params,
+                d_cell_ptr_lower, d_cell_ptr_upper);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 4 – Prefix sum: transform per-cell counts into CSR offsets
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_lower, ncx_lower + 1);
+    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_upper, ncx_upper + 1);
+
+    /* Read back total dict entries (= cell_ptr[num_cells_x]) */
+    int total_dict_lower = 0;
+    int total_dict_upper = 0;
+    cudaMemcpyAsync(&total_dict_lower, d_cell_ptr_lower + ncx_lower, sizeof(int), cudaMemcpyDeviceToHost, stream);
+    cudaMemcpyAsync(&total_dict_upper, d_cell_ptr_upper + ncx_upper, sizeof(int), cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+
+    printf("[build_cell_list_split_3d_1d_map_on_device] dict entries: lower=%d  upper=%d\n",
+           total_dict_lower, total_dict_upper);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 5 – Fill cell dictionaries (both maps in one kernel pass)
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    int    *d_cell_dict_lower = NULL;
+    real_t *d_lower_y_lower   = NULL;
+    real_t *d_upper_y_lower   = NULL;
+
+    int    *d_cell_dict_upper = NULL;
+    real_t *d_lower_y_upper   = NULL;
+    real_t *d_upper_y_upper   = NULL;
+
+    int *d_temp_count_lower = NULL;
+    int *d_temp_count_upper = NULL;
+
+    /* Guard size-0 allocations (CUDA spec allows them but we avoid for clarity) */
+    const size_t dict_lower_elems = (total_dict_lower > 0) ? (size_t)total_dict_lower : 1;
+    const size_t dict_upper_elems = (total_dict_upper > 0) ? (size_t)total_dict_upper : 1;
+
+    cudaMallocAsync((void **)&d_cell_dict_lower, dict_lower_elems * sizeof(int), stream);
+    cudaMallocAsync((void **)&d_lower_y_lower, dict_lower_elems * sizeof(real_t), stream);
+    cudaMallocAsync((void **)&d_upper_y_lower, dict_lower_elems * sizeof(real_t), stream);
+
+    cudaMallocAsync((void **)&d_cell_dict_upper, dict_upper_elems * sizeof(int), stream);
+    cudaMallocAsync((void **)&d_lower_y_upper, dict_upper_elems * sizeof(real_t), stream);
+    cudaMallocAsync((void **)&d_upper_y_upper, dict_upper_elems * sizeof(real_t), stream);
+
+    cudaMallocAsync((void **)&d_temp_count_lower, (size_t)ncx_lower * sizeof(int), stream);
+    cudaMallocAsync((void **)&d_temp_count_upper, (size_t)ncx_upper * sizeof(int), stream);
+    cudaMemsetAsync(d_temp_count_lower, 0, (size_t)ncx_lower * sizeof(int), stream);
+    cudaMemsetAsync(d_temp_count_upper, 0, (size_t)ncx_upper * sizeof(int), stream);
+    cudaStreamSynchronize(stream);
+
+    if (grid_boxes > 0) {
+        fill_cell_dict_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
+                d_box_min_x, d_box_max_x,
+                d_box_min_y, d_box_max_y,
+                num_boxes, split_x,
+                lower_params, upper_params,
+                /* lower outputs */
+                d_cell_ptr_lower, d_cell_dict_lower, d_lower_y_lower, d_upper_y_lower, d_temp_count_lower,
+                /* upper outputs */
+                d_cell_ptr_upper, d_cell_dict_upper, d_lower_y_upper, d_upper_y_upper, d_temp_count_upper);
+    }  /* END if (grid_boxes > 0) */
+
+    cudaStreamSynchronize(stream);
+
+    cudaFreeAsync(d_temp_count_lower, stream);
+    cudaFreeAsync(d_temp_count_upper, stream);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Phase 6 – Sort entries by lower_bounds_y; enforce non-decreasing
+     * upper_bounds_y per cell.  The CSR sort/fix kernels are bound-agnostic, so
+     * the 2-D "z" kernels are reused on the y-bound arrays (one thread per
+     * x-cell).
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    const int grid_lower = ceildiv(ncx_lower, block_size);
+    const int grid_upper = ceildiv(ncx_upper, block_size);
+
+    if (grid_lower > 0) {
+        sort_cells_by_lower_z_kernel<<<grid_lower, block_size, 0, stream>>>(
+                d_cell_ptr_lower, d_cell_dict_lower, d_lower_y_lower, d_upper_y_lower, ncx_lower);
+
+        fix_upper_bounds_z_kernel<<<grid_lower, block_size, 0, stream>>>(
+                d_cell_ptr_lower, d_upper_y_lower, ncx_lower);
+    }
+
+    if (grid_upper > 0) {
+        sort_cells_by_lower_z_kernel<<<grid_upper, block_size, 0, stream>>>(
+                d_cell_ptr_upper, d_cell_dict_upper, d_lower_y_upper, d_upper_y_upper, ncx_upper);
+
+        fix_upper_bounds_z_kernel<<<grid_upper, block_size, 0, stream>>>(
+                d_cell_ptr_upper, d_upper_y_upper, ncx_upper);
+    }
+
+    cudaStreamSynchronize(stream);
+
+    /* ══════════════════════════════════════════════════════════════════════════
+     * Assemble result: copy map structs (with device pointers) to device memory
+     *
+     * Matches the layout produced by copy_cell_list_split_3d_1d_map_to_device()
+     * so the result is directly usable with free_cell_list_split_3d_1d_map_device().
+     * ══════════════════════════════════════════════════════════════════════════ */
+
+    cell_list_3d_1d_map_t h_map_lower;
+    cell_list_3d_1d_map_t h_map_upper;
+    memset(&h_map_lower, 0, sizeof(h_map_lower));
+    memset(&h_map_upper, 0, sizeof(h_map_upper));
+
+    /* Scalars */
+    h_map_lower.total_num_dict_entries = total_dict_lower;
+    h_map_lower.delta_x                = delta_lower;
+    h_map_lower.delta_y                = (real_t)0;
+    h_map_lower.delta_z                = (real_t)0;
+    h_map_lower.min_x                  = x_min;
+    h_map_lower.min_y                  = y_min;
+    h_map_lower.min_z                  = z_min;
+    h_map_lower.max_x                  = x_max;
+    h_map_lower.max_y                  = y_max;
+    h_map_lower.max_z                  = z_max;
+    h_map_lower.num_cells_x            = ncx_lower;
+    /* Device pointers */
+    h_map_lower.cell_ptr       = d_cell_ptr_lower;
+    h_map_lower.cell_dict      = d_cell_dict_lower;
+    h_map_lower.lower_bounds_y = d_lower_y_lower;
+    h_map_lower.upper_bounds_y = d_upper_y_lower;
+
+    h_map_upper.total_num_dict_entries = total_dict_upper;
+    h_map_upper.delta_x                = delta_upper;
+    h_map_upper.delta_y                = (real_t)0;
+    h_map_upper.delta_z                = (real_t)0;
+    h_map_upper.min_x                  = x_min;
+    h_map_upper.min_y                  = y_min;
+    h_map_upper.min_z                  = z_min;
+    h_map_upper.max_x                  = x_max;
+    h_map_upper.max_y                  = y_max;
+    h_map_upper.max_z                  = z_max;
+    h_map_upper.num_cells_x            = ncx_upper;
+    /* Device pointers */
+    h_map_upper.cell_ptr       = d_cell_ptr_upper;
+    h_map_upper.cell_dict      = d_cell_dict_upper;
+    h_map_upper.lower_bounds_y = d_lower_y_upper;
+    h_map_upper.upper_bounds_y = d_upper_y_upper;
+
+    /* Allocate device storage for the map structs themselves */
+    cudaMallocAsync((void **)&d_split.map_lower, sizeof(cell_list_3d_1d_map_t), stream);
+    cudaMallocAsync((void **)&d_split.map_upper, sizeof(cell_list_3d_1d_map_t), stream);
+    cudaStreamSynchronize(stream);
+
+    cudaMemcpyAsync(d_split.map_lower, &h_map_lower, sizeof(cell_list_3d_1d_map_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_split.map_upper, &h_map_upper, sizeof(cell_list_3d_1d_map_t), cudaMemcpyHostToDevice, stream);
+    cudaStreamSynchronize(stream);
+
+    return d_split;
+}  // END Function: build_cell_list_split_3d_1d_map_on_device
