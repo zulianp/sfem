@@ -68,12 +68,12 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    class BSRSpMV : public Operator<T> {
+    class BSR : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
 
         int apply(const T* const x, T* const y) override {
-            SFEM_TRACE_SCOPE("BSRSpMV::apply");
+            SFEM_TRACE_SCOPE("BSR::apply");
 
             apply_(x, y);
             return 0;
@@ -95,7 +95,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void print(std::ostream& os) const {
-            os << "BSRSpMV" << std::endl;
+            os << "BSR" << std::endl;
 
             os << "block_size: " << block_size_ << std::endl;
             os << "block_cols: " << block_cols_ << std::endl;
@@ -122,14 +122,14 @@ namespace sfem {
     };
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<BSRSpMV<R, C, TStorage, T>> h_bsr_spmv(const ptrdiff_t               block_rows,
+    std::shared_ptr<BSR<R, C, TStorage, T>> h_bsr_spmv(const ptrdiff_t               block_rows,
                                                            const ptrdiff_t               block_cols,
                                                            const int                     block_size,
                                                            const SharedBuffer<R>&        rowptr,
                                                            const SharedBuffer<C>&        colidx,
                                                            const SharedBuffer<TStorage>& values,
                                                            const T                       scale_output) {
-        auto ret         = std::make_shared<BSRSpMV<R, C, TStorage, T>>();
+        auto ret         = std::make_shared<BSR<R, C, TStorage, T>>();
         ret->row_ptr     = rowptr;
         ret->col_idx     = colidx;
         ret->values      = values;
