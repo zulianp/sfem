@@ -31,6 +31,9 @@ namespace sfem {
     template <typename T>
     class Operator;
 
+    template <typename T>
+    class MatrixFreeLinearSolver;
+
     // template <typename pack_idx_t>
     // class Packed;
 }  // namespace sfem
