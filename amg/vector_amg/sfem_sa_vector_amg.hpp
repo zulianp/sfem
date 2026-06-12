@@ -8,14 +8,8 @@
 #include <vector>
 
 #include "sfem_BSR.hpp"
-#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-
-// TODO:
-// Refactor the code using the new BSR API that supports rectangular block sizes
-// Make sure to not use CRS when BSR is the optimal representation
-// Seize opportunities to parallelize the code with OpenMP and make the code SIMD friendly
 
 namespace sfem {
 
@@ -29,8 +23,8 @@ namespace sfem {
     struct SAVectorAMGLevel {
         SAVectorAMGAggregates<C>                aggregates;
         std::shared_ptr<BSR<R, C, TStorage, T>> a;
-        std::shared_ptr<CRS<R, C, T, T>>        p;
-        std::shared_ptr<CRS<R, C, T, T>>        r;
+        std::shared_ptr<BSR<R, C, T, T>>        p;
+        std::shared_ptr<BSR<R, C, T, T>>        r;
         std::shared_ptr<BSR<R, C, T, T>>        coarse_a;
         int                                     n_rigid_body_modes{0};
     };
@@ -231,65 +225,78 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename T>
-    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_block_tentative_prolongation(const ptrdiff_t                 block_rows,
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_block_tentative_prolongation(const ptrdiff_t                 block_rows,
                                                                                 const int                       block_size,
                                                                                 const SAVectorAMGAggregates<C>& aggregates) {
-        const ptrdiff_t fine_rows   = block_rows * block_size;
-        const ptrdiff_t coarse_cols = aggregates.n_aggregates * block_size;
+        const ptrdiff_t block_cols = aggregates.n_aggregates;
+        const int       block_area = block_size * block_size;
 
-        auto rowptr = create_host_buffer<R>(fine_rows + 1);
-        auto colidx = create_host_buffer<C>(fine_rows);
-        auto values = create_host_buffer<T>(fine_rows);
-
-        R* const       r   = rowptr->data();
-        C* const       c   = colidx->data();
-        T* const       v   = values->data();
-        const C* const agg = aggregates.aggregate->data();
-
-#pragma omp parallel for schedule(static)
-        for (ptrdiff_t row = 0; row < fine_rows; ++row) {
-            const ptrdiff_t node = row / block_size;
-            const int       d    = row - node * block_size;
-
-            r[row] = row;
-            c[row] = agg[node] * block_size + d;
-            v[row] = static_cast<T>(1);
-        }
-
-        r[fine_rows] = fine_rows;
-
-        return h_crs_spmv<R, C, T, T>(fine_rows, coarse_cols, rowptr, colidx, values, static_cast<T>(0));
-    }
-
-    template <typename R, typename C, typename X, typename T>
-    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_tentative_prolongation(const ptrdiff_t                 block_rows,
-                                                                          const int                       block_size,
-                                                                          const int                       spatial_dim,
-                                                                          const X* const* const           points,
-                                                                          const SAVectorAMGAggregates<C>& aggregates) {
-        const int       n_modes     = sa_vector_amg_n_rigid_body_modes(block_size, spatial_dim);
-        const ptrdiff_t fine_rows   = block_rows * block_size;
-        const ptrdiff_t coarse_cols = aggregates.n_aggregates * n_modes;
-
-        auto rowptr = create_host_buffer<R>(fine_rows + 1);
+        auto rowptr = create_host_buffer<R>(block_rows + 1);
 
         R* const       r   = rowptr->data();
         const C* const agg = aggregates.aggregate->data();
 
         r[0] = 0;
         for (ptrdiff_t node = 0; node < block_rows; ++node) {
-            const R row_nnz = agg[node] >= 0 ? static_cast<R>(n_modes) : static_cast<R>(0);
-            for (int d = 0; d < block_size; ++d) {
-                r[node * block_size + d + 1] = row_nnz;
+            r[node + 1] = agg[node] >= 0 ? static_cast<R>(1) : static_cast<R>(0);
+        }
+
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            r[node + 1] += r[node];
+        }
+
+        auto colidx = create_host_buffer<C>(r[block_rows]);
+        auto values = create_host_buffer<T>(r[block_rows] * block_area);
+
+        C* const c = colidx->data();
+        T* const v = values->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            const C a = agg[node];
+            if (a < 0) continue;
+
+            const R offset = r[node];
+            c[offset]      = a;
+
+            T* const block = &v[offset * block_area];
+            for (int d1 = 0; d1 < block_size; ++d1) {
+                T* const block_row = &block[d1 * block_size];
+                for (int d2 = 0; d2 < block_size; ++d2) {
+                    block_row[d2] = d1 == d2 ? static_cast<T>(1) : static_cast<T>(0);
+                }
             }
         }
 
-        for (ptrdiff_t i = 0; i < fine_rows; ++i) {
-            r[i + 1] += r[i];
+        return h_bsr_spmv<R, C, T, T>(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, static_cast<T>(0));
+    }
+
+    template <typename R, typename C, typename X, typename T>
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_tentative_prolongation(const ptrdiff_t                 block_rows,
+                                                                          const int                       block_size,
+                                                                          const int                       spatial_dim,
+                                                                          const X* const* const           points,
+                                                                          const SAVectorAMGAggregates<C>& aggregates) {
+        const int       n_modes     = sa_vector_amg_n_rigid_body_modes(block_size, spatial_dim);
+        const ptrdiff_t coarse_cols = aggregates.n_aggregates;
+        const int       block_area  = block_size * n_modes;
+
+        auto rowptr = create_host_buffer<R>(block_rows + 1);
+
+        R* const       r   = rowptr->data();
+        const C* const agg = aggregates.aggregate->data();
+
+        r[0] = 0;
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            r[node + 1] = agg[node] >= 0 ? static_cast<R>(1) : static_cast<R>(0);
         }
 
-        auto colidx = create_host_buffer<C>(r[fine_rows]);
-        auto values = create_host_buffer<T>(r[fine_rows]);
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            r[node + 1] += r[node];
+        }
+
+        auto colidx = create_host_buffer<C>(r[block_rows]);
+        auto values = create_host_buffer<T>(r[block_rows] * block_area);
 
         C* const c = colidx->data();
         T* const v = values->data();
@@ -370,6 +377,9 @@ namespace sfem {
 
             const T* const center = &centroid[a * spatial_dim];
             const T* const l      = &gram[a * n_modes * n_modes];
+            const R        offset = r[node];
+            c[offset]             = a;
+            T* const block        = &v[offset * block_area];
 
             for (int d = 0; d < block_size; ++d) {
                 T q[6] = {0, 0, 0, 0, 0, 0};
@@ -386,196 +396,36 @@ namespace sfem {
                     y[i] = val / l[i * n_modes + i];
                 }
 
-                const ptrdiff_t row = node * block_size + d;
                 for (int m = 0; m < n_modes; ++m) {
-                    const R offset = r[row] + m;
-                    c[offset]      = a * n_modes + m;
-                    v[offset]      = y[m];
+                    block[d * n_modes + m] = y[m];
                 }
             }
         }
 
-        return h_crs_spmv<R, C, T, T>(fine_rows, coarse_cols, rowptr, colidx, values, static_cast<T>(0));
+        return h_bsr_spmv<R, C, T, T>(block_rows, coarse_cols, block_size, n_modes, rowptr, colidx, values, static_cast<T>(0));
     }
 
-    template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_smooth_prolongation(const ptrdiff_t                         block_rows,
-                                                                       const int                               block_size,
-                                                                       const SharedBuffer<R>&                  bsr_rowptr,
-                                                                       const SharedBuffer<C>&                  bsr_colidx,
-                                                                       const SharedBuffer<TStorage>&           bsr_values,
-                                                                       const std::shared_ptr<CRS<R, C, T, T>>& p,
-                                                                       const T omega = static_cast<T>(4.0 / 3.0)) {
-        const ptrdiff_t rows        = block_rows * block_size;
-        const ptrdiff_t coarse_cols = p->cols();
-        const int       block_area  = block_size * block_size;
-
-        auto     rowptr = create_host_buffer<R>(rows + 1);
-        R* const pr     = p->row_ptr->data();
-        C* const pc     = p->col_idx->data();
-        T* const pv     = p->values->data();
-
-        const R* const        br = bsr_rowptr->data();
-        const C* const        bc = bsr_colidx->data();
-        const TStorage* const bv = bsr_values->data();
-
-#ifdef _OPENMP
-        const int n_workspaces = omp_get_max_threads();
-#else
-        const int n_workspaces = 1;
-#endif
-        std::vector<R> marker(n_workspaces * coarse_cols, static_cast<R>(-1));
-        R* const       mr = marker.data();
-        R* const       sr = rowptr->data();
-
-        sr[0] = 0;
-
-#pragma omp parallel num_threads(n_workspaces)
-        {
-#ifdef _OPENMP
-            const int tid = omp_get_thread_num();
-#else
-            const int tid = 0;
-#endif
-            R* const mark = &mr[tid * coarse_cols];
-
-#pragma omp for schedule(static)
-            for (ptrdiff_t row = 0; row < rows; ++row) {
-                const ptrdiff_t node = row / block_size;
-                R               nnz  = 0;
-
-                for (R pk = pr[row]; pk < pr[row + 1]; ++pk) {
-                    const C col = pc[pk];
-                    if (mark[col] != row) {
-                        mark[col] = row;
-                        ++nnz;
-                    }
-                }
-
-                for (R bk = br[node]; bk < br[node + 1]; ++bk) {
-                    const C bj = bc[bk];
-                    for (int d2 = 0; d2 < block_size; ++d2) {
-                        const ptrdiff_t p_row = bj * block_size + d2;
-                        for (R pk = pr[p_row]; pk < pr[p_row + 1]; ++pk) {
-                            const C col = pc[pk];
-                            if (mark[col] != row) {
-                                mark[col] = row;
-                                ++nnz;
-                            }
-                        }
-                    }
-                }
-
-                sr[row + 1] = nnz;
-            }
-        }
-
-        for (ptrdiff_t i = 0; i < rows; ++i) {
-            sr[i + 1] += sr[i];
-        }
-
-        auto     colidx = create_host_buffer<C>(sr[rows]);
-        auto     values = create_host_buffer<T>(sr[rows]);
-        C* const sc     = colidx->data();
-        T* const sv     = values->data();
-
-        std::fill(marker.begin(), marker.end(), static_cast<R>(-1));
-
-#pragma omp parallel num_threads(n_workspaces)
-        {
-#ifdef _OPENMP
-            const int tid = omp_get_thread_num();
-#else
-            const int tid = 0;
-#endif
-            R* const mark = &mr[tid * coarse_cols];
-
-#pragma omp for schedule(static)
-            for (ptrdiff_t row = 0; row < rows; ++row) {
-                const ptrdiff_t node = row / block_size;
-                const int       d1   = row - node * block_size;
-                R               end  = sr[row];
-                T               diag = static_cast<T>(0);
-
-                for (R bk = br[node]; bk < br[node + 1]; ++bk) {
-                    if (bc[bk] == node) {
-                        diag = static_cast<T>(bv[bk * block_area + d1 * block_size + d1]);
-                        break;
-                    }
-                }
-
-                if (std::abs(diag) <= std::numeric_limits<T>::epsilon()) {
-                    diag = static_cast<T>(1);
-                }
-
-                for (R pk = pr[row]; pk < pr[row + 1]; ++pk) {
-                    const C col = pc[pk];
-                    mark[col]   = end;
-                    sc[end]     = col;
-                    sv[end]     = pv[pk];
-                    ++end;
-                }
-
-                const T scale = -omega / diag;
-                for (R bk = br[node]; bk < br[node + 1]; ++bk) {
-                    const C bj = bc[bk];
-                    for (int d2 = 0; d2 < block_size; ++d2) {
-                        const T aij = static_cast<T>(bv[bk * block_area + d1 * block_size + d2]);
-                        if (aij == static_cast<T>(0)) continue;
-
-                        const ptrdiff_t p_row = bj * block_size + d2;
-                        const T         coeff = scale * aij;
-                        for (R pk = pr[p_row]; pk < pr[p_row + 1]; ++pk) {
-                            const C col = pc[pk];
-                            R       pos = mark[col];
-                            if (pos == static_cast<R>(-1)) {
-                                pos       = end;
-                                mark[col] = pos;
-                                sc[end]   = col;
-                                sv[end]   = coeff * pv[pk];
-                                ++end;
-                            } else {
-                                sv[pos] += coeff * pv[pk];
-                            }
-                        }
-                    }
-                }
-
-                for (R k = sr[row]; k < end; ++k) {
-                    mark[sc[k]] = static_cast<R>(-1);
-                }
-            }
-        }
-
-        return h_crs_spmv<R, C, T, T>(rows, coarse_cols, rowptr, colidx, values, static_cast<T>(0));
-    }
-
-    template <typename R, typename C, typename T>
-    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_restriction(const std::shared_ptr<CRS<R, C, T, T>>& p) {
-        return p->transpose();
-    }
-
-    template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_bsr_matmul(const ptrdiff_t                         block_rows,
+    template <typename R, typename C, typename TStorage, typename T>
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_bsr_matmul(const ptrdiff_t                         block_rows,
                                                               const int                               block_size,
                                                               const SharedBuffer<R>&                  bsr_rowptr,
                                                               const SharedBuffer<C>&                  bsr_colidx,
                                                               const SharedBuffer<TStorage>&           bsr_values,
-                                                              const std::shared_ptr<CRS<R, C, T, T>>& x) {
-        const ptrdiff_t rows       = block_rows * block_size;
-        const int       block_area = block_size * block_size;
-        const ptrdiff_t columns    = x->cols();
+                                                              const std::shared_ptr<BSR<R, C, T, T>>& x) {
+        const ptrdiff_t columns          = x->block_cols_;
+        const int       x_col_block_size = x->col_block_size();
+        const int       a_block_area     = block_size * block_size;
+        const int       y_block_area     = block_size * x_col_block_size;
 
-        auto rowptr = create_host_buffer<R>(rows + 1);
+        auto rowptr = create_host_buffer<R>(block_rows + 1);
 
         const R* const        br = bsr_rowptr->data();
         const C* const        bc = bsr_colidx->data();
         const TStorage* const bv = bsr_values->data();
-
-        const R* const xr = x->row_ptr->data();
-        const C* const xc = x->col_idx->data();
-        const T* const xv = x->values->data();
-        R* const       yr = rowptr->data();
+        const R* const        xr = x->row_ptr->data();
+        const C* const        xc = x->col_idx->data();
+        const T* const        xv = x->values->data();
+        R* const              yr = rowptr->data();
 
 #ifdef _OPENMP
         const int n_workspaces = omp_get_max_threads();
@@ -598,34 +448,31 @@ namespace sfem {
             R* const mark = &mr[tid * columns];
 
 #pragma omp for schedule(static)
-            for (ptrdiff_t row = 0; row < rows; ++row) {
-                const ptrdiff_t node = row / block_size;
-                R               nnz  = 0;
+            for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                const R stamp = static_cast<R>(node);
+                R       nnz   = 0;
 
                 for (R bk = br[node]; bk < br[node + 1]; ++bk) {
                     const C bj = bc[bk];
-                    for (int d2 = 0; d2 < block_size; ++d2) {
-                        const ptrdiff_t x_row = bj * block_size + d2;
-                        for (R xk = xr[x_row]; xk < xr[x_row + 1]; ++xk) {
-                            const C col = xc[xk];
-                            if (mark[col] != row) {
-                                mark[col] = row;
-                                ++nnz;
-                            }
+                    for (R xk = xr[bj]; xk < xr[bj + 1]; ++xk) {
+                        const C col = xc[xk];
+                        if (mark[col] != stamp) {
+                            mark[col] = stamp;
+                            ++nnz;
                         }
                     }
                 }
 
-                yr[row + 1] = nnz;
+                yr[node + 1] = nnz;
             }
         }
 
-        for (ptrdiff_t i = 0; i < rows; ++i) {
+        for (ptrdiff_t i = 0; i < block_rows; ++i) {
             yr[i + 1] += yr[i];
         }
 
-        auto     colidx = create_host_buffer<C>(yr[rows]);
-        auto     values = create_host_buffer<T>(yr[rows]);
+        auto     colidx = create_host_buffer<C>(yr[block_rows]);
+        auto     values = create_host_buffer<T>(yr[block_rows] * y_block_area);
         C* const yc     = colidx->data();
         T* const yv     = values->data();
 
@@ -641,73 +488,112 @@ namespace sfem {
             R* const mark = &mr[tid * columns];
 
 #pragma omp for schedule(static)
-            for (ptrdiff_t row = 0; row < rows; ++row) {
-                const ptrdiff_t node = row / block_size;
-                const int       d1   = row - node * block_size;
-                R               end  = yr[row];
+            for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                R end = yr[node];
 
                 for (R bk = br[node]; bk < br[node + 1]; ++bk) {
-                    const C bj = bc[bk];
-                    for (int d2 = 0; d2 < block_size; ++d2) {
-                        const T aij = static_cast<T>(bv[bk * block_area + d1 * block_size + d2]);
-                        if (aij == static_cast<T>(0)) continue;
+                    const C        bj      = bc[bk];
+                    const auto* const ablock = &bv[bk * a_block_area];
 
-                        const ptrdiff_t x_row = bj * block_size + d2;
-                        for (R xk = xr[x_row]; xk < xr[x_row + 1]; ++xk) {
-                            const C col = xc[xk];
-                            R       pos = mark[col];
-                            if (pos == static_cast<R>(-1)) {
-                                pos       = end;
-                                mark[col] = pos;
-                                yc[end]   = col;
-                                yv[end]   = aij * xv[xk];
-                                ++end;
-                            } else {
-                                yv[pos] += aij * xv[xk];
+                    for (R xk = xr[bj]; xk < xr[bj + 1]; ++xk) {
+                        const C col = xc[xk];
+                        R       pos = mark[col];
+                        if (pos == static_cast<R>(-1)) {
+                            pos       = end;
+                            mark[col] = pos;
+                            yc[end]   = col;
+
+                            T* const yblock = &yv[end * y_block_area];
+                            for (int k = 0; k < y_block_area; ++k) {
+                                yblock[k] = static_cast<T>(0);
+                            }
+                            ++end;
+                        }
+
+                        T* const       yblock = &yv[pos * y_block_area];
+                        const T* const xblock = &xv[xk * y_block_area];
+                        for (int d1 = 0; d1 < block_size; ++d1) {
+                            T* const yrow = &yblock[d1 * x_col_block_size];
+                            for (int d2 = 0; d2 < block_size; ++d2) {
+                                const T aij = static_cast<T>(ablock[d1 * block_size + d2]);
+                                const T* const xrow = &xblock[d2 * x_col_block_size];
+                                for (int m = 0; m < x_col_block_size; ++m) {
+                                    yrow[m] += aij * xrow[m];
+                                }
                             }
                         }
                     }
                 }
 
-                for (R k = yr[row]; k < end; ++k) {
+                for (R k = yr[node]; k < end; ++k) {
                     mark[yc[k]] = static_cast<R>(-1);
                 }
             }
         }
 
-        return h_crs_spmv<R, C, T, T>(rows, columns, rowptr, colidx, values, static_cast<T>(0));
+        return h_bsr_spmv<R, C, T, T>(
+                block_rows, columns, block_size, x_col_block_size, rowptr, colidx, values, static_cast<T>(0));
     }
 
-    template <typename R, typename C, typename T>
-    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_galerkin_bsr(const std::shared_ptr<CRS<R, C, T, T>>& r,
-                                                                const std::shared_ptr<CRS<R, C, T, T>>& ap,
-                                                                const int                               coarse_block_size) {
-        const ptrdiff_t block_rows = r->rows() / coarse_block_size;
-        const ptrdiff_t block_cols = ap->cols() / coarse_block_size;
-        const int       block_area = coarse_block_size * coarse_block_size;
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_smooth_prolongation(const ptrdiff_t                         block_rows,
+                                                                       const int                               block_size,
+                                                                       const SharedBuffer<R>&                  bsr_rowptr,
+                                                                       const SharedBuffer<C>&                  bsr_colidx,
+                                                                       const SharedBuffer<TStorage>&           bsr_values,
+                                                                       const std::shared_ptr<BSR<R, C, T, T>>& p,
+                                                                       const T omega = static_cast<T>(4.0 / 3.0)) {
+        const ptrdiff_t coarse_cols       = p->block_cols_;
+        const int       coarse_block_size = p->col_block_size();
+        const int       a_block_area      = block_size * block_size;
+        const int       p_block_area      = block_size * coarse_block_size;
+
+        auto ap = sa_vector_amg_bsr_matmul<R, C, TStorage, T>(block_rows, block_size, bsr_rowptr, bsr_colidx, bsr_values, p);
 
         auto rowptr = create_host_buffer<R>(block_rows + 1);
 
-        const R* const rr = r->row_ptr->data();
-        const C* const rc = r->col_idx->data();
-        const T* const rv = r->values->data();
-
+        const R* const pr = p->row_ptr->data();
+        const C* const pc = p->col_idx->data();
+        const T* const pv = p->values->data();
         const R* const ar = ap->row_ptr->data();
         const C* const ac = ap->col_idx->data();
         const T* const av = ap->values->data();
 
-        R* const br = rowptr->data();
+        const R* const        br = bsr_rowptr->data();
+        const C* const        bc = bsr_colidx->data();
+        const TStorage* const bv = bsr_values->data();
 
 #ifdef _OPENMP
         const int n_workspaces = omp_get_max_threads();
 #else
         const int n_workspaces = 1;
 #endif
-
-        std::vector<R> marker(n_workspaces * block_cols, static_cast<R>(-1));
+        std::vector<R> marker(n_workspaces * coarse_cols, static_cast<R>(-1));
         R* const       mr = marker.data();
+        R* const       sr = rowptr->data();
+        std::vector<T> row_scale(block_rows * block_size);
 
-        br[0] = 0;
+        sr[0] = 0;
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            const TStorage* diag_block = nullptr;
+            for (R bk = br[node]; bk < br[node + 1]; ++bk) {
+                if (bc[bk] == node) {
+                    diag_block = &bv[bk * a_block_area];
+                    break;
+                }
+            }
+
+            T* const scale = &row_scale[node * block_size];
+            for (int d = 0; d < block_size; ++d) {
+                T diag = diag_block ? static_cast<T>(diag_block[d * block_size + d]) : static_cast<T>(1);
+                if (std::abs(diag) <= std::numeric_limits<T>::epsilon()) {
+                    diag = static_cast<T>(1);
+                }
+                scale[d] = -omega / diag;
+            }
+        }
 
 #pragma omp parallel num_threads(n_workspaces)
         {
@@ -716,40 +602,41 @@ namespace sfem {
 #else
             const int tid = 0;
 #endif
-            R* const mark = &mr[tid * block_cols];
+            R* const mark = &mr[tid * coarse_cols];
 
 #pragma omp for schedule(static)
-            for (ptrdiff_t bi = 0; bi < block_rows; ++bi) {
-                const R stamp = static_cast<R>(bi);
+            for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                const R stamp = static_cast<R>(node);
                 R       nnz   = 0;
 
-                for (int m = 0; m < coarse_block_size; ++m) {
-                    const ptrdiff_t r_row = bi * coarse_block_size + m;
-                    for (R rk = rr[r_row]; rk < rr[r_row + 1]; ++rk) {
-                        const C fine_row = rc[rk];
-                        for (R ak = ar[fine_row]; ak < ar[fine_row + 1]; ++ak) {
-                            const C bj = ac[ak] / coarse_block_size;
-                            if (mark[bj] != stamp) {
-                                mark[bj] = stamp;
-                                ++nnz;
-                            }
-                        }
+                for (R pk = pr[node]; pk < pr[node + 1]; ++pk) {
+                    const C col = pc[pk];
+                    if (mark[col] != stamp) {
+                        mark[col] = stamp;
+                        ++nnz;
                     }
                 }
 
-                br[bi + 1] = nnz;
+                for (R ak = ar[node]; ak < ar[node + 1]; ++ak) {
+                    const C col = ac[ak];
+                    if (mark[col] != stamp) {
+                        mark[col] = stamp;
+                        ++nnz;
+                    }
+                }
+
+                sr[node + 1] = nnz;
             }
         }
 
-        for (ptrdiff_t bi = 0; bi < block_rows; ++bi) {
-            br[bi + 1] += br[bi];
+        for (ptrdiff_t i = 0; i < block_rows; ++i) {
+            sr[i + 1] += sr[i];
         }
 
-        auto colidx = create_host_buffer<C>(br[block_rows]);
-        auto values = create_host_buffer<T>(br[block_rows] * block_area);
-
-        C* const bc = colidx->data();
-        T* const bv = values->data();
+        auto     colidx = create_host_buffer<C>(sr[block_rows]);
+        auto     values = create_host_buffer<T>(sr[block_rows] * p_block_area);
+        C* const sc     = colidx->data();
+        T* const sv     = values->data();
 
         std::fill(marker.begin(), marker.end(), static_cast<R>(-1));
 
@@ -760,47 +647,74 @@ namespace sfem {
 #else
             const int tid = 0;
 #endif
-            R* const mark = &mr[tid * block_cols];
+            R* const mark = &mr[tid * coarse_cols];
 
 #pragma omp for schedule(static)
-            for (ptrdiff_t bi = 0; bi < block_rows; ++bi) {
-                R end = br[bi];
+            for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                R end = sr[node];
 
-                for (int m = 0; m < coarse_block_size; ++m) {
-                    const ptrdiff_t r_row = bi * coarse_block_size + m;
-                    for (R rk = rr[r_row]; rk < rr[r_row + 1]; ++rk) {
-                        const C fine_row = rc[rk];
-                        const T r_val    = rv[rk];
+                for (R pk = pr[node]; pk < pr[node + 1]; ++pk) {
+                    const C col = pc[pk];
+                    mark[col]   = end;
+                    sc[end]     = col;
 
-                        for (R ak = ar[fine_row]; ak < ar[fine_row + 1]; ++ak) {
-                            const C   scalar_col = ac[ak];
-                            const C   bj         = scalar_col / coarse_block_size;
-                            const int n          = scalar_col - bj * coarse_block_size;
+                    T* const       dst = &sv[end * p_block_area];
+                    const T* const src = &pv[pk * p_block_area];
+                    for (int k = 0; k < p_block_area; ++k) {
+                        dst[k] = src[k];
+                    }
+                    ++end;
+                }
 
-                            R pos = mark[bj];
-                            if (pos == static_cast<R>(-1)) {
-                                pos            = end;
-                                mark[bj]       = pos;
-                                bc[end]        = bj;
-                                T* const block = &bv[end * block_area];
-                                for (int k = 0; k < block_area; ++k) {
-                                    block[k] = static_cast<T>(0);
-                                }
-                                ++end;
-                            }
+                const T* const scale = &row_scale[node * block_size];
+                for (R ak = ar[node]; ak < ar[node + 1]; ++ak) {
+                    const C col = ac[ak];
+                    R       pos = mark[col];
+                    if (pos == static_cast<R>(-1)) {
+                        pos       = end;
+                        mark[col] = pos;
+                        sc[end]   = col;
 
-                            bv[pos * block_area + m * coarse_block_size + n] += r_val * av[ak];
+                        T* const block = &sv[end * p_block_area];
+                        for (int k = 0; k < p_block_area; ++k) {
+                            block[k] = static_cast<T>(0);
+                        }
+                        ++end;
+                    }
+
+                    T* const       dst = &sv[pos * p_block_area];
+                    const T* const src = &av[ak * p_block_area];
+                    for (int d = 0; d < block_size; ++d) {
+                        const T s = scale[d];
+                        T* const       dst_row = &dst[d * coarse_block_size];
+                        const T* const src_row = &src[d * coarse_block_size];
+                        for (int m = 0; m < coarse_block_size; ++m) {
+                            dst_row[m] += s * src_row[m];
                         }
                     }
                 }
 
-                for (R k = br[bi]; k < end; ++k) {
-                    mark[bc[k]] = static_cast<R>(-1);
+                for (R k = sr[node]; k < end; ++k) {
+                    mark[sc[k]] = static_cast<R>(-1);
                 }
             }
         }
 
-        return h_bsr_spmv<R, C, T, T>(block_rows, block_cols, coarse_block_size, rowptr, colidx, values, static_cast<T>(0));
+        return h_bsr_spmv<R, C, T, T>(
+                block_rows, coarse_cols, block_size, coarse_block_size, rowptr, colidx, values, static_cast<T>(0));
+    }
+
+    template <typename R, typename C, typename T>
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_restriction(const std::shared_ptr<BSR<R, C, T, T>>& p) {
+        return p->transpose();
+    }
+
+    template <typename R, typename C, typename T>
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_galerkin_bsr(const std::shared_ptr<BSR<R, C, T, T>>& r,
+                                                                const std::shared_ptr<BSR<R, C, T, T>>& ap,
+                                                                const int                               coarse_block_size) {
+        (void)coarse_block_size;
+        return r->mm(ap);
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
@@ -810,8 +724,8 @@ namespace sfem {
                                                                  const SharedBuffer<R>&                  bsr_rowptr,
                                                                  const SharedBuffer<C>&                  bsr_colidx,
                                                                  const SharedBuffer<TStorage>&           bsr_values,
-                                                                 const std::shared_ptr<CRS<R, C, T, T>>& r,
-                                                                 const std::shared_ptr<CRS<R, C, T, T>>& p) {
+                                                                 const std::shared_ptr<BSR<R, C, T, T>>& r,
+                                                                 const std::shared_ptr<BSR<R, C, T, T>>& p) {
         auto ap = sa_vector_amg_bsr_matmul<R, C, TStorage, T>(block_rows, block_size, bsr_rowptr, bsr_colidx, bsr_values, p);
         return sa_vector_amg_galerkin_bsr<R, C, T>(r, ap, coarse_block_size);
     }

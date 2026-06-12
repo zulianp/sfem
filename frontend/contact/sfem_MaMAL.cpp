@@ -32,7 +32,6 @@ namespace sfem {
 #endif
 
         void init() {
-            // TODO: all defaults
             auto space             = f->space();
             bool is_semistructured = space->has_semi_structured_mesh();
 
