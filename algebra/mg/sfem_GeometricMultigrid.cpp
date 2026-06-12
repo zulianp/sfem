@@ -27,6 +27,7 @@ namespace sfem {
         const int nlevels = levels.size();
 
         data->functions.push_back(f);
+        data->semistructured_levels = levels;
 
         for (int l = 1; l < nlevels; l++) {
             auto f_prev  = data->functions.back();

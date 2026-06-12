@@ -113,7 +113,8 @@ namespace sfem {
             contact_surface = smesh::skin(mesh);
             contact = create_contact(space, contact_surface, params.margin, params.search_radius * params.search_radius, es);
 
-            galerkin_restrictions.push_back({.R = nullptr, .P = nullptr});
+            // FIXME multiblock should still work!
+            galerkin_restrictions = create_galerkin_rap(contact_surface->block(0)->elements(), data->semistructured_levels);
         }
 
         void resample_contact_conditions(const smesh::SharedBuffer<real_t>& displacement) {
