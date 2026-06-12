@@ -315,12 +315,12 @@ namespace sfem {
     };
 
     // Boundary conditions should be imposed before by hand... (if any) so cusparse API is valid
-    std::shared_ptr<CooSymSpMV<idx_t, real_t>> d_sym_coo_spmv(
+    std::shared_ptr<CooSym<idx_t, real_t>> d_sym_coo_spmv(
             const ptrdiff_t ndofs, const std::shared_ptr<Buffer<idx_t>>& rowidx,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values,
             const std::shared_ptr<Buffer<real_t>>& diag_values, const real_t scale_output) {
-        auto ret = std::make_shared<CooSymSpMV<idx_t, real_t>>();
+        auto ret = std::make_shared<CooSym<idx_t, real_t>>();
         ret->offdiag_colidx = colidx;
         ret->offdiag_rowidx = rowidx;
         ret->values = values;

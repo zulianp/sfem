@@ -40,6 +40,7 @@ endif()
 
 set(SFEM_MODULES
     algebra base matrix 
+    algebra/coo
     algebra/bsr
     algebra/crs
     algebra/ell

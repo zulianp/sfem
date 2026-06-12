@@ -15,7 +15,7 @@ namespace sfem {
                                                                 const SharedBuffer<real_t>&  values,
                                                                 const real_t                 scale_output);
 
-    std::shared_ptr<CooSymSpMV<idx_t, real_t>> d_sym_coo_spmv(const ptrdiff_t             ndofs,
+    std::shared_ptr<CooSym<idx_t, real_t>> d_sym_coo_spmv(const ptrdiff_t             ndofs,
                                                               const SharedBuffer<idx_t>&  rowidx,
                                                               const SharedBuffer<idx_t>&  colidx,
                                                               const SharedBuffer<real_t>& values,

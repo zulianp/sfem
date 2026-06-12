@@ -16,7 +16,7 @@
 // version of the matrix triple product ptap and transposing is basically a NOP
 namespace sfem {
     template <typename R, typename T>
-    class CooSymSpMV final : public Operator<T> {
+    class CooSym final : public Operator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::function<void(const T* const, T* const)> apply_;
@@ -37,7 +37,7 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
-            SFEM_TRACE_SCOPE("CooSymSpMV::apply");
+            SFEM_TRACE_SCOPE("CooSym::apply");
 
             apply_(x, y);
             return SFEM_SUCCESS;
@@ -86,12 +86,12 @@ namespace sfem {
     };
 
     template <typename R, typename T>
-    std::shared_ptr<CooSymSpMV<R, T>> h_coosym(const SharedBuffer<mask_t>& bdy_dofs,
+    std::shared_ptr<CooSym<R, T>> h_coosym(const SharedBuffer<mask_t>& bdy_dofs,
                                                const SharedBuffer<R>& offdiag_rowidx,
                                                const SharedBuffer<R>& offdiag_colidx,
                                                const SharedBuffer<T>& values,
                                                const SharedBuffer<T>& diag_values) {
-        auto ret = std::make_shared<CooSymSpMV<R, T>>();
+        auto ret = std::make_shared<CooSym<R, T>>();
         ret->bdy_dofs = bdy_dofs;
         ret->offdiag_rowidx = offdiag_rowidx;
         ret->offdiag_colidx = offdiag_colidx;

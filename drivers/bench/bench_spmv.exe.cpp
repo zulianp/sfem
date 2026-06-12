@@ -13,6 +13,8 @@
 #include "sfem_base.hpp"
 #include "spmv.hpp"
 
+// TODO: Refactor using  Buffer and CRS classes
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -28,19 +30,18 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 6) {
-        fprintf(
-            stderr, "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
+        fprintf(stderr, "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     int SFEM_REPEAT = 1;
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
-    const real_t alpha = atof(argv[1]);
-    const int transpose = atoi(argv[2]);
-    const char *crs_folder = argv[3];
-    const char *x_path = argv[4];
-    const char *output_path = argv[5];
+    const real_t alpha       = atof(argv[1]);
+    const int    transpose   = atoi(argv[2]);
+    const char  *crs_folder  = argv[3];
+    const char  *x_path      = argv[4];
+    const char  *output_path = argv[5];
 
     double tick = MPI_Wtime();
 
@@ -53,19 +54,12 @@ int main(int argc, char *argv[]) {
     snprintf(values_path, sizeof(values_path), "%s/values.raw", crs_folder);
 
     crs_t crs;
-    crs_read(comm,
-             rowptr_path,
-             colidx_path,
-             values_path,
-             SFEM_MPI_COUNT_T,
-             SFEM_MPI_IDX_T,
-             SFEM_MPI_REAL_T,
-             &crs);
+    crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
 
     real_t *x = 0;
     if (strcmp("gen:ones", x_path) == 0) {
         ptrdiff_t ndofs = crs.lrows;
-        x = (real_t*)malloc(ndofs * sizeof(real_t));
+        x               = (real_t *)malloc(ndofs * sizeof(real_t));
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
             x[i] = 1;
@@ -76,7 +70,7 @@ int main(int argc, char *argv[]) {
         array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
     }
 
-    real_t *y = (real_t*)calloc(crs.grows, sizeof(real_t));
+    real_t *y = (real_t *)calloc(crs.grows, sizeof(real_t));
 
     double spmv_tick = MPI_Wtime();
 
@@ -91,8 +85,8 @@ int main(int argc, char *argv[]) {
                  y);
     }
 
-    double spmv_tock = MPI_Wtime();
-    double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
+    double spmv_tock      = MPI_Wtime();
+    double avg_time       = (spmv_tock - spmv_tick) / SFEM_REPEAT;
     double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
     printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
 
