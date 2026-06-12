@@ -89,7 +89,7 @@ namespace sfem {
             const std::shared_ptr<MultigridData>           &data,
             std::vector<std::shared_ptr<Operator<real_t>>> &ops,
             const int                                       smoothing_steps,
-            const bool                                      emable_mixed_precision) {
+            const bool                                      enable_mixed_precision) {
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> smoothers;
 
         if (data->functions.empty()) {
@@ -120,10 +120,15 @@ namespace sfem {
                 f->hessian_block_diag_sym(nullptr, diag->data());
 
                 std::shared_ptr<sfem::Operator<real_t>> jacobi;
-                if (emable_mixed_precision) {
-                    jacobi = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(block_size, diag, mask, es);
+                if (enable_mixed_precision) {
+                    auto temp =
+                            sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(block_size, diag, mask, es);
+                    temp->relaxation_parameter = 1. / block_size;
+                    jacobi                     = temp;
                 } else {
-                    jacobi = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
+                    auto temp                  = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
+                    temp->relaxation_parameter = 1. / block_size;
+                    jacobi                     = temp;
                 }
 
                 return jacobi;
@@ -139,9 +144,22 @@ namespace sfem {
 
         auto coarse_solver = sfem::create_cg<real_t>(ops.back(), es);
         coarse_solver->set_max_it(10000);
-        coarse_solver->set_preconditioner_op(create_jacobi(data->functions.back()));
-        coarse_solver->verbose = false;
+        coarse_solver->verbose = true;
         coarse_solver->set_rtol(1e-6);
+
+        bool enable_coarse_space_preconditioner = true;
+        if (enable_coarse_space_preconditioner) {
+            auto f    = data->functions.back();
+            auto diag = sfem::create_buffer<real_t>(f->space()->n_dofs(), es);
+            f->hessian_diag(nullptr, diag->data());
+            auto sj_coarse                  = sfem::create_shiftable_jacobi(diag, es);
+            sj_coarse->relaxation_parameter = 1. / block_size;
+            coarse_solver->set_preconditioner_op(sj_coarse);
+
+            // This is not working for some reason. BCs?
+            // coarse_solver->set_preconditioner_op(create_jacobi(data->functions.back()));
+        }
+
         smoothers.push_back(coarse_solver);
 
         return smoothers;
