@@ -338,13 +338,10 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
     list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
 else()
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
 endif()
 
-if(NOT SFEM_ENABLE_CUSPARSE)
-    # FIXME
-    list(APPEND SFEM_EXCLUDED_EXEC "cuda_do_spmv")
-endif()
+
 
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
@@ -508,17 +505,10 @@ endif()
 
 ######################################################
 
-if(TARGET cuda_do_spmv)
-    add_custom_command(TARGET cuda_do_spmv  POST_BUILD
+if(TARGET bench_spmv)
+    add_custom_command(TARGET bench_spmv POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy
-                           $<TARGET_FILE:cuda_do_spmv>
-                           cuspmv
-                       COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
+                           $<TARGET_FILE:bench_spmv>
+                           spmv
+                       COMMENT "Copying 'bench_spmv' executable to 'spmv'")
 endif()
-
-
-add_custom_command(TARGET do_spmv  POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy
-                       $<TARGET_FILE:do_spmv>
-                       spmv
-                   COMMENT "Copying 'do_spmv' executable to 'spmv'")
