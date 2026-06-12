@@ -34,7 +34,7 @@
 #include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_CRS.hpp"
 #include "sfem_crs_sym_SpMV.hpp"

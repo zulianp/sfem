@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <cmath>
 #include <memory>
+#include <vector>
 
 #include "sfem_test.hpp"
 
@@ -101,6 +103,305 @@ namespace {
                 [=](const real_t* const x, real_t* const y) {
                     for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(inv_diag->size()); ++i) {
                         y[i] = inv_diag->data()[i] * x[i];
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
+    sfem::SharedBuffer<real_t> bsr_inverse_diagonal(
+            const std::shared_ptr<sfem::BSR<sfem::count_t, sfem::idx_t, real_t, real_t>>& a) {
+        const ptrdiff_t block_rows = a->row_ptr->size() - 1;
+        const int       block_size = a->block_size();
+        auto            inv_diag   = sfem::create_host_buffer<real_t>(a->rows());
+
+        for (ptrdiff_t i = 0; i < a->rows(); ++i) {
+            inv_diag->data()[i] = 1;
+        }
+
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            for (sfem::count_t k = a->row_ptr->data()[node]; k < a->row_ptr->data()[node + 1]; ++k) {
+                if (a->col_idx->data()[k] != node) continue;
+
+                const real_t* const block = &a->values->data()[k * block_size * block_size];
+                for (int d = 0; d < block_size; ++d) {
+                    const real_t diag = block[d * block_size + d];
+                    inv_diag->data()[node * block_size + d] = std::abs(diag) > 1e-14 ? 1 / diag : 1;
+                }
+                break;
+            }
+        }
+
+        return inv_diag;
+    }
+
+    sfem::SharedBuffer<real_t> bsr_inverse_diagonal_blocks(
+            const std::shared_ptr<sfem::BSR<sfem::count_t, sfem::idx_t, real_t, real_t>>& a) {
+        const ptrdiff_t block_rows = a->row_ptr->size() - 1;
+        const int       block_size = a->block_size();
+        const int       block_area = block_size * block_size;
+        auto            inv_diag   = sfem::create_host_buffer<real_t>(block_rows * block_area);
+
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            real_t* const inv = &inv_diag->data()[node * block_area];
+            for (int i = 0; i < block_area; ++i) {
+                inv[i] = 0;
+            }
+            for (int d = 0; d < block_size; ++d) {
+                inv[d * block_size + d] = 1;
+            }
+
+            for (sfem::count_t k = a->row_ptr->data()[node]; k < a->row_ptr->data()[node + 1]; ++k) {
+                if (a->col_idx->data()[k] != node) continue;
+
+                std::vector<real_t> mat(block_area);
+                for (int i = 0; i < block_area; ++i) {
+                    mat[i] = a->values->data()[k * block_area + i];
+                    inv[i] = 0;
+                }
+                for (int d = 0; d < block_size; ++d) {
+                    inv[d * block_size + d] = 1;
+                }
+
+                bool invertible = true;
+                for (int p = 0; p < block_size; ++p) {
+                    int    pivot_row = p;
+                    real_t pivot_abs = std::abs(mat[p * block_size + p]);
+                    for (int r = p + 1; r < block_size; ++r) {
+                        const real_t candidate_abs = std::abs(mat[r * block_size + p]);
+                        if (candidate_abs > pivot_abs) {
+                            pivot_abs = candidate_abs;
+                            pivot_row = r;
+                        }
+                    }
+
+                    if (pivot_abs <= 1e-14) {
+                        invertible = false;
+                        break;
+                    }
+
+                    if (pivot_row != p) {
+                        for (int c = 0; c < block_size; ++c) {
+                            std::swap(mat[p * block_size + c], mat[pivot_row * block_size + c]);
+                            std::swap(inv[p * block_size + c], inv[pivot_row * block_size + c]);
+                        }
+                    }
+
+                    const real_t inv_pivot = 1 / mat[p * block_size + p];
+                    for (int c = 0; c < block_size; ++c) {
+                        mat[p * block_size + c] *= inv_pivot;
+                        inv[p * block_size + c] *= inv_pivot;
+                    }
+
+                    for (int r = 0; r < block_size; ++r) {
+                        if (r == p) continue;
+                        const real_t factor = mat[r * block_size + p];
+                        if (factor == 0) continue;
+                        for (int c = 0; c < block_size; ++c) {
+                            mat[r * block_size + c] -= factor * mat[p * block_size + c];
+                            inv[r * block_size + c] -= factor * inv[p * block_size + c];
+                        }
+                    }
+                }
+
+                if (!invertible) {
+                    for (int i = 0; i < block_area; ++i) {
+                        inv[i] = 0;
+                    }
+                    for (int d = 0; d < block_size; ++d) {
+                        const real_t diag = a->values->data()[k * block_area + d * block_size + d];
+                        inv[d * block_size + d] = std::abs(diag) > 1e-14 ? 1 / diag : 1;
+                    }
+                }
+
+                break;
+            }
+        }
+
+        return inv_diag;
+    }
+
+    std::shared_ptr<sfem::Operator<real_t>> block_diagonal_preconditioner(const sfem::SharedBuffer<real_t>& inv_diag_blocks,
+                                                                          const int                         block_size) {
+        const ptrdiff_t block_rows = inv_diag_blocks->size() / (block_size * block_size);
+
+        return sfem::make_op<real_t>(
+                block_rows * block_size,
+                block_rows * block_size,
+                [=](const real_t* const x, real_t* const y) {
+                    for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                        const real_t* const inv = &inv_diag_blocks->data()[node * block_size * block_size];
+                        for (int d = 0; d < block_size; ++d) {
+                            real_t value = 0;
+                            for (int e = 0; e < block_size; ++e) {
+                                value += inv[d * block_size + e] * x[node * block_size + e];
+                            }
+                            y[node * block_size + d] = value;
+                        }
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
+    std::shared_ptr<sfem::Operator<real_t>> sa_multilevel_additive_preconditioner(
+            const sfem::SAVectorAMGHierarchy<sfem::count_t, sfem::idx_t, real_t>& hierarchy,
+            const ptrdiff_t                                                       level_idx,
+            const sfem::SharedBuffer<real_t>&                                      inv_diag_blocks) {
+        const auto level = hierarchy.levels[level_idx];
+        const int  block_size = level.a->block_size();
+
+        std::shared_ptr<sfem::Operator<real_t>> coarse_apply;
+        if (level_idx + 1 < static_cast<ptrdiff_t>(hierarchy.levels.size())) {
+            auto next_inv_diag_blocks = bsr_inverse_diagonal_blocks(hierarchy.levels[level_idx + 1].a);
+            coarse_apply              = sa_multilevel_additive_preconditioner(hierarchy, level_idx + 1, next_inv_diag_blocks);
+        } else {
+            auto coarse_op     = zeroing_op(level.coarse_a);
+            auto coarse_solver = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+            coarse_solver->verbose = false;
+            coarse_solver->set_preconditioner_op(
+                    block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(level.coarse_a), level.coarse_a->block_size()));
+            coarse_solver->set_rtol(1e-10);
+            coarse_solver->set_atol(1e-14);
+            coarse_solver->set_max_it(200);
+
+            printf("hierarchy_level: %ld, coarse_solver->rows(): %ld\n", level_idx, coarse_solver->rows());
+
+            coarse_apply = sfem::make_op<real_t>(
+                    coarse_op->rows(),
+                    coarse_op->cols(),
+                    [=](const real_t* const x, real_t* const y) {
+                        for (ptrdiff_t i = 0; i < coarse_op->rows(); ++i) {
+                            y[i] = 0;
+                        }
+                        coarse_solver->apply(x, y);
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        }
+
+        printf("hierarchy_level: %ld, additive_rows: %ld, coarse_rows: %ld\n", level_idx, level.a->rows(), level.coarse_a->rows());
+
+        auto coarse_rhs  = sfem::create_host_buffer<real_t>(level.r->rows());
+        auto coarse_x    = sfem::create_host_buffer<real_t>(level.p->cols());
+        auto coarse_work = sfem::create_host_buffer<real_t>(level.p->rows());
+
+        return sfem::make_op<real_t>(
+                level.p->rows(),
+                level.r->cols(),
+                [=](const real_t* const x, real_t* const y) {
+                    for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
+                        coarse_rhs->data()[i] = 0;
+                        coarse_x->data()[i]   = 0;
+                    }
+
+                    level.r->apply(x, coarse_rhs->data());
+                    coarse_apply->apply(coarse_rhs->data(), coarse_x->data());
+
+                    for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
+                        coarse_work->data()[i] = 0;
+                    }
+                    level.p->apply(coarse_x->data(), coarse_work->data());
+
+                    const ptrdiff_t block_rows = level.a->row_ptr->size() - 1;
+                    for (ptrdiff_t node = 0; node < block_rows; ++node) {
+                        const real_t* const inv = &inv_diag_blocks->data()[node * block_size * block_size];
+                        for (int d = 0; d < block_size; ++d) {
+                            real_t smooth = 0;
+                            for (int e = 0; e < block_size; ++e) {
+                                smooth += inv[d * block_size + e] * x[node * block_size + e];
+                            }
+                            y[node * block_size + d] = smooth + coarse_work->data()[node * block_size + d];
+                        }
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
+    std::shared_ptr<sfem::Operator<real_t>> sa_multilevel_vcycle_preconditioner(
+            const sfem::SAVectorAMGHierarchy<sfem::count_t, sfem::idx_t, real_t>& hierarchy,
+            const ptrdiff_t                                                       level_idx,
+            const sfem::SharedBuffer<real_t>&                                      inv_diag_blocks) {
+        const auto level      = hierarchy.levels[level_idx];
+        const int  block_size = level.a->block_size();
+
+        std::shared_ptr<sfem::Operator<real_t>> coarse_apply;
+        if (level_idx + 1 < static_cast<ptrdiff_t>(hierarchy.levels.size())) {
+            auto next_inv_diag_blocks = bsr_inverse_diagonal_blocks(hierarchy.levels[level_idx + 1].a);
+            coarse_apply              = sa_multilevel_vcycle_preconditioner(hierarchy, level_idx + 1, next_inv_diag_blocks);
+        } else {
+            auto coarse_op     = zeroing_op(level.coarse_a);
+            auto coarse_solver = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+            coarse_solver->verbose = false;
+            coarse_solver->set_preconditioner_op(
+                    block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(level.coarse_a), level.coarse_a->block_size()));
+            coarse_solver->set_rtol(1e-10);
+            coarse_solver->set_atol(1e-14);
+            coarse_solver->set_max_it(200);
+
+            printf("hierarchy_level: %ld, coarse_solver->rows(): %ld\n", level_idx, coarse_solver->rows());
+
+            coarse_apply = sfem::make_op<real_t>(
+                    coarse_op->rows(),
+                    coarse_op->cols(),
+                    [=](const real_t* const x, real_t* const y) {
+                        for (ptrdiff_t i = 0; i < coarse_op->rows(); ++i) {
+                            y[i] = 0;
+                        }
+                        coarse_solver->apply(x, y);
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        }
+
+        printf("hierarchy_level: %ld, vcycle_rows: %ld, coarse_rows: %ld\n", level_idx, level.a->rows(), level.coarse_a->rows());
+
+        auto smooth_op   = block_diagonal_preconditioner(inv_diag_blocks, block_size);
+        auto residual    = sfem::create_host_buffer<real_t>(level.a->rows());
+        auto smooth_work = sfem::create_host_buffer<real_t>(level.a->rows());
+        auto coarse_rhs  = sfem::create_host_buffer<real_t>(level.r->rows());
+        auto coarse_x    = sfem::create_host_buffer<real_t>(level.p->cols());
+        auto coarse_work = sfem::create_host_buffer<real_t>(level.p->rows());
+
+        return sfem::make_op<real_t>(
+                level.a->rows(),
+                level.a->cols(),
+                [=](const real_t* const x, real_t* const y) {
+                    static const real_t omega = 0.8;
+
+                    smooth_op->apply(x, y);
+                    for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
+                        y[i] *= omega;
+                        residual->data()[i] = 0;
+                    }
+
+                    level.a->apply(y, residual->data());
+                    for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
+                        residual->data()[i] = x[i] - residual->data()[i];
+                    }
+
+                    for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
+                        coarse_rhs->data()[i] = 0;
+                        coarse_x->data()[i]   = 0;
+                    }
+
+                    level.r->apply(residual->data(), coarse_rhs->data());
+                    coarse_apply->apply(coarse_rhs->data(), coarse_x->data());
+
+                    for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
+                        coarse_work->data()[i] = 0;
+                    }
+                    level.p->apply(coarse_x->data(), coarse_work->data());
+
+                    for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
+                        y[i] += coarse_work->data()[i];
+                        residual->data()[i] = 0;
+                    }
+
+                    level.a->apply(y, residual->data());
+                    for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
+                        residual->data()[i] = x[i] - residual->data()[i];
+                    }
+
+                    smooth_op->apply(residual->data(), smooth_work->data());
+                    for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
+                        y[i] += omega * smooth_work->data()[i];
                     }
                 },
                 sfem::EXECUTION_SPACE_HOST);
@@ -210,14 +511,35 @@ int test_linear_elasticity_sa_vector_amg() {
         boundary_nodes->data()[node] = points->data()[0][node] < static_cast<geom_t>(1e-8);
     }
 
-    const int max_aggregate_size = 120;
-    auto      level              = sfem::h_sa_vector_amg_level<sfem::count_t, sfem::idx_t, real_t, geom_t, real_t>(
-            a_bsr, const_cast<const geom_t* const*>(points->data()), 3, boundary_nodes, max_aggregate_size);
+    const int       max_aggregate_size        = 120;
+    const int       coarse_max_aggregate_size = 16;
+    const int       max_levels                = 3;
+    const ptrdiff_t coarsest_block_rows       = 12;
+    auto            hierarchy                 = sfem::h_sa_vector_amg_hierarchy<sfem::count_t, sfem::idx_t, geom_t, real_t>(
+            a_bsr,
+            const_cast<const geom_t* const*>(points->data()),
+            3,
+            boundary_nodes,
+            max_aggregate_size,
+            coarse_max_aggregate_size,
+            max_levels,
+            coarsest_block_rows);
+
+    SFEM_TEST_ASSERT(!hierarchy.levels.empty());
+    const auto& level = hierarchy.levels[0];
 
     printf("max_aggregate_size: %d, aggregates: %ld, coarse rows: %ld\n",
            max_aggregate_size,
            level.aggregates.n_aggregates,
            level.coarse_a->rows());
+    printf("coarse_max_aggregate_size: %d, hierarchy_levels: %ld\n", coarse_max_aggregate_size, hierarchy.levels.size());
+    for (ptrdiff_t l = 0; l < static_cast<ptrdiff_t>(hierarchy.levels.size()); ++l) {
+        printf("hierarchy_level: %ld, rows: %ld, coarse_rows: %ld, aggregates: %ld\n",
+               l,
+               hierarchy.levels[l].a->rows(),
+               hierarchy.levels[l].coarse_a->rows(),
+               hierarchy.levels[l].aggregates.n_aggregates);
+    }
 
     SFEM_TEST_EQ(level.n_rigid_body_modes, 6);
     SFEM_TEST_ASSERT(level.coarse_a != nullptr);
@@ -227,7 +549,7 @@ int test_linear_elasticity_sa_vector_amg() {
     SFEM_TEST_ASSERT(level.coarse_a->rows() < a_bsr->rows());
 
     auto solve_op   = zeroing_op(a_bsr);
-    auto sa_precond = additive_sa_preconditioner(level, inv_diag);
+    auto sa_precond = sa_multilevel_vcycle_preconditioner(hierarchy, 0, bsr_inverse_diagonal_blocks(a_bsr));
 
     auto sa_solver     = sfem::create_cg<real_t>(solve_op, es);
     sa_solver->verbose = true;

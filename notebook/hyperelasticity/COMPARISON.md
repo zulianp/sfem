@@ -86,7 +86,7 @@ Total linear iterations: 22208
 
 ```c++
 name,calls,total,avg
-BSRSpMV::apply,22688,7.02717,0.000309731
+BSR::apply,22688,7.02717,0.000309731
 ConjugateGradient::apply,160,24.8244,0.155153
 DirichletConditions::apply_value,400,0.054882,0.000137205
 DirichletConditions::copy_constrained_dofs,45696,6.12706,0.000134083
@@ -130,7 +130,7 @@ Total linear iterations: 24695
 
 ```c++
 name,calls,total,avg
-BSRSpMV::apply,25015,7.59715,0.000303704
+BSR::apply,25015,7.59715,0.000303704
 ConjugateGradient::apply,160,23.5613,0.147258
 DirichletConditions::copy_constrained_dofs,50350,6.39795,0.00012707
 DirichletConditions::create_from_yaml,1,0.003241,0.003241

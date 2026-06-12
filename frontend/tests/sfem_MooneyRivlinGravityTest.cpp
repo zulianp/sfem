@@ -11,7 +11,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
 #include "smesh_sideset.hpp"
 

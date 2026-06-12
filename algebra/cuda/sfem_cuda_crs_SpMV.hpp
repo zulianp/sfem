@@ -2,7 +2,7 @@
 #define SFEM_CUDA_CRSSPMV_HPP
 
 #include "sfem_CooSym.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_CRS.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_defs.hpp"
@@ -22,7 +22,7 @@ namespace sfem {
                                                               const SharedBuffer<real_t>& diag_values,
                                                               const real_t                scale_output);
 
-    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t              block_rows,
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t              block_rows,
                                                                 const ptrdiff_t              block_cols,
                                                                 const int                    block_size,
                                                                 const SharedBuffer<count_t>& rowptr,

@@ -10,7 +10,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_CRS.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 
 namespace sfem {
 
@@ -23,11 +23,16 @@ namespace sfem {
     template <typename R, typename C, typename TStorage, typename T = TStorage>
     struct SAVectorAMGLevel {
         SAVectorAMGAggregates<C> aggregates;
-        std::shared_ptr<BSRSpMV<R, C, TStorage, T>> a;
+        std::shared_ptr<BSR<R, C, TStorage, T>> a;
         std::shared_ptr<CRS<R, C, T, T>> p;
         std::shared_ptr<CRS<R, C, T, T>> r;
-        std::shared_ptr<BSRSpMV<R, C, T, T>> coarse_a;
+        std::shared_ptr<BSR<R, C, T, T>> coarse_a;
         int                              n_rigid_body_modes{0};
+    };
+
+    template <typename R, typename C, typename T>
+    struct SAVectorAMGHierarchy {
+        std::vector<SAVectorAMGLevel<R, C, T, T>> levels;
     };
 
     inline int sa_vector_amg_n_rigid_body_modes(const int block_size, const int spatial_dim) {
@@ -81,16 +86,16 @@ namespace sfem {
             a[i] = static_cast<C>(-1);
         }
 
-        ptrdiff_t n_aggregates = 0;
         if (boundary_nodes) {
             const mask_t* const bdy = boundary_nodes->data();
             for (ptrdiff_t i = 0; i < block_rows; ++i) {
                 if (bdy[i]) {
-                    a[i] = static_cast<C>(n_aggregates++);
+                    a[i] = static_cast<C>(-1);
                 }
             }
         }
 
+        ptrdiff_t n_aggregates = 0;
         const R* const rp = rowptr->data();
         const C* const ci = colidx->data();
         const mask_t* const bdy = boundary_nodes ? boundary_nodes->data() : nullptr;
@@ -100,6 +105,7 @@ namespace sfem {
 
         for (ptrdiff_t i = 0; i < block_rows; ++i) {
             if (a[i] >= 0) continue;
+            if (bdy && bdy[i]) continue;
 
             const C agg = static_cast<C>(n_aggregates++);
             a[i]        = agg;
@@ -122,6 +128,132 @@ namespace sfem {
         return {aggregates, n_aggregates};
     }
 
+    template <typename R, typename C>
+    SAVectorAMGAggregates<C> sa_vector_amg_optimal_aggregate(const ptrdiff_t        block_rows,
+                                                             const SharedBuffer<R>& rowptr,
+                                                             const SharedBuffer<C>& colidx,
+                                                             const int              max_aggregate_size = 32) {
+        auto aggregates = create_host_buffer<C>(block_rows);
+        C* const a      = aggregates->data();
+
+        const R* const rp = rowptr->data();
+        const C* const ci = colidx->data();
+
+        std::vector<int> degree(block_rows, 0);
+        std::vector<C>   order(block_rows);
+
+        for (ptrdiff_t i = 0; i < block_rows; ++i) {
+            a[i]     = static_cast<C>(-1);
+            order[i] = static_cast<C>(i);
+
+            for (R k = rp[i]; k < rp[i + 1]; ++k) {
+                const C j = ci[k];
+                degree[i] += (j >= 0 && static_cast<ptrdiff_t>(j) < block_rows && j != i);
+            }
+        }
+
+        std::sort(order.begin(), order.end(), [&](const C left, const C right) {
+            if (degree[left] != degree[right]) return degree[left] > degree[right];
+            return left < right;
+        });
+
+        std::vector<C> members;
+        std::vector<C> candidates;
+        std::vector<R> candidate_mark(block_rows, static_cast<R>(-1));
+
+        members.reserve(std::max(1, max_aggregate_size));
+        candidates.reserve(std::max(1, max_aggregate_size * 4));
+
+        ptrdiff_t n_aggregates = 0;
+
+        for (const C seed : order) {
+            if (a[seed] >= 0) continue;
+
+            const C agg = static_cast<C>(n_aggregates++);
+            a[seed]    = agg;
+
+            members.clear();
+            candidates.clear();
+            members.push_back(seed);
+
+            while (static_cast<int>(members.size()) < max_aggregate_size) {
+                const R stamp = static_cast<R>(agg + 1);
+
+                for (const C member : members) {
+                    for (R k = rp[member]; k < rp[member + 1]; ++k) {
+                        const C candidate = ci[k];
+                        if (candidate < 0 || static_cast<ptrdiff_t>(candidate) >= block_rows || a[candidate] >= 0) continue;
+
+                        if (candidate_mark[candidate] != stamp) {
+                            candidate_mark[candidate] = stamp;
+                            candidates.push_back(candidate);
+                        }
+                    }
+                }
+
+                C   best       = static_cast<C>(-1);
+                int best_score = std::numeric_limits<int>::min();
+
+                for (const C candidate : candidates) {
+                    if (a[candidate] >= 0) continue;
+
+                    int links_to_aggregate = 0;
+                    for (R k = rp[candidate]; k < rp[candidate + 1]; ++k) {
+                        const C neighbor = ci[k];
+                        if (neighbor >= 0 && static_cast<ptrdiff_t>(neighbor) < block_rows && a[neighbor] == agg) {
+                            ++links_to_aggregate;
+                        }
+                    }
+
+                    const int score = links_to_aggregate * 1024 - degree[candidate];
+                    if (score > best_score || (score == best_score && (best < 0 || candidate < best))) {
+                        best       = candidate;
+                        best_score = score;
+                    }
+                }
+
+                if (best < 0) break;
+
+                a[best] = agg;
+                members.push_back(best);
+            }
+        }
+
+        return {aggregates, n_aggregates};
+    }
+
+    template <typename R, typename C, typename T>
+    std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_block_tentative_prolongation(
+            const ptrdiff_t                 block_rows,
+            const int                       block_size,
+            const SAVectorAMGAggregates<C>& aggregates) {
+        const ptrdiff_t fine_rows   = block_rows * block_size;
+        const ptrdiff_t coarse_cols = aggregates.n_aggregates * block_size;
+
+        auto rowptr = create_host_buffer<R>(fine_rows + 1);
+        auto colidx = create_host_buffer<C>(fine_rows);
+        auto values = create_host_buffer<T>(fine_rows);
+
+        R* const       r   = rowptr->data();
+        C* const       c   = colidx->data();
+        T* const       v   = values->data();
+        const C* const agg = aggregates.aggregate->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t row = 0; row < fine_rows; ++row) {
+            const ptrdiff_t node = row / block_size;
+            const int       d    = row - node * block_size;
+
+            r[row] = row;
+            c[row] = agg[node] * block_size + d;
+            v[row] = static_cast<T>(1);
+        }
+
+        r[fine_rows] = fine_rows;
+
+        return h_crs_spmv<R, C, T, T>(fine_rows, coarse_cols, rowptr, colidx, values, static_cast<T>(0));
+    }
+
     template <typename R, typename C, typename X, typename T>
     std::shared_ptr<CRS<R, C, T, T>> sa_vector_amg_tentative_prolongation(const ptrdiff_t                       block_rows,
                                                                           const int                             block_size,
@@ -133,17 +265,27 @@ namespace sfem {
         const ptrdiff_t coarse_cols = aggregates.n_aggregates * n_modes;
 
         auto rowptr = create_host_buffer<R>(fine_rows + 1);
-        auto colidx = create_host_buffer<C>(fine_rows * n_modes);
-        auto values = create_host_buffer<T>(fine_rows * n_modes);
 
-        R* const r = rowptr->data();
-        C* const c = colidx->data();
-        T* const v = values->data();
+        R* const       r   = rowptr->data();
         const C* const agg = aggregates.aggregate->data();
 
-        for (ptrdiff_t i = 0; i <= fine_rows; ++i) {
-            r[i] = i * n_modes;
+        r[0] = 0;
+        for (ptrdiff_t node = 0; node < block_rows; ++node) {
+            const R row_nnz = agg[node] >= 0 ? static_cast<R>(n_modes) : static_cast<R>(0);
+            for (int d = 0; d < block_size; ++d) {
+                r[node * block_size + d + 1] = row_nnz;
+            }
         }
+
+        for (ptrdiff_t i = 0; i < fine_rows; ++i) {
+            r[i + 1] += r[i];
+        }
+
+        auto colidx = create_host_buffer<C>(r[fine_rows]);
+        auto values = create_host_buffer<T>(r[fine_rows]);
+
+        C* const c = colidx->data();
+        T* const v = values->data();
 
         std::vector<T> centroid(aggregates.n_aggregates * spatial_dim, static_cast<T>(0));
         std::vector<T> count(aggregates.n_aggregates, static_cast<T>(0));
@@ -530,7 +672,7 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename T>
-    std::shared_ptr<BSRSpMV<R, C, T, T>> sa_vector_amg_galerkin_bsr(const std::shared_ptr<CRS<R, C, T, T>>& r,
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_galerkin_bsr(const std::shared_ptr<CRS<R, C, T, T>>& r,
                                                                     const std::shared_ptr<CRS<R, C, T, T>>& ap,
                                                                     const int coarse_block_size) {
         const ptrdiff_t block_rows = r->rows() / coarse_block_size;
@@ -655,7 +797,7 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    std::shared_ptr<BSRSpMV<R, C, T, T>> sa_vector_amg_coarse_matrix(const ptrdiff_t               block_rows,
+    std::shared_ptr<BSR<R, C, T, T>> sa_vector_amg_coarse_matrix(const ptrdiff_t               block_rows,
                                                                      const int                     block_size,
                                                                      const int                     coarse_block_size,
                                                                      const SharedBuffer<R>&        bsr_rowptr,
@@ -668,7 +810,7 @@ namespace sfem {
     }
 
     template <typename R, typename C, typename TStorage, typename X, typename T = TStorage>
-    SAVectorAMGLevel<R, C, TStorage, T> h_sa_vector_amg_level(const std::shared_ptr<BSRSpMV<R, C, TStorage, T>>& a_bsr,
+    SAVectorAMGLevel<R, C, TStorage, T> h_sa_vector_amg_level(const std::shared_ptr<BSR<R, C, TStorage, T>>& a_bsr,
                                                               const X* const* const                              points,
                                                               const int                                          spatial_dim,
                                                               const SharedBuffer<mask_t>& boundary_nodes = nullptr,
@@ -690,6 +832,65 @@ namespace sfem {
                 block_rows, block_size, level.n_rigid_body_modes, a_bsr->row_ptr, a_bsr->col_idx, a_bsr->values, level.r, level.p);
 
         return level;
+    }
+
+    template <typename R, typename C, typename T>
+    SAVectorAMGLevel<R, C, T, T> h_sa_vector_amg_coarse_level(const std::shared_ptr<BSR<R, C, T, T>>& a_bsr,
+                                                              const int                                  max_aggregate_size = 32,
+                                                              const T prolongation_omega = static_cast<T>(4.0 / 3.0)) {
+        SAVectorAMGLevel<R, C, T, T> level;
+
+        const ptrdiff_t block_rows = a_bsr->row_ptr->size() - 1;
+        const int       block_size = a_bsr->block_size();
+
+        level.aggregates         = sa_vector_amg_optimal_aggregate<R, C>(block_rows, a_bsr->row_ptr, a_bsr->col_idx, max_aggregate_size);
+        level.n_rigid_body_modes = block_size;
+
+        auto tentative_p = sa_vector_amg_block_tentative_prolongation<R, C, T>(block_rows, block_size, level.aggregates);
+        level.p          = sa_vector_amg_smooth_prolongation<R, C, T, T>(
+                block_rows, block_size, a_bsr->row_ptr, a_bsr->col_idx, a_bsr->values, tentative_p, prolongation_omega);
+        level.r        = sa_vector_amg_restriction<R, C, T>(level.p);
+        level.a        = a_bsr;
+        level.coarse_a = sa_vector_amg_coarse_matrix<R, C, T, T>(
+                block_rows, block_size, block_size, a_bsr->row_ptr, a_bsr->col_idx, a_bsr->values, level.r, level.p);
+
+        return level;
+    }
+
+    template <typename R, typename C, typename X, typename T>
+    SAVectorAMGHierarchy<R, C, T> h_sa_vector_amg_hierarchy(const std::shared_ptr<BSR<R, C, T, T>>& a_bsr,
+                                                            const X* const* const                       points,
+                                                            const int                                   spatial_dim,
+                                                            const SharedBuffer<mask_t>&                  boundary_nodes,
+                                                            const int                                   fine_max_aggregate_size = 32,
+                                                            const int                                   coarse_max_aggregate_size = 32,
+                                                            const int                                   max_levels = 4,
+                                                            const ptrdiff_t                             coarsest_block_rows = 32,
+                                                            const T prolongation_omega = static_cast<T>(4.0 / 3.0)) {
+        SAVectorAMGHierarchy<R, C, T> hierarchy;
+
+        if (max_levels <= 0) return hierarchy;
+
+        auto fine_level = h_sa_vector_amg_level<R, C, T, X, T>(
+                a_bsr, points, spatial_dim, boundary_nodes, fine_max_aggregate_size, prolongation_omega);
+
+        hierarchy.levels.push_back(fine_level);
+
+        auto current = fine_level.coarse_a;
+
+        while (static_cast<int>(hierarchy.levels.size()) < max_levels && current->row_ptr->size() > 1) {
+            const ptrdiff_t current_block_rows = current->row_ptr->size() - 1;
+            if (current_block_rows <= coarsest_block_rows) break;
+
+            auto coarse_level = h_sa_vector_amg_coarse_level<R, C, T>(current, coarse_max_aggregate_size, prolongation_omega);
+
+            if (coarse_level.aggregates.n_aggregates >= current_block_rows) break;
+
+            hierarchy.levels.push_back(coarse_level);
+            current = coarse_level.coarse_a;
+        }
+
+        return hierarchy;
     }
 }  // namespace sfem
 
