@@ -466,6 +466,8 @@ namespace sfem {
         ret->col_idx = colidx;
         ret->values = values;
         ret->block_cols_ = block_cols;
+        ret->row_block_size_ = block_size;
+        ret->col_block_size_ = block_size;
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
         auto impl = std::make_shared<BSRImpl>(

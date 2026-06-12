@@ -4,12 +4,122 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
-
-
+#include "sfem_aliases.hpp"
 
 namespace sfem {
+    template <typename T>
+    void bsr_scale_output(const ptrdiff_t rows, const T scale_output, T* const y) {
+        if (scale_output == 0) {
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                y[i] = 0;
+            }
+        } else if (scale_output != 1) {
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                y[i] *= scale_output;
+            }
+        }
+    }
+
+    template <int RowBlockSize, int ColBlockSize, typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_spmv_static(const ptrdiff_t       block_rows,
+                         const R* const        rowptr,
+                         const C* const        colidx,
+                         const TStorage* const values,
+                         const T* const        x,
+                         T* const              y) {
+        static_assert(RowBlockSize > 0, "RowBlockSize must be positive");
+        static_assert(ColBlockSize > 0, "ColBlockSize must be positive");
+
+        constexpr int block_matrix_size = RowBlockSize * ColBlockSize;
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < block_rows; i++) {
+            const R     row_begin = rowptr[i];
+            const R     row_end   = rowptr[i + 1];
+            auto* const block_y   = &y[i * RowBlockSize];
+
+            for (R k = row_begin; k < row_end; k++) {
+                const C           j       = colidx[k];
+                const auto* const block_x = &x[j * ColBlockSize];
+                const auto* const aij     = &values[k * block_matrix_size];
+
+#pragma unroll
+                for (int d1 = 0; d1 < RowBlockSize; d1++) {
+                    T sum = block_y[d1];
+#pragma unroll
+                    for (int d2 = 0; d2 < ColBlockSize; d2++) {
+                        sum += aij[d1 * ColBlockSize + d2] * block_x[d2];
+                    }
+
+                    block_y[d1] = sum;
+                }
+            }
+        }
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_spmv_dynamic(const ptrdiff_t       block_rows,
+                          const int             row_block_size,
+                          const int             col_block_size,
+                          const R* const        rowptr,
+                          const C* const        colidx,
+                          const TStorage* const values,
+                          const T* const        x,
+                          T* const              y) {
+        const int block_matrix_size = row_block_size * col_block_size;
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < block_rows; i++) {
+            const R     row_begin = rowptr[i];
+            const R     row_end   = rowptr[i + 1];
+            auto* const block_y   = &y[i * row_block_size];
+
+            for (R k = row_begin; k < row_end; k++) {
+                const C           j       = colidx[k];
+                const auto* const block_x = &x[j * col_block_size];
+                const auto* const aij     = &values[k * block_matrix_size];
+
+                for (int d1 = 0; d1 < row_block_size; d1++) {
+                    T sum = block_y[d1];
+                    for (int d2 = 0; d2 < col_block_size; d2++) {
+                        sum += aij[d1 * col_block_size + d2] * block_x[d2];
+                    }
+                    block_y[d1] = sum;
+                }
+            }
+        }
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_spmv(const ptrdiff_t       block_rows,
+                  const ptrdiff_t       block_cols,
+                  const int             row_block_size,
+                  const int             col_block_size,
+                  const R* const        rowptr,
+                  const C* const        colidx,
+                  const TStorage* const values,
+                  const T               scale_output,
+                  const T* const        x,
+                  T* const              y) {
+        (void)block_cols;
+
+        bsr_scale_output(block_rows * row_block_size, scale_output, y);
+
+        if (row_block_size == 3 && col_block_size == 3) {
+            bsr_spmv_static<3, 3>(block_rows, rowptr, colidx, values, x, y);
+        } else if (row_block_size == 6 && col_block_size == 6) {
+            bsr_spmv_static<6, 6>(block_rows, rowptr, colidx, values, x, y);
+        } else if (row_block_size == 3 && col_block_size == 6) {
+            bsr_spmv_static<3, 6>(block_rows, rowptr, colidx, values, x, y);
+        } else if (row_block_size == 6 && col_block_size == 3) {
+            bsr_spmv_static<6, 3>(block_rows, rowptr, colidx, values, x, y);
+        } else {
+            bsr_spmv_dynamic(block_rows, row_block_size, col_block_size, rowptr, colidx, values, x, y);
+        }
+    }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
     void bsr_spmv(const ptrdiff_t       block_rows,
@@ -21,50 +131,7 @@ namespace sfem {
                   const T               scale_output,
                   const T* const        x,
                   T* const              y) {
-        const int block_matrix_size = block_size * block_size;
-        if (block_size == 3) {
-#pragma omp parallel for schedule(static)
-            for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R     row_begin = rowptr[i];
-                const R     row_end   = rowptr[i + 1];
-                auto* const block_y   = &y[i * 3];
-
-                for (R k = row_begin; k < row_end; k++) {
-                    const C j = colidx[k];
-
-                    const auto* const block_x = &x[j * 3];
-                    const auto* const aij     = &values[k * block_matrix_size];
-#pragma unroll(3)
-                    for (int d1 = 0; d1 < 3; d1++) {
-#pragma unroll(3)
-                        for (int d2 = 0; d2 < 3; d2++) {
-                            block_y[d1] += aij[d1 * 3 + d2] * block_x[d2];
-                        }
-                    }
-                }
-            }
-
-        } else {
-#pragma omp parallel for schedule(static)
-            for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R     row_begin = rowptr[i];
-                const R     row_end   = rowptr[i + 1];
-                auto* const block_y   = &y[i * block_size];
-
-                for (R k = row_begin; k < row_end; k++) {
-                    const C j = colidx[k];
-
-                    const auto* const block_x = &x[j * block_size];
-                    const auto* const aij     = &values[k * block_matrix_size];
-
-                    for (int d1 = 0; d1 < block_size; d1++) {
-                        for (int d2 = 0; d2 < block_size; d2++) {
-                            block_y[d1] += aij[d1 * block_size + d2] * block_x[d2];
-                        }
-                    }
-                }
-            }
-        }
+        bsr_spmv(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, scale_output, x, y);
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
@@ -79,15 +146,21 @@ namespace sfem {
             return 0;
         }
 
-        std::ptrdiff_t rows() const override { return block_size_ * (row_ptr->size() - 1); }
-        std::ptrdiff_t cols() const override { return block_size_ * block_cols_; }
-        inline int     block_size() const { return block_size_; }
+        std::ptrdiff_t rows() const override { return row_block_size_ * (row_ptr->size() - 1); }
+        std::ptrdiff_t cols() const override { return col_block_size_ * block_cols_; }
+        inline int     row_block_size() const { return row_block_size_; }
+        inline int     col_block_size() const { return col_block_size_; }
+        inline int     block_size() const {
+            assert(row_block_size_ == col_block_size_);
+            return row_block_size_;
+        }
 
         SharedBuffer<R>        row_ptr;
         SharedBuffer<C>        col_idx;
         SharedBuffer<TStorage> values;
 
-        int       block_size_{0};
+        int       row_block_size_{0};
+        int       col_block_size_{0};
         ptrdiff_t block_cols_{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
@@ -97,19 +170,20 @@ namespace sfem {
         void print(std::ostream& os) const {
             os << "BSR" << std::endl;
 
-            os << "block_size: " << block_size_ << std::endl;
+            os << "row_block_size: " << row_block_size_ << std::endl;
+            os << "col_block_size: " << col_block_size_ << std::endl;
             os << "block_cols: " << block_cols_ << std::endl;
 
             const ptrdiff_t n = (row_ptr->size() - 1);
             for (ptrdiff_t i = 0; i < n; i++) {
                 for (ptrdiff_t j = row_ptr->data()[i]; j < row_ptr->data()[i + 1]; j++) {
-                    const auto* const block = &values->data()[j * block_size_ * block_size_];
+                    const auto* const block = &values->data()[j * row_block_size_ * col_block_size_];
                     idx_t             col   = col_idx->data()[j];
                     os << "(" << i << ", " << col << "): ";
                     os << "\n";
-                    for (int d1 = 0; d1 < block_size_; d1++) {
-                        for (int d2 = 0; d2 < block_size_; d2++) {
-                            os << block[d1 * block_size_ + d2] << " ";
+                    for (int d1 = 0; d1 < row_block_size_; d1++) {
+                        for (int d2 = 0; d2 < col_block_size_; d2++) {
+                            os << block[d1 * col_block_size_ + d2] << " ";
                         }
                         os << "\n";
                     }
@@ -123,26 +197,48 @@ namespace sfem {
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
     std::shared_ptr<BSR<R, C, TStorage, T>> h_bsr_spmv(const ptrdiff_t               block_rows,
-                                                           const ptrdiff_t               block_cols,
-                                                           const int                     block_size,
-                                                           const SharedBuffer<R>&        rowptr,
-                                                           const SharedBuffer<C>&        colidx,
-                                                           const SharedBuffer<TStorage>& values,
-                                                           const T                       scale_output) {
+                                                       const ptrdiff_t               block_cols,
+                                                       const int                     row_block_size,
+                                                       const int                     col_block_size,
+                                                       const SharedBuffer<R>&        rowptr,
+                                                       const SharedBuffer<C>&        colidx,
+                                                       const SharedBuffer<TStorage>& values,
+                                                       const T                       scale_output) {
         auto ret         = std::make_shared<BSR<R, C, TStorage, T>>();
         ret->row_ptr     = rowptr;
         ret->col_idx     = colidx;
         ret->values      = values;
         ret->block_cols_ = block_cols;
-        ret->block_size_ = block_size;
+        ret->row_block_size_ = row_block_size;
+        ret->col_block_size_ = col_block_size;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
         ret->apply_ = [=](const T* const x, T* const y) {
-            bsr_spmv(block_rows, block_cols, block_size, rowptr->data(), colidx->data(), values->data(), scale_output, x, y);
+            bsr_spmv(block_rows,
+                     block_cols,
+                     row_block_size,
+                     col_block_size,
+                     rowptr->data(),
+                     colidx->data(),
+                     values->data(),
+                     scale_output,
+                     x,
+                     y);
         };
 
         return ret;
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<BSR<R, C, TStorage, T>> h_bsr_spmv(const ptrdiff_t               block_rows,
+                                                       const ptrdiff_t               block_cols,
+                                                       const int                     block_size,
+                                                       const SharedBuffer<R>&        rowptr,
+                                                       const SharedBuffer<C>&        colidx,
+                                                       const SharedBuffer<TStorage>& values,
+                                                       const T                       scale_output) {
+        return h_bsr_spmv(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, scale_output);
     }
 }  // namespace sfem
 
