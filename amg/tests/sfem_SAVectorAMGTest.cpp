@@ -17,6 +17,7 @@ namespace {
                 op->rows(),
                 op->cols(),
                 [=](const real_t* const x, real_t* const y) {
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < op->rows(); ++i) {
                         y[i] = 0;
                     }
@@ -35,6 +36,8 @@ namespace {
         op->apply(x->data(), r);
 
         real_t nrm2 = 0;
+
+#pragma omp parallel for reduction(+ : nrm2)
         for (ptrdiff_t i = 0; i < op->rows(); ++i) {
             const real_t ri = b[i] - r[i];
             nrm2 += ri * ri;
@@ -61,6 +64,7 @@ namespace {
                 level.p->rows(),
                 level.r->cols(),
                 [=](const real_t* const x, real_t* const y) {
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
                         coarse_rhs->data()[i] = 0;
                         coarse_x->data()[i]   = 0;
@@ -69,6 +73,7 @@ namespace {
                     level.r->apply(x, coarse_rhs->data());
                     coarse_solver->apply(coarse_rhs->data(), coarse_x->data());
 
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
                         y[i] = 0;
                     }
@@ -89,6 +94,7 @@ namespace {
                 [=](const real_t* const x, real_t* const y) {
                     coarse->apply(x, coarse_work->data());
 
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
                         y[i] = inv_diag->data()[i] * x[i] + coarse_work->data()[i];
                     }
@@ -114,17 +120,19 @@ namespace {
         const int       block_size = a->block_size();
         auto            inv_diag   = sfem::create_host_buffer<real_t>(a->rows());
 
+#pragma omp parallel for
         for (ptrdiff_t i = 0; i < a->rows(); ++i) {
             inv_diag->data()[i] = 1;
         }
 
+#pragma omp parallel for
         for (ptrdiff_t node = 0; node < block_rows; ++node) {
             for (sfem::count_t k = a->row_ptr->data()[node]; k < a->row_ptr->data()[node + 1]; ++k) {
                 if (a->col_idx->data()[k] != node) continue;
 
                 const real_t* const block = &a->values->data()[k * block_size * block_size];
                 for (int d = 0; d < block_size; ++d) {
-                    const real_t diag = block[d * block_size + d];
+                    const real_t diag                       = block[d * block_size + d];
                     inv_diag->data()[node * block_size + d] = std::abs(diag) > 1e-14 ? 1 / diag : 1;
                 }
                 break;
@@ -141,6 +149,7 @@ namespace {
         const int       block_area = block_size * block_size;
         auto            inv_diag   = sfem::create_host_buffer<real_t>(block_rows * block_area);
 
+#pragma omp parallel for
         for (ptrdiff_t node = 0; node < block_rows; ++node) {
             real_t* const inv = &inv_diag->data()[node * block_area];
             for (int i = 0; i < block_area; ++i) {
@@ -208,7 +217,7 @@ namespace {
                         inv[i] = 0;
                     }
                     for (int d = 0; d < block_size; ++d) {
-                        const real_t diag = a->values->data()[k * block_area + d * block_size + d];
+                        const real_t diag       = a->values->data()[k * block_area + d * block_size + d];
                         inv[d * block_size + d] = std::abs(diag) > 1e-14 ? 1 / diag : 1;
                     }
                 }
@@ -228,6 +237,7 @@ namespace {
                 block_rows * block_size,
                 block_rows * block_size,
                 [=](const real_t* const x, real_t* const y) {
+#pragma omp parallel for
                     for (ptrdiff_t node = 0; node < block_rows; ++node) {
                         const real_t* const inv = &inv_diag_blocks->data()[node * block_size * block_size];
                         for (int d = 0; d < block_size; ++d) {
@@ -245,8 +255,8 @@ namespace {
     std::shared_ptr<sfem::Operator<real_t>> sa_multilevel_additive_preconditioner(
             const sfem::SAVectorAMGHierarchy<sfem::count_t, sfem::idx_t, real_t>& hierarchy,
             const ptrdiff_t                                                       level_idx,
-            const sfem::SharedBuffer<real_t>&                                      inv_diag_blocks) {
-        const auto level = hierarchy.levels[level_idx];
+            const sfem::SharedBuffer<real_t>&                                     inv_diag_blocks) {
+        const auto level      = hierarchy.levels[level_idx];
         const int  block_size = level.a->block_size();
 
         std::shared_ptr<sfem::Operator<real_t>> coarse_apply;
@@ -254,8 +264,8 @@ namespace {
             auto next_inv_diag_blocks = bsr_inverse_diagonal_blocks(hierarchy.levels[level_idx + 1].a);
             coarse_apply              = sa_multilevel_additive_preconditioner(hierarchy, level_idx + 1, next_inv_diag_blocks);
         } else {
-            auto coarse_op     = zeroing_op(level.coarse_a);
-            auto coarse_solver = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+            auto coarse_op         = zeroing_op(level.coarse_a);
+            auto coarse_solver     = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
             coarse_solver->verbose = false;
             coarse_solver->set_preconditioner_op(
                     block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(level.coarse_a), level.coarse_a->block_size()));
@@ -277,7 +287,10 @@ namespace {
                     sfem::EXECUTION_SPACE_HOST);
         }
 
-        printf("hierarchy_level: %ld, additive_rows: %ld, coarse_rows: %ld\n", level_idx, level.a->rows(), level.coarse_a->rows());
+        printf("hierarchy_level: %ld, additive_rows: %ld, coarse_rows: %ld\n",
+               level_idx,
+               level.a->rows(),
+               level.coarse_a->rows());
 
         auto coarse_rhs  = sfem::create_host_buffer<real_t>(level.r->rows());
         auto coarse_x    = sfem::create_host_buffer<real_t>(level.p->cols());
@@ -301,6 +314,8 @@ namespace {
                     level.p->apply(coarse_x->data(), coarse_work->data());
 
                     const ptrdiff_t block_rows = level.a->row_ptr->size() - 1;
+
+#pragma omp parallel for
                     for (ptrdiff_t node = 0; node < block_rows; ++node) {
                         const real_t* const inv = &inv_diag_blocks->data()[node * block_size * block_size];
                         for (int d = 0; d < block_size; ++d) {
@@ -318,7 +333,7 @@ namespace {
     std::shared_ptr<sfem::Operator<real_t>> sa_multilevel_vcycle_preconditioner(
             const sfem::SAVectorAMGHierarchy<sfem::count_t, sfem::idx_t, real_t>& hierarchy,
             const ptrdiff_t                                                       level_idx,
-            const sfem::SharedBuffer<real_t>&                                      inv_diag_blocks) {
+            const sfem::SharedBuffer<real_t>&                                     inv_diag_blocks) {
         const auto level      = hierarchy.levels[level_idx];
         const int  block_size = level.a->block_size();
 
@@ -327,8 +342,8 @@ namespace {
             auto next_inv_diag_blocks = bsr_inverse_diagonal_blocks(hierarchy.levels[level_idx + 1].a);
             coarse_apply              = sa_multilevel_vcycle_preconditioner(hierarchy, level_idx + 1, next_inv_diag_blocks);
         } else {
-            auto coarse_op     = zeroing_op(level.coarse_a);
-            auto coarse_solver = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+            auto coarse_op         = zeroing_op(level.coarse_a);
+            auto coarse_solver     = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
             coarse_solver->verbose = false;
             coarse_solver->set_preconditioner_op(
                     block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(level.coarse_a), level.coarse_a->block_size()));
@@ -342,6 +357,7 @@ namespace {
                     coarse_op->rows(),
                     coarse_op->cols(),
                     [=](const real_t* const x, real_t* const y) {
+#pragma omp parallel for
                         for (ptrdiff_t i = 0; i < coarse_op->rows(); ++i) {
                             y[i] = 0;
                         }
@@ -366,16 +382,21 @@ namespace {
                     static const real_t omega = 0.8;
 
                     smooth_op->apply(x, y);
+
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
                         y[i] *= omega;
                         residual->data()[i] = 0;
                     }
 
                     level.a->apply(y, residual->data());
+
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
                         residual->data()[i] = x[i] - residual->data()[i];
                     }
 
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
                         coarse_rhs->data()[i] = 0;
                         coarse_x->data()[i]   = 0;
@@ -384,22 +405,29 @@ namespace {
                     level.r->apply(residual->data(), coarse_rhs->data());
                     coarse_apply->apply(coarse_rhs->data(), coarse_x->data());
 
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
                         coarse_work->data()[i] = 0;
                     }
+
                     level.p->apply(coarse_x->data(), coarse_work->data());
 
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
                         y[i] += coarse_work->data()[i];
                         residual->data()[i] = 0;
                     }
 
                     level.a->apply(y, residual->data());
+
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
                         residual->data()[i] = x[i] - residual->data()[i];
                     }
 
                     smooth_op->apply(residual->data(), smooth_work->data());
+
+#pragma omp parallel for
                     for (ptrdiff_t i = 0; i < level.a->rows(); ++i) {
                         y[i] += omega * smooth_work->data()[i];
                     }
@@ -513,7 +541,7 @@ int test_linear_elasticity_sa_vector_amg() {
 
     const int       max_aggregate_size        = 120;
     const int       coarse_max_aggregate_size = 16;
-    const int       max_levels                = 3;
+    const int       max_levels                = 10;
     const ptrdiff_t coarsest_block_rows       = 12;
     auto            hierarchy                 = sfem::h_sa_vector_amg_hierarchy<sfem::count_t, sfem::idx_t, geom_t, real_t>(
             a_bsr,
@@ -565,7 +593,7 @@ int test_linear_elasticity_sa_vector_amg() {
     auto diag_precond = inverse_diagonal_preconditioner(inv_diag);
 
     auto diag_solver     = sfem::create_cg<real_t>(solve_op, es);
-    diag_solver->verbose = false;
+    diag_solver->verbose = true;
     diag_solver->set_preconditioner_op(diag_precond);
     diag_solver->set_rtol(1e-8);
     diag_solver->set_atol(1e-10);
