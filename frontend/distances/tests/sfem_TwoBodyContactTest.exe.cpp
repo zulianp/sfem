@@ -1,5 +1,6 @@
 #include "sfem_test.hpp"
 
+#include "sfem_ContactSkin.hpp"
 #include "sfem_FunctionSpace.hpp"
 
 #include "integrations/smesh/sccd_smesh_CCD.hpp"
@@ -201,146 +202,6 @@ struct ContactData {
     SharedBuffer<mask_t>                             constraints_mask;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
-
-static std::shared_ptr<smesh::Mesh> create_contact_skin(const std::shared_ptr<smesh::Mesh>& mesh) {
-    auto surface = smesh::skin(mesh);
-    if (!smesh::is_semistructured_type(mesh->element_type(0))) {
-        return surface;
-    }
-
-    auto ret = smesh::ssquad_to_quad4(surface);
-    ret->block(0)->set_element_type(smesh::QUADSHELL4);
-    return ret;
-}
-
-void remove_surface_elements_connected_to_constrained_nodes(const std::shared_ptr<smesh::Mesh>& surface,
-                                                            const smesh::SharedBuffer<mask_t>&  constraints_mask,
-                                                            const int                           block_size) {
-    auto node_mapping = surface->node_mapping();
-    assert(node_mapping);
-    assert(constraints_mask);
-
-    const ptrdiff_t            n_nodes           = surface->n_nodes();
-    const idx_t* const         node_mapping_data = node_mapping->data();
-    const mask_t* const        mask_data         = constraints_mask->data();
-    std::vector<unsigned char> constrained_node(n_nodes);
-
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-        const ptrdiff_t dof = node_mapping_data[i] * block_size;
-        bool            constrained{false};
-        for (int d = 0; d < block_size; ++d) {
-            constrained |= mask_get(dof + d, mask_data);
-        }
-
-        constrained_node[i] = constrained;
-    }
-
-    for (size_t b = 0; b < surface->n_blocks(); ++b) {
-        auto                       block         = surface->block(b);
-        const int                  nxe           = block->n_nodes_per_element();
-        const ptrdiff_t            n_elements    = block->n_elements();
-        auto                       elements      = block->elements();
-        auto                       elements_data = elements->data();
-        ptrdiff_t                  n_kept        = 0;
-        std::vector<unsigned char> keep(n_elements);
-
-#pragma omp parallel for reduction(+ : n_kept)
-        for (ptrdiff_t e = 0; e < n_elements; ++e) {
-            bool remove{false};
-            for (int v = 0; v < nxe; ++v) {
-                remove |= constrained_node[elements_data[v][e]];
-            }
-
-            keep[e] = !remove;
-            n_kept += keep[e];
-        }
-
-        if (n_kept == n_elements) {
-            continue;
-        }
-
-        auto filtered_elements      = smesh::create_host_buffer<idx_t>(nxe, n_kept);
-        auto filtered_elements_data = filtered_elements->data();
-
-        ptrdiff_t out = 0;
-        for (ptrdiff_t e = 0; e < n_elements; ++e) {
-            if (!keep[e]) {
-                continue;
-            }
-
-            for (int v = 0; v < nxe; ++v) {
-                filtered_elements_data[v][out] = elements_data[v][e];
-            }
-
-            ++out;
-        }
-
-        block->set_elements(filtered_elements);
-    }
-
-    std::vector<unsigned char> used_node(n_nodes);
-    std::vector<idx_t>         old_to_new(n_nodes);
-    ptrdiff_t                  n_used_nodes = 0;
-
-    for (size_t b = 0; b < surface->n_blocks(); ++b) {
-        auto            block         = surface->block(b);
-        const int       nxe           = block->n_nodes_per_element();
-        const ptrdiff_t n_elements    = block->n_elements();
-        auto            elements_data = block->elements()->data();
-
-        for (ptrdiff_t e = 0; e < n_elements; ++e) {
-            for (int v = 0; v < nxe; ++v) {
-                const idx_t node = elements_data[v][e];
-                if (!used_node[node]) {
-                    used_node[node]  = true;
-                    old_to_new[node] = n_used_nodes++;
-                }
-            }
-        }
-    }
-
-    if (n_used_nodes == n_nodes) {
-        return;
-    }
-
-    const int dim              = surface->spatial_dimension();
-    auto      points           = surface->points();
-    auto      points_data      = points->data();
-    auto      compact_points   = smesh::create_host_buffer<geom_t>(dim, n_used_nodes);
-    auto      compact_mapping  = smesh::create_host_buffer<idx_t>(n_used_nodes);
-    auto      compact_p_data   = compact_points->data();
-    auto      compact_map_data = compact_mapping->data();
-
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-        if (!used_node[i]) {
-            continue;
-        }
-
-        const idx_t new_node       = old_to_new[i];
-        compact_map_data[new_node] = node_mapping_data[i];
-        for (int d = 0; d < dim; ++d) {
-            compact_p_data[d][new_node] = points_data[d][i];
-        }
-    }
-
-    for (size_t b = 0; b < surface->n_blocks(); ++b) {
-        auto            block         = surface->block(b);
-        const int       nxe           = block->n_nodes_per_element();
-        const ptrdiff_t n_elements    = block->n_elements();
-        auto            elements_data = block->elements()->data();
-
-#pragma omp parallel for
-        for (ptrdiff_t e = 0; e < n_elements; ++e) {
-            for (int v = 0; v < nxe; ++v) {
-                elements_data[v][e] = old_to_new[elements_data[v][e]];
-            }
-        }
-    }
-
-    surface->set_points(compact_points);
-    surface->set_node_mapping(compact_mapping);
-}
 
 void compute_penetration(ContactData& cd, const real_t* const disp, real_t* const penetration) {
     SFEM_TRACE_SCOPE("compute_penetration");
@@ -946,8 +807,7 @@ int test_two_body_contact() {
         solver->apply(rhs->data(), displacement->data());
     }
 
-    auto surface = create_contact_skin(mesh);
-    remove_surface_elements_connected_to_constrained_nodes(surface, constraints_mask, dim);
+    auto surface = create_contact_skin(mesh, constraints_mask);
     surface->write(smesh::Path("contact_surface"));
 
     std::shared_ptr<sccd::CCD<real_t>> ccd;

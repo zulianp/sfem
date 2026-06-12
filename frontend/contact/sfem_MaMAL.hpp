@@ -15,17 +15,15 @@ namespace sfem {
     class MaMAL {
     public:
         /// Use the create method instead of directly calling the constructor
-        MaMAL(const std::shared_ptr<Function>& f, const ExecutionSpace es);
+        MaMAL(const std::shared_ptr<Function>& f);
         ~MaMAL();
 
 #ifdef SFEM_ENABLE_YAML
-        static std::shared_ptr<MaMAL> create(const std::shared_ptr<Function>& f,
-                                             const ryml::ConstNodeRef&        node,
-                                             const ExecutionSpace             es);
+        static std::shared_ptr<MaMAL> create(const std::shared_ptr<Function>& f, const ryml::ConstNodeRef& node);
 #endif
 
         // USE only defaults
-        static std::shared_ptr<MaMAL> create(const std::shared_ptr<Function>& f, const ExecutionSpace es);
+        static std::shared_ptr<MaMAL> create(const std::shared_ptr<Function>& f);
 
         int solve(const smesh::SharedBuffer<real_t>& x);
 
