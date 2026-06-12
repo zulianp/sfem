@@ -21,7 +21,7 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
-#include "spmv.hpp"
+
 
 using namespace sfem;
 

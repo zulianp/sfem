@@ -5,7 +5,7 @@
 #include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "spmv.hpp"
+
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"

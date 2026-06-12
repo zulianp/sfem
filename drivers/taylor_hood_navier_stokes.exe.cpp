@@ -34,7 +34,7 @@
 #include "sfem_CRS.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_output.hpp"
-#include "spmv.hpp"
+
 
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
