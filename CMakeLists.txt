@@ -44,6 +44,7 @@ set(SFEM_MODULES
     algebra/bsr
     algebra/crs
     algebra/ell
+    algebra/mg
     algebra/openmp
     mesh 
     mesh/multiblock
