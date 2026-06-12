@@ -10,6 +10,7 @@
 namespace sfem {
 
     struct MultigridData {
+        std::vector<int>                               semistructured_levels;
         std::vector<std::shared_ptr<Function>>         functions;
         std::vector<std::shared_ptr<Operator<real_t>>> restrictions;
         std::vector<std::shared_ptr<Operator<real_t>>> prolongations;
