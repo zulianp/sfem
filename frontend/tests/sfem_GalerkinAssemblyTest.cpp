@@ -114,7 +114,7 @@ int test_cube() {
 
     auto f  = sfem::Function::create(fs);
     auto x  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto op = sfem::create_op(fs, sfem::op_type::MATRIX_FREE, es);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
 
     op->initialize();
     f->add_operator(op);
