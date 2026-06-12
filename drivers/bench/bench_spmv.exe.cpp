@@ -36,21 +36,6 @@ static void bench_synchronize(const sfem::ExecutionSpace es) {
 #endif
 }
 
-static void scale_vector(const sfem::ExecutionSpace es, const ptrdiff_t n, const real_t alpha, real_t* const SFEM_RESTRICT x) {
-#ifdef SFEM_ENABLE_CUDA
-    if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        d_scal(n, alpha, x);
-        return;
-    }
-#else
-    (void)es;
-#endif
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) {
-        x[i] *= alpha;
-    }
-}
-
 static sfem::SharedBuffer<real_t> load_input_vector(const smesh::Path&         x_path,
                                                     const ptrdiff_t            cols,
                                                     const sfem::ExecutionSpace es) {
