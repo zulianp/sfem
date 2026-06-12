@@ -350,6 +350,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_;
 
         std::shared_ptr<BSR<R, C, TStorage, T>> transpose() const {
+            SFEM_TRACE_SCOPE("BSR::transpose");
             if (execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Transpose is not supported for non-host execution space");
@@ -511,6 +512,18 @@ namespace sfem {
                                                        const SharedBuffer<TStorage>& values,
                                                        const T                       scale_output) {
         return h_bsr_spmv(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, scale_output);
+    }
+
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<BSR<R, C, TStorage, T>> rap(const std::shared_ptr<BSR<R, C, TStorage, T>>& r,
+                                                const std::shared_ptr<BSR<R, C, TStorage, T>>& a,
+                                                const std::shared_ptr<BSR<R, C, TStorage, T>>& p) {
+        // Compute D = A P
+        auto d = a->mm(p);
+
+        // Compute G = R D
+        auto g = r->mm(d);
+        return g;
     }
 }  // namespace sfem
 
