@@ -2,6 +2,7 @@
 #define SFEM_BSR_SPMV_HPP
 
 #include <cstddef>
+#include <iostream>
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
@@ -165,6 +166,61 @@ namespace sfem {
         }
     }
 
+    template <typename R, typename C, typename TStorage>
+    int bsr_transpose(const ptrdiff_t               block_rows,
+                      const ptrdiff_t               block_cols,
+                      const int                     row_block_size,
+                      const int                     col_block_size,
+                      const SharedBuffer<R>&        a_rowptr,
+                      const SharedBuffer<C>&        a_colidx,
+                      const SharedBuffer<TStorage>& a_values,
+                      SharedBuffer<R>&              b_rowptr,
+                      SharedBuffer<C>&              b_colidx,
+                      SharedBuffer<TStorage>&       b_values) {
+        const ptrdiff_t block_matrix_size = (ptrdiff_t)row_block_size * col_block_size;
+
+        if (b_rowptr->size() != block_cols + 1) {
+            b_rowptr = create_host_buffer<R>(block_cols + 1);
+        }
+
+        const R* const SFEM_RESTRICT        d_a_rowptr = a_rowptr->data();
+        const C* const SFEM_RESTRICT        d_a_colidx = a_colidx->data();
+        const TStorage* const SFEM_RESTRICT d_a_values = a_values->data();
+
+        R* const SFEM_RESTRICT d_b_rowptr = b_rowptr->data();
+
+        bsr_transpose_sym(block_rows, block_cols, row_block_size, col_block_size, d_a_rowptr, d_a_colidx, d_a_values, d_b_rowptr);
+
+        const ptrdiff_t nblocks = d_b_rowptr[block_cols];
+
+        if (b_colidx->size() != nblocks) {
+            b_colidx = create_host_buffer<C>(nblocks);
+        }
+
+        if (b_values->size() != nblocks * block_matrix_size) {
+            b_values = create_host_buffer<TStorage>(nblocks * block_matrix_size);
+        }
+
+        C* const SFEM_RESTRICT        d_b_colidx = b_colidx->data();
+        TStorage* const SFEM_RESTRICT d_b_values = b_values->data();
+
+        auto next_workspace = create_host_buffer<R>(block_cols);
+
+        bsr_transpose_apply(block_rows,
+                            block_cols,
+                            row_block_size,
+                            col_block_size,
+                            d_a_rowptr,
+                            d_a_colidx,
+                            d_a_values,
+                            d_b_rowptr,
+                            d_b_colidx,
+                            d_b_values,
+                            next_workspace->data());
+
+        return SFEM_SUCCESS;
+    }
+
     // TODO: implement bsr_mm_sym and bsr_mm_apply (see CRS as a reference)
 
     template <typename T>
@@ -293,6 +349,64 @@ namespace sfem {
     public:
         std::function<void(const T* const, T* const)> apply_;
 
+        std::shared_ptr<BSR<R, C, TStorage, T>> transpose() const {
+            if (execution_space() != EXECUTION_SPACE_HOST) {
+                // TODO: Implement device version
+                SFEM_ERROR("Transpose is not supported for non-host execution space");
+                return nullptr;
+            }
+
+            const ptrdiff_t block_rows = row_ptr->size() - 1;
+
+            auto ret     = std::make_shared<BSR<R, C, TStorage, T>>();
+            ret->row_ptr = create_host_buffer<R>(0);
+            ret->col_idx = create_host_buffer<C>(0);
+            ret->values  = create_host_buffer<TStorage>(0);
+
+            bsr_transpose(block_rows,
+                          block_cols_,
+                          row_block_size_,
+                          col_block_size_,
+                          row_ptr,
+                          col_idx,
+                          values,
+                          ret->row_ptr,
+                          ret->col_idx,
+                          ret->values);
+
+            // The transposed block has swapped row/column block sizes
+            ret->block_cols_                = block_rows;
+            ret->row_block_size_            = col_block_size_;
+            ret->col_block_size_            = row_block_size_;
+            ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
+            ret->execution_space_           = EXECUTION_SPACE_HOST;
+
+            const ptrdiff_t ret_block_rows = block_cols_;
+            const ptrdiff_t ret_block_cols = block_rows;
+            const int       ret_row_bs     = col_block_size_;
+            const int       ret_col_bs     = row_block_size_;
+            const T         scaling        = uniform_pre_output_scaling;
+
+            auto t_rowptr = ret->row_ptr;
+            auto t_colidx = ret->col_idx;
+            auto t_values = ret->values;
+
+            ret->apply_ = [=](const T* const x, T* const y) {
+                bsr_spmv(ret_block_rows,
+                         ret_block_cols,
+                         ret_row_bs,
+                         ret_col_bs,
+                         t_rowptr->data(),
+                         t_colidx->data(),
+                         t_values->data(),
+                         scaling,
+                         x,
+                         y);
+            };
+
+            return ret;
+        }
+
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("BSR::apply");
 
@@ -302,9 +416,11 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return row_block_size_ * (row_ptr->size() - 1); }
         std::ptrdiff_t cols() const override { return col_block_size_ * block_cols_; }
-        inline int     row_block_size() const { return row_block_size_; }
-        inline int     col_block_size() const { return col_block_size_; }
-        inline int     block_size() const {
+
+        size_t     nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
+        inline int row_block_size() const { return row_block_size_; }
+        inline int col_block_size() const { return col_block_size_; }
+        inline int block_size() const {
             assert(row_block_size_ == col_block_size_);
             return row_block_size_;
         }
@@ -316,12 +432,13 @@ namespace sfem {
         int       row_block_size_{0};
         int       col_block_size_{0};
         ptrdiff_t block_cols_{0};
+        T         uniform_pre_output_scaling{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
-        void print(std::ostream& os) const {
+        void print(std::ostream& os = std::cout) const {
             os << "BSR" << std::endl;
 
             os << "row_block_size: " << row_block_size_ << std::endl;
@@ -358,13 +475,14 @@ namespace sfem {
                                                        const SharedBuffer<C>&        colidx,
                                                        const SharedBuffer<TStorage>& values,
                                                        const T                       scale_output) {
-        auto ret             = std::make_shared<BSR<R, C, TStorage, T>>();
-        ret->row_ptr         = rowptr;
-        ret->col_idx         = colidx;
-        ret->values          = values;
-        ret->block_cols_     = block_cols;
-        ret->row_block_size_ = row_block_size;
-        ret->col_block_size_ = col_block_size;
+        auto ret                        = std::make_shared<BSR<R, C, TStorage, T>>();
+        ret->row_ptr                    = rowptr;
+        ret->col_idx                    = colidx;
+        ret->values                     = values;
+        ret->block_cols_                = block_cols;
+        ret->row_block_size_            = row_block_size;
+        ret->col_block_size_            = col_block_size;
+        ret->uniform_pre_output_scaling = scale_output;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
