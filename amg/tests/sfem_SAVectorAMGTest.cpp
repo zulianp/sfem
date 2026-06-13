@@ -591,6 +591,7 @@ int test_linear_elasticity_sa_vector_amg() {
     const double diag_setup_start = smesh::time_seconds();
 
     auto diag_precond = inverse_diagonal_preconditioner(inv_diag);
+    // auto diag_precond = block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(a_bsr), 3);
 
     auto diag_solver     = sfem::create_cg<real_t>(solve_op, es);
     diag_solver->verbose = true;
