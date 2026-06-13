@@ -446,7 +446,7 @@ int test_linear_elasticity_sa_vector_amg() {
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto mesh = sfem::Mesh::create_cube(sfem::Communicator::wrap(comm),
-                                        smesh::TET4,
+                                        smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4),
                                         SFEM_MESH_RESOLUTION,
                                         SFEM_MESH_RESOLUTION,
                                         SFEM_MESH_RESOLUTION,
