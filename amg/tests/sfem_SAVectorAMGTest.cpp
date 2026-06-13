@@ -379,7 +379,7 @@ namespace {
                 level.a->rows(),
                 level.a->cols(),
                 [=](const real_t* const x, real_t* const y) {
-                    static const real_t omega = 0.8;
+                    static const real_t omega = 0.5;
 
                     smooth_op->apply(x, y);
 
