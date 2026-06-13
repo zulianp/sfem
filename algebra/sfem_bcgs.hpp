@@ -221,18 +221,18 @@ namespace sfem {
             blas.copy(n, r0, p);
 
             int info = SFEM_FAILURE;
-            for (int iterations_ = 0; iterations_ < max_it; iterations_++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 auto y = t;  // reuse t as a temp for y
                 blas.zeros(n, y);
                 right_preconditioner_op(p, y);
 
-                blas.zeros(n, y);
+                blas.zeros(n, v);
                 apply_op(y, v);
 
                 const T ptv = blas.dot(n, r0, v);
-                if(ptv == 0) {
+                if (ptv == 0) {
                     info = SFEM_FAILURE;
-                    break;    
+                    break;
                 }
 
                 const T alpha = rho / ptv;
@@ -260,11 +260,10 @@ namespace sfem {
                 const T tts = blas.dot(n, t, s);
                 const T ttt = blas.dot(n, t, t);
 
-                if(ttt == 0) {
+                if (ttt == 0) {
                     info = SFEM_FAILURE;
-                    break;    
+                    break;
                 }
-
 
                 const T omega = tts / ttt;
 
