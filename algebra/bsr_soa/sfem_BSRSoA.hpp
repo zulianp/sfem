@@ -17,158 +17,209 @@
 
 namespace sfem {
 
-    template <typename R, typename C, typename TStorage, typename T = TStorage>
-    static inline T bsr_soa_dot(const R                            extent,
-                                const C* const SFEM_RESTRICT        cols,
-                                const TStorage* const SFEM_RESTRICT vals,
-                                const T* const SFEM_RESTRICT        x) {
+    template <typename R, typename TStorage, typename T = TStorage>
+    static inline T bsr_soa_dot(const R extent, const TStorage* const SFEM_RESTRICT vals, const T* const SFEM_RESTRICT x) {
         T acc = 0;
+
+        const static int BLOCK_SIZE       = 8;
+        const R          n_blocks         = extent / BLOCK_SIZE;
+        const R          b_extent         = n_blocks * BLOCK_SIZE;
+        T                buff[BLOCK_SIZE] = {0};
+
+#pragma unroll(BLOCK_SIZE)
+        for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
+#pragma omp simd
+            for (int b = 0; b < BLOCK_SIZE; b++) {
+                buff[b] += vals[k + b] * x[k + b];
+            }
+        }
+
+        if (b_extent) {
 #pragma omp simd reduction(+ : acc)
-        for (R k = 0; k < extent; k++) {
-            acc += vals[k] * x[cols[k]];
+            for (int b = 0; b < BLOCK_SIZE; b++) {
+                acc += buff[b];
+            }
+        }
+
+        for (R k = b_extent; k < extent; k++) {
+            const T aij = vals[k];
+
+            acc += aij * x[k];
         }
 
         return acc;
     }
 
-    template <int RowBlockSize, int ColBlockSize, int ScaleMode, typename R, typename C, typename TStorage, typename T = TStorage>
-    void bsr_soa_spmv_static(const ptrdiff_t                              block_rows,
-                             const ptrdiff_t                              block_cols,
-                             const R* const SFEM_RESTRICT                 rowptr,
-                             const C* const SFEM_RESTRICT                 colidx,
-                             TStorage* const* const SFEM_RESTRICT         values,
-                             const T                                      scale_output,
-                             const T* const SFEM_RESTRICT                 x,
-                             T* const SFEM_RESTRICT                       y) {
+    template <typename T>
+    void bsr_soa_scale_output(const ptrdiff_t rows, const T scale_output, T* const SFEM_RESTRICT y) {
+        if (scale_output == 0) {
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                y[i] = 0;
+            }
+        } else if (scale_output != 1) {
+#pragma omp      parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < rows; i++) {
+                y[i] *= scale_output;
+            }
+        }
+    }
+
+    template <int RowBlockSize, int ColBlockSize, typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_soa_spmv_static(const ptrdiff_t                      block_rows,
+                                  const ptrdiff_t                      block_cols,
+                                  const R* const SFEM_RESTRICT         rowptr,
+                                  const C* const SFEM_RESTRICT         colidx,
+                                  TStorage* const* const SFEM_RESTRICT values,
+                                  const T* const SFEM_RESTRICT         x,
+                                  T* const* const SFEM_RESTRICT        x_workspace,
+                                  T* const SFEM_RESTRICT               y) {
         static_assert(RowBlockSize > 0, "RowBlockSize must be positive");
         static_assert(ColBlockSize > 0, "ColBlockSize must be positive");
+        (void)block_cols;
 
-#pragma omp parallel for collapse(2) schedule(static)
-        for (int d1 = 0; d1 < RowBlockSize; d1++) {
+#pragma omp parallel
+        {
+            int tid = 0;
+#ifdef _OPENMP
+            tid = omp_get_thread_num();
+#endif
+            T* const SFEM_RESTRICT x_row = x_workspace[tid];
+
+#pragma omp for schedule(static)
             for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R                     row_begin = rowptr[i];
-                const R                     extent    = rowptr[i + 1] - row_begin;
-                const C* const SFEM_RESTRICT cols      = &colidx[row_begin];
-                T* const SFEM_RESTRICT       y_comp    = &y[d1 * block_rows];
+                const R row_begin = rowptr[i];
+                const R row_end   = rowptr[i + 1];
+                const R row_nnz   = row_end - row_begin;
 
-                T val;
-                if constexpr (ScaleMode == 0) {
-                    val = 0;
-                } else if constexpr (ScaleMode == 1) {
-                    val = y_comp[i];
-                } else {
-                    val = scale_output * y_comp[i];
-                }
-
+                for (R k = 0; k < row_nnz; k++) {
+                    const C                col     = colidx[row_begin + k];
+                    T* const SFEM_RESTRICT x_block = &x_row[k * ColBlockSize];
 #pragma unroll(ColBlockSize)
-                for (int d2 = 0; d2 < ColBlockSize; d2++) {
-                    const int                              bb     = d1 * ColBlockSize + d2;
-                    const TStorage* const SFEM_RESTRICT    vals   = &values[bb][row_begin];
-                    const T* const SFEM_RESTRICT           x_comp = &x[d2 * block_cols];
-                    val += bsr_soa_dot<R, C, TStorage, T>(extent, cols, vals, x_comp);
+                    for (int d2 = 0; d2 < ColBlockSize; d2++) {
+                        x_block[d2] = x[col * ColBlockSize + d2];
+                    }
                 }
 
-                y_comp[i] = val;
+                const R scalar_extent = row_nnz * ColBlockSize;
+
+#pragma unroll(RowBlockSize)
+                for (int d1 = 0; d1 < RowBlockSize; d1++) {
+                    T* const SFEM_RESTRICT              y_comp = &y[d1 * block_rows];
+                    const TStorage* const SFEM_RESTRICT vals   = &values[d1][row_begin * ColBlockSize];
+                    T                                   val    = y_comp[i];
+
+                    val += bsr_soa_dot<R, TStorage, T>(scalar_extent, vals, x_row);
+
+                    y_comp[i] = val;
+                }
             }
         }
     }
 
-    template <int ScaleMode, typename R, typename C, typename TStorage, typename T = TStorage>
-    void bsr_soa_spmv_dynamic(const ptrdiff_t                              block_rows,
-                              const ptrdiff_t                              block_cols,
-                              const int                                    row_block_size,
-                              const int                                    col_block_size,
-                              const R* const SFEM_RESTRICT                 rowptr,
-                              const C* const SFEM_RESTRICT                 colidx,
-                              TStorage* const* const SFEM_RESTRICT         values,
-                              const T                                      scale_output,
-                              const T* const SFEM_RESTRICT                 x,
-                              T* const SFEM_RESTRICT                       y) {
-#pragma omp parallel for collapse(2) schedule(static)
-        for (int d1 = 0; d1 < row_block_size; d1++) {
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_soa_spmv_dynamic(const ptrdiff_t                      block_rows,
+                              const ptrdiff_t                      block_cols,
+                              const int                            row_block_size,
+                              const int                            col_block_size,
+                              const R* const SFEM_RESTRICT         rowptr,
+                              const C* const SFEM_RESTRICT         colidx,
+                              TStorage* const* const SFEM_RESTRICT values,
+                              const T* const SFEM_RESTRICT         x,
+                              T* const* const SFEM_RESTRICT        x_workspace,
+                              T* const SFEM_RESTRICT               y) {
+        (void)block_cols;
+
+#pragma omp parallel
+        {
+            int tid = 0;
+#ifdef _OPENMP
+            tid = omp_get_thread_num();
+#endif
+            T* const SFEM_RESTRICT x_row = x_workspace[tid];
+
+#pragma omp for schedule(static)
             for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R                      row_begin = rowptr[i];
-                const R                      extent    = rowptr[i + 1] - row_begin;
-                const C* const SFEM_RESTRICT cols      = &colidx[row_begin];
-                T* const SFEM_RESTRICT       y_comp    = &y[d1 * block_rows];
+                const R row_begin = rowptr[i];
+                const R row_end   = rowptr[i + 1];
+                const R row_nnz   = row_end - row_begin;
 
-                T val;
-                if constexpr (ScaleMode == 0) {
-                    val = 0;
-                } else if constexpr (ScaleMode == 1) {
-                    val = y_comp[i];
-                } else {
-                    val = scale_output * y_comp[i];
+                const I* const SFEM_RESTRICT cols = &colidx[row_begin];
+
+                for (R k = 0; k < row_nnz; k++) {
+                    T* const SFEM_RESTRICT       x_block = &x_row[k * col_block_size];
+                    const T* const SFEM_RESTRICT xx      = &x[cols[k] * col_block_size];
+                    for (int d2 = 0; d2 < col_block_size; d2++) {
+                        x_block[d2] = xx[d2];
+                    }
                 }
 
-                for (int d2 = 0; d2 < col_block_size; d2++) {
-                    const int                           bb     = d1 * col_block_size + d2;
-                    const TStorage* const SFEM_RESTRICT vals   = &values[bb][row_begin];
-                    const T* const SFEM_RESTRICT        x_comp = &x[d2 * block_cols];
-                    val += bsr_soa_dot<R, C, TStorage, T>(extent, cols, vals, x_comp);
-                }
+                const R scalar_extent = row_nnz * col_block_size;
 
-                y_comp[i] = val;
+                for (int d1 = 0; d1 < row_block_size; d1++) {
+                    T* const SFEM_RESTRICT              y_comp = &y[d1 * block_rows];
+                    const TStorage* const SFEM_RESTRICT vals   = &values[d1][row_begin * col_block_size];
+                    const T                             val    = bsr_soa_dot<R, TStorage, T>(scalar_extent, vals, x_row);
+
+                    y_comp[i] += val;
+                }
             }
         }
     }
 
-    template <int ScaleMode, typename R, typename C, typename TStorage, typename T = TStorage>
-    void bsr_soa_spmv_dispatch(const ptrdiff_t                              block_rows,
-                               const ptrdiff_t                              block_cols,
-                               const int                                    row_block_size,
-                               const int                                    col_block_size,
-                               const R* const SFEM_RESTRICT                 rowptr,
-                               const C* const SFEM_RESTRICT                 colidx,
-                               TStorage* const* const SFEM_RESTRICT         values,
-                               const T                                      scale_output,
-                               const T* const SFEM_RESTRICT                 x,
-                               T* const SFEM_RESTRICT                       y) {
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    void bsr_soa_spmv_dispatch(const ptrdiff_t                      block_rows,
+                               const ptrdiff_t                      block_cols,
+                               const int                            row_block_size,
+                               const int                            col_block_size,
+                               const R* const SFEM_RESTRICT         rowptr,
+                               const C* const SFEM_RESTRICT         colidx,
+                               TStorage* const* const SFEM_RESTRICT values,
+                               const T* const SFEM_RESTRICT         x,
+                               T* const* const SFEM_RESTRICT        x_workspace,
+                               T* const SFEM_RESTRICT               y) {
         if (row_block_size == 3 && col_block_size == 3) {
-            bsr_soa_spmv_static<3, 3, ScaleMode>(block_rows, block_cols, rowptr, colidx, values, scale_output, x, y);
+            bsr_soa_spmv_static<3, 3>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
         } else if (row_block_size == 6 && col_block_size == 6) {
-            bsr_soa_spmv_static<6, 6, ScaleMode>(block_rows, block_cols, rowptr, colidx, values, scale_output, x, y);
+            bsr_soa_spmv_static<6, 6>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
         } else if (row_block_size == 3 && col_block_size == 6) {
-            bsr_soa_spmv_static<3, 6, ScaleMode>(block_rows, block_cols, rowptr, colidx, values, scale_output, x, y);
+            bsr_soa_spmv_static<3, 6>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
         } else if (row_block_size == 6 && col_block_size == 3) {
-            bsr_soa_spmv_static<6, 3, ScaleMode>(block_rows, block_cols, rowptr, colidx, values, scale_output, x, y);
+            bsr_soa_spmv_static<6, 3>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
         } else {
-            bsr_soa_spmv_dynamic<ScaleMode>(
-                    block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, scale_output, x, y);
+            bsr_soa_spmv_dynamic(
+                    block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, x, x_workspace, y);
         }
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    void bsr_soa_spmv(const ptrdiff_t                              block_rows,
-                      const ptrdiff_t                              block_cols,
-                      const int                                    row_block_size,
-                      const int                                    col_block_size,
-                      const R* const SFEM_RESTRICT                 rowptr,
-                      const C* const SFEM_RESTRICT                 colidx,
-                      TStorage* const* const SFEM_RESTRICT         values,
-                      const T                                      scale_output,
-                      const T* const SFEM_RESTRICT                 x,
-                      T* const SFEM_RESTRICT                       y) {
-        if (scale_output == 0) {
-            bsr_soa_spmv_dispatch<0>(block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, scale_output, x, y);
-        } else if (scale_output == 1) {
-            bsr_soa_spmv_dispatch<1>(block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, scale_output, x, y);
-        } else {
-            bsr_soa_spmv_dispatch<2>(block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, scale_output, x, y);
-        }
+    void bsr_soa_spmv(const ptrdiff_t                      block_rows,
+                      const ptrdiff_t                      block_cols,
+                      const int                            row_block_size,
+                      const int                            col_block_size,
+                      const R* const SFEM_RESTRICT         rowptr,
+                      const C* const SFEM_RESTRICT         colidx,
+                      TStorage* const* const SFEM_RESTRICT values,
+                      const T                              scale_output,
+                      const T* const SFEM_RESTRICT         x,
+                      T* const* const SFEM_RESTRICT        x_workspace,
+                      T* const SFEM_RESTRICT               y) {
+        bsr_soa_scale_output(block_rows * row_block_size, scale_output, y);
+        bsr_soa_spmv_dispatch(block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, x, x_workspace, y);
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    void bsr_soa_spmv(const ptrdiff_t                              block_rows,
-                      const ptrdiff_t                              block_cols,
-                      const int                                    block_size,
-                      const R* const SFEM_RESTRICT                 rowptr,
-                      const C* const SFEM_RESTRICT                 colidx,
-                      TStorage* const* const SFEM_RESTRICT         values,
-                      const T                                      scale_output,
-                      const T* const SFEM_RESTRICT                 x,
-                      T* const SFEM_RESTRICT                       y) {
-        bsr_soa_spmv(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, scale_output, x, y);
+    void bsr_soa_spmv(const ptrdiff_t                      block_rows,
+                      const ptrdiff_t                      block_cols,
+                      const int                            block_size,
+                      const R* const SFEM_RESTRICT         rowptr,
+                      const C* const SFEM_RESTRICT         colidx,
+                      TStorage* const* const SFEM_RESTRICT values,
+                      const T                              scale_output,
+                      const T* const SFEM_RESTRICT         x,
+                      T* const* const SFEM_RESTRICT        x_workspace,
+                      T* const SFEM_RESTRICT               y) {
+        bsr_soa_spmv(block_rows, block_cols, block_size, block_size, rowptr, colidx, values, scale_output, x, x_workspace, y);
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>
@@ -197,9 +248,11 @@ namespace sfem {
         SharedBuffer<R>         row_ptr;
         SharedBuffer<C>         col_idx;
         SharedBuffer<TStorage*> values;
+        SharedBuffer<T*>        x_workspace;
 
         ptrdiff_t block_rows_{0};
         ptrdiff_t block_cols_{0};
+        ptrdiff_t x_workspace_stride_{0};
         int       row_block_size_{0};
         int       col_block_size_{0};
         T         uniform_pre_output_scaling{0};
@@ -223,7 +276,7 @@ namespace sfem {
                     os << "(" << i << ", " << col << "):\n";
                     for (int d1 = 0; d1 < row_block_size_; d1++) {
                         for (int d2 = 0; d2 < col_block_size_; d2++) {
-                            os << vals[d1 * col_block_size_ + d2][j] << " ";
+                            os << vals[d1][j * col_block_size_ + d2] << " ";
                         }
                         os << "\n";
                     }
@@ -244,10 +297,48 @@ namespace sfem {
                                                               const SharedBuffer<C>&         colidx,
                                                               const SharedBuffer<TStorage*>& values,
                                                               const T                        scale_output) {
-        auto ret                        = std::make_shared<BSRSoA<R, C, TStorage, T>>();
-        ret->row_ptr                    = rowptr;
-        ret->col_idx                    = colidx;
-        ret->values                     = values;
+        const ptrdiff_t nnz = rowptr->data()[block_rows];
+        assert(values->extent(0) == static_cast<size_t>(row_block_size));
+        assert(values->extent(1) == static_cast<size_t>(nnz * col_block_size));
+
+        ptrdiff_t max_row_nnz = 0;
+        for (ptrdiff_t i = 0; i < block_rows; i++) {
+            const ptrdiff_t row_nnz = rowptr->data()[i + 1] - rowptr->data()[i];
+            if (row_nnz > max_row_nnz) {
+                max_row_nnz = row_nnz;
+            }
+        }
+
+        int nthreads = 1;
+#ifdef _OPENMP
+        nthreads = omp_get_max_threads();
+#endif
+
+        auto ret                 = std::make_shared<BSRSoA<R, C, TStorage, T>>();
+        ret->row_ptr             = rowptr;
+        ret->col_idx             = colidx;
+        ret->values              = values;
+        ret->x_workspace_stride_ = max_row_nnz ? max_row_nnz * col_block_size : col_block_size;
+        ret->x_workspace         = create_host_buffer<T>(nthreads, ret->x_workspace_stride_);
+
+        T* const* const x_workspace_data = ret->x_workspace->data();
+        const ptrdiff_t workspace_stride = ret->x_workspace_stride_;
+#ifdef _OPENMP
+#pragma omp parallel num_threads(nthreads)
+        {
+            const int tid = omp_get_thread_num();
+            T* const  dst = x_workspace_data[tid];
+#pragma omp simd
+            for (ptrdiff_t i = 0; i < workspace_stride; i++) {
+                dst[i] = T(0);
+            }
+        }
+#else
+        T* const dst = x_workspace_data[0];
+        for (ptrdiff_t i = 0; i < workspace_stride; i++) {
+            dst[i] = T(0);
+        }
+#endif
         ret->block_rows_                = block_rows;
         ret->block_cols_                = block_cols;
         ret->row_block_size_            = row_block_size;
@@ -255,6 +346,8 @@ namespace sfem {
         ret->uniform_pre_output_scaling = scale_output;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
+
+        auto x_workspace = ret->x_workspace;
 
         ret->apply_ = [=](const T* const x, T* const y) {
             bsr_soa_spmv(block_rows,
@@ -266,6 +359,7 @@ namespace sfem {
                          values->data(),
                          scale_output,
                          x,
+                         x_workspace->data(),
                          y);
         };
 
