@@ -13,6 +13,7 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_aliases.hpp"
+#include "smesh_alloc.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
@@ -28,9 +29,11 @@ namespace sfem {
 
 #pragma unroll(BLOCK_SIZE)
         for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
+            auto *v = &vals[k];
+            auto *xx = &x[k];
 #pragma omp simd
             for (int b = 0; b < BLOCK_SIZE; b++) {
-                buff[b] += vals[k + b] * x[k + b];
+                buff[b] += v[b] * xx[b];
             }
         }
 
@@ -318,26 +321,21 @@ namespace sfem {
         ret->col_idx             = colidx;
         ret->values              = values;
         ret->x_workspace_stride_ = max_row_nnz ? max_row_nnz * col_block_size : col_block_size;
-        ret->x_workspace         = create_host_buffer<T>(nthreads, ret->x_workspace_stride_);
 
-        T* const* const x_workspace_data = ret->x_workspace->data();
-        const ptrdiff_t workspace_stride = ret->x_workspace_stride_;
+        const size_t workspace_stride   = static_cast<size_t>(ret->x_workspace_stride_);
+        T **const      x_workspace_data = static_cast<T **>(SMESH_ALLOC(static_cast<size_t>(nthreads) * sizeof(T *)));
+
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
         {
-            const int tid = omp_get_thread_num();
-            T* const  dst = x_workspace_data[tid];
-#pragma omp simd
-            for (ptrdiff_t i = 0; i < workspace_stride; i++) {
-                dst[i] = T(0);
-            }
+            const int tid         = omp_get_thread_num();
+            x_workspace_data[tid] = static_cast<T *>(SMESH_CALLOC(workspace_stride, sizeof(T)));
         }
 #else
-        T* const dst = x_workspace_data[0];
-        for (ptrdiff_t i = 0; i < workspace_stride; i++) {
-            dst[i] = T(0);
-        }
+        x_workspace_data[0] = static_cast<T *>(SMESH_CALLOC(workspace_stride, sizeof(T)));
 #endif
+
+        ret->x_workspace = manage_host_buffer<T>(static_cast<size_t>(nthreads), workspace_stride, x_workspace_data);
         ret->block_rows_                = block_rows;
         ret->block_cols_                = block_cols;
         ret->row_block_size_            = row_block_size;

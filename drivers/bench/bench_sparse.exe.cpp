@@ -25,14 +25,14 @@ struct SparseBench {
     double      apply;
 
     static const char *header() {
-        return "Format        Assembly [s]    Apply [s]    Apply Rate [Mentry/s]    Apply BW [GB/s]    Rows        NNZ         "
+        return "Format        Assembly [s]    Apply [s]    Apply Rate [MDoF/s]    Apply BW [GB/s]    Rows        NNZ         "
                "Bytes\n"
                "----------    ------------    ---------    ---------------------    ---------------    --------    --------    "
                "--------\n";
     }
 
     void print() const {
-        const double rate = apply > 0 ? 1e-6 * nnz / apply : 0;
+        const double rate = apply > 0 ? 1e-6 * rows / apply : 0;
         const double bw   = apply > 0 ? 1e-9 * nbytes / apply : 0;
         printf("%-10s    %12.3e    %9.3e    %21.3f    %15.3f    %8td    %8td    %8zu\n",
                name,
@@ -179,8 +179,13 @@ int main(int argc, char *argv[]) {
 
         const ptrdiff_t scalar_nnz = static_cast<ptrdiff_t>(node_graph->nnz()) * block_entries;
 
-        auto bsr = sfem::h_bsr_spmv(
-                node_graph->n_nodes(), node_graph->n_nodes(), block_size, node_graph->rowptr(), node_graph->colidx(), values, (real_t)0);
+        auto bsr = sfem::h_bsr_spmv(node_graph->n_nodes(),
+                                    node_graph->n_nodes(),
+                                    block_size,
+                                    node_graph->rowptr(),
+                                    node_graph->colidx(),
+                                    values,
+                                    (real_t)0);
 
         const double apply = measure(SFEM_REPEAT, [&]() { bsr->apply(x_apply->data(), y->data()); });
 
