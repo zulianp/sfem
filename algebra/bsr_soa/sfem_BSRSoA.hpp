@@ -21,7 +21,7 @@ namespace sfem {
     static inline T bsr_soa_dot(const R extent, const TStorage* const SFEM_RESTRICT vals, const T* const SFEM_RESTRICT x) {
         T acc = 0;
 
-        const static int BLOCK_SIZE       = 8;
+        const static int BLOCK_SIZE       = 16;
         const R          n_blocks         = extent / BLOCK_SIZE;
         const R          b_extent         = n_blocks * BLOCK_SIZE;
         T                buff[BLOCK_SIZE] = {0};
@@ -144,7 +144,7 @@ namespace sfem {
                 const R row_end   = rowptr[i + 1];
                 const R row_nnz   = row_end - row_begin;
 
-                const I* const SFEM_RESTRICT cols = &colidx[row_begin];
+                const C* const SFEM_RESTRICT cols = &colidx[row_begin];
 
                 for (R k = 0; k < row_nnz; k++) {
                     T* const SFEM_RESTRICT       x_block = &x_row[k * col_block_size];
@@ -153,7 +153,6 @@ namespace sfem {
                         x_block[d2] = xx[d2];
                     }
                 }
-
                 const R scalar_extent = row_nnz * col_block_size;
 
                 for (int d1 = 0; d1 < row_block_size; d1++) {

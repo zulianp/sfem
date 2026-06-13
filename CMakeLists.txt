@@ -42,6 +42,7 @@ set(SFEM_MODULES
     algebra base matrix 
     algebra/coo
     algebra/bsr
+    algebra/bsr_soa
     algebra/crs
     algebra/ell
     algebra/mg
