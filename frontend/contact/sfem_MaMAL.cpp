@@ -314,6 +314,57 @@ namespace sfem {
         }
     }
 
+    void assemble_contact_hessian_block_diag(ContactData&                                     cd,
+                                             const real_t                                     penalty,
+                                             const real_t* const                              macaulay,
+                                             real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
+        SFEM_TRACE_SCOPE("assemble_contact_hessian_block_diag");
+        const int dim = cd.surface->spatial_dimension();
+        assert(dim == 3);
+
+        auto            coupling_matrix = cd.coupling_matrix;
+        auto            rowptr          = coupling_matrix->row_ptr->data();
+        auto            colidx          = coupling_matrix->col_idx->data();
+        auto            vals            = coupling_matrix->values->data();
+        const ptrdiff_t n               = coupling_matrix->rows();
+
+        auto normals = cd.normals->data();
+        auto mass    = cd.mass_vector->data();
+        auto nm      = cd.surface->node_mapping()->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; i++) {
+            if (macaulay[i] == 0) continue;
+
+            const count_t lenrow = rowptr[i + 1] - rowptr[i];
+            if (lenrow == 0) continue;
+
+            const idx_t* const  row     = &colidx[rowptr[i]];
+            const real_t* const weights = &vals[rowptr[i]];
+
+            const real_t s  = mass[i] * penalty;
+            const real_t n0 = normals[0][i];
+            const real_t n1 = normals[1][i];
+            const real_t n2 = normals[2][i];
+
+            const real_t block[6] = {s * n0 * n0, s * n0 * n1, s * n0 * n2, s * n1 * n1, s * n1 * n2, s * n2 * n2};
+
+            for (int d = 0; d < 6; ++d) {
+#pragma omp atomic update
+                diag_values[d][nm[i]] += block[d];
+            }
+
+            for (count_t j = 0; j < lenrow; j++) {
+                const idx_t  r  = nm[row[j]];
+                const real_t w2 = weights[j] * weights[j];
+                for (int d = 0; d < 6; ++d) {
+#pragma omp atomic update
+                    diag_values[d][r] += w2 * block[d];
+                }
+            }
+        }
+    }
+
     // Gather the diagonal values from the symmetric representation elast_diag_values (uses node mapping to read), add them to the
     // diag_values, mask (uses node mapping to read) them for the constraint rows with an identiity row
     void gather_combine_hessian_diag(ContactData&                                     cd,
@@ -590,16 +641,18 @@ namespace sfem {
         }
     };
 
-    std::vector<GalerkinRAP> create_galerkin_rap(const SharedBuffer<idx_t*>& elements, const std::vector<int>& levels) {
-        const ptrdiff_t nelements = elements->extent(1);
+    std::vector<GalerkinRAP> create_galerkin_rap(const std::vector<std::shared_ptr<smesh::Mesh>>& surfaces,
+                                                 const std::vector<std::shared_ptr<Function>>&    functions,
+                                                 const std::vector<int>&                          levels) {
         int             nlevels   = levels.size();
 
-        ptrdiff_t fine_n_nodes = sfem::ss_elements_max_node_id(elements) + 1;
-
         std::vector<GalerkinRAP> ret;
-        auto                     elems = elements;
         for (int i = 0; i < nlevels - 1; i++) {
-            auto rowptr = create_host_buffer<count_t>(fine_n_nodes);
+            auto            elems        = surfaces[i]->block(0)->elements();
+            const ptrdiff_t nelements    = elems->extent(1);
+            const ptrdiff_t fine_n_nodes = functions[i]->space()->mesh_ptr()->n_nodes();
+
+            auto rowptr = create_host_buffer<count_t>(fine_n_nodes + 1);
             smesh::ssquad4_prolongation_crs_nnz(levels[i], nelements, elems->data(), fine_n_nodes, rowptr->data());
 
             auto colidx = create_host_buffer<idx_t>(rowptr->data()[fine_n_nodes]);
@@ -608,15 +661,35 @@ namespace sfem {
             smesh::ssquad4_prolongation_crs_fill(
                     levels[i], nelements, elems->data(), fine_n_nodes, rowptr->data(), colidx->data(), values->data());
 
-            // FIXME This method should be moved to SMESH
-            elems                    = sfem::ssquad4_derefine_element_connectivity(levels[i], levels[i + 1], elements);
-            ptrdiff_t coarse_n_nodes = sfem::ss_elements_max_node_id(elems) + 1;
+            const ptrdiff_t coarse_n_nodes = functions[i + 1]->space()->mesh_ptr()->n_nodes();
+            std::vector<idx_t> fine_to_coarse(fine_n_nodes, SFEM_IDX_INVALID);
+            auto               fine_points   = functions[i]->space()->mesh_ptr()->points()->data();
+            auto               coarse_points = functions[i + 1]->space()->mesh_ptr()->points()->data();
+            const int          dim           = functions[i]->space()->mesh_ptr()->spatial_dimension();
+
+            for (ptrdiff_t c = 0; c < coarse_n_nodes; ++c) {
+                for (ptrdiff_t f = 0; f < fine_n_nodes; ++f) {
+                    bool same = true;
+                    for (int d = 0; d < dim; ++d) {
+                        same = same && fine_points[d][f] == coarse_points[d][c];
+                    }
+
+                    if (same) {
+                        fine_to_coarse[f] = c;
+                        break;
+                    }
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < colidx->size(); ++k) {
+                assert(colidx->data()[k] < fine_n_nodes);
+                assert(fine_to_coarse[colidx->data()[k]] != SFEM_IDX_INVALID);
+                colidx->data()[k] = fine_to_coarse[colidx->data()[k]];
+            }
 
             auto P = h_crs_spmv(fine_n_nodes, coarse_n_nodes, rowptr, colidx, values, real_t(0));
             auto R = P->transpose();
             ret.push_back({.R = R, .P = P});
-
-            fine_n_nodes = coarse_n_nodes;
         }
 
         return ret;
@@ -629,7 +702,7 @@ namespace sfem {
         std::shared_ptr<Contact>                       contact;
         std::shared_ptr<MultigridData>                 data;
         std::vector<std::shared_ptr<Operator<real_t>>> operators;
-        // std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> smoothers;
+        std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> smoothers;
 
         std::vector<std::shared_ptr<CRS_t>> coupling_matrices;
         std::vector<SharedBuffer<real_t*>>  normals;
@@ -637,8 +710,17 @@ namespace sfem {
         std::vector<GalerkinRAP>            galerkin_restrictions;
 
         std::vector<std::shared_ptr<Memory>> memory;
+        std::vector<std::shared_ptr<smesh::Mesh>> contact_surfaces;
+        std::vector<SharedBuffer<real_t*>>        contact_block_diag_soa;
+        std::vector<SharedBuffer<real_t>>         contact_block_diag_aos;
+        std::vector<SharedBuffer<idx_t>>          contact_block_idx;
+        std::vector<std::shared_ptr<SparseBlockVector<real_t>>> contact_block_diag;
+        std::vector<SharedBuffer<mask_t>>                       level_constraints_mask;
+        SharedBuffer<real_t>                                    contact_grad;
+        SharedBuffer<real_t>                                    macaulay;
 
         std::shared_ptr<smesh::Mesh>   contact_surface;
+        std::shared_ptr<smesh::Mesh>   contact_eval_surface;
         std::shared_ptr<ContactJacobi> contact_jacobi;
         SharedBuffer<mask_t>           constraints_mask;
         SharedBuffer<real_t>           agumentation;
@@ -676,25 +758,77 @@ namespace sfem {
 
             operators = sfem::create_gmg_operators(data, op_type::MATRIX_FREE);
 
-            contact_surface = smesh::skin(mesh);
-            contact = create_contact(space, contact_surface, params.margin, params.search_radius * params.search_radius, es);
+            std::vector<std::shared_ptr<smesh::Mesh>> galerkin_contact_surfaces(n_levels());
+            contact_surface              = smesh::skin(mesh);
+            galerkin_contact_surfaces[0] = contact_surface;
+            for (int i = 1; i < n_levels(); ++i) {
+                galerkin_contact_surfaces[i] = smesh::skin(data->functions[i]->space()->mesh_ptr());
+            }
+
+            contact_eval_surface = contact_surface;
+            if (smesh::is_semistructured_type(contact_surface->element_type(0))) {
+                contact_eval_surface = smesh::ssquad_to_quad4(contact_surface);
+                contact_eval_surface->block(0)->set_element_type(smesh::QUADSHELL4);
+            }
+
+            contact = create_contact(space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
 
             // FIXME multiblock should still work!
-            galerkin_restrictions = create_galerkin_rap(contact_surface->block(0)->elements(), data->semistructured_levels);
+            galerkin_restrictions = create_galerkin_rap(galerkin_contact_surfaces, data->functions, data->semistructured_levels);
 
             contact_jacobi = std::make_shared<ContactJacobi>();
 
             constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
             agumentation     = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
+            contact_grad     = sfem::create_buffer<real_t>(space->n_dofs(), es);
+            macaulay         = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
+                constraints_mask->data()[i] = 0;
+            }
+            f->constraints_mask(constraints_mask->data());
+
+            smoothers = sfem::create_gmg_default_smoothers_and_solver(data, operators, 3, false);
+
+            contact_surfaces.resize(n_levels());
+            contact_surfaces[0] = contact_eval_surface;
+            for (int i = 1; i < n_levels(); ++i) {
+                auto surface = galerkin_contact_surfaces[i];
+                if (smesh::is_semistructured_type(surface->element_type(0))) {
+                    surface = smesh::ssquad_to_quad4(surface);
+                    surface->block(0)->set_element_type(smesh::QUADSHELL4);
+                }
+
+                contact_surfaces[i] = surface;
+            }
 
             memory.resize(n_levels());
+            contact_block_diag_soa.resize(n_levels());
+            contact_block_diag_aos.resize(n_levels());
+            contact_block_idx.resize(n_levels());
+            contact_block_diag.resize(n_levels());
+            level_constraints_mask.resize(n_levels());
             for (int i = 0; i < n_levels(); i++) {
-                memory[i]           = std::make_shared<Memory>();
-                const ptrdiff_t n   = data->functions[i]->space()->n_dofs();
+                memory[i]         = std::make_shared<Memory>();
+                const ptrdiff_t n = data->functions[i]->space()->n_dofs();
                 memory[i]->solution = create_buffer<real_t>(n, es);
                 memory[i]->rhs      = create_buffer<real_t>(n, es);
                 memory[i]->work     = create_buffer<real_t>(n, es);
-                memory[i]->diag     = create_buffer<real_t>(n, es);
+
+                const ptrdiff_t n_nodes = n / data->functions[i]->space()->block_size();
+                memory[i]->diag         = create_buffer<real_t>(n_nodes, es);
+                contact_block_diag_soa[i] = create_buffer<real_t>(6, n_nodes, es);
+                contact_block_diag_aos[i] = create_buffer<real_t>(n_nodes * 6, es);
+                contact_block_idx[i]      = create_buffer<idx_t>(n_nodes, es);
+                contact_block_diag[i]     = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
+
+#pragma omp parallel for
+                for (ptrdiff_t j = 0; j < n_nodes; ++j) {
+                    contact_block_idx[i]->data()[j] = j;
+                }
+
+                level_constraints_mask[i] = sfem::create_buffer<mask_t>(mask_count(n), es);
             }
         }
 
@@ -708,7 +842,7 @@ namespace sfem {
                                                    contact->values(),
                                                    real_t(0)));
 
-            const int spatial_dim = contact_surface->spatial_dimension();
+            const int spatial_dim = contact_eval_surface->spatial_dimension();
             const int nlevels     = data->semistructured_levels.size();
 
             if (normals.empty()) {
@@ -739,7 +873,7 @@ namespace sfem {
             }
 
             contact_jacobi->cd = {.f                   = f,
-                                  .surface             = contact_surface,
+                                  .surface             = contact_eval_surface,
                                   .coupling_matrix     = coupling_matrices[0],
                                   .values              = contact->values(),
                                   .mass_vector         = contact->mass_vector(),
@@ -752,24 +886,182 @@ namespace sfem {
 
         void nonlinear_smooth(const SharedBuffer<real_t>& x) { contact_jacobi->smooth(x); }
 
-        // TODO: complete this class (similar to ShiftedPenaltyMultigrid but we have the Galerkin.R for the restriction and
-        // Galerkin.P for the prolongation)
+        void pack_contact_block_diag(const int level) {
+            auto            src  = contact_block_diag_soa[level]->data();
+            real_t* const   dst  = contact_block_diag_aos[level]->data();
+            const ptrdiff_t n    = memory[level]->diag->size();
+            const int       dim  = data->functions[level]->space()->block_size();
+            const mask_t*   mask = level_constraints_mask[level]->data();
+
+            assert(dim == 3);
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                const ptrdiff_t dof = i * dim;
+                real_t* const   b    = &dst[i * 6];
+
+                b[0] = src[0][i];
+                b[1] = src[1][i];
+                b[2] = src[2][i];
+                b[3] = src[3][i];
+                b[4] = src[4][i];
+                b[5] = src[5][i];
+
+                const bool c0 = mask_get(dof, mask);
+                const bool c1 = mask_get(dof + 1, mask);
+                const bool c2 = mask_get(dof + 2, mask);
+
+                if (c0) {
+                    b[0] = 0;
+                    b[1] = 0;
+                    b[2] = 0;
+                }
+
+                if (c1) {
+                    b[1] = 0;
+                    b[3] = 0;
+                    b[4] = 0;
+                }
+
+                if (c2) {
+                    b[2] = 0;
+                    b[4] = 0;
+                    b[5] = 0;
+                }
+            }
+        }
+
+        void restrict_contact_hessian_block_diag() {
+            auto blas = sfem::blas<real_t>(f->execution_space());
+
+            for (int l = 0; l < n_levels(); ++l) {
+                blas->values(memory[l]->diag->size(), 1, memory[l]->diag->data());
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < level_constraints_mask[l]->size(); ++i) {
+                    level_constraints_mask[l]->data()[i] = 0;
+                }
+                data->functions[l]->constraints_mask(level_constraints_mask[l]->data());
+            }
+
+            pack_contact_block_diag(0);
+
+            for (int l = 0; l < n_levels() - 1; ++l) {
+                auto coarse = contact_block_diag_soa[l + 1]->data();
+                for (int d = 0; d < 6; ++d) {
+                    blas->values(contact_block_diag_soa[l + 1]->extent(1), 0, coarse[d]);
+                }
+
+                galerkin_restrictions[l].R->multi_apply(6, contact_block_diag_soa[l]->data(), coarse);
+                pack_contact_block_diag(l + 1);
+            }
+        }
+
+        std::shared_ptr<Operator<real_t>> shifted_op(const int level) {
+            return operators[level] +
+                   sfem::create_sparse_block_vector_mult(operators[level]->rows(), contact_block_diag[level], memory[level]->diag);
+        }
+
+        void eval_fine_residual_and_jacobian() {
+            SFEM_TRACE_SCOPE("MaMAL::eval_fine_residual_and_jacobian");
+
+            auto            blas  = sfem::blas<real_t>(f->execution_space());
+            auto            mem   = memory[0];
+            const ptrdiff_t ndofs = mem->solution->size();
+
+            blas->values(ndofs, 0, mem->work->data());
+            f->gradient(mem->solution->data(), mem->work->data());
+            blas->scal(ndofs, -1, mem->work->data());
+
+            blas->values(ndofs, 0, contact_grad->data());
+            compute_macaulay_term(contact_jacobi->cd, contact_jacobi->penalty, mem->solution->data(), macaulay->data());
+            assemble_contact_gradient(contact_jacobi->cd, contact_jacobi->penalty, macaulay->data(), contact_grad->data());
+            blas->axpy(ndofs, -1, contact_grad->data(), mem->work->data());
+
+            auto fine_diag = contact_block_diag_soa[0]->data();
+            for (int d = 0; d < 6; ++d) {
+                blas->values(contact_block_diag_soa[0]->extent(1), 0, fine_diag[d]);
+            }
+
+            assemble_contact_hessian_block_diag(contact_jacobi->cd, contact_jacobi->penalty, macaulay->data(), fine_diag);
+            restrict_contact_hessian_block_diag();
+        }
+
+        void update_augmentation() {
+            compute_macaulay_term(contact_jacobi->cd, contact_jacobi->penalty, memory[0]->solution->data(), macaulay->data());
+
+            real_t* const       aug = agumentation->data();
+            const real_t* const m   = macaulay->data();
+            const real_t        p   = contact_jacobi->penalty;
+            const ptrdiff_t     n   = agumentation->size();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                aug[i] = p * m[i];
+            }
+        }
+
         void nonlinear_cycle() {
             nonlinear_smooth(memory[0]->solution);
 
-            // Restrict residual and contact hessian diagonal component (see ShiftedPenaltyMultigrid)
-            linear_cycle(1);
+            eval_fine_residual_and_jacobian();
+
+            if (n_levels() > 1) {
+                auto blas       = sfem::blas<real_t>(f->execution_space());
+                auto mem        = memory[0];
+                auto mem_coarse = memory[1];
+
+                blas->values(mem_coarse->rhs->size(), 0, mem_coarse->rhs->data());
+                data->restrictions[0]->apply(mem->work->data(), mem_coarse->rhs->data());
+                blas->values(mem_coarse->solution->size(), 0, mem_coarse->solution->data());
+
+                linear_cycle(1);
+
+                blas->values(mem->work->size(), 0, mem->work->data());
+                data->prolongations[1]->apply(mem_coarse->solution->data(), mem->work->data());
+                blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
+            }
 
             nonlinear_smooth(memory[0]->solution);
 
-            // update agumentation
+            update_augmentation();
         }
 
         void linear_cycle(int level) {
+            SFEM_TRACE_SCOPE("MaMAL::linear_cycle");
+
+            auto blas     = sfem::blas<real_t>(f->execution_space());
+            auto mem      = memory[level];
+            auto smoother = smoothers[level];
+            auto op       = operators[level];
+
             if (level == n_levels() - 1) {
-                // Solve coarse grid system
+                smoother->set_op(shifted_op(level));
+                blas->values(mem->solution->size(), 0, mem->solution->data());
+                smoother->apply(mem->rhs->data(), mem->solution->data());
                 return;
             }
+
+            auto sop        = shifted_op(level);
+            auto mem_coarse = memory[level + 1];
+
+            smoother->set_op_and_diag_shift(op, contact_block_diag[level], memory[level]->diag);
+            smoother->apply(mem->rhs->data(), mem->solution->data());
+
+            blas->values(mem->work->size(), 0, mem->work->data());
+            sop->apply(mem->solution->data(), mem->work->data());
+            blas->axpby(mem->work->size(), 1, mem->rhs->data(), -1, mem->work->data());
+
+            blas->values(mem_coarse->rhs->size(), 0, mem_coarse->rhs->data());
+            data->restrictions[level]->apply(mem->work->data(), mem_coarse->rhs->data());
+            blas->values(mem_coarse->solution->size(), 0, mem_coarse->solution->data());
+
+            linear_cycle(level + 1);
+
+            blas->values(mem->work->size(), 0, mem->work->data());
+            data->prolongations[level + 1]->apply(mem_coarse->solution->data(), mem->work->data());
+            blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
+
+            smoother->apply(mem->rhs->data(), mem->solution->data());
         }
 
         ~Impl() = default;
