@@ -522,14 +522,6 @@ namespace sfem {
 
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
-        SharedBuffer<R>        row_ptr;
-        SharedBuffer<C>        col_idx;
-        SharedBuffer<TStorage> values;
-        ptrdiff_t              cols_{0};
-        T                      uniform_pre_output_scaling{0};
-
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void print(std::ostream& os = std::cout) const {
@@ -548,6 +540,13 @@ namespace sfem {
                 os << "\n";
             }
         }
+
+        SharedBuffer<R>        row_ptr;
+        SharedBuffer<C>        col_idx;
+        SharedBuffer<TStorage> values;
+        ptrdiff_t              cols_{0};
+        T                      uniform_pre_output_scaling{0};
+        ExecutionSpace         execution_space_{EXECUTION_SPACE_INVALID};
     };
 
     // CRS matrix product here: https://github.com/zhen-xie/IA-SpGEMM/blob/master/IA-SPGEMM-CPU_release/detail/csr/common_csr.h

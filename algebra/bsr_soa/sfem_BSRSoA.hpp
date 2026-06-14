@@ -27,10 +27,9 @@ namespace sfem {
         const R          b_extent         = n_blocks * BLOCK_SIZE;
         T                buff[BLOCK_SIZE] = {0};
 
-#pragma unroll(BLOCK_SIZE)
         for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
-            auto *v = &vals[k];
-            auto *xx = &x[k];
+            auto* v  = &vals[k];
+            auto* xx = &x[k];
 #pragma omp simd
             for (int b = 0; b < BLOCK_SIZE; b++) {
                 buff[b] += v[b] * xx[b];
@@ -322,24 +321,24 @@ namespace sfem {
         ret->values              = values;
         ret->x_workspace_stride_ = max_row_nnz ? max_row_nnz * col_block_size : col_block_size;
 
-        const size_t workspace_stride   = static_cast<size_t>(ret->x_workspace_stride_);
-        T **const      x_workspace_data = static_cast<T **>(SMESH_ALLOC(static_cast<size_t>(nthreads) * sizeof(T *)));
+        const size_t workspace_stride = static_cast<size_t>(ret->x_workspace_stride_);
+        T** const    x_workspace_data = static_cast<T**>(SMESH_ALLOC(static_cast<size_t>(nthreads) * sizeof(T*)));
 
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
         {
             const int tid         = omp_get_thread_num();
-            x_workspace_data[tid] = static_cast<T *>(SMESH_CALLOC(workspace_stride, sizeof(T)));
+            x_workspace_data[tid] = static_cast<T*>(SMESH_CALLOC(workspace_stride, sizeof(T)));
         }
 #else
-        x_workspace_data[0] = static_cast<T *>(SMESH_CALLOC(workspace_stride, sizeof(T)));
+        x_workspace_data[0] = static_cast<T*>(SMESH_CALLOC(workspace_stride, sizeof(T)));
 #endif
 
-        ret->x_workspace = manage_host_buffer<T>(static_cast<size_t>(nthreads), workspace_stride, x_workspace_data);
-        ret->block_rows_                = block_rows;
-        ret->block_cols_                = block_cols;
-        ret->row_block_size_            = row_block_size;
-        ret->col_block_size_            = col_block_size;
+        ret->x_workspace     = manage_host_buffer<T>(static_cast<size_t>(nthreads), workspace_stride, x_workspace_data);
+        ret->block_rows_     = block_rows;
+        ret->block_cols_     = block_cols;
+        ret->row_block_size_ = row_block_size;
+        ret->col_block_size_ = col_block_size;
         ret->uniform_pre_output_scaling = scale_output;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;

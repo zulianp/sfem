@@ -12,11 +12,24 @@ namespace sfem {
     template <typename T>
     class Operator {
     public:
-        virtual ~Operator()                                        = default;
-        virtual int            apply(const T* const x, T* const y) = 0;
-        virtual std::ptrdiff_t rows() const                        = 0;
-        virtual std::ptrdiff_t cols() const                        = 0;
-        virtual ExecutionSpace execution_space() const             = 0;
+        virtual ~Operator()                             = default;
+        virtual int apply(const T* const x, T* const y) = 0;
+        virtual int multi_apply(const int vec_size, const T* const* const x, T* const* const y) {
+            if (execution_space() == EXECUTION_SPACE_DEVICE) {
+                SFEM_ERROR(
+                        "apply(vec_size, x, y) is not supported for device execution space! Override this method in the "
+                        "derived class.");
+            }
+
+            for (int b = 0; b < vec_size; b++) {
+                apply(x[b], y[b]);
+            }
+            return SFEM_SUCCESS;
+        }
+
+        virtual std::ptrdiff_t rows() const            = 0;
+        virtual std::ptrdiff_t cols() const            = 0;
+        virtual ExecutionSpace execution_space() const = 0;
     };
 
     template <typename T>
@@ -136,9 +149,9 @@ namespace sfem {
     template <typename T>
     class InPlaceLambdaOperator final : public InPlaceOperator<T> {
     public:
-        std::ptrdiff_t                                size_{0};
+        std::ptrdiff_t                size_{0};
         std::function<void(T* const)> apply_;
-        ExecutionSpace                                execution_space_;
+        ExecutionSpace                execution_space_;
 
         InPlaceLambdaOperator(const std::ptrdiff_t size, std::function<void(T* const)> apply, const ExecutionSpace es)
             : size_(size), apply_(apply), execution_space_(es) {}
