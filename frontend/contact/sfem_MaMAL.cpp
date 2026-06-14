@@ -752,8 +752,8 @@ namespace sfem {
 
         void nonlinear_smooth(const SharedBuffer<real_t>& x) { contact_jacobi->smooth(x); }
 
-        // TODO: complete this (similar to ShiftedPenaltyMultigrid but we have the Galerkin.R for the restriction and Galerkin.P
-        // for the prolongation)
+        // TODO: complete this class (similar to ShiftedPenaltyMultigrid but we have the Galerkin.R for the restriction and
+        // Galerkin.P for the prolongation)
         void nonlinear_cycle() {
             nonlinear_smooth(memory[0]->solution);
 
