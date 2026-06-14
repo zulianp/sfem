@@ -412,6 +412,10 @@ if(SFEM_ENABLE_TESTING)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
+
+    if(TARGET sfem_MaMALTest)
+        target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial)
+    endif()
 endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
