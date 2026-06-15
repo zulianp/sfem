@@ -1568,13 +1568,13 @@ namespace sfem {
         // Implement also the create_domain_tags function as descibed in the stub.
     };
 
-    std::vector<SharedBuffer<domain_t>> create_domain_tags(const std::shared_ptr<smesh::Mesh>& surface) {
+    SharedBuffer<domain_t> create_domain_tags(const std::shared_ptr<smesh::Mesh>& surface) {
         // TODO: Implement this. Identify surfaces of unconnected bodies and assign a unique tag to each surface element
         // use n2e to traverse the mesh and assign a unique tag to eavery element group. Initialize tags with 0 (not considered)
         // And start tagging from 1. Use breadth to search untagged elements. Faces connected to the same node should have the
         // same tag. Go through the n2e graph for each node (this should guarantee that all elements are tagged). If nodes have no
         // incidente elements, ignore them.
-        return std::vector<SharedBuffer<domain_t>>();
+        return SharedBuffer<domain_t>();
     }
 
     std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
