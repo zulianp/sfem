@@ -30,11 +30,11 @@ namespace sfem {
         int    max_iterations{100};
         real_t tolerance{1e-6};
         real_t margin{1e-8};
-        real_t search_radius{5e-2};
+        real_t search_radius{1e-2};
         real_t correction_damping{1};
         real_t min_correction_damping{1e-2};
         real_t augmentation_relaxation{1};
-        int    line_search_steps{0};
+        int    line_search_steps{1};
         int    contact_update_frequency{0};
         int    contact_jacobi_loops{20};
         bool   line_search_recompute_contact{false};
