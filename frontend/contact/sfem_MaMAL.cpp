@@ -1020,7 +1020,7 @@ namespace sfem {
 
             std::vector<std::shared_ptr<smesh::Mesh>> galerkin_contact_surfaces(n_levels());
             contact_surface = smesh::skin(mesh);
-            remove_contraints_connected_elements(contact_surface, constraints_mask, spatial_dim);
+
             galerkin_contact_surfaces[0] = contact_surface;
             for (int i = 1; i < n_levels(); ++i) {
                 galerkin_contact_surfaces[i] =
@@ -1031,6 +1031,7 @@ namespace sfem {
             if (smesh::is_semistructured_type(contact_surface->element_type(0))) {
                 contact_eval_surface = smesh::ssquad_to_quad4(contact_surface);
                 contact_eval_surface->block(0)->set_element_type(smesh::QUADSHELL4);
+                remove_contraints_connected_elements(contact_eval_surface, constraints_mask, spatial_dim);
             }
 
             contact = create_contact(space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
