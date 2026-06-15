@@ -15,7 +15,7 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      cm_vals,
                                const real_t* const SFEM_RESTRICT                      distances,
                                const real_t* const SFEM_RESTRICT                      agumentation,
-                               const real_t* const* const SFEM_RESTRICT               normals,
+                               const real_t* const* SFEM_RESTRICT const SFEM_RESTRICT normals,
                                const real_t* const SFEM_RESTRICT                      mass,
                                const real_t                                           penalty,
                                const ptrdiff_t                                        in_stride,
@@ -282,6 +282,46 @@ namespace sfem {
                 contact_diag_values[2][local_node] += elasticity_diag_values[1][global_node];
                 contact_diag_values[3][local_node] += elasticity_diag_values[2][global_node];
             }
+        }
+    }
+
+    void compute_penetration(const int                                              dim,
+                             const ptrdiff_t                                        nnodes,
+                             const count_t* const SFEM_RESTRICT                     cm_rowptr,
+                             const idx_t* const SFEM_RESTRICT                       cm_colidx,
+                             const real_t* const SFEM_RESTRICT                      cm_vals,
+                             const real_t* const* SFEM_RESTRICT const SFEM_RESTRICT normals,
+                             const real_t* const SFEM_RESTRICT                      gap,
+                             const ptrdiff_t                                        in_stride,
+                             const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in_old,
+                             const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
+                             real_t* const SFEM_RESTRICT                            penetration) {
+        SFEM_TRACE_SCOPE("compute_penetration");
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t lenrow = cm_rowptr[i + 1] - cm_rowptr[i];
+            if (lenrow == 0) {
+                penetration[i] = 0;
+                continue;
+            }
+
+            const idx_t* const  row     = &cm_colidx[cm_rowptr[i]];
+            const real_t* const weights = &cm_vals[cm_rowptr[i]];
+            const ptrdiff_t     dof1    = i * in_stride;
+
+            real_t normal_diff = 0;
+            for (int d = 0; d < dim; d++) {
+                real_t u2 = 0;
+                for (count_t j = 0; j < lenrow; j++) {
+                    const ptrdiff_t dof2 = row[j] * in_stride + d;
+                    u2 += weights[j] * (in[d][dof2] - in_old[d][dof2]);
+                }
+
+                normal_diff += normals[d][i] * (in[d][dof1] - in_old[d][dof1] - u2);
+            }
+
+            penetration[i] = std::max(real_t(0), normal_diff - gap[i]);
         }
     }
 
