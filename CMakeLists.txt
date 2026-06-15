@@ -414,7 +414,10 @@ if(SFEM_ENABLE_TESTING)
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
 
     if(TARGET sfem_MaMALTest)
-        target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial)
+        target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
+        if(TARGET ssdf)
+            target_link_libraries(sfem_MaMALTest PRIVATE ssdf)
+        endif()
     endif()
 endif()
 
