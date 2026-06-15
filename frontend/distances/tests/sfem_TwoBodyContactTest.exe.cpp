@@ -200,19 +200,16 @@ struct ContactData {
     smesh::SharedBuffer<real_t>&                     mass_vector;
     smesh::SharedBuffer<real_t*>&                    normals;
     smesh::SharedBuffer<real_t>&                     distances;
-    smesh::SharedBuffer<real_t>&                     frozen_displacement;
     SharedBuffer<mask_t>                             constraints_mask;
     smesh::SharedBuffer<real_t>                      agumentation;
 };
 
 struct ContactKernelWorkspace {
     smesh::SharedBuffer<real_t*> displacement;
-    smesh::SharedBuffer<real_t*> frozen_displacement;
     smesh::SharedBuffer<real_t>  local_gradient;
 
     ContactKernelWorkspace(const int dim, const ptrdiff_t n_contact, const ExecutionSpace es)
         : displacement(sfem::create_buffer<real_t>(dim, n_contact, es)),
-          frozen_displacement(sfem::create_buffer<real_t>(dim, n_contact, es)),
           local_gradient(sfem::create_buffer<real_t>(n_contact * dim, es)) {}
 };
 
@@ -268,7 +265,6 @@ void compute_penetration(ContactData&              cd,
                               cd.normals->data(),
                               cd.distances->data(),
                               1,
-                              ws.frozen_displacement->data(),
                               ws.displacement->data(),
                               penetration);
 }
@@ -295,7 +291,6 @@ void compute_macaulay_term(ContactData&              cd,
                                 cd.mass_vector->data(),
                                 penalty,
                                 1,
-                                ws.frozen_displacement->data(),
                                 ws.displacement->data(),
                                 macaulay);
 }
@@ -460,7 +455,6 @@ void nljacobi(ContactData&                                 cd,
     auto constraints_mask  = cd.constraints_mask;
     assert(constraints_mask);
     ContactKernelWorkspace contact_ws(dim, n_contact, es);
-    gather_contact_displacement(cd, cd.frozen_displacement->data(), contact_ws.frozen_displacement->data());
 
     const idx_t* const nm = cd.surface->node_mapping()->data();
 #pragma omp parallel for
@@ -733,6 +727,7 @@ int test_two_body_contact() {
 
     real_t penalty          = env.penalty;
     auto   lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
+    auto   previous_displacement = sfem::create_buffer<real_t>(space->n_dofs(), es);
 
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
@@ -742,6 +737,7 @@ int test_two_body_contact() {
     const int inner_loops = env.inner_loops;
 
     contact_conditions->recompute(displacement);
+    blas->copy(space->n_dofs(), displacement->data(), previous_displacement->data());
 
     out->write_time_step("disp", 0, displacement->data());
     out->write_time_step("distance", 0, contact_conditions->distances_whole()->data());
@@ -759,14 +755,13 @@ int test_two_body_contact() {
                           .mass_vector         = contact_conditions->mass_vector(),
                           .normals             = contact_conditions->normals(),
                           .distances           = contact_conditions->distances(),
-                          .frozen_displacement = contact_conditions->frozen_displacement(),
                           .constraints_mask    = constraints_mask,
                           .agumentation        = agumentation};
 
         nljacobi(cd, f, displacement, penalty, inner_loops, env.solver_tol, env.enable_augmentation);
 
         {
-            const real_t* const u0 = contact_conditions->frozen_displacement()->data();
+            const real_t* const u0 = previous_displacement->data();
             real_t* const       u1 = displacement->data();
             const ptrdiff_t     n  = space->n_dofs();
 
@@ -778,7 +773,7 @@ int test_two_body_contact() {
 
         if (env.enable_ccd && ccd) {
             p0 = smesh::astype<real_t>(surface->points());
-            displace_points(surface, contact_conditions->frozen_displacement(), p0);
+            displace_points(surface, previous_displacement, p0);
 
             p1 = smesh::astype<real_t>(surface->points());
             displace_points(surface, displacement, p1);
@@ -788,7 +783,7 @@ int test_two_body_contact() {
             printf("CCD TOI: %g\n", ccd_toi);
 
             if (ccd_toi < 1) {
-                const real_t* const u0 = contact_conditions->frozen_displacement()->data();
+                const real_t* const u0 = previous_displacement->data();
                 real_t* const       u1 = displacement->data();
                 const ptrdiff_t     n  = space->n_dofs();
 
@@ -800,6 +795,7 @@ int test_two_body_contact() {
         }
 
         contact_conditions->recompute(displacement);
+        blas->copy(space->n_dofs(), displacement->data(), previous_displacement->data());
 
         blas->values(space->n_dofs(), 0, lagr_mult_normal->data());
 

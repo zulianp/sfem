@@ -87,7 +87,6 @@ namespace sfem {
         smesh::SharedBuffer<real_t>     mass_vector;
         smesh::SharedBuffer<real_t*>    normals;
         smesh::SharedBuffer<real_t>     distances;
-        smesh::SharedBuffer<real_t>     frozen_displacement;
         SharedBuffer<mask_t>            constraints_mask;
         smesh::SharedBuffer<real_t>     agumentation;
     };
@@ -103,7 +102,6 @@ namespace sfem {
 
         auto d       = cd.distances->data();
         auto normals = cd.normals->data();
-        auto disp0   = cd.frozen_displacement->data();
         auto nm      = cd.surface->node_mapping()->data();
 
 #pragma omp parallel for
@@ -123,10 +121,10 @@ namespace sfem {
                 real_t u2 = 0;
                 for (count_t j = 0; j < lenrow; j++) {
                     const ptrdiff_t dof2 = nm[row[j]] * dim + d;
-                    u2 += weights[j] * (disp[dof2] - disp0[dof2]);
+                    u2 += weights[j] * disp[dof2];
                 }
 
-                normal_diff += normals[d][i] * (disp[dof1 + d] - disp0[dof1 + d] - u2);
+                normal_diff += normals[d][i] * (disp[dof1 + d] - u2);
             }
 
             penetration[i] = std::max(real_t(0), normal_diff - d[i]);
@@ -186,7 +184,6 @@ namespace sfem {
         auto aug     = cd.agumentation->data();
         auto normals = cd.normals->data();
         auto mass    = cd.mass_vector->data();
-        auto disp0   = cd.frozen_displacement->data();
 
         auto nm = cd.surface->node_mapping()->data();
 
@@ -205,14 +202,14 @@ namespace sfem {
             real_t u1[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 const ptrdiff_t dof = nm[i] * dim + d;
-                u1[d]               = disp[dof] - disp0[dof];
+                u1[d]               = disp[dof];
             }
 
             real_t u2[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 for (count_t j = 0; j < lenrow; j++) {
                     const ptrdiff_t dof = nm[row[j]] * dim + d;
-                    u2[d] += weights[j] * (disp[dof] - disp0[dof]);
+                    u2[d] += weights[j] * disp[dof];
                 }
             }
 
@@ -1204,7 +1201,6 @@ namespace sfem {
                                   .mass_vector         = contact->mass_vector(),
                                   .normals             = contact->normals(),
                                   .distances           = contact->distances(),
-                                  .frozen_displacement = contact->frozen_displacement(),
                                   .constraints_mask    = constraints_mask,
                                   .agumentation        = agumentation};
         }
@@ -1288,7 +1284,6 @@ namespace sfem {
                     .mass_vector         = mass_vectors[level],
                     .normals             = normals[level],
                     .distances           = nullptr,
-                    .frozen_displacement = nullptr,
                     .constraints_mask    = level_constraints_mask[level],
                     .agumentation        = nullptr};
         }
