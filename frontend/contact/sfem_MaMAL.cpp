@@ -1,5 +1,6 @@
 #include "sfem_MaMAL.hpp"
 
+#include "sfem_ContactSkin.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_GeometricMultigrid.hpp"
 
@@ -29,7 +30,7 @@ namespace sfem {
         int    max_iterations{100};
         real_t tolerance{1e-6};
         real_t margin{1e-8};
-        real_t search_radius{1e-2};
+        real_t search_radius{5e-2};
         real_t correction_damping{1};
         real_t min_correction_damping{1e-2};
         real_t augmentation_relaxation{1};
@@ -605,7 +606,7 @@ namespace sfem {
         ContactData cd;
 
         real_t penalty{100};
-        int    n_loops{3};
+        int    n_loops{10};
         bool   enable_augmentation{false};
 
         void smooth(const SharedBuffer<real_t>& x) {
@@ -853,6 +854,96 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<smesh::Mesh> derefine_contact_trace(const std::shared_ptr<smesh::Mesh>& fine_surface,
+                                                        const int                           from_level,
+                                                        const int                           to_level) {
+        if (from_level == to_level) {
+            return fine_surface;
+        }
+
+        assert(fine_surface->n_blocks() == 1);
+        assert(from_level % to_level == 0);
+
+        auto      coarse_view = ssquad4_derefine_element_connectivity(from_level, to_level, fine_surface->block(0)->elements());
+        auto      coarse_view_data  = coarse_view->data();
+        const int nxe               = coarse_view->extent(0);
+        const ptrdiff_t nelements   = coarse_view->extent(1);
+        idx_t           max_node_id = 0;
+
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int v = 0; v < nxe; ++v) {
+                const idx_t old = coarse_view_data[v][e];
+                assert(old >= 0);
+                max_node_id = std::max(max_node_id, old);
+            }
+        }
+
+        std::vector<idx_t> old_to_new(max_node_id + 1, SFEM_IDX_INVALID);
+        ptrdiff_t          coarse_n_nodes = 0;
+
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int v = 0; v < nxe; ++v) {
+                const idx_t old = coarse_view_data[v][e];
+                if (old_to_new[old] == SFEM_IDX_INVALID) {
+                    old_to_new[old] = coarse_n_nodes++;
+                }
+            }
+        }
+
+        auto elements = create_host_buffer<idx_t>(nxe, nelements);
+        auto elems    = elements->data();
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int v = 0; v < nxe; ++v) {
+                elems[v][e] = old_to_new[coarse_view_data[v][e]];
+            }
+        }
+
+        auto            points       = create_host_buffer<geom_t>(fine_surface->spatial_dimension(), coarse_n_nodes);
+        auto            node_mapping = create_host_buffer<idx_t>(coarse_n_nodes);
+        auto            fine_points  = fine_surface->points()->data();
+        auto            coarse_pts   = points->data();
+        auto            fine_mapping = fine_surface->node_mapping()->data();
+        auto            coarse_map   = node_mapping->data();
+        const ptrdiff_t fine_n_nodes = fine_surface->n_nodes();
+
+        std::vector<idx_t> volume_to_surface;
+        if (max_node_id >= fine_n_nodes) {
+            idx_t max_volume_node = max_node_id;
+            for (ptrdiff_t i = 0; i < fine_n_nodes; ++i) {
+                max_volume_node = std::max(max_volume_node, fine_mapping[i]);
+            }
+
+            volume_to_surface.resize(max_volume_node + 1, SFEM_IDX_INVALID);
+            for (ptrdiff_t i = 0; i < fine_n_nodes; ++i) {
+                volume_to_surface[fine_mapping[i]] = i;
+            }
+        }
+
+        for (ptrdiff_t old = 0; old <= max_node_id; ++old) {
+            const idx_t n = old_to_new[old];
+            if (n == SFEM_IDX_INVALID) continue;
+
+            const idx_t fine_node = old < fine_n_nodes ? old : volume_to_surface[old];
+            assert(fine_node >= 0 && fine_node < fine_n_nodes);
+            coarse_map[n] = fine_mapping[fine_node];
+            for (int d = 0; d < fine_surface->spatial_dimension(); ++d) {
+                coarse_pts[d][n] = fine_points[d][fine_node];
+            }
+        }
+
+        auto block = std::make_shared<smesh::Mesh::Block>();
+        block->set_name(fine_surface->block(0)->name());
+        block->set_element_type(smesh::shell_type(smesh::proteus_hex_type(to_level)));
+        block->set_elements(elements);
+
+        std::vector<std::shared_ptr<smesh::Mesh::Block>> blocks;
+        blocks.push_back(block);
+
+        auto ret = std::make_shared<smesh::Mesh>(fine_surface->comm(), blocks, points);
+        ret->set_node_mapping(node_mapping);
+        return ret;
+    }
+
     class MaMAL::Impl {
     public:
         std::shared_ptr<Function>                                    f;
@@ -920,11 +1011,20 @@ namespace sfem {
 
             operators = sfem::create_gmg_operators(data, op_type::MATRIX_FREE);
 
+            constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
+                constraints_mask->data()[i] = 0;
+            }
+            f->constraints_mask(constraints_mask->data());
+
             std::vector<std::shared_ptr<smesh::Mesh>> galerkin_contact_surfaces(n_levels());
-            contact_surface              = smesh::skin(mesh);
+            contact_surface = smesh::skin(mesh);
+            remove_contraints_connected_elements(contact_surface, constraints_mask, spatial_dim);
             galerkin_contact_surfaces[0] = contact_surface;
             for (int i = 1; i < n_levels(); ++i) {
-                galerkin_contact_surfaces[i] = smesh::skin(data->functions[i]->space()->mesh_ptr());
+                galerkin_contact_surfaces[i] =
+                        derefine_contact_trace(contact_surface, data->semistructured_levels[0], data->semistructured_levels[i]);
             }
 
             contact_eval_surface = contact_surface;
@@ -941,16 +1041,9 @@ namespace sfem {
             contact_jacobi          = std::make_shared<ContactJacobi>();
             contact_jacobi->n_loops = params.contact_jacobi_loops;
 
-            constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
-            agumentation     = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
-            contact_grad     = sfem::create_buffer<real_t>(space->n_dofs(), es);
-            macaulay         = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
-
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
-                constraints_mask->data()[i] = 0;
-            }
-            f->constraints_mask(constraints_mask->data());
+            agumentation = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
+            contact_grad = sfem::create_buffer<real_t>(space->n_dofs(), es);
+            macaulay     = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
 
             smoothers = sfem::create_gmg_default_smoothers_and_solver(data, operators, 3, false);
 
@@ -1291,6 +1384,7 @@ namespace sfem {
         void nonlinear_cycle() { nonlinear_iteration(); }
 
         real_t nonlinear_iteration() {
+            resample_contact_conditions(memory[0]->solution);
             nonlinear_smooth(memory[0]->solution);
 
             const real_t grad_norm = eval_fine_residual_and_jacobian();
