@@ -330,8 +330,6 @@ namespace sfem {
 
         auto normals = cd.normals->data();
         auto mass    = cd.mass_vector->data();
-        auto nm      = cd.surface->node_mapping()->data();
-
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; i++) {
             if (macaulay[i] == 0) continue;
@@ -351,11 +349,11 @@ namespace sfem {
 
             for (int d = 0; d < 6; ++d) {
 #pragma omp atomic update
-                diag_values[d][nm[i]] += block[d];
+                diag_values[d][i] += block[d];
             }
 
             for (count_t j = 0; j < lenrow; j++) {
-                const idx_t  r  = nm[row[j]];
+                const idx_t  r  = row[j];
                 const real_t w2 = weights[j] * weights[j];
                 for (int d = 0; d < 6; ++d) {
 #pragma omp atomic update
@@ -642,7 +640,6 @@ namespace sfem {
     };
 
     std::vector<GalerkinRAP> create_galerkin_rap(const std::vector<std::shared_ptr<smesh::Mesh>>& surfaces,
-                                                 const std::vector<std::shared_ptr<Function>>&    functions,
                                                  const std::vector<int>&                          levels) {
         int             nlevels   = levels.size();
 
@@ -650,7 +647,7 @@ namespace sfem {
         for (int i = 0; i < nlevels - 1; i++) {
             auto            elems        = surfaces[i]->block(0)->elements();
             const ptrdiff_t nelements    = elems->extent(1);
-            const ptrdiff_t fine_n_nodes = functions[i]->space()->mesh_ptr()->n_nodes();
+            const ptrdiff_t fine_n_nodes = surfaces[i]->n_nodes();
 
             auto rowptr = create_host_buffer<count_t>(fine_n_nodes + 1);
             smesh::ssquad4_prolongation_crs_nnz(levels[i], nelements, elems->data(), fine_n_nodes, rowptr->data());
@@ -661,23 +658,25 @@ namespace sfem {
             smesh::ssquad4_prolongation_crs_fill(
                     levels[i], nelements, elems->data(), fine_n_nodes, rowptr->data(), colidx->data(), values->data());
 
-            const ptrdiff_t coarse_n_nodes = functions[i + 1]->space()->mesh_ptr()->n_nodes();
+            const ptrdiff_t coarse_n_nodes = surfaces[i + 1]->n_nodes();
             std::vector<idx_t> fine_to_coarse(fine_n_nodes, SFEM_IDX_INVALID);
-            auto               fine_points   = functions[i]->space()->mesh_ptr()->points()->data();
-            auto               coarse_points = functions[i + 1]->space()->mesh_ptr()->points()->data();
-            const int          dim           = functions[i]->space()->mesh_ptr()->spatial_dimension();
+            const idx_t* const fine_to_volume   = surfaces[i]->node_mapping()->data();
+            const idx_t* const coarse_to_volume = surfaces[i + 1]->node_mapping()->data();
 
+            idx_t max_coarse_volume_node = 0;
             for (ptrdiff_t c = 0; c < coarse_n_nodes; ++c) {
-                for (ptrdiff_t f = 0; f < fine_n_nodes; ++f) {
-                    bool same = true;
-                    for (int d = 0; d < dim; ++d) {
-                        same = same && fine_points[d][f] == coarse_points[d][c];
-                    }
+                max_coarse_volume_node = std::max(max_coarse_volume_node, coarse_to_volume[c]);
+            }
 
-                    if (same) {
-                        fine_to_coarse[f] = c;
-                        break;
-                    }
+            std::vector<idx_t> volume_to_coarse(max_coarse_volume_node + 1, SFEM_IDX_INVALID);
+            for (ptrdiff_t c = 0; c < coarse_n_nodes; ++c) {
+                volume_to_coarse[coarse_to_volume[c]] = c;
+            }
+
+            for (ptrdiff_t f = 0; f < fine_n_nodes; ++f) {
+                const idx_t volume_node = fine_to_volume[f];
+                if (volume_node <= max_coarse_volume_node) {
+                    fine_to_coarse[f] = volume_to_coarse[volume_node];
                 }
             }
 
@@ -774,7 +773,7 @@ namespace sfem {
             contact = create_contact(space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
 
             // FIXME multiblock should still work!
-            galerkin_restrictions = create_galerkin_rap(galerkin_contact_surfaces, data->functions, data->semistructured_levels);
+            galerkin_restrictions = create_galerkin_rap(galerkin_contact_surfaces, data->semistructured_levels);
 
             contact_jacobi = std::make_shared<ContactJacobi>();
 
@@ -816,17 +815,12 @@ namespace sfem {
                 memory[i]->rhs      = create_buffer<real_t>(n, es);
                 memory[i]->work     = create_buffer<real_t>(n, es);
 
-                const ptrdiff_t n_nodes = n / data->functions[i]->space()->block_size();
-                memory[i]->diag         = create_buffer<real_t>(n_nodes, es);
-                contact_block_diag_soa[i] = create_buffer<real_t>(6, n_nodes, es);
-                contact_block_diag_aos[i] = create_buffer<real_t>(n_nodes * 6, es);
-                contact_block_idx[i]      = create_buffer<idx_t>(n_nodes, es);
+                const ptrdiff_t n_contact = contact_surfaces[i]->node_mapping()->size();
+                memory[i]->diag           = create_buffer<real_t>(n_contact, es);
+                contact_block_diag_soa[i] = create_buffer<real_t>(6, n_contact, es);
+                contact_block_diag_aos[i] = create_buffer<real_t>(n_contact * 6, es);
+                contact_block_idx[i]      = contact_surfaces[i]->node_mapping();
                 contact_block_diag[i]     = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
-
-#pragma omp parallel for
-                for (ptrdiff_t j = 0; j < n_nodes; ++j) {
-                    contact_block_idx[i]->data()[j] = j;
-                }
 
                 level_constraints_mask[i] = sfem::create_buffer<mask_t>(mask_count(n), es);
             }
@@ -892,12 +886,13 @@ namespace sfem {
             const ptrdiff_t n    = memory[level]->diag->size();
             const int       dim  = data->functions[level]->space()->block_size();
             const mask_t*   mask = level_constraints_mask[level]->data();
+            const idx_t*     idx  = contact_block_idx[level]->data();
 
             assert(dim == 3);
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; ++i) {
-                const ptrdiff_t dof = i * dim;
+                const ptrdiff_t dof = idx[i] * dim;
                 real_t* const   b    = &dst[i * 6];
 
                 b[0] = src[0][i];
@@ -1001,13 +996,19 @@ namespace sfem {
         }
 
         void nonlinear_cycle() {
+            nonlinear_iteration();
+        }
+
+        real_t nonlinear_iteration() {
             nonlinear_smooth(memory[0]->solution);
 
             eval_fine_residual_and_jacobian();
 
+            auto                  blas      = sfem::blas<real_t>(f->execution_space());
+            const real_t          grad_norm = blas->norm2(memory[0]->work->size(), memory[0]->work->data());
+            std::shared_ptr<Memory> mem     = memory[0];
+
             if (n_levels() > 1) {
-                auto blas       = sfem::blas<real_t>(f->execution_space());
-                auto mem        = memory[0];
                 auto mem_coarse = memory[1];
 
                 blas->values(mem_coarse->rhs->size(), 0, mem_coarse->rhs->data());
@@ -1022,8 +1023,9 @@ namespace sfem {
             }
 
             nonlinear_smooth(memory[0]->solution);
-
             update_augmentation();
+
+            return grad_norm;
         }
 
         void linear_cycle(int level) {
@@ -1084,4 +1086,28 @@ namespace sfem {
         return ret;
     }
 #endif
+
+    int MaMAL::solve(const smesh::SharedBuffer<real_t>& x) {
+        auto blas = sfem::blas<real_t>(impl_->f->execution_space());
+        auto mem  = impl_->memory[0];
+
+        blas->copy(x->size(), x->data(), mem->solution->data());
+        impl_->f->apply_constraints(mem->solution->data());
+
+        int iter = 0;
+        for (; iter < impl_->params.max_iterations; ++iter) {
+            impl_->resample_contact_conditions(mem->solution);
+
+            const real_t grad_norm = impl_->nonlinear_iteration();
+            printf("MaMAL::solve %d gradient_norm %e\n", iter, (double)grad_norm);
+
+            if (grad_norm < impl_->params.tolerance) {
+                ++iter;
+                break;
+            }
+        }
+
+        blas->copy(mem->solution->size(), mem->solution->data(), x->data());
+        return SFEM_SUCCESS;
+    }
 }  // namespace sfem

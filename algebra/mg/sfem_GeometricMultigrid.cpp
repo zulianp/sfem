@@ -145,7 +145,7 @@ namespace sfem {
 
         auto coarse_solver = sfem::create_cg<real_t>(ops.back(), es);
         coarse_solver->set_max_it(10000);
-        coarse_solver->verbose = true;
+        coarse_solver->verbose = false;
         coarse_solver->set_rtol(1e-6);
 
         bool enable_coarse_space_preconditioner = true;
