@@ -15,15 +15,18 @@
 #include "../contact/sfem_SelfContact.cpp"
 
 std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::ExecutionSpace es) {
-    const ptrdiff_t nx = 4;
-    const ptrdiff_t ny = 4;
-    const ptrdiff_t nz = 4;
+    const ptrdiff_t n  = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
+    const ptrdiff_t nx = n;
+    const ptrdiff_t ny = n;
+    const ptrdiff_t nz = n;
+
+    const geom_t poc = 1;  // Use 1 for actual contact
 
     auto lower = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, nx, nx, 0, 0, 0, 1, 1, 1);
-    auto upper = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, ny, nz, 0.25, 1, 0.25, 0.75, 1.75, 0.75);
+    auto upper = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, ny, nz, 0.25, poc, 0.25, 0.75, 1.75, 0.75);
     auto mesh  = smesh::concatenate(lower, upper);
 
-    mesh = smesh::to_semistructured(4, mesh, true, false);
+    mesh = smesh::to_semistructured(16, mesh, true, false);
 
     const int dim   = mesh->spatial_dimension();
     auto      space = sfem::FunctionSpace::create(mesh, dim);
@@ -50,7 +53,7 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
     assert(right_ns);
 
     sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.4, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
     sfem::DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
