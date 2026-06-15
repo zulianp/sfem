@@ -18,7 +18,7 @@
 #include <ryml.hpp>
 #endif
 
-// #define VIZ_DEBUG
+#define VIZ_DEBUG
 
 #ifdef VIZ_DEBUG
 #include "/Users/patrickzulian/Desktop/code/sviz/src/sviz_monitor_client.hpp"
@@ -679,8 +679,8 @@ namespace sfem {
 
                     try {
                         sviz::Client().send(msg);
-                    } catch (const std::exception&) {
-                        // printf("Error sending message to sviz: %s\n", e.what());
+                    } catch (const std::exception& e) {
+                        printf("Error sending message to sviz: %s\n", e.what());
                     }
                 }
                 sviz::Message msg("assemble_mortar_matrices (gaps)");
@@ -1016,8 +1016,8 @@ namespace sfem {
 #ifdef VIZ_DEBUG
                 try {
                     sviz::Client().send(msg);
-                } catch (const std::exception&) {
-                    // printf("Error sending message to sviz: %s\n", e.what());
+                } catch (const std::exception& e) {
+                    printf("Error sending message to sviz: %s\n", e.what());
                 }
 #endif  // VIZ_DEBUG
 
@@ -1520,14 +1520,13 @@ namespace sfem {
         const char* const sel    = std::getenv("SFEM_CONTACT");
         const std::string method = sel ? sel : "mortar";
 
-        if (method != "nts") {
+        if (method == "nts") {
+            printf("[Contact] strategy: nts (SFEM_CONTACT=nts)\n");
             return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
         } else {
-            printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
+            printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
+            return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
         }
-
-        // if (method == "mortar")
-        return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
     }
 
 #ifdef SFEM_ENABLE_YAML
