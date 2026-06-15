@@ -53,7 +53,7 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
     assert(right_ns);
 
     sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.05, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .nodeset = top_ns, .value = -0.1, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .nodeset = top_ns, .value = 0, .component = 2};
 
     sfem::DirichletConditions::Condition xleft{.sidesets = left_ss, .nodeset = left_ns, .value = 0, .component = 0};
