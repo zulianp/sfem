@@ -39,6 +39,7 @@ namespace sfem {
         int    contact_jacobi_loops{20};
         bool   line_search_recompute_contact{false};
         bool   enable_augmentation{false};
+        bool   enable_self_contact{false};
 
         void from_env() {
             max_iterations           = smesh::Env::read("SFEM_MAMAL_MAX_ITERATIONS", max_iterations);
@@ -54,6 +55,7 @@ namespace sfem {
             line_search_recompute_contact =
                     smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_RECOMPUTE_CONTACT", line_search_recompute_contact);
             enable_augmentation = smesh::Env::read("SFEM_MAMAL_ENABLE_AUGMENTATION", enable_augmentation);
+            enable_self_contact = smesh::Env::read("SFEM_MAMAL_ENABLE_SELF_CONTACT", enable_self_contact);
         }
 
 #ifdef SFEM_ENABLE_YAML
@@ -1034,7 +1036,13 @@ namespace sfem {
                 remove_contraints_connected_elements(contact_eval_surface, constraints_mask, spatial_dim);
             }
 
-            contact = create_contact(space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
+            if (params.enable_self_contact) {
+                contact = create_contact(
+                        space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
+            } else {
+                contact = create_mulitbody_contact(
+                        space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
+            }
 
             // FIXME multiblock should still work!
             galerkin_restrictions = create_galerkin_rap(galerkin_contact_surfaces, data->semistructured_levels);
