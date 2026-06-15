@@ -1550,6 +1550,12 @@ namespace sfem {
 
     using domain_t = smesh::u32;
 
+    //  TODO:
+    // class MultiBodyContact: For this contact variant we identify collision pairs between surface elements that have different
+    // tags. Then assemble using the mortar method and the functions defined in the file just the same way as the ContactMortar
+    // class Info: tags are associated with the surface mesh, one tag per element.
+    // If elements have the same tag (i.e., they are part of the same domain) do not consider them as collision pairs.
+    // Implement also the create_domain_tags function as descibed in its stub.
     class MultiBodyContact : public Contact {
     public:
         MultiBodyContact(const std::shared_ptr<FunctionSpace>&      space,
@@ -1559,13 +1565,6 @@ namespace sfem {
                          real_t                                     margin,
                          real_t                                     search_radius_sqr,
                          ExecutionSpace                             es);
-
-        //  TODO:
-        // Identify collision pairs between surface elements with the specified tag pairings
-        // Then assemble using the mortar method and the functions defined in the file just the same way as the ContactMortar
-        // class Info: tags are associated with the surface mesh, one tag per element.
-        // If elements have the same tag (i.e., they are part of the same domain) do not consider them as collision pairs.
-        // Implement also the create_domain_tags function as descibed in the stub.
     };
 
     SharedBuffer<domain_t> create_domain_tags(const std::shared_ptr<smesh::Mesh>& surface) {
@@ -1573,7 +1572,7 @@ namespace sfem {
         // use n2e to traverse the mesh and assign a unique tag to eavery element group. Initialize tags with 0 (not considered)
         // And start tagging from 1. Use breadth to search untagged elements. Faces connected to the same node should have the
         // same tag. Go through the n2e graph for each node (this should guarantee that all elements are tagged). If nodes have no
-        // incidente elements, ignore them.
+        // incident elements, ignore them.
         return SharedBuffer<domain_t>();
     }
 
