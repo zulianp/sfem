@@ -245,4 +245,44 @@ namespace sfem {
         }
     }
 
+    void gather_combine_hessian_diag(const int                                              dim,
+                                     const ptrdiff_t                                        n_contact_nodes,
+                                     const idx_t* const                                     node_mapping,
+                                     const ptrdiff_t                                        elasticity_diag_stride,
+                                     const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT elasticity_diag_values,
+                                     const ptrdiff_t                                        contact_diag_stride,
+                                     real_t* const SFEM_RESTRICT* const SFEM_RESTRICT       contact_diag_values) {
+        SFEM_TRACE_SCOPE("gather_combine_hessian_diag");
+
+        if (dim == 3) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact_nodes; ++i) {
+                const ptrdiff_t global_node = node_mapping[i] * elasticity_diag_stride;
+                const ptrdiff_t local_node  = i * contact_diag_stride;
+
+                contact_diag_values[0][local_node] += elasticity_diag_values[0][global_node];
+                contact_diag_values[1][local_node] += elasticity_diag_values[1][global_node];
+                contact_diag_values[2][local_node] += elasticity_diag_values[2][global_node];
+                contact_diag_values[3][local_node] += elasticity_diag_values[1][global_node];
+                contact_diag_values[4][local_node] += elasticity_diag_values[3][global_node];
+                contact_diag_values[5][local_node] += elasticity_diag_values[4][global_node];
+                contact_diag_values[6][local_node] += elasticity_diag_values[2][global_node];
+                contact_diag_values[7][local_node] += elasticity_diag_values[4][global_node];
+                contact_diag_values[8][local_node] += elasticity_diag_values[5][global_node];
+            }
+        } else {
+            SMESH_ASSERT(dim == 2);
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact_nodes; ++i) {
+                const ptrdiff_t global_node = node_mapping[i] * elasticity_diag_stride;
+                const ptrdiff_t local_node  = i * contact_diag_stride;
+                contact_diag_values[0][local_node] += elasticity_diag_values[0][global_node];
+                contact_diag_values[1][local_node] += elasticity_diag_values[1][global_node];
+                contact_diag_values[2][local_node] += elasticity_diag_values[1][global_node];
+                contact_diag_values[3][local_node] += elasticity_diag_values[2][global_node];
+            }
+        }
+    }
+
 }  // namespace sfem
