@@ -1548,4 +1548,39 @@ namespace sfem {
     }
 #endif
 
+    class MultiBodyContact : public Contact {
+    public:
+        MultiBodyContact(const std::shared_ptr<FunctionSpace>& space,
+                         const std::shared_ptr<smesh::Mesh>&   surface,
+                         std::vector<SharedBuffer<u8>>         tags,
+                         std::vector<std::pair<u8, u8>>        pairings,
+                         real_t                                margin,
+                         real_t                                search_radius_sqr,
+                         ExecutionSpace                        es);
+
+        //  TODO:
+        // Identify collision pairs between surface elements with the specified tag pairings
+        // Then assemble using the mortar method and the functions defined in the file just the same way as the ContactMortar
+        // class Info: tags are associated with the surface mesh, one tag per element.
+        // If elements have the same tag do not consider them as collision pairs.
+    };
+
+    std::vector<SharedBuffer<u8>> create_unconnected_bodies_tags(const std::shared_ptr<smesh::Mesh>& surface) {
+        // TODO: Implement this. Identify surfaces of unconnected bodies and assign a unique tag to each surface element
+        // use n2e to traverse the mesh and assign a unique tag to eavery element group. Initialize tags with 0 (not considered)
+        // And start tagging from 1. Use breadth to search untagged elements. Faces connected to the same node should have the
+        // same tag. Go through the n2e graph for each node (this should guarantee that all elements are tagged). If nodes have no
+        // incidente elements, ignore them.
+        return std::vector<SharedBuffer<u8>>();
+    }
+
+    std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
+                                                      const std::shared_ptr<smesh::Mesh>&   surface,
+                                                      real_t                                margin,
+                                                      real_t                                search_radius_sqr,
+                                                      ExecutionSpace                        es) {
+        // TODO: Implement this
+        return nullptr;
+    }
+
 }  // namespace sfem

@@ -28,18 +28,24 @@ namespace sfem {
         virtual const smesh::SharedBuffer<real_t>&                      directors() const       = 0;
     };
 
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            real_t                                 margin,
-                                            real_t                                 search_radius_sqr,
-                                            ExecutionSpace                         es);
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            real_t                                margin,
+                                            real_t                                search_radius_sqr,
+                                            ExecutionSpace                        es);
 
 #ifdef SFEM_ENABLE_YAML
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const ryml::ConstNodeRef&              node,
-                                            ExecutionSpace                         es);
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            const ryml::ConstNodeRef&             node,
+                                            ExecutionSpace                        es);
 #endif
+
+    std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
+                                                      const std::shared_ptr<smesh::Mesh>&   surface,
+                                                      real_t                                margin,
+                                                      real_t                                search_radius_sqr,
+                                                      ExecutionSpace                        es);
 
 }  // namespace sfem
 
