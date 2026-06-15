@@ -139,6 +139,74 @@ namespace sfem {
             }
         }
 
+        void add_normal_projected_displacement_to_gap(const int                               dim,
+                                                      const smesh::Mesh&                     surface,
+                                                      const smesh::CRSGraph<count_t, idx_t>& graph,
+                                                      const smesh::SharedBuffer<real_t>&     values,
+                                                      const smesh::SharedBuffer<real_t*>&    normals,
+                                                      const std::shared_ptr<Buffer<real_t>>& displacement,
+                                                      const smesh::SharedBuffer<real_t>&     gap) {
+            const count_t* const rowptr = graph.rowptr()->data();
+            const idx_t* const   colidx = graph.colidx()->data();
+            const real_t* const  vals   = values->data();
+            const idx_t* const   nm     = surface.node_mapping()->data();
+            const real_t* const  u      = displacement->data();
+            real_t* const        g      = gap->data();
+            const ptrdiff_t      n      = graph.rowptr()->size() - 1;
+            real_t** const       normal = normals->data();
+
+            if (dim == 3) {
+                const real_t* const nx = normal[0];
+                const real_t* const ny = normal[1];
+                const real_t* const nz = normal[2];
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    const count_t begin = rowptr[i];
+                    const count_t end   = rowptr[i + 1];
+                    if (begin == end) {
+                        continue;
+                    }
+
+                    const ptrdiff_t dof1 = (ptrdiff_t)nm[i] * 3;
+                    real_t          du0  = u[dof1 + 0];
+                    real_t          du1  = u[dof1 + 1];
+                    real_t          du2  = u[dof1 + 2];
+
+                    for (count_t k = begin; k < end; ++k) {
+                        const ptrdiff_t dof2 = (ptrdiff_t)nm[colidx[k]] * 3;
+                        const real_t    w    = vals[k];
+                        du0 -= w * u[dof2 + 0];
+                        du1 -= w * u[dof2 + 1];
+                        du2 -= w * u[dof2 + 2];
+                    }
+
+                    g[i] += nx[i] * du0 + ny[i] * du1 + nz[i] * du2;
+                }
+            } else {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    const count_t begin = rowptr[i];
+                    const count_t end   = rowptr[i + 1];
+                    if (begin == end) {
+                        continue;
+                    }
+
+                    const ptrdiff_t dof1 = (ptrdiff_t)nm[i] * dim;
+                    real_t          proj = 0;
+                    for (int d = 0; d < dim; ++d) {
+                        real_t du = u[dof1 + d];
+                        for (count_t k = begin; k < end; ++k) {
+                            du -= vals[k] * u[(ptrdiff_t)nm[colidx[k]] * dim + d];
+                        }
+
+                        proj += normal[d][i] * du;
+                    }
+
+                    g[i] += proj;
+                }
+            }
+        }
+
         void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
                              const std::shared_ptr<Buffer<real_t>>&  displacement,
                              const std::shared_ptr<Buffer<real_t*>>& inout) {
@@ -183,8 +251,7 @@ namespace sfem {
                   closest_triangles_(sfem::create_buffer<idx_t>(npoints_, es_)),
                   distances_whole_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
                   directors_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
-                  normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
-                  frozen_displacement_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)) {
+                  normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)) {
                 assemble_mass_vector();
             }
 
@@ -380,7 +447,7 @@ namespace sfem {
 
                 assemble_coupling_operator(
                         surface_element_type_, surface_elements_, closest_triangles_, closest_s_, closest_t_, *graph_, values_);
-                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
+                add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -388,7 +455,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            smesh::SharedBuffer<real_t>&       frozen_displacement() override { return frozen_displacement_; }
             const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
             const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
 
@@ -423,7 +489,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>                      distances_whole_;
             smesh::SharedBuffer<real_t>                      directors_;
             smesh::SharedBuffer<real_t*>                     normals_;
-            smesh::SharedBuffer<real_t>                      frozen_displacement_;
             std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
             smesh::SharedBuffer<real_t>                      values_;
         };
@@ -1276,8 +1341,7 @@ namespace sfem {
                   normals_(sfem::create_buffer<real_t>(surface->spatial_dimension(), surface->n_nodes(), es)),
                   distances_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
                   distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-                  directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-                  frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
+                  directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
             void assemble_mass_vector(const smesh::ElemType        element_type,
                                       const SharedBuffer<idx_t*>&  elements,
@@ -1476,8 +1540,8 @@ namespace sfem {
                         dir[dof + c] = director_gap * nrm[c][i];
                     }
                 }
+                add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
 
-                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -1485,7 +1549,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            smesh::SharedBuffer<real_t>&       frozen_displacement() override { return frozen_displacement_; }
             const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
             const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
 
@@ -1509,7 +1572,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>                      distances_;
             smesh::SharedBuffer<real_t>                      distances_whole_;
             smesh::SharedBuffer<real_t>                      directors_;
-            smesh::SharedBuffer<real_t>                      frozen_displacement_;
         };
 
     }  // namespace
@@ -1576,8 +1638,7 @@ namespace sfem {
               normals_(sfem::create_buffer<real_t>(surface->spatial_dimension(), surface->n_nodes(), es)),
               distances_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
               distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-              directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-              frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
+              directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
         void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) override {
             SFEM_TRACE_SCOPE("MultiBodyContact::recompute");
@@ -1717,7 +1778,7 @@ namespace sfem {
                 }
             }
 
-            blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
+            add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
         }
 
         const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -1725,7 +1786,6 @@ namespace sfem {
         smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
         smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
         smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-        smesh::SharedBuffer<real_t>&                            frozen_displacement() override { return frozen_displacement_; }
         const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
         const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
@@ -1749,7 +1809,6 @@ namespace sfem {
         smesh::SharedBuffer<real_t>                      distances_;
         smesh::SharedBuffer<real_t>                      distances_whole_;
         smesh::SharedBuffer<real_t>                      directors_;
-        smesh::SharedBuffer<real_t>                      frozen_displacement_;
     };
 
     SharedBuffer<domain_t> create_domain_tags(const std::shared_ptr<smesh::Mesh>& surface) {

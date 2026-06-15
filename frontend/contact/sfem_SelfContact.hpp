@@ -23,7 +23,6 @@ namespace sfem {
         virtual smesh::SharedBuffer<real_t>&                            mass_vector()           = 0;
         virtual smesh::SharedBuffer<real_t*>&                           normals()               = 0;
         virtual smesh::SharedBuffer<real_t>&                            distances()             = 0;
-        virtual smesh::SharedBuffer<real_t>&                            frozen_displacement()   = 0;
         virtual const smesh::SharedBuffer<real_t>&                      distances_whole() const = 0;
         virtual const smesh::SharedBuffer<real_t>&                      directors() const       = 0;
     };

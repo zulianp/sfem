@@ -19,7 +19,6 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      mass,
                                const real_t                                           penalty,
                                const ptrdiff_t                                        in_stride,
-                               const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in_old,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                                real_t* const                                          macaulay);
 
@@ -77,10 +76,9 @@ namespace sfem {
                              const count_t* const SFEM_RESTRICT                     cm_rowptr,
                              const idx_t* const SFEM_RESTRICT                       cm_colidx,
                              const real_t* const SFEM_RESTRICT                      cm_vals,
-                             const real_t* const* SFEM_RESTRICT const SFEM_RESTRICT normals,
+                             const real_t* const* const SFEM_RESTRICT               normals,
                              const real_t* const SFEM_RESTRICT                      gap,
                              const ptrdiff_t                                        in_stride,
-                             const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in_old,
                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                              real_t* const SFEM_RESTRICT                            penetration);
 }  // namespace sfem
