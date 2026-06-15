@@ -43,8 +43,8 @@ namespace sfem {
             real_t u2[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 for (count_t j = 0; j < lenrow; j++) {
-                    const ptrdiff_t dof = row[j] * dim + d;
-                    u2[d] += weights[j] * (in[d][j * in_stride] - in_old[d][j * in_stride]);
+                    const ptrdiff_t dof = row[j] * in_stride;
+                    u2[d] += weights[j] * (in[d][dof] - in_old[d][dof]);
                 }
             }
 
@@ -205,8 +205,8 @@ namespace sfem {
             real_t u2[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 for (count_t j = 0; j < lenrow; j++) {
-                    const ptrdiff_t dof = row[j] * dim + d;
-                    u2[d] += weights[j] * in[d][j * in_stride];
+                    const ptrdiff_t dof = row[j] * in_stride;
+                    u2[d] += weights[j] * in[d][dof];
                 }
             }
 
@@ -314,7 +314,7 @@ namespace sfem {
             for (int d = 0; d < dim; d++) {
                 real_t u2 = 0;
                 for (count_t j = 0; j < lenrow; j++) {
-                    const ptrdiff_t dof2 = row[j] * in_stride + d;
+                    const ptrdiff_t dof2 = row[j] * in_stride;
                     u2 += weights[j] * (in[d][dof2] - in_old[d][dof2]);
                 }
 
