@@ -1518,19 +1518,16 @@ namespace sfem {
                                             const real_t                          search_radius_sqr,
                                             const ExecutionSpace                  es) {
         const char* const sel    = std::getenv("SFEM_CONTACT");
-        const std::string method = sel ? sel : "nts";
-
-        if (method == "mortar") {
-            printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
-            return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
-        }
+        const std::string method = sel ? sel : "mortar";
 
         if (method != "nts") {
-            printf("[Contact] unknown SFEM_CONTACT='%s', falling back to node-to-segment\n", method.c_str());
+            return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
         } else {
             printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
         }
-        return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
+
+        // if (method == "mortar")
+        return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
     }
 
 #ifdef SFEM_ENABLE_YAML
