@@ -1034,9 +1034,7 @@ namespace sfem {
             }
         }
 
-        void nonlinear_cycle() { nonlinear_iteration(); }
-
-        real_t nonlinear_iteration() {
+        void nonlinear_cycle() {
             nonlinear_smooth(memory[0]->solution);
 
             const real_t grad_norm = eval_fine_residual_and_jacobian();
@@ -1047,47 +1045,48 @@ namespace sfem {
             if (n_levels() > 1) {
                 auto mem_coarse = memory[1];
 
-                blas->values(mem_coarse->rhs->size(), 0, mem_coarse->rhs->data());
+                blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                 data->restrictions[0]->apply(mem->work->data(), mem_coarse->rhs->data());
-                blas->values(mem_coarse->solution->size(), 0, mem_coarse->solution->data());
+                blas->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
 
                 linear_cycle(1);
 
-                blas->values(mem->correction->size(), 0, mem->correction->data());
+                blas->zeros(mem->correction->size(), mem->correction->data());
                 data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
 
-                blas->copy(mem->solution->size(), mem->solution->data(), mem->rhs->data());
+                // Simple correction
+                blas->axpy(mem->solution->size(), 1, mem->correction->data(), mem->solution->data());
 
-                real_t alpha = params.correction_damping;
-                for (int ls = 0; ls < params.line_search_steps; ++ls) {
-                    const real_t* const x0 = mem->rhs->data();
-                    const real_t* const dx = mem->correction->data();
-                    real_t* const       x  = mem->solution->data();
-                    const ptrdiff_t     n  = mem->solution->size();
+                // blas->copy(mem->solution->size(), mem->solution->data(), mem->rhs->data());
 
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; ++i) {
-                        x[i] = x0[i] + alpha * dx[i];
-                    }
+                //                 real_t alpha = params.correction_damping;
+                //                 for (int ls = 0; ls < params.line_search_steps; ++ls) {
+                //                     const real_t* const x0 = mem->rhs->data();
+                //                     const real_t* const dx = mem->correction->data();
+                //                     real_t* const       x  = mem->solution->data();
+                //                     const ptrdiff_t     n  = mem->solution->size();
 
-                    if (params.line_search_recompute_contact) {
-                        resample_contact_conditions(mem->solution);
-                    }
+                // #pragma omp parallel for
+                //                     for (ptrdiff_t i = 0; i < n; ++i) {
+                //                         x[i] = x0[i] + alpha * dx[i];
+                //                     }
 
-                    const real_t trial_norm = eval_fine_residual(mem->solution, mem->work);
-                    if (trial_norm <= grad_norm || alpha <= params.min_correction_damping) {
-                        break;
-                    }
+                //                     if (params.line_search_recompute_contact) {
+                //                         resample_contact_conditions(mem->solution);
+                //                     }
 
-                    alpha *= real_t(0.5);
-                }
+                //                     const real_t trial_norm = eval_fine_residual(mem->solution, mem->work);
+                //                     if (trial_norm <= grad_norm || alpha <= params.min_correction_damping) {
+                //                         break;
+                //                     }
+
+                //                     alpha *= real_t(0.5);
+                //                 }
             }
 
             nonlinear_smooth(memory[0]->solution);
 
             if (params.enable_augmentation) update_augmentation();
-
-            return grad_norm;
         }
 
         void linear_cycle(int level) {
@@ -1099,9 +1098,8 @@ namespace sfem {
             auto op       = operators[level];
 
             if (level == n_levels() - 1) {
-                smoother->set_op_and_diag_shift(
-                        op + contact_hessian_op(level, true), contact_block_diag[level], memory[level]->diag);
-                blas->values(mem->solution->size(), 0, mem->solution->data());
+                smoother->set_op_and_diag_shift(shifted_op(level), contact_block_diag[level], memory[level]->diag);
+                blas->zeros(mem->solution->size(), mem->solution->data());
                 smoother->apply(mem->rhs->data(), mem->solution->data());
                 return;
             }
@@ -1109,20 +1107,20 @@ namespace sfem {
             auto sop        = shifted_op(level);
             auto mem_coarse = memory[level + 1];
 
-            smoother->set_op_and_diag_shift(op + contact_hessian_op(level, true), contact_block_diag[level], memory[level]->diag);
+            smoother->set_op_and_diag_shift(sop, contact_block_diag[level], memory[level]->diag);
             smoother->apply(mem->rhs->data(), mem->solution->data());
 
-            blas->values(mem->work->size(), 0, mem->work->data());
+            blas->zeros(mem->work->size(), mem->work->data());
             sop->apply(mem->solution->data(), mem->work->data());
             blas->axpby(mem->work->size(), 1, mem->rhs->data(), -1, mem->work->data());
 
-            blas->values(mem_coarse->rhs->size(), 0, mem_coarse->rhs->data());
+            blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
             data->restrictions[level]->apply(mem->work->data(), mem_coarse->rhs->data());
-            blas->values(mem_coarse->solution->size(), 0, mem_coarse->solution->data());
+            blas->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
 
             linear_cycle(level + 1);
 
-            blas->values(mem->work->size(), 0, mem->work->data());
+            blas->zeros(mem->work->size(), mem->work->data());
             data->prolongations[level + 1]->apply(mem_coarse->solution->data(), mem->work->data());
             blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
 
@@ -1163,7 +1161,9 @@ namespace sfem {
                 impl_->resample_contact_conditions(mem->solution);
             }
 
-            const real_t grad_norm = impl_->nonlinear_iteration();
+            impl_->nonlinear_cycle();
+
+            const real_t grad_norm = impl_->eval_fine_residual(mem->solution, mem->work);
             printf("MaMAL::solve %d gradient_norm %e\n", iter, (double)grad_norm);
             fflush(stdout);
 
