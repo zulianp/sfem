@@ -249,7 +249,7 @@ namespace sfem {
             real_t applied[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 // Point-applied we scale it by the density at the contact point
-                applied[d] = mass[i] * normal_diff * normal[d];
+                applied[d] = penalty * mass[i] * normal_diff * normal[d];
             }
 
             for (int d = 0; d < dim; d++) {
