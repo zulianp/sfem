@@ -194,6 +194,87 @@ namespace sfem {
         }
     }
 
+    void assemble_contact_hessian_block_diag(const int                                        dim,
+                                             const ptrdiff_t                                  nnodes,
+                                             const count_t* const SFEM_RESTRICT               cm_rowptr,
+                                             const idx_t* const SFEM_RESTRICT                 cm_colidx,
+                                             const real_t* const SFEM_RESTRICT                cm_vals,
+                                             const real_t* const* const SFEM_RESTRICT         normals,
+                                             const real_t* const SFEM_RESTRICT                mass,
+                                             const real_t                                     penalty,
+                                             const real_t* const SFEM_RESTRICT                active,
+                                             const ptrdiff_t                                  diag_stride,
+                                             real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
+        SFEM_TRACE_SCOPE("assemble_contact_hessian_block_diag");
+        assert(dim == 3);
+
+        const real_t* const nx = normals[0];
+        const real_t* const ny = normals[1];
+        const real_t* const nz = normals[2];
+
+        real_t* const d0 = diag_values[0];
+        real_t* const d1 = diag_values[1];
+        real_t* const d2 = diag_values[2];
+        real_t* const d3 = diag_values[3];
+        real_t* const d4 = diag_values[4];
+        real_t* const d5 = diag_values[5];
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            if (active[i] == 0) continue;
+
+            const count_t row_begin = cm_rowptr[i];
+            const count_t row_end   = cm_rowptr[i + 1];
+            if (row_begin == row_end) continue;
+
+            const real_t s  = mass[i] * penalty;
+            const real_t n0 = nx[i];
+            const real_t n1 = ny[i];
+            const real_t n2 = nz[i];
+
+            const real_t b0 = s * n0 * n0;
+            const real_t b1 = s * n0 * n1;
+            const real_t b2 = s * n0 * n2;
+            const real_t b3 = s * n1 * n1;
+            const real_t b4 = s * n1 * n2;
+            const real_t b5 = s * n2 * n2;
+
+            const ptrdiff_t ii = i * diag_stride;
+
+#pragma omp atomic update
+            d0[ii] += b0;
+#pragma omp atomic update
+            d1[ii] += b1;
+#pragma omp atomic update
+            d2[ii] += b2;
+#pragma omp atomic update
+            d3[ii] += b3;
+#pragma omp atomic update
+            d4[ii] += b4;
+#pragma omp atomic update
+            d5[ii] += b5;
+
+            for (count_t k = row_begin; k < row_end; ++k) {
+                const ptrdiff_t r  = cm_colidx[k] * diag_stride;
+                const real_t    w  = cm_vals[k];
+                const real_t    w2 = w * w;
+
+#pragma omp atomic update
+                d0[r] += w2 * b0;
+#pragma omp atomic update
+                d1[r] += w2 * b1;
+#pragma omp atomic update
+                d2[r] += w2 * b2;
+#pragma omp atomic update
+                d3[r] += w2 * b3;
+#pragma omp atomic update
+                d4[r] += w2 * b4;
+#pragma omp atomic update
+                d5[r] += w2 * b5;
+            }
+        }
+    }
+
     void contact_hessian_apply(const int                                              dim,
                                const ptrdiff_t                                        nnodes,
                                const count_t* const SFEM_RESTRICT                     cm_rowptr,
@@ -262,6 +343,85 @@ namespace sfem {
 #pragma omp atomic update
                     out_values[d][row[j] * out_stride] -= applied[d] * weights[j];
                 }
+            }
+        }
+    }
+
+    void apply_contact_hessian(const int                                dim,
+                               const ptrdiff_t                          nnodes,
+                               const count_t* const SFEM_RESTRICT       cm_rowptr,
+                               const idx_t* const SFEM_RESTRICT         cm_colidx,
+                               const real_t* const SFEM_RESTRICT        cm_vals,
+                               const idx_t* const SFEM_RESTRICT         node_mapping,
+                               const real_t* const* const SFEM_RESTRICT normals,
+                               const real_t* const SFEM_RESTRICT        mass,
+                               const real_t* const SFEM_RESTRICT        active,
+                               const real_t                             penalty,
+                               const real_t* const SFEM_RESTRICT        x,
+                               real_t* const SFEM_RESTRICT              y) {
+        assert(dim == 3);
+
+        const real_t* const nx = normals[0];
+        const real_t* const ny = normals[1];
+        const real_t* const nz = normals[2];
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t a = active[i];
+            if (a == 0) continue;
+
+            const count_t row_begin = cm_rowptr[i];
+            const count_t row_end   = cm_rowptr[i + 1];
+            if (row_begin == row_end) continue;
+
+            const ptrdiff_t dof1 = node_mapping[i] * dim;
+
+            const real_t x10 = x[dof1];
+            const real_t x11 = x[dof1 + 1];
+            const real_t x12 = x[dof1 + 2];
+
+            real_t x20 = 0;
+            real_t x21 = 0;
+            real_t x22 = 0;
+
+            for (count_t k = row_begin; k < row_end; ++k) {
+                const real_t    w    = cm_vals[k];
+                const ptrdiff_t dof2 = node_mapping[cm_colidx[k]] * dim;
+
+                x20 += w * x[dof2];
+                x21 += w * x[dof2 + 1];
+                x22 += w * x[dof2 + 2];
+            }
+
+            const real_t n0 = nx[i];
+            const real_t n1 = ny[i];
+            const real_t n2 = nz[i];
+            const real_t s  = a * penalty * mass[i] * (n0 * (x10 - x20) + n1 * (x11 - x21) + n2 * (x12 - x22));
+            const real_t f0 = s * n0;
+            const real_t f1 = s * n1;
+            const real_t f2 = s * n2;
+
+#pragma omp atomic update
+            y[dof1] += f0;
+
+#pragma omp atomic update
+            y[dof1 + 1] += f1;
+
+#pragma omp atomic update
+            y[dof1 + 2] += f2;
+
+            for (count_t k = row_begin; k < row_end; ++k) {
+                const real_t    w    = cm_vals[k];
+                const ptrdiff_t dof2 = node_mapping[cm_colidx[k]] * dim;
+
+#pragma omp atomic update
+                y[dof2] -= w * f0;
+
+#pragma omp atomic update
+                y[dof2 + 1] -= w * f1;
+
+#pragma omp atomic update
+                y[dof2 + 2] -= w * f2;
             }
         }
     }

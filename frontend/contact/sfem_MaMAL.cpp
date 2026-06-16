@@ -120,7 +120,6 @@ namespace sfem {
                               macaulay);
     }
 
-    // TODO: replace with assemble_contact_hessian_diag_block
     void assemble_contact_hessian_block_diag(ContactData&                                     cd,
                                              const real_t                                     penalty,
                                              const real_t* const                              macaulay,
@@ -129,45 +128,18 @@ namespace sfem {
         const int dim = cd.surface->spatial_dimension();
         assert(dim == 3);
 
-        auto            coupling_matrix = cd.coupling_matrix;
-        auto            rowptr          = coupling_matrix->row_ptr->data();
-        auto            colidx          = coupling_matrix->col_idx->data();
-        auto            vals            = coupling_matrix->values->data();
-        const ptrdiff_t n               = coupling_matrix->rows();
-
-        auto normals = cd.normals->data();
-        auto mass    = cd.mass_vector->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; i++) {
-            if (macaulay[i] == 0) continue;
-
-            const count_t lenrow = rowptr[i + 1] - rowptr[i];
-            if (lenrow == 0) continue;
-
-            const idx_t* const  row     = &colidx[rowptr[i]];
-            const real_t* const weights = &vals[rowptr[i]];
-
-            const real_t s  = mass[i] * penalty;
-            const real_t n0 = normals[0][i];
-            const real_t n1 = normals[1][i];
-            const real_t n2 = normals[2][i];
-
-            const real_t block[6] = {s * n0 * n0, s * n0 * n1, s * n0 * n2, s * n1 * n1, s * n1 * n2, s * n2 * n2};
-
-            for (int d = 0; d < 6; ++d) {
-#pragma omp atomic update
-                diag_values[d][i] += block[d];
-            }
-
-            for (count_t j = 0; j < lenrow; j++) {
-                const idx_t  r  = row[j];
-                const real_t w2 = weights[j] * weights[j];
-                for (int d = 0; d < 6; ++d) {
-#pragma omp atomic update
-                    diag_values[d][r] += w2 * block[d];
-                }
-            }
-        }
+        auto coupling_matrix = cd.coupling_matrix;
+        sfem::assemble_contact_hessian_block_diag(dim,
+                                                  coupling_matrix->rows(),
+                                                  coupling_matrix->row_ptr->data(),
+                                                  coupling_matrix->col_idx->data(),
+                                                  coupling_matrix->values->data(),
+                                                  cd.normals->data(),
+                                                  cd.mass_vector->data(),
+                                                  penalty,
+                                                  macaulay,
+                                                  1,
+                                                  diag_values);
     }
 
     void apply_contact_hessian(const std::shared_ptr<smesh::Mesh>& surface,
@@ -183,107 +155,18 @@ namespace sfem {
         const int dim = surface->spatial_dimension();
         assert(dim == 3);
 
-        const count_t* const rowptr = coupling_matrix->row_ptr->data();
-        const idx_t* const   colidx = coupling_matrix->col_idx->data();
-        const real_t* const  vals   = coupling_matrix->values->data();
-        const idx_t* const   nm     = surface->node_mapping()->data();
-        const real_t* const  mass   = mass_vector->data();
-        const real_t* const  alpha  = active->data();
-        const real_t* const  nx     = normals->data()[0];
-        const real_t* const  ny     = normals->data()[1];
-        const real_t* const  nz     = normals->data()[2];
-        const ptrdiff_t      n      = coupling_matrix->rows();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            const real_t a = alpha[i];
-            if (a == 0) continue;
-
-            const count_t row_begin = rowptr[i];
-            const count_t row_end   = rowptr[i + 1];
-            if (row_begin == row_end) continue;
-
-            const ptrdiff_t dof1 = nm[i] * dim;
-
-            const real_t x10 = x[dof1];
-            const real_t x11 = x[dof1 + 1];
-            const real_t x12 = x[dof1 + 2];
-
-            real_t x20 = 0;
-            real_t x21 = 0;
-            real_t x22 = 0;
-
-            for (count_t k = row_begin; k < row_end; ++k) {
-                const real_t    w    = vals[k];
-                const ptrdiff_t dof2 = nm[colidx[k]] * dim;
-
-                x20 += w * x[dof2];
-                x21 += w * x[dof2 + 1];
-                x22 += w * x[dof2 + 2];
-            }
-
-            const real_t n0 = nx[i];
-            const real_t n1 = ny[i];
-            const real_t n2 = nz[i];
-            const real_t s  = a * penalty * mass[i] * (n0 * (x10 - x20) + n1 * (x11 - x21) + n2 * (x12 - x22));
-            const real_t f0 = s * n0;
-            const real_t f1 = s * n1;
-            const real_t f2 = s * n2;
-
-#pragma omp atomic update
-            y[dof1] += f0;
-
-#pragma omp atomic update
-            y[dof1 + 1] += f1;
-
-#pragma omp atomic update
-            y[dof1 + 2] += f2;
-
-            for (count_t k = row_begin; k < row_end; ++k) {
-                const real_t    w    = vals[k];
-                const ptrdiff_t dof2 = nm[colidx[k]] * dim;
-
-#pragma omp atomic update
-                y[dof2] -= w * f0;
-
-#pragma omp atomic update
-                y[dof2 + 1] -= w * f1;
-
-#pragma omp atomic update
-                y[dof2 + 2] -= w * f2;
-            }
-        }
-    }
-
-    void apply_scaled_block_diag(const std::shared_ptr<SparseBlockVector<real_t>>& block_diag,
-                                 const SharedBuffer<real_t>&                       scaling,
-                                 const real_t                                      sign,
-                                 const real_t* const                               x,
-                                 real_t* const                                     y) {
-        SFEM_TRACE_SCOPE("apply_scaled_block_diag");
-
-        const ptrdiff_t      n_blocks = block_diag->n_blocks();
-        const idx_t* const   idx      = block_diag->idx()->data();
-        const real_t* const  blocks   = block_diag->data()->data();
-        const real_t* const  scale    = scaling->data();
-        static constexpr int dim      = 3;
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n_blocks; ++i) {
-            const real_t* const b  = &blocks[i * 6];
-            const real_t        s  = sign * scale[i];
-            const ptrdiff_t     d  = idx[i] * dim;
-            const real_t* const xi = &x[d];
-            real_t* const       yi = &y[d];
-
-            const real_t y0 = s * (b[0] * xi[0] + b[1] * xi[1] + b[2] * xi[2]);
-            const real_t y1 = s * (b[1] * xi[0] + b[3] * xi[1] + b[4] * xi[2]);
-            const real_t y2 = s * (b[2] * xi[0] + b[4] * xi[1] + b[5] * xi[2]);
-
-            yi[0] += y0;
-            yi[1] += y1;
-            yi[2] += y2;
-        }
+        sfem::apply_contact_hessian(dim,
+                                    coupling_matrix->rows(),
+                                    coupling_matrix->row_ptr->data(),
+                                    coupling_matrix->col_idx->data(),
+                                    coupling_matrix->values->data(),
+                                    surface->node_mapping()->data(),
+                                    normals->data(),
+                                    mass_vector->data(),
+                                    active->data(),
+                                    penalty,
+                                    x,
+                                    y);
     }
 
     std::vector<GalerkinRAP> create_galerkin_rap(const std::vector<std::shared_ptr<smesh::Mesh>>& surfaces,
@@ -709,12 +592,11 @@ namespace sfem {
         void nonlinear_smooth(const SharedBuffer<real_t>& x) { contact_jacobi->smooth(x); }
 
         void pack_contact_block_diag(const int level) {
-            auto            src  = contact_block_diag_soa[level]->data();
-            real_t* const   dst  = contact_block_diag_aos[level]->data();
-            const ptrdiff_t n    = memory[level]->diag->size();
-            const int       dim  = data->functions[level]->space()->block_size();
-            const mask_t*   mask = level_constraints_mask[level]->data();
-            const idx_t*    idx  = contact_block_idx[level]->data();
+            auto            src = contact_block_diag_soa[level]->data();
+            real_t* const   dst = contact_block_diag_aos[level]->data();
+            const ptrdiff_t n   = memory[level]->diag->size();
+            const int       dim = data->functions[level]->space()->block_size();
+            const idx_t*    idx = contact_block_idx[level]->data();
 
             assert(dim == 3);
 
@@ -729,28 +611,6 @@ namespace sfem {
                 b[3] = src[3][i];
                 b[4] = src[4][i];
                 b[5] = src[5][i];
-
-                const bool c0 = mask_get(dof, mask);
-                const bool c1 = mask_get(dof + 1, mask);
-                const bool c2 = mask_get(dof + 2, mask);
-
-                if (c0) {
-                    b[0] = 0;
-                    b[1] = 0;
-                    b[2] = 0;
-                }
-
-                if (c1) {
-                    b[1] = 0;
-                    b[3] = 0;
-                    b[4] = 0;
-                }
-
-                if (c2) {
-                    b[2] = 0;
-                    b[4] = 0;
-                    b[5] = 0;
-                }
             }
         }
 
