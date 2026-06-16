@@ -51,6 +51,18 @@ namespace sfem {
                                              const ptrdiff_t                                  diag_stride,
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values);
 
+    void assemble_contact_hessian_block_diag(const int                                        dim,
+                                             const ptrdiff_t                                  nnodes,
+                                             const count_t* const SFEM_RESTRICT               cm_rowptr,
+                                             const idx_t* const SFEM_RESTRICT                 cm_colidx,
+                                             const real_t* const SFEM_RESTRICT                cm_vals,
+                                             const real_t* const* const SFEM_RESTRICT         normals,
+                                             const real_t* const SFEM_RESTRICT                mass,
+                                             const real_t                                     penalty,
+                                             const real_t* const SFEM_RESTRICT                active,
+                                             const ptrdiff_t                                  diag_stride,
+                                             real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values);
+
     void contact_hessian_apply(const int                                              dim,
                                const ptrdiff_t                                        nnodes,
                                const count_t* const SFEM_RESTRICT                     cm_rowptr,
@@ -64,6 +76,19 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                                const ptrdiff_t                                        out_stride,
                                real_t* const SFEM_RESTRICT* const SFEM_RESTRICT       out_values);
+
+    void apply_contact_hessian(const int                                dim,
+                               const ptrdiff_t                          nnodes,
+                               const count_t* const SFEM_RESTRICT       cm_rowptr,
+                               const idx_t* const SFEM_RESTRICT         cm_colidx,
+                               const real_t* const SFEM_RESTRICT        cm_vals,
+                               const idx_t* const SFEM_RESTRICT         node_mapping,
+                               const real_t* const* const SFEM_RESTRICT normals,
+                               const real_t* const SFEM_RESTRICT        mass,
+                               const real_t* const SFEM_RESTRICT        active,
+                               const real_t                             penalty,
+                               const real_t* const SFEM_RESTRICT        x,
+                               real_t* const SFEM_RESTRICT              y);
 
     void gather_combine_hessian_diag(const int                                              dim,
                                      const ptrdiff_t                                        n_contact_nodes,
