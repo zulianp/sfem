@@ -403,7 +403,6 @@ namespace sfem {
         }
     }
 
-
     std::vector<GalerkinRAP> create_galerkin_rap(const std::vector<std::shared_ptr<smesh::Mesh>>& surfaces,
                                                  const std::vector<int>&                          levels) {
         int nlevels = levels.size();
@@ -821,7 +820,7 @@ namespace sfem {
 
             contact_jacobi->set_penalty(contact_penalty);
             contact_jacobi->set_n_loops(params.contact_jacobi_loops);
-            contact_jacobi->set_enable_augmentation(params.enable_augmentation);
+            contact_jacobi->set_enable_augmentation(false);
         }
 
         void nonlinear_smooth(const SharedBuffer<real_t>& x) { contact_jacobi->smooth(x); }

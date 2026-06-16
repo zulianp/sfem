@@ -1094,6 +1094,16 @@ namespace sfem {
             } else {
                 SFEM_ERROR("assemble_mortar_matrices not implemented for element type %d\n", element_type);
             }
+
+            {
+                auto   m    = mass_vector->data();
+                real_t area = 0;
+                for (ptrdiff_t i = 0; i < mass_vector->size(); i++) {
+                    area += m[i];
+                }
+                printf("AREA: %g\n", (double)area);
+                assert(area > 0);
+            }
         }
 
         void mortar_elemental_matrices_to_crs(const smesh::ElemType                             element_type,
