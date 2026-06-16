@@ -13,6 +13,7 @@
 
 #include "../contact/sfem_MaMAL.cpp"
 #include "../contact/sfem_SelfContact.cpp"
+#include "../contact/sfem_ContactSolveKernels.cpp"
 
 std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::ExecutionSpace es) {
     const ptrdiff_t n  = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
