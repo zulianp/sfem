@@ -916,3 +916,94 @@ int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t             
 
     return SFEM_SUCCESS;
 }
+
+int hex8_linear_elasticity_objective_steps(const ptrdiff_t                   nelements,
+                                           const ptrdiff_t                   stride,
+                                           const ptrdiff_t                   nnodes,
+                                           idx_t **const SFEM_RESTRICT       elements,
+                                           geom_t **const SFEM_RESTRICT      points,
+                                           const real_t                      mu,
+                                           const real_t                      lambda,
+                                           const ptrdiff_t                   u_stride,
+                                           const real_t *const SFEM_RESTRICT ux,
+                                           const real_t *const SFEM_RESTRICT uy,
+                                           const real_t *const SFEM_RESTRICT uz,
+                                           const ptrdiff_t                   inc_stride,
+                                           const real_t *const SFEM_RESTRICT incx,
+                                           const real_t *const SFEM_RESTRICT incy,
+                                           const real_t *const SFEM_RESTRICT incz,
+                                           const int                         nsteps,
+                                           const real_t *const               steps,
+                                           real_t *const SFEM_RESTRICT       out) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel
+    {
+        scalar_t *out_local = (scalar_t *)calloc(nsteps, sizeof(scalar_t));
+
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[8];
+
+            scalar_t lx[8];
+            scalar_t ly[8];
+            scalar_t lz[8];
+
+            scalar_t edispx[8];
+            scalar_t edispy[8];
+            scalar_t edispz[8];
+
+            scalar_t eincx[8];
+            scalar_t eincy[8];
+            scalar_t eincz[8];
+
+            for (int v = 0; v < 8; ++v) {
+                ev[v] = elements[v][i * stride];
+            }
+
+            for (int d = 0; d < 8; d++) {
+                lx[d] = x[ev[d]];
+                ly[d] = y[ev[d]];
+                lz[d] = z[ev[d]];
+            }
+
+            for (int v = 0; v < 8; ++v) {
+                const ptrdiff_t idx = ev[v] * u_stride;
+                edispx[v]           = ux[idx];
+                edispy[v]           = uy[idx];
+                edispz[v]           = uz[idx];
+            }
+
+            for (int v = 0; v < 8; ++v) {
+                const ptrdiff_t idx = ev[v] * inc_stride;
+                eincx[v]            = incx[idx];
+                eincy[v]            = incy[idx];
+                eincz[v]            = incz[idx];
+            }
+
+            hex8_linear_elasticity_objective_steps_integral(
+                    lx, ly, lz, n_qp, qx, qw, mu, lambda, edispx, edispy, edispz, eincx, eincy, eincz, nsteps, steps, out_local);
+        }
+
+        for (int s = 0; s < nsteps; s++) {
+#pragma omp atomic update
+            out[s] += out_local[s];
+        }
+
+        free(out_local);
+    }
+
+    for (int s = 0; s < nsteps; s++) {
+        if (out[s] != out[s]) {
+            out[s] = 1e10;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}

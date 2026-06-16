@@ -3515,86 +3515,181 @@ static SFEM_INLINE void hex8_strain(const scalar_t *const SFEM_RESTRICT adjugate
                                     const scalar_t *const SFEM_RESTRICT uy,
                                     const scalar_t *const SFEM_RESTRICT uz,
                                     scalar_t *const SFEM_RESTRICT       strain) {
-  const scalar_t x0 = 1.0/jacobian_determinant;
-  const scalar_t x1 = adjugate[0]*qy;
-  const scalar_t x2 = qz*x1;
-  const scalar_t x3 = adjugate[3]*qx;
-  const scalar_t x4 = qz*x3;
-  const scalar_t x5 = adjugate[6]*qx;
-  const scalar_t x6 = qy*x5;
-  const scalar_t x7 = x2 + x4 + x6;
-  const scalar_t x8 = qz - 1;
-  const scalar_t x9 = x1*x8 + x3*x8 + x6;
-  const scalar_t x10 = qy - 1;
-  const scalar_t x11 = qz*x10;
-  const scalar_t x12 = adjugate[0]*x11 + x10*x5 + x4;
-  const scalar_t x13 = qx - 1;
-  const scalar_t x14 = qz*x13;
-  const scalar_t x15 = qy*x13;
-  const scalar_t x16 = adjugate[3]*x14 + adjugate[6]*x15 + x2;
-  const scalar_t x17 = -x8;
-  const scalar_t x18 = -x10;
-  const scalar_t x19 = adjugate[0]*x18;
-  const scalar_t x20 = x17*x19;
-  const scalar_t x21 = x17*x3 + x18*x5 - x20;
-  const scalar_t x22 = -x13;
-  const scalar_t x23 = adjugate[6]*x22;
-  const scalar_t x24 = adjugate[3]*x22;
-  const scalar_t x25 = x17*x24;
-  const scalar_t x26 = qy*x23 + x1*x17 - x25;
-  const scalar_t x27 = x18*x23;
-  const scalar_t x28 = qz*x19 + qz*x24 - x27;
-  const scalar_t x29 = x20 + x25 + x27;
-  const scalar_t x30 = adjugate[1]*qy;
-  const scalar_t x31 = qz*x30;
-  const scalar_t x32 = adjugate[4]*qx;
-  const scalar_t x33 = qz*x32;
-  const scalar_t x34 = adjugate[7]*qx;
-  const scalar_t x35 = qy*x34;
-  const scalar_t x36 = x31 + x33 + x35;
-  const scalar_t x37 = x30*x8 + x32*x8 + x35;
-  const scalar_t x38 = adjugate[1]*x11 + x10*x34 + x33;
-  const scalar_t x39 = adjugate[4]*x14 + adjugate[7]*x15 + x31;
-  const scalar_t x40 = adjugate[1]*x18;
-  const scalar_t x41 = x17*x40;
-  const scalar_t x42 = x17*x32 + x18*x34 - x41;
-  const scalar_t x43 = adjugate[7]*x22;
-  const scalar_t x44 = adjugate[4]*x22;
-  const scalar_t x45 = x17*x44;
-  const scalar_t x46 = qy*x43 + x17*x30 - x45;
-  const scalar_t x47 = x18*x43;
-  const scalar_t x48 = qz*x40 + qz*x44 - x47;
-  const scalar_t x49 = x41 + x45 + x47;
-  const scalar_t x50 = (1.0/2.0)*x0;
-  const scalar_t x51 = adjugate[2]*qy;
-  const scalar_t x52 = qz*x51;
-  const scalar_t x53 = adjugate[5]*qx;
-  const scalar_t x54 = qz*x53;
-  const scalar_t x55 = adjugate[8]*qx;
-  const scalar_t x56 = qy*x55;
-  const scalar_t x57 = x52 + x54 + x56;
-  const scalar_t x58 = x51*x8 + x53*x8 + x56;
-  const scalar_t x59 = adjugate[2]*x11 + x10*x55 + x54;
-  const scalar_t x60 = adjugate[5]*x14 + adjugate[8]*x15 + x52;
-  const scalar_t x61 = adjugate[2]*x18;
-  const scalar_t x62 = x17*x61;
-  const scalar_t x63 = x17*x53 + x18*x55 - x62;
-  const scalar_t x64 = adjugate[8]*x22;
-  const scalar_t x65 = adjugate[5]*x22;
-  const scalar_t x66 = x17*x65;
-  const scalar_t x67 = qy*x64 + x17*x51 - x66;
-  const scalar_t x68 = x18*x64;
-  const scalar_t x69 = qz*x61 + qz*x65 - x68;
-  const scalar_t x70 = x62 + x66 + x68;
-  strain[0] = x0*(-ux[0]*x29 - ux[1]*x21 - ux[2]*x9 - ux[3]*x26 - ux[4]*x28 - ux[5]*x12 + ux[6]*x7 - ux[7]*x16);
-  strain[1] = x50*(-ux[0]*x49 - ux[1]*x42 - ux[2]*x37 - ux[3]*x46 - ux[4]*x48 - ux[5]*x38 + ux[6]*x36 - ux[7]*x39 - uy[0]*x29 - 
-  uy[1]*x21 - uy[2]*x9 - uy[3]*x26 - uy[4]*x28 - uy[5]*x12 + uy[6]*x7 - uy[7]*x16);
-  strain[2] = x50*(-ux[0]*x70 - ux[1]*x63 - ux[2]*x58 - ux[3]*x67 - ux[4]*x69 - ux[5]*x59 + ux[6]*x57 - ux[7]*x60 - uz[0]*x29 - 
-  uz[1]*x21 - uz[2]*x9 - uz[3]*x26 - uz[4]*x28 - uz[5]*x12 + uz[6]*x7 - uz[7]*x16);
-  strain[3] = x0*(-uy[0]*x49 - uy[1]*x42 - uy[2]*x37 - uy[3]*x46 - uy[4]*x48 - uy[5]*x38 + uy[6]*x36 - uy[7]*x39);
-  strain[4] = x50*(-uy[0]*x70 - uy[1]*x63 - uy[2]*x58 - uy[3]*x67 - uy[4]*x69 - uy[5]*x59 + uy[6]*x57 - uy[7]*x60 - uz[0]*x49 - 
-  uz[1]*x42 - uz[2]*x37 - uz[3]*x46 - uz[4]*x48 - uz[5]*x38 + uz[6]*x36 - uz[7]*x39);
-  strain[5] = x0*(-uz[0]*x70 - uz[1]*x63 - uz[2]*x58 - uz[3]*x67 - uz[4]*x69 - uz[5]*x59 + uz[6]*x57 - uz[7]*x60);
+    const scalar_t x0  = 1.0 / jacobian_determinant;
+    const scalar_t x1  = adjugate[0] * qy;
+    const scalar_t x2  = qz * x1;
+    const scalar_t x3  = adjugate[3] * qx;
+    const scalar_t x4  = qz * x3;
+    const scalar_t x5  = adjugate[6] * qx;
+    const scalar_t x6  = qy * x5;
+    const scalar_t x7  = x2 + x4 + x6;
+    const scalar_t x8  = qz - 1;
+    const scalar_t x9  = x1 * x8 + x3 * x8 + x6;
+    const scalar_t x10 = qy - 1;
+    const scalar_t x11 = qz * x10;
+    const scalar_t x12 = adjugate[0] * x11 + x10 * x5 + x4;
+    const scalar_t x13 = qx - 1;
+    const scalar_t x14 = qz * x13;
+    const scalar_t x15 = qy * x13;
+    const scalar_t x16 = adjugate[3] * x14 + adjugate[6] * x15 + x2;
+    const scalar_t x17 = -x8;
+    const scalar_t x18 = -x10;
+    const scalar_t x19 = adjugate[0] * x18;
+    const scalar_t x20 = x17 * x19;
+    const scalar_t x21 = x17 * x3 + x18 * x5 - x20;
+    const scalar_t x22 = -x13;
+    const scalar_t x23 = adjugate[6] * x22;
+    const scalar_t x24 = adjugate[3] * x22;
+    const scalar_t x25 = x17 * x24;
+    const scalar_t x26 = qy * x23 + x1 * x17 - x25;
+    const scalar_t x27 = x18 * x23;
+    const scalar_t x28 = qz * x19 + qz * x24 - x27;
+    const scalar_t x29 = x20 + x25 + x27;
+    const scalar_t x30 = adjugate[1] * qy;
+    const scalar_t x31 = qz * x30;
+    const scalar_t x32 = adjugate[4] * qx;
+    const scalar_t x33 = qz * x32;
+    const scalar_t x34 = adjugate[7] * qx;
+    const scalar_t x35 = qy * x34;
+    const scalar_t x36 = x31 + x33 + x35;
+    const scalar_t x37 = x30 * x8 + x32 * x8 + x35;
+    const scalar_t x38 = adjugate[1] * x11 + x10 * x34 + x33;
+    const scalar_t x39 = adjugate[4] * x14 + adjugate[7] * x15 + x31;
+    const scalar_t x40 = adjugate[1] * x18;
+    const scalar_t x41 = x17 * x40;
+    const scalar_t x42 = x17 * x32 + x18 * x34 - x41;
+    const scalar_t x43 = adjugate[7] * x22;
+    const scalar_t x44 = adjugate[4] * x22;
+    const scalar_t x45 = x17 * x44;
+    const scalar_t x46 = qy * x43 + x17 * x30 - x45;
+    const scalar_t x47 = x18 * x43;
+    const scalar_t x48 = qz * x40 + qz * x44 - x47;
+    const scalar_t x49 = x41 + x45 + x47;
+    const scalar_t x50 = (1.0 / 2.0) * x0;
+    const scalar_t x51 = adjugate[2] * qy;
+    const scalar_t x52 = qz * x51;
+    const scalar_t x53 = adjugate[5] * qx;
+    const scalar_t x54 = qz * x53;
+    const scalar_t x55 = adjugate[8] * qx;
+    const scalar_t x56 = qy * x55;
+    const scalar_t x57 = x52 + x54 + x56;
+    const scalar_t x58 = x51 * x8 + x53 * x8 + x56;
+    const scalar_t x59 = adjugate[2] * x11 + x10 * x55 + x54;
+    const scalar_t x60 = adjugate[5] * x14 + adjugate[8] * x15 + x52;
+    const scalar_t x61 = adjugate[2] * x18;
+    const scalar_t x62 = x17 * x61;
+    const scalar_t x63 = x17 * x53 + x18 * x55 - x62;
+    const scalar_t x64 = adjugate[8] * x22;
+    const scalar_t x65 = adjugate[5] * x22;
+    const scalar_t x66 = x17 * x65;
+    const scalar_t x67 = qy * x64 + x17 * x51 - x66;
+    const scalar_t x68 = x18 * x64;
+    const scalar_t x69 = qz * x61 + qz * x65 - x68;
+    const scalar_t x70 = x62 + x66 + x68;
+    strain[0] =
+            x0 * (-ux[0] * x29 - ux[1] * x21 - ux[2] * x9 - ux[3] * x26 - ux[4] * x28 - ux[5] * x12 + ux[6] * x7 - ux[7] * x16);
+    strain[1] = x50 *
+                (-ux[0] * x49 - ux[1] * x42 - ux[2] * x37 - ux[3] * x46 - ux[4] * x48 - ux[5] * x38 + ux[6] * x36 - ux[7] * x39 -
+                 uy[0] * x29 - uy[1] * x21 - uy[2] * x9 - uy[3] * x26 - uy[4] * x28 - uy[5] * x12 + uy[6] * x7 - uy[7] * x16);
+    strain[2] = x50 *
+                (-ux[0] * x70 - ux[1] * x63 - ux[2] * x58 - ux[3] * x67 - ux[4] * x69 - ux[5] * x59 + ux[6] * x57 - ux[7] * x60 -
+                 uz[0] * x29 - uz[1] * x21 - uz[2] * x9 - uz[3] * x26 - uz[4] * x28 - uz[5] * x12 + uz[6] * x7 - uz[7] * x16);
+    strain[3] =
+            x0 * (-uy[0] * x49 - uy[1] * x42 - uy[2] * x37 - uy[3] * x46 - uy[4] * x48 - uy[5] * x38 + uy[6] * x36 - uy[7] * x39);
+    strain[4] = x50 *
+                (-uy[0] * x70 - uy[1] * x63 - uy[2] * x58 - uy[3] * x67 - uy[4] * x69 - uy[5] * x59 + uy[6] * x57 - uy[7] * x60 -
+                 uz[0] * x49 - uz[1] * x42 - uz[2] * x37 - uz[3] * x46 - uz[4] * x48 - uz[5] * x38 + uz[6] * x36 - uz[7] * x39);
+    strain[5] =
+            x0 * (-uz[0] * x70 - uz[1] * x63 - uz[2] * x58 - uz[3] * x67 - uz[4] * x69 - uz[5] * x59 + uz[6] * x57 - uz[7] * x60);
+}
+
+static SFEM_INLINE void hex8_linear_elasticity_objective_at_qp(const scalar_t *const SFEM_RESTRICT adjugate,
+                                                               const scalar_t                      jacobian_determinant,
+                                                               const scalar_t                      qx,
+                                                               const scalar_t                      qy,
+                                                               const scalar_t                      qz,
+                                                               const scalar_t                      qw,
+                                                               const scalar_t                      mu,
+                                                               const scalar_t                      lmbda,
+                                                               const scalar_t *const SFEM_RESTRICT dispx,
+                                                               const scalar_t *const SFEM_RESTRICT dispy,
+                                                               const scalar_t *const SFEM_RESTRICT dispz,
+                                                               scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t disp_grad[9];
+    hex8_displacement_gradient(adjugate, jacobian_determinant, qx, qy, qz, dispx, dispy, dispz, disp_grad);
+
+    v[0] = scalar_t(1.0 / 2.0) * jacobian_determinant * qw *
+           (lmbda * POW2(disp_grad[0] + disp_grad[4] + disp_grad[8]) +
+            mu * (2 * POW2(disp_grad[0]) + 2 * POW2(disp_grad[4]) + 2 * POW2(disp_grad[8]) + POW2(disp_grad[1] + disp_grad[3]) +
+                  POW2(disp_grad[2] + disp_grad[6]) + POW2(disp_grad[5] + disp_grad[7])));
+}
+
+static SFEM_INLINE void hex8_linear_elasticity_objective_integral(const scalar_t *const SFEM_RESTRICT lx,
+                                                                  const scalar_t *const SFEM_RESTRICT ly,
+                                                                  const scalar_t *const SFEM_RESTRICT lz,
+                                                                  const int                           nqp,
+                                                                  const scalar_t *const SFEM_RESTRICT qx,
+                                                                  const scalar_t *const SFEM_RESTRICT qw,
+                                                                  const scalar_t                      mu,
+                                                                  const scalar_t                      lmbda,
+                                                                  const scalar_t *const SFEM_RESTRICT dispx,
+                                                                  const scalar_t *const SFEM_RESTRICT dispy,
+                                                                  const scalar_t *const SFEM_RESTRICT dispz,
+                                                                  scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t jacobian_adjugate[9];
+    scalar_t jacobian_determinant;
+
+    for (int kz = 0; kz < nqp; kz++) {
+        for (int ky = 0; ky < nqp; ky++) {
+            for (int kx = 0; kx < nqp; kx++) {
+                hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
+                hex8_linear_elasticity_objective_at_qp(jacobian_adjugate,
+                                                       jacobian_determinant,
+                                                       qx[kx],
+                                                       qx[ky],
+                                                       qx[kz],
+                                                       qw[kx] * qw[ky] * qw[kz],
+                                                       mu,
+                                                       lmbda,
+                                                       dispx,
+                                                       dispy,
+                                                       dispz,
+                                                       v);
+            }
+        }
+    }
+}
+
+static SFEM_INLINE void hex8_linear_elasticity_objective_steps_integral(const scalar_t *const SFEM_RESTRICT lx,
+                                                                        const scalar_t *const SFEM_RESTRICT ly,
+                                                                        const scalar_t *const SFEM_RESTRICT lz,
+                                                                        const int                           nqp,
+                                                                        const scalar_t *const SFEM_RESTRICT qx,
+                                                                        const scalar_t *const SFEM_RESTRICT qw,
+                                                                        const scalar_t                      mu,
+                                                                        const scalar_t                      lmbda,
+                                                                        const scalar_t *const SFEM_RESTRICT dispx,
+                                                                        const scalar_t *const SFEM_RESTRICT dispy,
+                                                                        const scalar_t *const SFEM_RESTRICT dispz,
+                                                                        const scalar_t *const SFEM_RESTRICT incx,
+                                                                        const scalar_t *const SFEM_RESTRICT incy,
+                                                                        const scalar_t *const SFEM_RESTRICT incz,
+                                                                        const int                           nsteps,
+                                                                        const scalar_t *const SFEM_RESTRICT steps,
+                                                                        scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t ux[8];
+    scalar_t uy[8];
+    scalar_t uz[8];
+
+    for (int i = 0; i < nsteps; i++) {
+        for (int j = 0; j < 8; j++) {
+            ux[j] = dispx[j] + incx[j] * steps[i];
+            uy[j] = dispy[j] + incy[j] * steps[i];
+            uz[j] = dispz[j] + incz[j] * steps[i];
+        }
+
+        hex8_linear_elasticity_objective_integral(lx, ly, lz, nqp, qx, qw, mu, lmbda, ux, uy, uz, &v[i]);
+    }
 }
 
 #endif  // HEX8_LINEAR_ELASTICITY_INLINE_CPU_H

@@ -253,6 +253,33 @@ namespace sfem {
                               macaulay);
     }
 
+    void compute_penetration_from_global_displacement(ContactData&        cd,
+                                                      const real_t* const disp,
+                                                      real_t* const       work,
+                                                      real_t* const       penetration) {
+        SFEM_TRACE_SCOPE("compute_penetration_from_global_displacement");
+        const int dim             = cd.surface->spatial_dimension();
+        auto      coupling_matrix = cd.coupling_matrix;
+        auto      rowptr          = coupling_matrix->row_ptr->data();
+        auto      colidx          = coupling_matrix->col_idx->data();
+        auto      vals            = coupling_matrix->values->data();
+        auto      nm              = cd.surface->node_mapping()->data();
+        ptrdiff_t n               = coupling_matrix->rows();
+        assert(dim == 3);
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; i++) {
+            const ptrdiff_t global_dof = nm[i] * dim;
+            const ptrdiff_t local_dof  = i * dim;
+            work[local_dof + 0]        = disp[global_dof + 0];
+            work[local_dof + 1]        = disp[global_dof + 1];
+            work[local_dof + 2]        = disp[global_dof + 2];
+        }
+
+        const real_t* const local_disp[3] = {work + 0, work + 1, work + 2};
+        compute_penetration(dim, n, rowptr, colidx, vals, cd.normals->data(), cd.distances->data(), dim, local_disp, penetration);
+    }
+
     void assemble_contact_hessian_block_diag(ContactData&                                     cd,
                                              const real_t                                     penalty,
                                              const real_t* const                              macaulay,
@@ -1014,6 +1041,9 @@ namespace sfem {
                 {  // Prolongate and correct
                     blas->zeros(mem->correction->size(), mem->correction->data());
                     data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
+
+                    // TODO: Line search using augmented lagrangian energy as well as the function energy
+
                     blas->axpy(mem->solution->size(), 0.4, mem->correction->data(), mem->solution->data());
                 }
             }
@@ -1091,6 +1121,8 @@ namespace sfem {
 #endif
 
     int MaMAL::solve(const smesh::SharedBuffer<real_t>& x) {
+        SFEM_TRACE_SCOPE("MaMAL::solve");
+
         auto blas = sfem::blas<real_t>(impl_->f->execution_space());
         auto mem  = impl_->memory[0];
 
@@ -1106,7 +1138,13 @@ namespace sfem {
             impl_->nonlinear_cycle();
 
             const real_t grad_norm = impl_->eval_fine_residual(mem->solution, mem->work);
-            printf("MaMAL::solve %d gradient_norm %e\n", iter, (double)grad_norm);
+            compute_penetration_from_global_displacement(*impl_->contact_jacobi_data,
+                                                         mem->solution->data(),
+                                                         impl_->contact_local_grad->data(),
+                                                         impl_->macaulay->data());
+            const real_t penetration_norm = blas->norm2(impl_->macaulay->size(), impl_->macaulay->data());
+
+            printf("MaMAL::solve %d gradient_norm %e penetration_norm %e\n", iter, (double)grad_norm, (double)penetration_norm);
             fflush(stdout);
 
             if (grad_norm < impl_->params.tolerance) {

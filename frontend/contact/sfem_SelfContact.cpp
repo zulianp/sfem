@@ -18,7 +18,7 @@
 #include <ryml.hpp>
 #endif
 
-#define VIZ_DEBUG
+// #define VIZ_DEBUG
 
 #ifdef VIZ_DEBUG
 #include "/Users/patrickzulian/Desktop/code/sviz/src/sviz_monitor_client.hpp"
@@ -1101,7 +1101,7 @@ namespace sfem {
                 for (ptrdiff_t i = 0; i < mass_vector->size(); i++) {
                     area += m[i];
                 }
-                printf("AREA: %g\n", (double)area);
+                // printf("AREA: %g\n", (double)area);
                 assert(area > 0);
             }
         }
