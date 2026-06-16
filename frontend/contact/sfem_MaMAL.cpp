@@ -80,148 +80,44 @@ namespace sfem {
         std::shared_ptr<CRS_t> apply(const std::shared_ptr<CRS_t>& A) const { return sfem::rap(R, A, P); }
     };
 
-    void compute_penetration(ContactData& cd, const real_t* const disp, real_t* const penetration) {
-        SFEM_TRACE_SCOPE("compute_penetration");
+    void compute_macaulay_term_from_global_displacement(ContactData&        cd,
+                                                        const real_t        penalty,
+                                                        const real_t* const disp,
+                                                        real_t* const       work,
+                                                        real_t* const       macaulay) {
+        SFEM_TRACE_SCOPE("compute_macaulay_term_from_global_displacement");
         const int dim             = cd.surface->spatial_dimension();
         auto      coupling_matrix = cd.coupling_matrix;
         auto      rowptr          = coupling_matrix->row_ptr->data();
         auto      colidx          = coupling_matrix->col_idx->data();
         auto      vals            = coupling_matrix->values->data();
+        auto      nm              = cd.surface->node_mapping()->data();
         ptrdiff_t n               = coupling_matrix->rows();
-
-        auto d       = cd.distances->data();
-        auto normals = cd.normals->data();
-        auto nm      = cd.surface->node_mapping()->data();
+        assert(dim == 3);
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; i++) {
-            const count_t lenrow = rowptr[i + 1] - rowptr[i];
-            if (lenrow == 0) {
-                penetration[i] = 0;
-                continue;
-            }
-
-            const idx_t* const  row     = &colidx[rowptr[i]];
-            const real_t* const weights = &vals[rowptr[i]];
-            const ptrdiff_t     dof1    = nm[i] * dim;
-
-            real_t normal_diff = 0;
-            for (int d = 0; d < dim; d++) {
-                real_t u2 = 0;
-                for (count_t j = 0; j < lenrow; j++) {
-                    const ptrdiff_t dof2 = nm[row[j]] * dim + d;
-                    u2 += weights[j] * disp[dof2];
-                }
-
-                normal_diff += normals[d][i] * (disp[dof1 + d] - u2);
-            }
-
-            penetration[i] = std::max(real_t(0), normal_diff - d[i]);
+            const ptrdiff_t global_dof = nm[i] * dim;
+            const ptrdiff_t local_dof  = i * dim;
+            work[local_dof + 0]        = disp[global_dof + 0];
+            work[local_dof + 1]        = disp[global_dof + 1];
+            work[local_dof + 2]        = disp[global_dof + 2];
         }
-    }
 
-    void compute_macaulay_term_from_penetration(ContactData&        cd,
-                                                const real_t        penalty,
-                                                const real_t* const penetration,
-                                                real_t* const       macaulay) {
-        SFEM_TRACE_SCOPE("compute_macaulay_term_from_penetration");
-        auto            coupling_matrix = cd.coupling_matrix;
-        auto            rowptr          = coupling_matrix->row_ptr->data();
-        auto            aug             = cd.agumentation->data();
-        const ptrdiff_t n               = coupling_matrix->rows();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; i++) {
-            if (rowptr[i + 1] == rowptr[i]) {
-                macaulay[i] = 0;
-                continue;
-            }
-
-            macaulay[i] = std::max(penetration[i] + aug[i] / penalty, real_t(0));
-        }
-    }
-
-    void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
-                         const std::shared_ptr<Buffer<real_t>>&  displacement,
-                         const std::shared_ptr<Buffer<real_t*>>& inout) {
-        auto p = inout->data();
-        auto u = displacement->data();
-        auto m = surface->node_mapping()->data();
-
-        const ptrdiff_t n   = surface->node_mapping()->size();
-        const int       dim = surface->spatial_dimension();
-
-        for (int d = 0; d < dim; d++) {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                p[d][i] += u[m[i] * dim + d];
-            }
-        }
-    }
-
-    void compute_macaulay_term(ContactData& cd, const real_t penalty, const real_t* const disp, real_t* const macaulay) {
-        SFEM_TRACE_SCOPE("compute_macaulay_term");
-        const int dim             = cd.surface->spatial_dimension();
-        auto      coupling_matrix = cd.coupling_matrix;
-        auto      values          = cd.values;
-        auto      rowptr          = coupling_matrix->row_ptr->data();
-        auto      colidx          = coupling_matrix->col_idx->data();
-        auto      vals            = values->data();
-        ptrdiff_t n               = coupling_matrix->row_ptr->size() - 1;
-
-        auto d       = cd.distances->data();
-        auto aug     = cd.agumentation->data();
-        auto normals = cd.normals->data();
-        auto mass    = cd.mass_vector->data();
-
-        auto nm = cd.surface->node_mapping()->data();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; i++) {
-            auto lenrow = rowptr[i + 1] - rowptr[i];
-            if (lenrow == 0) {
-                macaulay[i] = 0;
-                continue;
-            }
-
-            auto row = &colidx[rowptr[i]];
-
-            auto weights = &vals[rowptr[i]];
-
-            real_t u1[3] = {0, 0, 0};
-            for (int d = 0; d < dim; d++) {
-                const ptrdiff_t dof = nm[i] * dim + d;
-                u1[d]               = disp[dof];
-            }
-
-            real_t u2[3] = {0, 0, 0};
-            for (int d = 0; d < dim; d++) {
-                for (count_t j = 0; j < lenrow; j++) {
-                    const ptrdiff_t dof = nm[row[j]] * dim + d;
-                    u2[d] += weights[j] * disp[dof];
-                }
-            }
-
-            const real_t g         = d[i];
-            real_t       normal[3] = {0, 0, 0};
-            for (int d = 0; d < dim; d++) {
-                normal[d] = normals[d][i];
-            }
-
-            real_t diff[3] = {0, 0, 0};
-            for (int d = 0; d < dim; d++) {
-                diff[d] = u1[d] - u2[d];
-            }
-
-            real_t normal_diff = 0;
-            for (int d = 0; d < dim; d++) {
-                normal_diff += normal[d] * diff[d];
-            }
-
-            real_t pen       = normal_diff - g;
-            real_t lagr_mult = aug[i];
-            macaulay[i]      = std::max(pen + lagr_mult / penalty, real_t(0));
-        }
+        const real_t* const local_disp[3] = {work + 0, work + 1, work + 2};
+        compute_macaulay_term(dim,
+                              n,
+                              rowptr,
+                              colidx,
+                              vals,
+                              cd.distances->data(),
+                              cd.agumentation->data(),
+                              cd.normals->data(),
+                              cd.mass_vector->data(),
+                              penalty,
+                              dim,
+                              local_disp,
+                              macaulay);
     }
 
     void assemble_contact_hessian_block_diag(ContactData&                                     cd,
@@ -971,17 +867,16 @@ namespace sfem {
 
             blas->values(ndofs, 0, contact_grad->data());
 
-            // TODO: use the function from ContactSolveKernels.cpp
-            compute_macaulay_term(*contact_jacobi_data, contact_penalty, x->data(), macaulay->data());
-
-            const int           dim       = contact_jacobi_data->surface->spatial_dimension();
-            const ptrdiff_t     n_contact = contact_jacobi_data->coupling_matrix->rows();
-            const auto          cm        = contact_jacobi_data->coupling_matrix;
-            const auto          surface   = contact_jacobi_data->surface;
-            real_t* const       cg        = contact_grad->data();
-            const real_t* const lcg       = contact_local_grad->data();
-            const idx_t* const  nm        = surface->node_mapping()->data();
+            const int          dim       = contact_jacobi_data->surface->spatial_dimension();
+            const ptrdiff_t    n_contact = contact_jacobi_data->coupling_matrix->rows();
+            const auto         cm        = contact_jacobi_data->coupling_matrix;
+            const auto         surface   = contact_jacobi_data->surface;
+            real_t* const      cg        = contact_grad->data();
+            const idx_t* const nm        = surface->node_mapping()->data();
             assert(dim == 3);
+
+            compute_macaulay_term_from_global_displacement(
+                    *contact_jacobi_data, contact_penalty, x->data(), contact_local_grad->data(), macaulay->data());
 
             blas->values(contact_local_grad->size(), 0, contact_local_grad->data());
             assemble_contact_gradient(dim,
@@ -997,6 +892,7 @@ namespace sfem {
                                       macaulay->data(),
                                       contact_local_grad->data());
 
+            const real_t* const lcg = contact_local_grad->data();
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_contact; ++i) {
                 const ptrdiff_t global_dof = nm[i] * dim;
@@ -1021,7 +917,11 @@ namespace sfem {
         }
 
         void update_augmentation() {
-            compute_macaulay_term(*contact_jacobi_data, contact_penalty, memory[0]->solution->data(), macaulay->data());
+            compute_macaulay_term_from_global_displacement(*contact_jacobi_data,
+                                                           contact_penalty,
+                                                           memory[0]->solution->data(),
+                                                           contact_local_grad->data(),
+                                                           macaulay->data());
 
             real_t* const       aug = agumentation->data();
             const real_t* const m   = macaulay->data();
