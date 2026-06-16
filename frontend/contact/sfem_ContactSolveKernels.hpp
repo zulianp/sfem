@@ -5,6 +5,8 @@
 #include "sfem_base.hpp"
 #include "sfem_macros.hpp"
 
+#include "sfem_ForwardDeclarations.hpp"
+
 #include <stddef.h>
 
 namespace sfem {
@@ -81,6 +83,38 @@ namespace sfem {
                              const ptrdiff_t                                        in_stride,
                              const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                              real_t* const SFEM_RESTRICT                            penetration);
+
+    struct ContactData {
+        using CRS_t = sfem::CRS<count_t, idx_t, real_t, real_t>;
+
+        std::shared_ptr<sfem::Function> f;
+        std::shared_ptr<smesh::Mesh>    surface;
+        std::shared_ptr<CRS_t>          coupling_matrix;
+        smesh::SharedBuffer<real_t>     values;
+        smesh::SharedBuffer<real_t>     mass_vector;
+        smesh::SharedBuffer<real_t*>    normals;
+        smesh::SharedBuffer<real_t>     distances;
+        SharedBuffer<mask_t>            constraints_mask;
+        smesh::SharedBuffer<real_t>     agumentation;
+    };
+
+    class ContactJacobi {
+    public:
+        ContactJacobi(const std::shared_ptr<ContactData>& cd);
+        ~ContactJacobi();
+
+        void smooth(const SharedBuffer<real_t>& x);
+        void contact_data_changed();
+
+        void set_penalty(real_t penalty);
+        void set_n_loops(int n_loops);
+        void set_enable_augmentation(bool enable_augmentation);
+        void set_relaxation_parameter(real_t relaxation_parameter);
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
 }  // namespace sfem
 
 #endif  // SFEM_CONTACT_SOLVE_KERNELS_HPP

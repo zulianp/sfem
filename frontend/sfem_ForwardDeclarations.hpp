@@ -34,6 +34,9 @@ namespace sfem {
     template <typename T>
     class MatrixFreeLinearSolver;
 
+    template <typename R, typename C, typename TStorage, typename T>
+    class CRS;
+
     // template <typename pack_idx_t>
     // class Packed;
 }  // namespace sfem
