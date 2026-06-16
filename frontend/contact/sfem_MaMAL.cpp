@@ -120,6 +120,7 @@ namespace sfem {
                               macaulay);
     }
 
+    // TODO: replace with assemble_contact_hessian_diag_block
     void assemble_contact_hessian_block_diag(ContactData&                                     cd,
                                              const real_t                                     penalty,
                                              const real_t* const                              macaulay,
@@ -174,7 +175,6 @@ namespace sfem {
                                const SharedBuffer<real_t*>&        normals,
                                const SharedBuffer<real_t>&         mass_vector,
                                const SharedBuffer<real_t>&         active,
-                               const SharedBuffer<mask_t>&         constraints_mask,
                                const real_t                        penalty,
                                const real_t* const                 x,
                                real_t* const                       y) {
@@ -192,7 +192,6 @@ namespace sfem {
         const real_t* const  nx     = normals->data()[0];
         const real_t* const  ny     = normals->data()[1];
         const real_t* const  nz     = normals->data()[2];
-        const mask_t* const  mask   = constraints_mask ? constraints_mask->data() : nullptr;
         const ptrdiff_t      n      = coupling_matrix->rows();
 
 #pragma omp parallel for
@@ -206,9 +205,9 @@ namespace sfem {
 
             const ptrdiff_t dof1 = nm[i] * dim;
 
-            const real_t x10 = (mask && mask_get(dof1, mask)) ? 0 : x[dof1];
-            const real_t x11 = (mask && mask_get(dof1 + 1, mask)) ? 0 : x[dof1 + 1];
-            const real_t x12 = (mask && mask_get(dof1 + 2, mask)) ? 0 : x[dof1 + 2];
+            const real_t x10 = x[dof1];
+            const real_t x11 = x[dof1 + 1];
+            const real_t x12 = x[dof1 + 2];
 
             real_t x20 = 0;
             real_t x21 = 0;
@@ -218,9 +217,9 @@ namespace sfem {
                 const real_t    w    = vals[k];
                 const ptrdiff_t dof2 = nm[colidx[k]] * dim;
 
-                x20 += w * ((mask && mask_get(dof2, mask)) ? 0 : x[dof2]);
-                x21 += w * ((mask && mask_get(dof2 + 1, mask)) ? 0 : x[dof2 + 1]);
-                x22 += w * ((mask && mask_get(dof2 + 2, mask)) ? 0 : x[dof2 + 2]);
+                x20 += w * x[dof2];
+                x21 += w * x[dof2 + 1];
+                x22 += w * x[dof2 + 2];
             }
 
             const real_t n0 = nx[i];
@@ -231,39 +230,27 @@ namespace sfem {
             const real_t f1 = s * n1;
             const real_t f2 = s * n2;
 
-            if (!mask || !mask_get(dof1, mask)) {
 #pragma omp atomic update
-                y[dof1] += f0;
-            }
+            y[dof1] += f0;
 
-            if (!mask || !mask_get(dof1 + 1, mask)) {
 #pragma omp atomic update
-                y[dof1 + 1] += f1;
-            }
+            y[dof1 + 1] += f1;
 
-            if (!mask || !mask_get(dof1 + 2, mask)) {
 #pragma omp atomic update
-                y[dof1 + 2] += f2;
-            }
+            y[dof1 + 2] += f2;
 
             for (count_t k = row_begin; k < row_end; ++k) {
                 const real_t    w    = vals[k];
                 const ptrdiff_t dof2 = nm[colidx[k]] * dim;
 
-                if (!mask || !mask_get(dof2, mask)) {
 #pragma omp atomic update
-                    y[dof2] -= w * f0;
-                }
+                y[dof2] -= w * f0;
 
-                if (!mask || !mask_get(dof2 + 1, mask)) {
 #pragma omp atomic update
-                    y[dof2 + 1] -= w * f1;
-                }
+                y[dof2 + 1] -= w * f1;
 
-                if (!mask || !mask_get(dof2 + 2, mask)) {
 #pragma omp atomic update
-                    y[dof2 + 2] -= w * f2;
-                }
+                y[dof2 + 2] -= w * f2;
             }
         }
     }
@@ -824,36 +811,26 @@ namespace sfem {
             }
         }
 
-        std::shared_ptr<Operator<real_t>> contact_hessian_op(const int level, const bool offdiag_only) {
-            auto            surface          = contact_surfaces[level];
-            auto            coupling_matrix  = coupling_matrices[level];
-            auto            level_normals    = normals[level];
-            auto            level_mass       = mass_vectors[level];
-            auto            active           = contact_active[level];
-            auto            constraints      = level_constraints_mask[level];
-            auto            block_diag       = contact_block_diag[level];
-            auto            block_diag_scale = memory[level]->diag;
-            const real_t    penalty          = contact_penalty;
-            const ptrdiff_t n                = operators[level]->rows();
-            auto            es               = f->execution_space();
+        std::shared_ptr<Operator<real_t>> contact_hessian_op(const int level) {
+            auto            surface         = contact_surfaces[level];
+            auto            coupling_matrix = coupling_matrices[level];
+            auto            level_normals   = normals[level];
+            auto            level_mass      = mass_vectors[level];
+            auto            active          = contact_active[level];
+            const real_t    penalty         = contact_penalty;
+            const ptrdiff_t n               = operators[level]->rows();
+            auto            es              = f->execution_space();
 
             return sfem::make_op<real_t>(
                     n,
                     n,
                     [=](const real_t* const x, real_t* const y) {
-                        apply_contact_hessian(
-                                surface, coupling_matrix, level_normals, level_mass, active, constraints, penalty, x, y);
-
-                        if (offdiag_only) {
-                            apply_scaled_block_diag(block_diag, block_diag_scale, real_t(-1), x, y);
-                        }
+                        apply_contact_hessian(surface, coupling_matrix, level_normals, level_mass, active, penalty, x, y);
                     },
                     es);
         }
 
-        std::shared_ptr<Operator<real_t>> combined_op(const int level) {
-            return operators[level] + contact_hessian_op(level, false);
-        }
+        std::shared_ptr<Operator<real_t>> combined_op(const int level) { return operators[level] + contact_hessian_op(level); }
 
         real_t eval_fine_residual(const SharedBuffer<real_t>& x, const SharedBuffer<real_t>& residual) {
             SFEM_TRACE_SCOPE("MaMAL::eval_fine_residual");
