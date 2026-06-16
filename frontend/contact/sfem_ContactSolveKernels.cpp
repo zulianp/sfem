@@ -14,6 +14,87 @@
 
 namespace sfem {
 
+    static SFEM_INLINE count_t contact_find_col(const idx_t target, const idx_t* const SFEM_RESTRICT row, const count_t lenrow) {
+        if (lenrow <= 32) {
+            count_t k = 0;
+            for (; k + 3 < lenrow; k += 4) {
+                if (row[k] == target) return k;
+                if (row[k + 1] == target) return k + 1;
+                if (row[k + 2] == target) return k + 2;
+                if (row[k + 3] == target) return k + 3;
+            }
+
+            for (; k < lenrow; ++k) {
+                if (row[k] == target) return k;
+            }
+        } else {
+            count_t left  = 0;
+            count_t right = lenrow;
+            while (left < right) {
+                const count_t mid = left + ((right - left) >> 1);
+                if (row[mid] < target) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
+            }
+
+            return left;
+        }
+
+        return 0;
+    }
+
+    static SFEM_INLINE void contact_add_block3(real_t* const SFEM_RESTRICT block,
+                                               const real_t                c,
+                                               const real_t                b00,
+                                               const real_t                b01,
+                                               const real_t                b02,
+                                               const real_t                b11,
+                                               const real_t                b12,
+                                               const real_t                b22) {
+        const real_t v0 = c * b00;
+        const real_t v1 = c * b01;
+        const real_t v2 = c * b02;
+        const real_t v4 = c * b11;
+        const real_t v5 = c * b12;
+        const real_t v8 = c * b22;
+
+#pragma omp atomic update
+        block[0] += v0;
+#pragma omp atomic update
+        block[1] += v1;
+#pragma omp atomic update
+        block[2] += v2;
+#pragma omp atomic update
+        block[3] += v1;
+#pragma omp atomic update
+        block[4] += v4;
+#pragma omp atomic update
+        block[5] += v5;
+#pragma omp atomic update
+        block[6] += v2;
+#pragma omp atomic update
+        block[7] += v5;
+#pragma omp atomic update
+        block[8] += v8;
+    }
+
+    static SFEM_INLINE void contact_add_block(real_t* const SFEM_RESTRICT       block,
+                                              const int                         dim,
+                                              const real_t                      c,
+                                              const real_t* const SFEM_RESTRICT b) {
+        for (int d1 = 0; d1 < dim; ++d1) {
+            const int row_offset = d1 * dim;
+            for (int d2 = 0; d2 < dim; ++d2) {
+                const int    offset = row_offset + d2;
+                const real_t v      = c * b[offset];
+#pragma omp atomic update
+                block[offset] += v;
+            }
+        }
+    }
+
     void compute_macaulay_term(const int                                              dim,
                                const ptrdiff_t                                        nnodes,
                                const count_t* const SFEM_RESTRICT                     cm_rowptr,
@@ -342,6 +423,135 @@ namespace sfem {
                 for (count_t j = 0; j < lenrow; j++) {
 #pragma omp atomic update
                     out_values[d][row[j] * out_stride] -= applied[d] * weights[j];
+                }
+            }
+        }
+    }
+
+    void contact_hessian_bsr(const int                                dim,
+                             const ptrdiff_t                          nnodes,
+                             const count_t* const SFEM_RESTRICT       cm_rowptr,
+                             const idx_t* const SFEM_RESTRICT         cm_colidx,
+                             const real_t* const SFEM_RESTRICT        cm_vals,
+                             const real_t* const* const SFEM_RESTRICT normals,
+                             const real_t* const SFEM_RESTRICT        mass,
+                             const real_t                             penalty,
+                             const real_t* const SFEM_RESTRICT        macaulay,
+                             const count_t* const SFEM_RESTRICT       rowptr,
+                             const idx_t* const SFEM_RESTRICT         colidx,
+                             real_t* const SFEM_RESTRICT              values) {
+        if (dim == 3) {
+            const real_t* const nx = normals[0];
+            const real_t* const ny = normals[1];
+            const real_t* const nz = normals[2];
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (macaulay[i] == 0) continue;
+
+                const count_t contact_begin = cm_rowptr[i];
+                const count_t contact_end   = cm_rowptr[i + 1];
+                if (contact_begin == contact_end) continue;
+
+                const real_t s  = penalty * mass[i];
+                const real_t n0 = nx[i];
+                const real_t n1 = ny[i];
+                const real_t n2 = nz[i];
+
+                const real_t b00 = s * n0 * n0;
+                const real_t b01 = s * n0 * n1;
+                const real_t b02 = s * n0 * n2;
+                const real_t b11 = s * n1 * n1;
+                const real_t b12 = s * n1 * n2;
+                const real_t b22 = s * n2 * n2;
+
+                const count_t      bsr_i_begin = rowptr[i];
+                const count_t      bsr_i_len   = rowptr[i + 1] - bsr_i_begin;
+                const idx_t* const bsr_i_cols  = &colidx[bsr_i_begin];
+                real_t* const      bsr_i_vals  = &values[bsr_i_begin * 9];
+
+                {
+                    const count_t block = contact_find_col(i, bsr_i_cols, bsr_i_len);
+                    contact_add_block3(&bsr_i_vals[block * 9], 1, b00, b01, b02, b11, b12, b22);
+                }
+
+                for (count_t k = contact_begin; k < contact_end; ++k) {
+                    const idx_t  j = cm_colidx[k];
+                    const real_t w = cm_vals[k];
+
+                    {
+                        const count_t block = contact_find_col(j, bsr_i_cols, bsr_i_len);
+                        contact_add_block3(&bsr_i_vals[block * 9], -w, b00, b01, b02, b11, b12, b22);
+                    }
+
+                    const count_t      bsr_j_begin = rowptr[j];
+                    const count_t      bsr_j_len   = rowptr[j + 1] - bsr_j_begin;
+                    const idx_t* const bsr_j_cols  = &colidx[bsr_j_begin];
+                    real_t* const      bsr_j_vals  = &values[bsr_j_begin * 9];
+
+                    {
+                        const count_t block = contact_find_col(i, bsr_j_cols, bsr_j_len);
+                        contact_add_block3(&bsr_j_vals[block * 9], -w, b00, b01, b02, b11, b12, b22);
+                    }
+
+                    for (count_t l = contact_begin; l < contact_end; ++l) {
+                        const count_t block = contact_find_col(cm_colidx[l], bsr_j_cols, bsr_j_len);
+                        contact_add_block3(&bsr_j_vals[block * 9], w * cm_vals[l], b00, b01, b02, b11, b12, b22);
+                    }
+                }
+            }
+        } else {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (macaulay[i] == 0) continue;
+
+                const count_t contact_begin = cm_rowptr[i];
+                const count_t contact_end   = cm_rowptr[i + 1];
+                if (contact_begin == contact_end) continue;
+
+                const real_t s = penalty * mass[i];
+                real_t       b[9];
+                for (int d1 = 0; d1 < dim; ++d1) {
+                    const real_t sn = s * normals[d1][i];
+                    for (int d2 = 0; d2 < dim; ++d2) {
+                        b[d1 * dim + d2] = sn * normals[d2][i];
+                    }
+                }
+
+                const int          block_size  = dim * dim;
+                const count_t      bsr_i_begin = rowptr[i];
+                const count_t      bsr_i_len   = rowptr[i + 1] - bsr_i_begin;
+                const idx_t* const bsr_i_cols  = &colidx[bsr_i_begin];
+                real_t* const      bsr_i_vals  = &values[bsr_i_begin * block_size];
+
+                {
+                    const count_t block = contact_find_col(i, bsr_i_cols, bsr_i_len);
+                    contact_add_block(&bsr_i_vals[block * block_size], dim, 1, b);
+                }
+
+                for (count_t k = contact_begin; k < contact_end; ++k) {
+                    const idx_t  j = cm_colidx[k];
+                    const real_t w = cm_vals[k];
+
+                    {
+                        const count_t block = contact_find_col(j, bsr_i_cols, bsr_i_len);
+                        contact_add_block(&bsr_i_vals[block * block_size], dim, -w, b);
+                    }
+
+                    const count_t      bsr_j_begin = rowptr[j];
+                    const count_t      bsr_j_len   = rowptr[j + 1] - bsr_j_begin;
+                    const idx_t* const bsr_j_cols  = &colidx[bsr_j_begin];
+                    real_t* const      bsr_j_vals  = &values[bsr_j_begin * block_size];
+
+                    {
+                        const count_t block = contact_find_col(i, bsr_j_cols, bsr_j_len);
+                        contact_add_block(&bsr_j_vals[block * block_size], dim, -w, b);
+                    }
+
+                    for (count_t l = contact_begin; l < contact_end; ++l) {
+                        const count_t block = contact_find_col(cm_colidx[l], bsr_j_cols, bsr_j_len);
+                        contact_add_block(&bsr_j_vals[block * block_size], dim, w * cm_vals[l], b);
+                    }
                 }
             }
         }
