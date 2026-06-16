@@ -532,16 +532,18 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            // return linear_elasticity_value_aos(domain.element_type,
-            //                                   domain.block->n_elements(),
-            //                                   mesh->n_nodes(),
-            //                                   domain.block->elements()->data(),
-            //                                   mesh->points()->data(),
-            //                                   impl_->mu,
-            //                                   impl_->lambda,
-            //                                   x,
-            //                                   out);
-            SFEM_ERROR("LinearElasticity::value not implemented");
+            auto lambda = domain.parameters->require_real_value("lambda");
+            auto mu     = domain.parameters->require_real_value("mu");
+
+            return linear_elasticity_assemble_value_aos(domain.element_type,
+                                                        domain.block->n_elements(),
+                                                        mesh->n_nodes(),
+                                                        domain.block->elements()->data(),
+                                                        mesh->points()->data(),
+                                                        mu,
+                                                        lambda,
+                                                        x,
+                                                        out);
             return SFEM_FAILURE;
         });
     }
