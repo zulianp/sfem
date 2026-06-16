@@ -18,7 +18,6 @@
 
 #include "sfem_aliases.hpp"
 
-
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
@@ -236,10 +235,8 @@ namespace sfem {
                 blas_.copy(n_dofs, x, x_old->data());
             }
 
-
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
-                
                 T rnorm_previous = 10000000000;
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     count_inner_iter++;
@@ -295,9 +292,9 @@ namespace sfem {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
                     }
 
-                    bool stagnation = (std::abs(r_pen_norm/rnorm_previous) > stagnation_threshold);
-                    rnorm_previous = r_pen_norm;
-                    if(stagnation) {
+                    bool stagnation = (std::abs(r_pen_norm / rnorm_previous) > stagnation_threshold);
+                    rnorm_previous  = r_pen_norm;
+                    if (stagnation) {
                         printf("Stagnation detected\n");
                     }
 
@@ -519,12 +516,12 @@ namespace sfem {
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
-            if(debug > 1) {
+            if (debug > 1) {
                 printf("Residual: %g\n", blas_.norm2(n_dofs, mem->work->data()));
-                if(ub) {
+                if (ub) {
                     printf("UB: %g, LUB %g\n", blas_.norm2(n_constrained_dofs, ub), blas_.norm2(n_constrained_dofs, l_ub));
                 }
-                if(lb) {
+                if (lb) {
                     printf("LB: %g, LLB %g\n", blas_.norm2(n_constrained_dofs, lb), blas_.norm2(n_constrained_dofs, l_lb));
                 }
             }
@@ -591,15 +588,16 @@ namespace sfem {
             auto      mem      = memory_[level];
             auto      smoother = smoother_[level];
             auto      op       = operator_[level];
+            auto      sop      = shifted_op(level);
 
             const ptrdiff_t n_dofs = op->rows();
             for (int ns = 0; ns < nlsmooth_steps; ns++) {
                 eval_residual_and_jacobian();
 
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
+                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
                 } else {
-                    smoother->set_op_and_diag_shift(op, mem->diag);
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
                 blas_.zeros(n_dofs, correction->data());
@@ -641,8 +639,8 @@ namespace sfem {
                 penalty_pseudo_galerkin_assembly();
 
                 int ret = cycle(coarser_level(finest_level()));
-                
-                if(ret == CYCLE_FAILURE) {
+
+                if (ret == CYCLE_FAILURE) {
                     fprintf(stderr, "Coarse level solver did not converge as desired!\n");
                 }
 
@@ -709,9 +707,9 @@ namespace sfem {
 
             if (coarsest_level() == level) {
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
+                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
                 } else {
-                    smoother->set_op_and_diag_shift(op, mem->diag);
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
                 blas_.zeros(mem->solution->size(), mem->solution->data());
@@ -731,9 +729,7 @@ namespace sfem {
 
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
-                } else {
-                    smoother->set_op_and_diag_shift(op, mem->diag);
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
@@ -858,7 +854,7 @@ namespace sfem {
         T    stagnation_threshold{0.999};
         bool enable_shift{true};
 
-        int                      debug{0};
+        int                       debug{0};
         std::vector<struct Stats> stats;
 
         BLAS_Tpl<T>           blas_;
