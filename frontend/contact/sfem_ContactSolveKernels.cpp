@@ -6,6 +6,12 @@
 #include <stddef.h>
 #include "sfem_base.hpp"
 
+#include "sfem_Function.hpp"
+#include "sfem_aliases.hpp"
+#include "sfem_macros.hpp"
+
+#include "sfem_API.hpp"
+
 namespace sfem {
 
     void compute_macaulay_term(const int                                              dim,
@@ -53,9 +59,8 @@ namespace sfem {
                     u22 += w * in2[dof2];
                 }
 
-                const real_t normal_diff =
-                        n0[i] * (in0[dof1] - u20) + n1[i] * (in1[dof1] - u21) + n2[i] * (in2[dof1] - u22);
-                macaulay[i] = std::max(normal_diff - distances[i] + agumentation[i] / penalty, real_t(0));
+                const real_t normal_diff = n0[i] * (in0[dof1] - u20) + n1[i] * (in1[dof1] - u21) + n2[i] * (in2[dof1] - u22);
+                macaulay[i]              = std::max(normal_diff - distances[i] + agumentation[i] / penalty, real_t(0));
             }
         } else {
 #pragma omp parallel for
@@ -343,9 +348,8 @@ namespace sfem {
                     u22 += w * in2[dof2];
                 }
 
-                const real_t normal_diff =
-                        n0[i] * (in0[dof1] - u20) + n1[i] * (in1[dof1] - u21) + n2[i] * (in2[dof1] - u22);
-                penetration[i] = std::max(real_t(0), normal_diff - gap[i]);
+                const real_t normal_diff = n0[i] * (in0[dof1] - u20) + n1[i] * (in1[dof1] - u21) + n2[i] * (in2[dof1] - u22);
+                penetration[i]           = std::max(real_t(0), normal_diff - gap[i]);
             }
         } else {
 #pragma omp parallel for
@@ -390,278 +394,359 @@ namespace sfem {
         }
     }
 
-    //     struct ContactJacobiParameters {
-    //         real_t penalty{100};
-    //         int    n_loops{10};
-    //         real_t solver_tol{1e-6};
-    //         bool   enable_augmentation{true};
-    //         real_t relaxation_parameter{1. / 3};
-    //     };
+    void contact_scatter_displacement(const int                                              dim,
+                                      const ptrdiff_t                                        n_contact,
+                                      const idx_t* const SFEM_RESTRICT                       node_mapping,
+                                      const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
+                                      real_t* const SFEM_RESTRICT                            out) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_contact; ++i) {
+            const ptrdiff_t dof = node_mapping[i] * dim;
+            for (int d = 0; d < dim; ++d) {
+                out[dof + d] = in[d][i];
+            }
+        }
+    }
 
-    //     struct ContactJacobiWorkspace {
-    //         smesh::SharedBuffer<real_t> material_grad;
-    //         smesh::SharedBuffer<real_t> elast_diag_values;
-    //         smesh::SharedBuffer<mask_t> contact_node_mask;
-    //         smesh::SharedBuffer<real_t> contact_grad;
-    //         smesh::SharedBuffer<real_t> penetration;
-    //         smesh::SharedBuffer<real_t> macaulay;
-    //         smesh::SharedBuffer<real_t> diag_values;
-    //     };
+    class ContactJacobi::Impl {
+    public:
+        std::shared_ptr<ContactData> cd;
 
-    //     void contact_jacobi_workspace_init(const std::shared_ptr<sfem::Function>& f,
-    //                                        const std::shared_ptr<sfem::Mesh>&     contact_surface,
-    //                                        ContactJacobiWorkspace&                ws) {
-    //         SFEM_TRACE_SCOPE("contact_jacobi_workspace_init");
+        real_t penalty{100};
+        int    n_loops{10};
+        bool   enable_augmentation{false};
+        real_t relaxation_parameter{1. / 3};
 
-    //         int             dim     = f->space()->mesh_ptr()->spatial_dimension();
-    //         const ptrdiff_t ndofs   = f->space()->n_dofs();
-    //         const ptrdiff_t n_nodes = ndofs / dim;
+        struct Workspace {
+            smesh::SharedBuffer<real_t>  material_grad;
+            smesh::SharedBuffer<real_t>  elast_diag_values;
+            smesh::SharedBuffer<mask_t>  contact_node_mask;
+            smesh::SharedBuffer<real_t>  contact_grad;
+            smesh::SharedBuffer<real_t>  penetration;
+            smesh::SharedBuffer<real_t>  macaulay;
+            smesh::SharedBuffer<real_t*> displacement;
+            smesh::SharedBuffer<real_t*> diag_values;
+        };
 
-    //         const ptrdiff_t n_contact = contact_surface->n_nodes();
+        Workspace ws;
 
-    //         const int sym_block_size = (dim * (dim + 1)) / 2;
-    //         auto      es             = f->execution_space();
+        void init() {
+            auto f               = cd->f;
+            auto contact_surface = cd->surface;
+            auto es              = f->execution_space();
 
-    //         // Material-related buffers
-    //         ws.material_grad     = sfem::create_buffer<real_t>(ndofs, es);
-    //         ws.elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
-    //         ws.contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
+            const int       dim            = f->space()->mesh_ptr()->spatial_dimension();
+            const ptrdiff_t ndofs          = f->space()->n_dofs();
+            const ptrdiff_t n_nodes        = ndofs / dim;
+            const ptrdiff_t n_contact      = contact_surface->n_nodes();
+            const int       sym_block_size = (dim * (dim + 1)) / 2;
 
-    //         // Contact-related buffers
-    //         ws.contact_grad = sfem::create_buffer<real_t>(ndofs, es);
-    //         ws.penetration  = sfem::create_buffer<real_t>(n_contact, es);
-    //         ws.macaulay     = sfem::create_buffer<real_t>(n_contact, es);
-    //         ws.diag_values  = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
-    //     }
+            // Material-related buffers
+            ws.material_grad     = sfem::create_buffer<real_t>(ndofs, es);
+            ws.elast_diag_values = sfem::create_buffer<real_t>(n_nodes * sym_block_size, es);
+            ws.contact_node_mask = sfem::create_buffer<mask_t>(mask_count(n_nodes), es);
 
-    //     void contact_jacobi_apply(const ContactJacobiParameters&               params,
-    //                               const ContactJacobiContactData&              cd,
-    //                               const std::shared_ptr<sfem::Function>&       f,
-    //                               const std::shared_ptr<sfem::Buffer<real_t>>& x,
-    //                               ContactJacobiWorkspace&                      ws) {
-    //         SFEM_TRACE_SCOPE("contact_jacobi_step");
+            // Contact-related buffers
+            ws.contact_grad = sfem::create_buffer<real_t>(n_contact * dim, es);
+            ws.penetration  = sfem::create_buffer<real_t>(n_contact, es);
+            ws.macaulay     = sfem::create_buffer<real_t>(n_contact, es);
+            ws.displacement = sfem::create_buffer<real_t>(dim, n_contact, es);
+            ws.diag_values  = sfem::create_buffer<real_t>(dim * dim, n_contact, es);
+        }
 
-    //         auto      space = f->space();
-    //         auto      mesh  = space->mesh_ptr();
-    //         const int dim   = mesh->spatial_dimension();
-    //         assert(dim == 3);
+        Impl(const std::shared_ptr<ContactData>& cd) : cd(cd) { init(); }
 
-    //         const ptrdiff_t ndofs          = space->n_dofs();
-    //         const ptrdiff_t n_nodes        = ndofs / dim;
-    //         const ptrdiff_t n_contact      = cd.surface->node_mapping()->size();
-    //         const int       sym_block_size = (dim * (dim + 1)) / 2;
-    //         const real_t    omega          = 1. / 3;
-    //         auto            es             = f->execution_space();
-    //         auto            blas           = sfem::blas<real_t>(es);
+        void smooth(const SharedBuffer<real_t>& x) {
+            SFEM_TRACE_SCOPE("ContactJacobi::smooth");
 
-    //         auto material_grad     = ws.material_grad;
-    //         auto elast_diag_values = ws.elast_diag_values;
-    //         auto contact_node_mask = ws.contact_node_mask;
-    //         auto contact_grad      = ws.contact_grad;
-    //         auto penetration       = ws.penetration;
-    //         auto macaulay          = ws.macaulay;
-    //         auto diag_values       = ws.diag_values;
-    //         auto constraints_mask  = cd.constraints_mask;
+            auto      space = cd->f->space();
+            auto      mesh  = space->mesh_ptr();
+            const int dim   = mesh->spatial_dimension();
+            assert(dim == 3);
 
-    //         assert(constraints_mask);
-    //         ContactKernelWorkspace contact_ws(dim, n_contact, es);
+            const ptrdiff_t ndofs          = space->n_dofs();
+            const ptrdiff_t n_nodes        = ndofs / dim;
+            const ptrdiff_t n_contact      = cd->surface->node_mapping()->size();
+            const int       sym_block_size = (dim * (dim + 1)) / 2;
+            const real_t    omega          = 1. / dim;
+            auto            es             = cd->f->execution_space();
+            auto            blas           = sfem::blas<real_t>(es);
 
-    //         const idx_t* const nm = cd.surface->node_mapping()->data();
-    // #pragma omp parallel for
-    //         for (ptrdiff_t i = 0; i < contact_node_mask->size(); ++i) {
-    //             contact_node_mask->data()[i] = 0;
-    //         }
+            auto material_grad     = ws.material_grad;
+            auto elast_diag_values = ws.elast_diag_values;
+            auto contact_node_mask = ws.contact_node_mask;
+            auto contact_grad      = ws.contact_grad;
+            auto macaulay          = ws.macaulay;
+            auto displacement      = ws.displacement;
+            auto diag_values       = ws.diag_values;
+            auto constraints_mask  = cd->constraints_mask;
+            assert(constraints_mask);
 
-    // #pragma omp parallel for
-    //         for (ptrdiff_t i = 0; i < n_contact; ++i) {
-    //             mask_set(nm[i], contact_node_mask->data());
-    //         }
+            const idx_t* const nm        = cd->surface->node_mapping()->data();
+            auto               cm        = cd->coupling_matrix;
+            const count_t*     cm_rowptr = cm->row_ptr->data();
+            const idx_t*       cm_colidx = cm->col_idx->data();
+            const real_t*      cm_vals   = cm->values->data();
+            const real_t*      distances = cd->distances->data();
+            const real_t*      aug       = cd->agumentation->data();
+            const real_t*      mass      = cd->mass_vector->data();
+            real_t* const*     normals   = cd->normals->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < contact_node_mask->size(); ++i) {
+                contact_node_mask->data()[i] = 0;
+            }
 
-    //         const mask_t* const mask         = constraints_mask->data();
-    //         const mask_t* const contact_mask = contact_node_mask->data();
-    //         real_t* const       xd           = x->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                mask_set(nm[i], contact_node_mask->data());
+            }
 
-    //         // If the material is nonlinear should be inside the loop
-    //         blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
-    //         f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
+            const mask_t* const mask         = constraints_mask->data();
+            const mask_t* const contact_mask = contact_node_mask->data();
+            real_t* const       xd           = x->data();
 
-    //         ptrdiff_t each = std::min(n_loops, 1);
-    //         for (int loop = 0; loop < n_loops; ++loop) {
-    //             blas->values(ndofs, 0, material_grad->data());
+            // If the material is nonlinear should be inside the loop
+            blas->values(elast_diag_values->size(), 0, elast_diag_values->data());
+            cd->f->hessian_block_diag_sym(x->data(), elast_diag_values->data());
 
-    //             f->gradient(x->data(), material_grad->data());
+            ptrdiff_t each = std::min(n_loops, 1);
+            for (int loop = 0; loop < n_loops; ++loop) {
+                blas->values(ndofs, 0, material_grad->data());
 
-    //             const real_t* const eg = material_grad->data();
-    //             const real_t* const ed = elast_diag_values->data();
+                cd->f->gradient(x->data(), material_grad->data());
 
-    //             blas->values(ndofs, 0, contact_grad->data());
-    //             for (int d = 0; d < dim * dim; ++d) {
-    //                 blas->values(n_contact, 0, diag_values->data()[d]);
-    //             }
+                const real_t* const eg = material_grad->data();
+                const real_t* const ed = elast_diag_values->data();
 
-    //             compute_macaulay_term(cd, contact_ws, penalty, x->data(), macaulay->data());
-    //             assemble_contact_gradient(cd, contact_ws, penalty, macaulay->data(), contact_grad->data());
-    //             assemble_contact_hessian_diag(cd, penalty, macaulay->data(), 1, diag_values->data());
-    //             gather_combine_hessian_diag(cd, constraints_mask->data(), elast_diag_values->data(), 1, diag_values->data());
+                contact_gather_displacement(dim, n_contact, nm, x->data(), displacement->data());
 
-    // #pragma omp parallel for
-    //             for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-    //                 if (mask_get(i, contact_mask)) continue;
+                blas->values(contact_grad->size(), 0, contact_grad->data());
+                for (int d = 0; d < dim * dim; ++d) {
+                    blas->values(n_contact, 0, diag_values->data()[d]);
+                }
 
-    //                 real_t a0 = ed[i * 6 + 0], a1 = ed[i * 6 + 1], a2 = ed[i * 6 + 2];
-    //                 real_t a3 = ed[i * 6 + 1], a4 = ed[i * 6 + 3], a5 = ed[i * 6 + 4];
-    //                 real_t a6 = ed[i * 6 + 2], a7 = ed[i * 6 + 4], a8 = ed[i * 6 + 5];
+                compute_macaulay_term(dim,
+                                      n_contact,
+                                      cm_rowptr,
+                                      cm_colidx,
+                                      cm_vals,
+                                      distances,
+                                      aug,
+                                      normals,
+                                      mass,
+                                      penalty,
+                                      1,
+                                      displacement->data(),
+                                      macaulay->data());
 
-    //                 const ptrdiff_t dof = i * 3;
-    //                 if (mask_get(dof, mask)) {
-    //                     a0 = 1;
-    //                     a1 = 0;
-    //                     a2 = 0;
-    //                 }
+                assemble_contact_gradient(dim,
+                                          n_contact,
+                                          penalty,
+                                          cm_rowptr,
+                                          cm_colidx,
+                                          cm_vals,
+                                          distances,
+                                          aug,
+                                          normals,
+                                          mass,
+                                          macaulay->data(),
+                                          contact_grad->data());
 
-    //                 if (mask_get(dof + 1, mask)) {
-    //                     a3 = 0;
-    //                     a4 = 1;
-    //                     a5 = 0;
-    //                 }
+                assemble_contact_hessian_diag_block(dim,
+                                                    n_contact,
+                                                    cm_rowptr,
+                                                    cm_colidx,
+                                                    cm_vals,
+                                                    distances,
+                                                    aug,
+                                                    normals,
+                                                    mass,
+                                                    penalty,
+                                                    macaulay->data(),
+                                                    1,
+                                                    diag_values->data());
 
-    //                 if (mask_get(dof + 2, mask)) {
-    //                     a6 = 0;
-    //                     a7 = 0;
-    //                     a8 = 1;
-    //                 }
+                const real_t* const ed_soa[6] = {ed, ed + 1, ed + 2, ed + 3, ed + 4, ed + 5};
+                gather_combine_hessian_diag(dim, n_contact, nm, sym_block_size, ed_soa, 1, diag_values->data());
 
-    //                 const real_t g0 = eg[dof + 0];
-    //                 const real_t g1 = eg[dof + 1];
-    //                 const real_t g2 = eg[dof + 2];
+                real_t* const* const dv_mask = diag_values->data();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                    const ptrdiff_t dof = nm[i] * 3;
+                    if (mask_get(dof, mask)) {
+                        dv_mask[0][i] = 1;
+                        dv_mask[1][i] = 0;
+                        dv_mask[2][i] = 0;
+                    }
 
-    //                 const real_t x0  = a4 * a8;
-    //                 const real_t x1  = a5 * a7;
-    //                 const real_t x2  = a1 * a5;
-    //                 const real_t x3  = a1 * a8;
-    //                 const real_t x4  = a2 * a4;
-    //                 const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
+                    if (mask_get(dof + 1, mask)) {
+                        dv_mask[3][i] = 0;
+                        dv_mask[4][i] = 1;
+                        dv_mask[5][i] = 0;
+                    }
 
-    //                 if (!std::isfinite(det) || det == 0) {
-    //                     if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
-    //                     if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
-    //                     if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
-    //                     continue;
-    //                 }
+                    if (mask_get(dof + 2, mask)) {
+                        dv_mask[6][i] = 0;
+                        dv_mask[7][i] = 0;
+                        dv_mask[8][i] = 1;
+                    }
+                }
 
-    //                 const real_t inv_det = 1 / det;
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+                    if (mask_get(i, contact_mask)) continue;
 
-    //                 const real_t i0 = inv_det * (x0 - x1);
-    //                 const real_t i1 = inv_det * (a2 * a7 - x3);
-    //                 const real_t i2 = inv_det * (x2 - x4);
-    //                 const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
-    //                 const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
-    //                 const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
-    //                 const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
-    //                 const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
-    //                 const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
+                    real_t a0 = ed[i * 6 + 0], a1 = ed[i * 6 + 1], a2 = ed[i * 6 + 2];
+                    real_t a3 = ed[i * 6 + 1], a4 = ed[i * 6 + 3], a5 = ed[i * 6 + 4];
+                    real_t a6 = ed[i * 6 + 2], a7 = ed[i * 6 + 4], a8 = ed[i * 6 + 5];
 
-    //                 xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
-    //                 xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
-    //                 xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
-    //             }
+                    const ptrdiff_t dof = i * 3;
+                    if (mask_get(dof, mask)) {
+                        a0 = 1;
+                        a1 = 0;
+                        a2 = 0;
+                    }
 
-    //             const real_t* const* const dv = diag_values->data();
-    //             const real_t* const        cg = contact_grad->data();
+                    if (mask_get(dof + 1, mask)) {
+                        a3 = 0;
+                        a4 = 1;
+                        a5 = 0;
+                    }
 
-    // #pragma omp parallel for
-    //             for (ptrdiff_t i = 0; i < n_contact; ++i) {
-    //                 const ptrdiff_t local_node  = i;
-    //                 const ptrdiff_t global_node = nm[i];
-    //                 const ptrdiff_t dof         = global_node * 3;
+                    if (mask_get(dof + 2, mask)) {
+                        a6 = 0;
+                        a7 = 0;
+                        a8 = 1;
+                    }
 
-    //                 const real_t g0 = eg[dof + 0] + (mask_get(dof + 0, mask) ? 0 : cg[dof + 0]);
-    //                 const real_t g1 = eg[dof + 1] + (mask_get(dof + 1, mask) ? 0 : cg[dof + 1]);
-    //                 const real_t g2 = eg[dof + 2] + (mask_get(dof + 2, mask) ? 0 : cg[dof + 2]);
+                    const real_t g0 = eg[dof + 0];
+                    const real_t g1 = eg[dof + 1];
+                    const real_t g2 = eg[dof + 2];
 
-    //                 if (g0 == 0 && g1 == 0 && g2 == 0) continue;
+                    const real_t x0  = a4 * a8;
+                    const real_t x1  = a5 * a7;
+                    const real_t x2  = a1 * a5;
+                    const real_t x3  = a1 * a8;
+                    const real_t x4  = a2 * a4;
+                    const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
 
-    //                 const real_t a0 = dv[0][local_node], a1 = dv[1][local_node], a2 = dv[2][local_node];
-    //                 const real_t a3 = dv[3][local_node], a4 = dv[4][local_node], a5 = dv[5][local_node];
-    //                 const real_t a6 = dv[6][local_node], a7 = dv[7][local_node], a8 = dv[8][local_node];
+                    if (!std::isfinite(det) || det == 0) {
+                        if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
+                        if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
+                        if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                        continue;
+                    }
 
-    //                 const real_t x0  = a4 * a8;
-    //                 const real_t x1  = a5 * a7;
-    //                 const real_t x2  = a1 * a5;
-    //                 const real_t x3  = a1 * a8;
-    //                 const real_t x4  = a2 * a4;
-    //                 const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
+                    const real_t inv_det = 1 / det;
 
-    //                 if (!std::isfinite(det) || det == 0) {
-    //                     if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
-    //                     if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
-    //                     if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
-    //                     continue;
-    //                 }
+                    const real_t i0 = inv_det * (x0 - x1);
+                    const real_t i1 = inv_det * (a2 * a7 - x3);
+                    const real_t i2 = inv_det * (x2 - x4);
+                    const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
+                    const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
+                    const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
+                    const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
+                    const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
+                    const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
 
-    //                 const real_t inv_det = 1 / det;
+                    xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
+                    xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
+                    xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+                }
 
-    //                 const real_t i0 = inv_det * (x0 - x1);
-    //                 const real_t i1 = inv_det * (a2 * a7 - x3);
-    //                 const real_t i2 = inv_det * (x2 - x4);
-    //                 const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
-    //                 const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
-    //                 const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
-    //                 const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
-    //                 const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
-    //                 const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
+                const real_t* const* const dv = diag_values->data();
+                const real_t* const        cg = contact_grad->data();
 
-    //                 xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
-    //                 xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
-    //                 xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
-    //             }
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                    const ptrdiff_t local_node  = i;
+                    const ptrdiff_t global_node = nm[i];
+                    const ptrdiff_t dof         = global_node * 3;
+                    const ptrdiff_t local_dof   = local_node * 3;
 
-    //             real_t* const aug = cd.agumentation->data();
-    //             if ((loop + 1) % each == 0 && enable_augmentation) {
-    //                 compute_macaulay_term(cd, contact_ws, penalty, x->data(), macaulay->data());
+                    const real_t g0 = eg[dof + 0] + (mask_get(dof + 0, mask) ? 0 : cg[local_dof + 0]);
+                    const real_t g1 = eg[dof + 1] + (mask_get(dof + 1, mask) ? 0 : cg[local_dof + 1]);
+                    const real_t g2 = eg[dof + 2] + (mask_get(dof + 2, mask) ? 0 : cg[local_dof + 2]);
 
-    //                 const real_t* const m = macaulay->data();
-    // #pragma omp parallel for
-    //                 for (ptrdiff_t i = 0; i < n_contact; ++i) {
-    //                     aug[i] = penalty * m[i];
-    //                 }
-    //             }
+                    if (g0 == 0 && g1 == 0 && g2 == 0) continue;
 
-    //             compute_penetration(cd, contact_ws, x->data(), penetration->data());
+                    const real_t a0 = dv[0][local_node], a1 = dv[1][local_node], a2 = dv[2][local_node];
+                    const real_t a3 = dv[3][local_node], a4 = dv[4][local_node], a5 = dv[5][local_node];
+                    const real_t a6 = dv[6][local_node], a7 = dv[7][local_node], a8 = dv[8][local_node];
 
-    //             real_t              penetration_norm2 = 0;
-    //             real_t              lagr_mult_norm2   = 0;
-    //             const real_t* const p                 = penetration->data();
-    // #pragma omp parallel for reduction(+ : penetration_norm2, lagr_mult_norm2)
-    //             for (ptrdiff_t i = 0; i < n_contact; ++i) {
-    //                 penetration_norm2 += p[i] * p[i];
-    //                 lagr_mult_norm2 += aug[i] * aug[i];
-    //             }
+                    const real_t x0  = a4 * a8;
+                    const real_t x1  = a5 * a7;
+                    const real_t x2  = a1 * a5;
+                    const real_t x3  = a1 * a8;
+                    const real_t x4  = a2 * a4;
+                    const real_t det = a0 * x0 - a0 * x1 + a2 * a3 * a7 - a3 * x3 + a6 * x2 - a6 * x4;
 
-    //             real_t              full_grad_norm2 = 0;
-    //             const real_t* const mg              = material_grad->data();
-    // #pragma omp parallel for reduction(+ : full_grad_norm2)
-    //             for (ptrdiff_t i = 0; i < ndofs; ++i) {
-    //                 const real_t g = mg[i] + cg[i];
-    //                 full_grad_norm2 += g * g;
-    //             }
+                    if (!std::isfinite(det) || det == 0) {
+                        if (std::isfinite(a0) && a0 != 0) xd[dof + 0] -= omega * g0 / a0;
+                        if (std::isfinite(a4) && a4 != 0) xd[dof + 1] -= omega * g1 / a4;
+                        if (std::isfinite(a8) && a8 != 0) xd[dof + 2] -= omega * g2 / a8;
+                        continue;
+                    }
 
-    //             full_grad_norm2   = std::sqrt(full_grad_norm2);
-    //             penetration_norm2 = std::sqrt(penetration_norm2);
-    //             lagr_mult_norm2   = std::sqrt(lagr_mult_norm2);
+                    const real_t inv_det = 1 / det;
 
-    //             if (full_grad_norm2 < solver_tol && penetration_norm2 < solver_tol && lagr_mult_norm2 < solver_tol) {
-    //                 break;
-    //             }
+                    const real_t i0 = inv_det * (x0 - x1);
+                    const real_t i1 = inv_det * (a2 * a7 - x3);
+                    const real_t i2 = inv_det * (x2 - x4);
+                    const real_t i3 = inv_det * (-a3 * a8 + a5 * a6);
+                    const real_t i4 = inv_det * (a0 * a8 - a2 * a6);
+                    const real_t i5 = inv_det * (-a0 * a5 + a2 * a3);
+                    const real_t i6 = inv_det * (a3 * a7 - a4 * a6);
+                    const real_t i7 = inv_det * (-a0 * a7 + a1 * a6);
+                    const real_t i8 = inv_det * (a0 * a4 - a1 * a3);
 
-    //             if (loop % 100 == 0) {
-    //                 printf("%d) full_grad_norm = %g, penetration_norm = %g, lagr_mult_norm = %g\n",
-    //                        loop,
-    //                        full_grad_norm2,
-    //                        penetration_norm2,
-    //                        lagr_mult_norm2);
-    //             }
-    //         }
-    //     }
+                    xd[dof + 0] -= omega * (i0 * g0 + i1 * g1 + i2 * g2);
+                    xd[dof + 1] -= omega * (i3 * g0 + i4 * g1 + i5 * g2);
+                    xd[dof + 2] -= omega * (i6 * g0 + i7 * g1 + i8 * g2);
+                }
+
+                real_t* const aug = cd->agumentation->data();
+                if ((loop + 1) % each == 0 && enable_augmentation) {
+                    contact_gather_displacement(dim, n_contact, nm, x->data(), displacement->data());
+                    compute_macaulay_term(dim,
+                                          n_contact,
+                                          cm_rowptr,
+                                          cm_colidx,
+                                          cm_vals,
+                                          distances,
+                                          aug,
+                                          normals,
+                                          mass,
+                                          penalty,
+                                          1,
+                                          displacement->data(),
+                                          macaulay->data());
+
+                    const real_t* const m = macaulay->data();
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                        aug[i] = penalty * m[i];
+                    }
+                }
+            }
+        }
+    };
+
+    ContactJacobi::ContactJacobi(const std::shared_ptr<ContactData>& cd) : impl_(std::make_unique<Impl>(cd)) {}
+    ContactJacobi::~ContactJacobi() {}
+
+    void ContactJacobi::smooth(const SharedBuffer<real_t>& x) { impl_->smooth(x); }
+
+    void ContactJacobi::set_penalty(real_t penalty) { impl_->penalty = penalty; }
+
+    void ContactJacobi::set_n_loops(int n_loops) { impl_->n_loops = n_loops; }
+
+    void ContactJacobi::set_enable_augmentation(bool enable_augmentation) { impl_->enable_augmentation = enable_augmentation; }
+
+    void ContactJacobi::set_relaxation_parameter(real_t relaxation_parameter) {
+        impl_->relaxation_parameter = relaxation_parameter;
+    }
+
+    void ContactJacobi::contact_data_changed() { impl_->init(); }
 
 }  // namespace sfem

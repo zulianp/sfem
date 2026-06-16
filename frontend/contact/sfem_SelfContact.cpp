@@ -139,7 +139,7 @@ namespace sfem {
             }
         }
 
-        void add_normal_projected_displacement_to_gap(const int                               dim,
+        void add_normal_projected_displacement_to_gap(const int                              dim,
                                                       const smesh::Mesh&                     surface,
                                                       const smesh::CRSGraph<count_t, idx_t>& graph,
                                                       const smesh::SharedBuffer<real_t>&     values,
@@ -455,8 +455,8 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
-            const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
+            const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+            const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
         private:
             void assemble_mass_vector() {
@@ -1541,7 +1541,6 @@ namespace sfem {
                     }
                 }
                 add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
-
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -1549,8 +1548,8 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
-            const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
+            const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+            const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
         private:
             std::shared_ptr<FunctionSpace> space_;
@@ -1716,13 +1715,29 @@ namespace sfem {
             }
 
             if (tag) {
+                bool biased_contact = smesh::Env::read("SFEM_BIASED_CONTACT", false);
+
+                if (biased_contact) {
 #pragma omp parallel for
-                for (ptrdiff_t e = 0; e < nselements_; ++e) {
-                    const domain_t te = tag[e];
-                    for (ptrdiff_t k = pc_ptr_data[e]; k < pc_ptr_data[e + 1]; ++k) {
-                        const domain_t tm = tag[pi[k]];
-                        if (te == 0 || tm == 0 || te == tm) {
-                            iv[k] = 0;
+                    for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                        const domain_t te = tag[e];
+                        for (ptrdiff_t k = pc_ptr_data[e]; k < pc_ptr_data[e + 1]; ++k) {
+                            const domain_t tm = tag[pi[k]];
+                            // Key difference: te >= tm (makes the contact biased, i.e., standard mortar master-slave approach)
+                            if (te == 0 || tm == 0 || te >= tm) {
+                                iv[k] = 0;
+                            }
+                        }
+                    }
+                } else {
+#pragma omp parallel for
+                    for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                        const domain_t te = tag[e];
+                        for (ptrdiff_t k = pc_ptr_data[e]; k < pc_ptr_data[e + 1]; ++k) {
+                            const domain_t tm = tag[pi[k]];
+                            if (te == 0 || tm == 0 || te == tm) {
+                                iv[k] = 0;
+                            }
                         }
                     }
                 }
