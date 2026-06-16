@@ -955,7 +955,7 @@ namespace sfem {
                     es);
         }
 
-        std::shared_ptr<Operator<real_t>> shifted_op(const int level) {
+        std::shared_ptr<Operator<real_t>> combined_op(const int level) {
             return operators[level] + contact_hessian_op(level, false);
         }
 
@@ -970,6 +970,8 @@ namespace sfem {
             blas->scal(ndofs, -1, residual->data());
 
             blas->values(ndofs, 0, contact_grad->data());
+
+            // TODO: use the function from ContactSolveKernels.cpp
             compute_macaulay_term(*contact_jacobi_data, contact_penalty, x->data(), macaulay->data());
 
             const int           dim       = contact_jacobi_data->surface->spatial_dimension();
@@ -1045,43 +1047,17 @@ namespace sfem {
             if (n_levels() > 1) {
                 auto mem_coarse = memory[1];
 
-                blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
-                data->restrictions[0]->apply(mem->work->data(), mem_coarse->rhs->data());
-                blas->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
-
+                {  // Restrict residual
+                    blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    data->restrictions[0]->apply(mem->work->data(), mem_coarse->rhs->data());
+                }
                 linear_cycle(1);
 
-                blas->zeros(mem->correction->size(), mem->correction->data());
-                data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
-
-                // Simple correction
-                blas->axpy(mem->solution->size(), 1, mem->correction->data(), mem->solution->data());
-
-                // blas->copy(mem->solution->size(), mem->solution->data(), mem->rhs->data());
-
-                //                 real_t alpha = params.correction_damping;
-                //                 for (int ls = 0; ls < params.line_search_steps; ++ls) {
-                //                     const real_t* const x0 = mem->rhs->data();
-                //                     const real_t* const dx = mem->correction->data();
-                //                     real_t* const       x  = mem->solution->data();
-                //                     const ptrdiff_t     n  = mem->solution->size();
-
-                // #pragma omp parallel for
-                //                     for (ptrdiff_t i = 0; i < n; ++i) {
-                //                         x[i] = x0[i] + alpha * dx[i];
-                //                     }
-
-                //                     if (params.line_search_recompute_contact) {
-                //                         resample_contact_conditions(mem->solution);
-                //                     }
-
-                //                     const real_t trial_norm = eval_fine_residual(mem->solution, mem->work);
-                //                     if (trial_norm <= grad_norm || alpha <= params.min_correction_damping) {
-                //                         break;
-                //                     }
-
-                //                     alpha *= real_t(0.5);
-                //                 }
+                {  // Prolongate and correct
+                    blas->zeros(mem->correction->size(), mem->correction->data());
+                    data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
+                    blas->axpy(mem->solution->size(), 1, mem->correction->data(), mem->solution->data());
+                }
             }
 
             nonlinear_smooth(memory[0]->solution);
@@ -1095,36 +1071,44 @@ namespace sfem {
             auto blas     = sfem::blas<real_t>(f->execution_space());
             auto mem      = memory[level];
             auto smoother = smoothers[level];
-            auto op       = operators[level];
+            auto cop      = combined_op(level);
 
             if (level == n_levels() - 1) {
-                smoother->set_op_and_diag_shift(shifted_op(level), contact_block_diag[level], memory[level]->diag);
+                // Coarse grid solve
+                smoother->set_op_and_diag_shift(cop, contact_block_diag[level], memory[level]->diag);
                 blas->zeros(mem->solution->size(), mem->solution->data());
                 smoother->apply(mem->rhs->data(), mem->solution->data());
                 return;
             }
 
-            auto sop        = shifted_op(level);
             auto mem_coarse = memory[level + 1];
 
-            smoother->set_op_and_diag_shift(sop, contact_block_diag[level], memory[level]->diag);
-            smoother->apply(mem->rhs->data(), mem->solution->data());
+            {  // Pre-smooth
+                smoother->set_op_and_diag_shift(cop, contact_block_diag[level], memory[level]->diag);
+                blas->zeros(mem->solution->size(), mem->solution->data());
+                smoother->apply(mem->rhs->data(), mem->solution->data());
+            }
 
-            blas->zeros(mem->work->size(), mem->work->data());
-            sop->apply(mem->solution->data(), mem->work->data());
-            blas->axpby(mem->work->size(), 1, mem->rhs->data(), -1, mem->work->data());
+            {  // Restrict residual
+                blas->zeros(mem->work->size(), mem->work->data());
+                cop->apply(mem->solution->data(), mem->work->data());
+                blas->axpby(mem->work->size(), 1, mem->rhs->data(), -1, mem->work->data());
 
-            blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
-            data->restrictions[level]->apply(mem->work->data(), mem_coarse->rhs->data());
-            blas->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
+                blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                data->restrictions[level]->apply(mem->work->data(), mem_coarse->rhs->data());
+            }
 
             linear_cycle(level + 1);
 
-            blas->zeros(mem->work->size(), mem->work->data());
-            data->prolongations[level + 1]->apply(mem_coarse->solution->data(), mem->work->data());
-            blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
+            {  // Prolongate and correct
+                blas->zeros(mem->work->size(), mem->work->data());
+                data->prolongations[level + 1]->apply(mem_coarse->solution->data(), mem->work->data());
+                blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
+            }
 
-            smoother->apply(mem->rhs->data(), mem->solution->data());
+            {  // Post-smooth
+                smoother->apply(mem->rhs->data(), mem->solution->data());
+            }
         }
 
         ~Impl() = default;
