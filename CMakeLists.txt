@@ -44,6 +44,7 @@ set(SFEM_MODULES
     algebra/bsr
     algebra/bsr_soa
     algebra/crs
+    algebra/crs_x_bsr
     algebra/ell
     algebra/mg
     algebra/openmp
@@ -371,6 +372,7 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND SFEM_UNIT_TESTS
         algebra/crs/tests
         algebra/bsr/tests
+        algebra/crs_x_bsr/tests
         operators/ssquad4/tests
         operators/sshex8/tests
         operators/stencil/tests
