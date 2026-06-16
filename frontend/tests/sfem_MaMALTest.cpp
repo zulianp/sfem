@@ -11,9 +11,9 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
+#include "../contact/sfem_ContactSolveKernels.cpp"
 #include "../contact/sfem_MaMAL.cpp"
 #include "../contact/sfem_SelfContact.cpp"
-#include "../contact/sfem_ContactSolveKernels.cpp"
 
 std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::ExecutionSpace es) {
     const ptrdiff_t n  = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
@@ -25,7 +25,7 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
 
     auto lower = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, nx, nx, 0, 0, 0, 1, 1, 1);
     auto upper = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, ny, nz, 0.25, poc, 0.25, 0.75, 1.75, 0.75);
-    auto mesh  = smesh::concatenate(lower, upper);
+    auto mesh  = smesh::concatenate(upper, lower);
 
     mesh = smesh::to_semistructured(16, mesh, true, false);
 
