@@ -6,6 +6,7 @@
 #include "sfem_GeometricMultigrid.hpp"
 
 #include "sfem_CRS.hpp"
+#include "sfem_CRS_X_BSR.hpp"
 #include "sfem_SelfContact.hpp"
 #include "smesh_crs_graph.hpp"
 #include "smesh_env.hpp"
@@ -13,7 +14,9 @@
 #include "sfem_API.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace sfem {
     class Memory {
@@ -41,6 +44,7 @@ namespace sfem {
         bool   line_search_recompute_contact{false};
         bool   enable_augmentation{false};
         bool   enable_self_contact{false};
+        bool   contact_hessian_galerkin_assembly{true};
 
         void from_env() {
             max_iterations           = smesh::Env::read("SFEM_MAMAL_MAX_ITERATIONS", max_iterations);
@@ -57,6 +61,8 @@ namespace sfem {
                     smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_RECOMPUTE_CONTACT", line_search_recompute_contact);
             enable_augmentation = smesh::Env::read("SFEM_MAMAL_ENABLE_AUGMENTATION", enable_augmentation);
             enable_self_contact = smesh::Env::read("SFEM_MAMAL_ENABLE_SELF_CONTACT", enable_self_contact);
+            contact_hessian_galerkin_assembly =
+                    smesh::Env::read("SFEM_MAMAL_CONTACT_HESSIAN_GALERKIN", contact_hessian_galerkin_assembly);
         }
 
 #ifdef SFEM_ENABLE_YAML
@@ -73,12 +79,139 @@ namespace sfem {
 
     using CRSGraph_t = smesh::CRSGraph<count_t, idx_t>;
     using CRS_t      = sfem::ContactData::CRS_t;
+    using BSR_t      = sfem::BSR<count_t, idx_t, real_t, real_t>;
 
     struct GalerkinRAP {
         std::shared_ptr<CRS_t> R, P;
 
         std::shared_ptr<CRS_t> apply(const std::shared_ptr<CRS_t>& A) const { return sfem::rap(R, A, P); }
     };
+
+    std::shared_ptr<CRSGraph_t> create_contact_hessian_graph(const std::shared_ptr<CRS_t>& coupling_matrix) {
+        SFEM_TRACE_SCOPE("create_contact_hessian_graph");
+
+        const ptrdiff_t n      = coupling_matrix->rows();
+        const count_t*  rowptr = coupling_matrix->row_ptr->data();
+        const idx_t*    colidx = coupling_matrix->col_idx->data();
+
+        std::vector<std::vector<idx_t>> graph_rows(n);
+        std::vector<idx_t>              targets;
+
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            targets.clear();
+            targets.reserve(rowptr[i + 1] - rowptr[i] + 1);
+            targets.push_back(i);
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+                targets.push_back(colidx[k]);
+            }
+
+            std::sort(targets.begin(), targets.end());
+            targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+
+            for (const idx_t row : targets) {
+                auto& dst = graph_rows[row];
+                dst.insert(dst.end(), targets.begin(), targets.end());
+            }
+        }
+
+        auto out_rowptr       = create_host_buffer<count_t>(n + 1);
+        out_rowptr->data()[0] = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            auto& row = graph_rows[i];
+            std::sort(row.begin(), row.end());
+            row.erase(std::unique(row.begin(), row.end()), row.end());
+            out_rowptr->data()[i + 1] = out_rowptr->data()[i] + row.size();
+        }
+
+        auto out_colidx = create_host_buffer<idx_t>(out_rowptr->data()[n]);
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const auto& row = graph_rows[i];
+            idx_t*      dst = &out_colidx->data()[out_rowptr->data()[i]];
+            for (ptrdiff_t k = 0, len = row.size(); k < len; ++k) {
+                dst[k] = row[k];
+            }
+        }
+
+        return std::make_shared<CRSGraph_t>(out_rowptr, out_colidx);
+    }
+
+    void apply_contact_hessian_bsr(const std::shared_ptr<smesh::Mesh>& surface,
+                                   const std::shared_ptr<BSR_t>&       hessian,
+                                   const SharedBuffer<real_t>&         local_x,
+                                   const SharedBuffer<real_t>&         local_y,
+                                   const real_t* const                 x,
+                                   real_t* const                       y) {
+        SFEM_TRACE_SCOPE("apply_contact_hessian_bsr");
+
+        const int          dim = surface->spatial_dimension();
+        const ptrdiff_t    n   = surface->node_mapping()->size();
+        const idx_t* const nm  = surface->node_mapping()->data();
+        real_t* const      lx  = local_x->data();
+        real_t* const      ly  = local_y->data();
+
+        assert(dim == 3);
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t gdof = nm[i] * dim;
+            const ptrdiff_t ldof = i * dim;
+            lx[ldof + 0]         = x[gdof + 0];
+            lx[ldof + 1]         = x[gdof + 1];
+            lx[ldof + 2]         = x[gdof + 2];
+        }
+
+        hessian->apply(lx, ly);
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t gdof = nm[i] * dim;
+            const ptrdiff_t ldof = i * dim;
+
+#pragma omp atomic update
+            y[gdof + 0] += ly[ldof + 0];
+#pragma omp atomic update
+            y[gdof + 1] += ly[ldof + 1];
+#pragma omp atomic update
+            y[gdof + 2] += ly[ldof + 2];
+        }
+    }
+
+    void extract_contact_hessian_bsr_diag(const std::shared_ptr<BSR_t>& hessian, real_t* const SFEM_RESTRICT block_diag) {
+        SFEM_TRACE_SCOPE("extract_contact_hessian_bsr_diag");
+
+        const count_t* const rowptr = hessian->row_ptr->data();
+        const idx_t* const   colidx = hessian->col_idx->data();
+        const real_t* const  values = hessian->values->data();
+        const ptrdiff_t      n      = hessian->row_ptr->size() - 1;
+
+        assert(hessian->row_block_size() == 3);
+        assert(hessian->col_block_size() == 3);
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            real_t* const dst = &block_diag[i * 6];
+            dst[0]            = 0;
+            dst[1]            = 0;
+            dst[2]            = 0;
+            dst[3]            = 0;
+            dst[4]            = 0;
+            dst[5]            = 0;
+
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+                if (colidx[k] == i) {
+                    const real_t* const b = &values[k * 9];
+                    dst[0]                = b[0];
+                    dst[1]                = b[1];
+                    dst[2]                = b[2];
+                    dst[3]                = b[4];
+                    dst[4]                = b[5];
+                    dst[5]                = b[8];
+                    break;
+                }
+            }
+        }
+    }
 
     void compute_macaulay_term_from_global_displacement(ContactData&        cd,
                                                         const real_t        penalty,
@@ -329,6 +462,7 @@ namespace sfem {
         std::vector<SharedBuffer<real_t>>   mass_vectors;
         std::vector<SharedBuffer<real_t>>   contact_active;
         std::vector<GalerkinRAP>            galerkin_restrictions;
+        std::vector<std::shared_ptr<BSR_t>> galerkin_contact_hessian_bsr;
 
         std::vector<std::shared_ptr<Memory>>                    memory;
         std::vector<std::shared_ptr<smesh::Mesh>>               contact_surfaces;
@@ -340,6 +474,8 @@ namespace sfem {
         SharedBuffer<real_t>                                    contact_grad;
         SharedBuffer<real_t>                                    contact_local_grad;
         SharedBuffer<real_t>                                    macaulay;
+        std::vector<SharedBuffer<real_t>>                       contact_hessian_local_x;
+        std::vector<SharedBuffer<real_t>>                       contact_hessian_local_y;
 
         std::shared_ptr<smesh::Mesh>       contact_surface;
         std::shared_ptr<smesh::Mesh>       contact_eval_surface;
@@ -444,6 +580,8 @@ namespace sfem {
             contact_block_diag.resize(n_levels());
             level_constraints_mask.resize(n_levels());
             contact_active.resize(n_levels());
+            contact_hessian_local_x.resize(n_levels());
+            contact_hessian_local_y.resize(n_levels());
             for (int i = 0; i < n_levels(); i++) {
                 memory[i]             = std::make_shared<Memory>();
                 const ptrdiff_t n     = data->functions[i]->space()->n_dofs();
@@ -452,12 +590,14 @@ namespace sfem {
                 memory[i]->work       = create_buffer<real_t>(n, es);
                 memory[i]->correction = create_buffer<real_t>(n, es);
 
-                const ptrdiff_t n_contact = contact_surfaces[i]->node_mapping()->size();
-                memory[i]->diag           = create_buffer<real_t>(n_contact, es);
-                contact_block_diag_soa[i] = create_buffer<real_t>(6, n_contact, es);
-                contact_block_diag_aos[i] = create_buffer<real_t>(n_contact * 6, es);
-                contact_block_idx[i]      = contact_surfaces[i]->node_mapping();
-                contact_block_diag[i]     = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
+                const ptrdiff_t n_contact  = contact_surfaces[i]->node_mapping()->size();
+                memory[i]->diag            = create_buffer<real_t>(n_contact, es);
+                contact_block_diag_soa[i]  = create_buffer<real_t>(6, n_contact, es);
+                contact_block_diag_aos[i]  = create_buffer<real_t>(n_contact * 6, es);
+                contact_block_idx[i]       = contact_surfaces[i]->node_mapping();
+                contact_block_diag[i]      = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
+                contact_hessian_local_x[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
+                contact_hessian_local_y[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
 
                 level_constraints_mask[i] = sfem::create_buffer<mask_t>(mask_count(n), es);
                 contact_active[i]         = sfem::create_buffer<real_t>(n_contact, es);
@@ -488,6 +628,7 @@ namespace sfem {
         void resample_contact_conditions(const smesh::SharedBuffer<real_t>& displacement) {
             contact->recompute(displacement);
             coupling_matrices.clear();
+            galerkin_contact_hessian_bsr.clear();
             coupling_matrices.push_back(h_crs_spmv(contact->graph()->n_nodes(),
                                                    contact->graph()->n_nodes(),
                                                    contact->graph()->rowptr(),
@@ -650,7 +791,13 @@ namespace sfem {
         }
 
         void assemble_level_contact_hessian_block_diag() {
-            auto blas = sfem::blas<real_t>(f->execution_space());
+            auto       blas = sfem::blas<real_t>(f->execution_space());
+            const bool use_galerkin_contact_hessian =
+                    params.contact_hessian_galerkin_assembly && f->execution_space() == EXECUTION_SPACE_HOST;
+
+            if (use_galerkin_contact_hessian) {
+                assemble_galerkin_contact_hessian_bsr();
+            }
 
             for (int l = 0; l < n_levels(); ++l) {
                 blas->values(memory[l]->diag->size(), 1, memory[l]->diag->data());
@@ -660,18 +807,92 @@ namespace sfem {
                 }
                 data->functions[l]->constraints_mask(level_constraints_mask[l]->data());
 
-                auto diag = contact_block_diag_soa[l]->data();
-                for (int d = 0; d < 6; ++d) {
-                    blas->values(contact_block_diag_soa[l]->extent(1), 0, diag[d]);
-                }
+                if (use_galerkin_contact_hessian) {
+                    extract_contact_hessian_bsr_diag(galerkin_contact_hessian_bsr[l], contact_block_diag_aos[l]->data());
+                } else {
+                    auto diag = contact_block_diag_soa[l]->data();
+                    for (int d = 0; d < 6; ++d) {
+                        blas->values(contact_block_diag_soa[l]->extent(1), 0, diag[d]);
+                    }
 
-                ContactData cd = linearized_contact_data(l);
-                assemble_contact_hessian_block_diag(cd, contact_penalty, contact_active[l]->data(), diag);
-                pack_contact_block_diag(l);
+                    ContactData cd = linearized_contact_data(l);
+                    assemble_contact_hessian_block_diag(cd, contact_penalty, contact_active[l]->data(), diag);
+                    pack_contact_block_diag(l);
+                }
+            }
+        }
+
+        void ensure_fine_contact_hessian_bsr() {
+            if (galerkin_contact_hessian_bsr.size() != static_cast<size_t>(n_levels())) {
+                galerkin_contact_hessian_bsr.resize(n_levels());
+            }
+
+            if (galerkin_contact_hessian_bsr[0]) return;
+
+            auto      graph  = create_contact_hessian_graph(coupling_matrices[0]);
+            const int dim    = contact_surfaces[0]->spatial_dimension();
+            auto      values = create_host_buffer<real_t>(graph->nnz() * dim * dim);
+
+            galerkin_contact_hessian_bsr[0] = sfem::h_bsr_spmv<count_t, idx_t, real_t, real_t>(
+                    graph->n_nodes(), graph->n_nodes(), dim, graph->rowptr(), graph->colidx(), values, real_t(0));
+        }
+
+        void assemble_galerkin_contact_hessian_bsr() {
+            if (!params.contact_hessian_galerkin_assembly) return;
+            if (f->execution_space() != EXECUTION_SPACE_HOST) return;
+
+            SFEM_TRACE_SCOPE("assemble_galerkin_contact_hessian_bsr");
+            ensure_fine_contact_hessian_bsr();
+
+            auto fine = galerkin_contact_hessian_bsr[0];
+            {
+                real_t* const   values = fine->values->data();
+                const ptrdiff_t n      = fine->values->size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    values[i] = 0;
+                }
+            }
+
+            const int dim = contact_surfaces[0]->spatial_dimension();
+            contact_hessian_bsr(dim,
+                                coupling_matrices[0]->rows(),
+                                coupling_matrices[0]->row_ptr->data(),
+                                coupling_matrices[0]->col_idx->data(),
+                                coupling_matrices[0]->values->data(),
+                                normals[0]->data(),
+                                mass_vectors[0]->data(),
+                                contact_penalty,
+                                contact_active[0]->data(),
+                                fine->row_ptr->data(),
+                                fine->col_idx->data(),
+                                fine->values->data());
+
+            for (int l = 0; l < n_levels() - 1; ++l) {
+                galerkin_contact_hessian_bsr[l + 1] =
+                        sfem::rap(galerkin_restrictions[l].R, galerkin_contact_hessian_bsr[l], galerkin_restrictions[l].P);
             }
         }
 
         std::shared_ptr<Operator<real_t>> contact_hessian_op(const int level) {
+            if (params.contact_hessian_galerkin_assembly && f->execution_space() == EXECUTION_SPACE_HOST &&
+                level < static_cast<int>(galerkin_contact_hessian_bsr.size()) && galerkin_contact_hessian_bsr[level]) {
+                auto            surface = contact_surfaces[level];
+                auto            hessian = galerkin_contact_hessian_bsr[level];
+                auto            local_x = contact_hessian_local_x[level];
+                auto            local_y = contact_hessian_local_y[level];
+                const auto      es      = f->execution_space();
+                const ptrdiff_t n       = operators[level]->rows();
+
+                return sfem::make_op<real_t>(
+                        n,
+                        n,
+                        [=](const real_t* const x, real_t* const y) {
+                            apply_contact_hessian_bsr(surface, hessian, local_x, local_y, x, y);
+                        },
+                        es);
+            }
+
             auto            surface         = contact_surfaces[level];
             auto            coupling_matrix = coupling_matrices[level];
             auto            level_normals   = normals[level];
@@ -793,7 +1014,7 @@ namespace sfem {
                 {  // Prolongate and correct
                     blas->zeros(mem->correction->size(), mem->correction->data());
                     data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
-                    blas->axpy(mem->solution->size(), 1, mem->correction->data(), mem->solution->data());
+                    blas->axpy(mem->solution->size(), 0.4, mem->correction->data(), mem->solution->data());
                 }
             }
 
