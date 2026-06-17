@@ -90,6 +90,22 @@ namespace sfem {
                              const idx_t* const SFEM_RESTRICT         colidx,
                              real_t* const SFEM_RESTRICT              values);
 
+    void contact_objective_steps(const int                                dim,
+                                 const ptrdiff_t                          nnodes,
+                                 const count_t* const SFEM_RESTRICT       cm_rowptr,
+                                 const idx_t* const SFEM_RESTRICT         cm_colidx,
+                                 const real_t* const SFEM_RESTRICT        cm_vals,
+                                 const real_t* const SFEM_RESTRICT        distances,
+                                 const real_t* const SFEM_RESTRICT        agumentation,
+                                 const real_t* const* const SFEM_RESTRICT normals,
+                                 const real_t* const SFEM_RESTRICT        mass,
+                                 const real_t                             penalty,
+                                 const real_t* const SFEM_RESTRICT        disp,
+                                 const real_t* const SFEM_RESTRICT        inc,
+                                 const int                                nsteps,
+                                 const real_t* const SFEM_RESTRICT        steps,
+                                 real_t* const SFEM_RESTRICT              values);
+
     void apply_contact_hessian(const int                                dim,
                                const ptrdiff_t                          nnodes,
                                const count_t* const SFEM_RESTRICT       cm_rowptr,

@@ -4,6 +4,7 @@
 // Gather / Scatter done outside
 
 #include <stddef.h>
+#include <stdlib.h>
 #include "sfem_base.hpp"
 
 #include "sfem_Function.hpp"
@@ -774,6 +775,148 @@ namespace sfem {
             const ptrdiff_t dof = node_mapping[i] * dim;
             for (int d = 0; d < dim; ++d) {
                 out[dof + d] = in[d][i];
+            }
+        }
+    }
+
+    void contact_objective_steps(const int                                dim,
+                                 const ptrdiff_t                          nnodes,
+                                 const count_t* const SFEM_RESTRICT       cm_rowptr,
+                                 const idx_t* const SFEM_RESTRICT         cm_colidx,
+                                 const real_t* const SFEM_RESTRICT        cm_vals,
+                                 const real_t* const SFEM_RESTRICT        distances,
+                                 const real_t* const SFEM_RESTRICT        agumentation,
+                                 const real_t* const* const SFEM_RESTRICT normals,
+                                 const real_t* const SFEM_RESTRICT        mass,
+                                 const real_t                             penalty,
+                                 const real_t* const SFEM_RESTRICT        disp,
+                                 const real_t* const SFEM_RESTRICT        inc,
+                                 const int                                nsteps,
+                                 const real_t* const SFEM_RESTRICT        steps,
+                                 real_t* const SFEM_RESTRICT              values) {
+        SFEM_TRACE_SCOPE("contact_objective_steps");
+
+        if (nsteps <= 0) return;
+
+        const real_t half_penalty = real_t(0.5) * penalty;
+        const real_t inv_penalty  = real_t(1) / penalty;
+
+        if (dim == 3) {
+            const real_t* const n0 = normals[0];
+            const real_t* const n1 = normals[1];
+            const real_t* const n2 = normals[2];
+
+#pragma omp parallel
+            {
+                real_t* const local_values = (real_t*)calloc(nsteps, sizeof(real_t));
+
+#pragma omp for
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    const count_t row_begin = cm_rowptr[i];
+                    const count_t row_end   = cm_rowptr[i + 1];
+                    if (row_begin == row_end) continue;
+
+                    const ptrdiff_t dof1 = i * 3;
+
+                    real_t d20 = 0;
+                    real_t d21 = 0;
+                    real_t d22 = 0;
+                    real_t c20 = 0;
+                    real_t c21 = 0;
+                    real_t c22 = 0;
+
+                    for (count_t k = row_begin; k < row_end; ++k) {
+                        const real_t    w    = cm_vals[k];
+                        const ptrdiff_t dof2 = cm_colidx[k] * 3;
+
+                        d20 += w * disp[dof2 + 0];
+                        d21 += w * disp[dof2 + 1];
+                        d22 += w * disp[dof2 + 2];
+
+                        c20 += w * inc[dof2 + 0];
+                        c21 += w * inc[dof2 + 1];
+                        c22 += w * inc[dof2 + 2];
+                    }
+
+                    const real_t nx = n0[i];
+                    const real_t ny = n1[i];
+                    const real_t nz = n2[i];
+
+                    const real_t disp_normal =
+                            nx * (disp[dof1 + 0] - d20) + ny * (disp[dof1 + 1] - d21) + nz * (disp[dof1 + 2] - d22);
+                    const real_t inc_normal =
+                            nx * (inc[dof1 + 0] - c20) + ny * (inc[dof1 + 1] - c21) + nz * (inc[dof1 + 2] - c22);
+                    const real_t m     = mass[i];
+                    const real_t aug   = agumentation[i];
+                    const real_t shift = -distances[i] + aug * inv_penalty;
+                    const real_t c     = -real_t(0.5) * m * aug * aug * inv_penalty;
+                    const real_t scale = m * half_penalty;
+
+                    for (int s = 0; s < nsteps; ++s) {
+                        const real_t v = disp_normal + steps[s] * inc_normal + shift;
+                        const real_t p = v > 0 ? v : 0;
+                        local_values[s] += scale * p * p + c;
+                    }
+                }
+
+                for (int s = 0; s < nsteps; ++s) {
+#pragma omp atomic update
+                    values[s] += local_values[s];
+                }
+
+                free(local_values);
+            }
+        } else {
+#pragma omp parallel
+            {
+                real_t* const local_values = (real_t*)calloc(nsteps, sizeof(real_t));
+
+#pragma omp for
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    const count_t row_begin = cm_rowptr[i];
+                    const count_t row_end   = cm_rowptr[i + 1];
+                    if (row_begin == row_end) continue;
+
+                    const ptrdiff_t dof1        = i * dim;
+                    real_t          disp_normal = 0;
+                    real_t          inc_normal  = 0;
+
+                    for (int d = 0; d < dim; ++d) {
+                        real_t disp_secondary = 0;
+                        real_t inc_secondary  = 0;
+
+                        for (count_t k = row_begin; k < row_end; ++k) {
+                            const ptrdiff_t dof2 = cm_colidx[k] * dim;
+                            const real_t    w    = cm_vals[k];
+
+                            disp_secondary += w * disp[dof2 + d];
+                            inc_secondary += w * inc[dof2 + d];
+                        }
+
+                        const real_t normal = normals[d][i];
+                        disp_normal += normal * (disp[dof1 + d] - disp_secondary);
+                        inc_normal += normal * (inc[dof1 + d] - inc_secondary);
+                    }
+
+                    const real_t m     = mass[i];
+                    const real_t aug   = agumentation[i];
+                    const real_t shift = -distances[i] + aug * inv_penalty;
+                    const real_t c     = -real_t(0.5) * m * aug * aug * inv_penalty;
+                    const real_t scale = m * half_penalty;
+
+                    for (int s = 0; s < nsteps; ++s) {
+                        const real_t v = disp_normal + steps[s] * inc_normal + shift;
+                        const real_t p = v > 0 ? v : 0;
+                        local_values[s] += scale * p * p + c;
+                    }
+                }
+
+                for (int s = 0; s < nsteps; ++s) {
+#pragma omp atomic update
+                    values[s] += local_values[s];
+                }
+
+                free(local_values);
             }
         }
     }
