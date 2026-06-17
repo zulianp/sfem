@@ -306,14 +306,21 @@ tri3_raster_mesh_cell_quad_full_gpu_build_device_data(                          
         RETURN_FROM_FUNCTION(ret);
     }
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    /* Two independent streams: cell-list build (stream_cl) and geometry upload (stream_geom).
+       The geometry H2D transfer overlaps with the cell list construction on the GPU. */
+    cudaStream_t stream_cl, stream_geom;
+    cudaStreamCreate(&stream_cl);
+    cudaStreamCreate(&stream_geom);
 
-    /* Upload bounding boxes — needed only during cell list construction. */
-    boxes_t d_boxes = copy_boxes_to_device(h_bounding_boxes, stream);
-    cudaStreamSynchronize(stream);
+    /* Upload bounding boxes on stream_cl — needed to build the cell list. */
+    boxes_t d_boxes = copy_boxes_to_device(h_bounding_boxes, stream_cl);
 
-    /* Assemble the split 3D->1D cell list entirely on the GPU. */
+    /* Upload tri3 element coordinates on stream_geom in parallel with cell list build. */
+    mesh_tri3_geom_device_t geom_device = copy_mesh_tri3_geom_to_device(h_geom, (int)nelements, stream_geom);
+
+    /* Assemble the split 3D->1D cell list entirely on the GPU.
+       build_cell_list_split_3d_1d_map_on_device contains internal stream syncs so the
+       boxes H2D is guaranteed to be complete before the first kernel reads them. */
     gpu_data->split_map = build_cell_list_split_3d_1d_map_on_device(d_boxes.min_x,
                                                                     d_boxes.min_y,
                                                                     d_boxes.min_z,
@@ -329,14 +336,14 @@ tri3_raster_mesh_cell_quad_full_gpu_build_device_data(                          
                                                                     y_max,
                                                                     z_min,
                                                                     z_max,
-                                                                    stream);
+                                                                    stream_cl);
 
     /* The temporary device copy of the bounding boxes is no longer needed. */
-    free_boxes_device(&d_boxes, stream);
+    free_boxes_device(&d_boxes, stream_cl);
 
-    /* Upload tri3 element coordinates (the launch consumes them directly). */
-    mesh_tri3_geom_device_t geom_device = copy_mesh_tri3_geom_to_device(h_geom, (int)nelements, stream);
-    cudaStreamSynchronize(stream);
+    /* Wait for geometry upload before using the device pointer. */
+    cudaStreamSynchronize(stream_geom);
+    cudaStreamDestroy(stream_geom);
 
     gpu_data->element_coords_device = geom_device.element_coords;
     gpu_data->nelements             = (ptrdiff_t)geom_device.nelements;
@@ -347,7 +354,8 @@ tri3_raster_mesh_cell_quad_full_gpu_build_device_data(                          
         ret = EXIT_FAILURE;
     }
 
-    cudaStreamDestroy(stream);
+    cudaStreamSynchronize(stream_cl);
+    cudaStreamDestroy(stream_cl);
 
     RETURN_FROM_FUNCTION(ret);
 }  // END Function: tri3_raster_mesh_cell_quad_full_gpu_build_device_data
