@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <cub/cub.cuh>
+
 #include "cell_list_build_cuda.cuh"
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +67,6 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
     cudaMallocAsync((void **)&d_max_upper, 3 * sizeof(real_t), stream);
     cudaMemsetAsync(d_max_lower, 0, 3 * sizeof(real_t), stream);
     cudaMemsetAsync(d_max_upper, 0, 3 * sizeof(real_t), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         reduce_max_delta_split_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -119,7 +120,6 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
     cudaMallocAsync((void **)&d_cell_ptr_upper, (size_t)(total_2d_upper + 1) * sizeof(int), stream);
     cudaMemsetAsync(d_cell_ptr_lower, 0, (size_t)(total_2d_lower + 1) * sizeof(int), stream);
     cudaMemsetAsync(d_cell_ptr_upper, 0, (size_t)(total_2d_upper + 1) * sizeof(int), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         count_cell_overlaps_split_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -133,9 +133,23 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
      * Phase 4 – Prefix sum: transform per-cell counts into CSR offsets
      * ══════════════════════════════════════════════════════════════════════════ */
 
-    /* n = total_2d + 1; loop runs from i=1 so n=1 (empty map) is fine */
-    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_lower, total_2d_lower + 1);
-    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_upper, total_2d_upper + 1);
+    /* Parallel prefix sum via CUB (in-place inclusive scan on the count entries). */
+    if (total_2d_lower > 0) {
+        void  *d_tmp_l     = NULL;
+        size_t tmp_bytes_l = 0;
+        cub::DeviceScan::InclusiveSum(d_tmp_l, tmp_bytes_l, d_cell_ptr_lower + 1, d_cell_ptr_lower + 1, total_2d_lower, stream);
+        cudaMallocAsync(&d_tmp_l, tmp_bytes_l, stream);
+        cub::DeviceScan::InclusiveSum(d_tmp_l, tmp_bytes_l, d_cell_ptr_lower + 1, d_cell_ptr_lower + 1, total_2d_lower, stream);
+        cudaFreeAsync(d_tmp_l, stream);
+    }
+    if (total_2d_upper > 0) {
+        void  *d_tmp_u     = NULL;
+        size_t tmp_bytes_u = 0;
+        cub::DeviceScan::InclusiveSum(d_tmp_u, tmp_bytes_u, d_cell_ptr_upper + 1, d_cell_ptr_upper + 1, total_2d_upper, stream);
+        cudaMallocAsync(&d_tmp_u, tmp_bytes_u, stream);
+        cub::DeviceScan::InclusiveSum(d_tmp_u, tmp_bytes_u, d_cell_ptr_upper + 1, d_cell_ptr_upper + 1, total_2d_upper, stream);
+        cudaFreeAsync(d_tmp_u, stream);
+    }
 
     /* Read back total dict entries (= cell_ptr[total_2d_cells]) */
     int total_dict_lower = 0;
@@ -180,7 +194,6 @@ build_cell_list_split_map_on_device(const real_t *d_box_min_x,              //
     cudaMallocAsync((void **)&d_temp_count_upper, cnt_upper_bytes * sizeof(int), stream);
     cudaMemsetAsync(d_temp_count_lower, 0, cnt_lower_bytes * sizeof(int), stream);
     cudaMemsetAsync(d_temp_count_upper, 0, cnt_upper_bytes * sizeof(int), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         fill_cell_dict_split_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -353,7 +366,6 @@ build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,            
     cudaMallocAsync((void **)&d_max_dx_upper, sizeof(real_t), stream);
     cudaMemsetAsync(d_max_dx_lower, 0, sizeof(real_t), stream);
     cudaMemsetAsync(d_max_dx_upper, 0, sizeof(real_t), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         reduce_max_dx_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -408,7 +420,6 @@ build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,            
     cudaMallocAsync((void **)&d_cell_ptr_upper, (size_t)(ncx_upper + 1) * sizeof(int), stream);
     cudaMemsetAsync(d_cell_ptr_lower, 0, (size_t)(ncx_lower + 1) * sizeof(int), stream);
     cudaMemsetAsync(d_cell_ptr_upper, 0, (size_t)(ncx_upper + 1) * sizeof(int), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         count_cell_overlaps_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -422,8 +433,23 @@ build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,            
      * Phase 4 – Prefix sum: transform per-cell counts into CSR offsets
      * ══════════════════════════════════════════════════════════════════════════ */
 
-    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_lower, ncx_lower + 1);
-    prefix_sum_inplace_kernel<<<1, 1, 0, stream>>>(d_cell_ptr_upper, ncx_upper + 1);
+    /* Parallel prefix sum via CUB (in-place inclusive scan on the count entries). */
+    {
+        void  *d_tmp_l     = NULL;
+        size_t tmp_bytes_l = 0;
+        cub::DeviceScan::InclusiveSum(d_tmp_l, tmp_bytes_l, d_cell_ptr_lower + 1, d_cell_ptr_lower + 1, ncx_lower, stream);
+        cudaMallocAsync(&d_tmp_l, tmp_bytes_l, stream);
+        cub::DeviceScan::InclusiveSum(d_tmp_l, tmp_bytes_l, d_cell_ptr_lower + 1, d_cell_ptr_lower + 1, ncx_lower, stream);
+        cudaFreeAsync(d_tmp_l, stream);
+    }
+    {
+        void  *d_tmp_u     = NULL;
+        size_t tmp_bytes_u = 0;
+        cub::DeviceScan::InclusiveSum(d_tmp_u, tmp_bytes_u, d_cell_ptr_upper + 1, d_cell_ptr_upper + 1, ncx_upper, stream);
+        cudaMallocAsync(&d_tmp_u, tmp_bytes_u, stream);
+        cub::DeviceScan::InclusiveSum(d_tmp_u, tmp_bytes_u, d_cell_ptr_upper + 1, d_cell_ptr_upper + 1, ncx_upper, stream);
+        cudaFreeAsync(d_tmp_u, stream);
+    }
 
     /* Read back total dict entries (= cell_ptr[num_cells_x]) */
     int total_dict_lower = 0;
@@ -466,7 +492,6 @@ build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,            
     cudaMallocAsync((void **)&d_temp_count_upper, (size_t)ncx_upper * sizeof(int), stream);
     cudaMemsetAsync(d_temp_count_lower, 0, (size_t)ncx_lower * sizeof(int), stream);
     cudaMemsetAsync(d_temp_count_upper, 0, (size_t)ncx_upper * sizeof(int), stream);
-    cudaStreamSynchronize(stream);
 
     if (grid_boxes > 0) {
         fill_cell_dict_split_1d_kernel<<<grid_boxes, block_size, 0, stream>>>(
@@ -486,32 +511,85 @@ build_cell_list_split_3d_1d_map_on_device(const real_t *d_box_min_x,            
     cudaFreeAsync(d_temp_count_upper, stream);
 
     /* ══════════════════════════════════════════════════════════════════════════
-     * Phase 6 – Sort entries by lower_bounds_y; enforce non-decreasing
-     * upper_bounds_y per cell.  The CSR sort/fix kernels are bound-agnostic, so
-     * the 2-D "z" kernels are reused on the y-bound arrays (one thread per
-     * x-cell).
+     * Phase 6 – Sort entries per x-cell by lower_bounds_y using CUB segmented
+     * sort (replaces the single-thread O(n²) insertion sort per cell).
+     *
+     * CUB DeviceSegmentedSort is deterministic for identical keys, so running
+     * SortPairs twice with the same key array d_lower_y_{lower,upper} produces
+     * the same permutation for both (cell_dict, lower_y) and (lower_y, upper_y).
+     * After sorting, fix_upper_bounds_z_kernel enforces non-decreasing upper_y.
      * ══════════════════════════════════════════════════════════════════════════ */
 
-    const int grid_lower = ceildiv(ncx_lower, block_size);
-    const int grid_upper = ceildiv(ncx_upper, block_size);
+    auto cub_sort_group = [&](int    *&d_cell_dict,   /* in/out: reordered on exit */
+                               real_t *&d_lower_y,    /* in/out: sorted on exit    */
+                               real_t *&d_upper_y,    /* in/out: reordered on exit */
+                               const int *d_cell_ptr,
+                               const int  total_dict,
+                               const int  ncx) {
+        if (total_dict <= 1 || ncx == 0) return;
+
+        real_t *d_lower_y_out   = NULL;
+        int    *d_cell_dict_out = NULL;
+        real_t *d_upper_y_out   = NULL;
+
+        cudaMallocAsync(&d_lower_y_out,   (size_t)total_dict * sizeof(real_t), stream);
+        cudaMallocAsync(&d_cell_dict_out, (size_t)total_dict * sizeof(int),    stream);
+        cudaMallocAsync(&d_upper_y_out,   (size_t)total_dict * sizeof(real_t), stream);
+
+        /* Compute shared workspace size (same for both SortPairs calls). */
+        void  *d_sort_tmp      = NULL;
+        size_t sort_tmp_bytes  = 0;
+        cub::DeviceSegmentedSort::SortPairs(d_sort_tmp, sort_tmp_bytes,
+                d_lower_y, d_lower_y_out,
+                d_cell_dict, d_cell_dict_out,
+                total_dict, ncx,
+                d_cell_ptr, d_cell_ptr + 1, stream);
+        cudaMallocAsync(&d_sort_tmp, sort_tmp_bytes, stream);
+
+        /* Sort 1: (lower_y, cell_dict) — establishes the sort permutation. */
+        cub::DeviceSegmentedSort::SortPairs(d_sort_tmp, sort_tmp_bytes,
+                d_lower_y, d_lower_y_out,
+                d_cell_dict, d_cell_dict_out,
+                total_dict, ncx,
+                d_cell_ptr, d_cell_ptr + 1, stream);
+
+        /* Sort 2: (lower_y, upper_y) — same key → same permutation → consistent. */
+        cub::DeviceSegmentedSort::SortPairs(d_sort_tmp, sort_tmp_bytes,
+                d_lower_y, d_lower_y_out,
+                d_upper_y, d_upper_y_out,
+                total_dict, ncx,
+                d_cell_ptr, d_cell_ptr + 1, stream);
+
+        cudaFreeAsync(d_sort_tmp, stream);
+
+        /* Redirect caller's pointers to sorted output; free the old unsorted buffers. */
+        cudaFreeAsync(d_lower_y,   stream);
+        cudaFreeAsync(d_cell_dict, stream);
+        cudaFreeAsync(d_upper_y,   stream);
+
+        d_lower_y   = d_lower_y_out;
+        d_cell_dict = d_cell_dict_out;
+        d_upper_y   = d_upper_y_out;
+    };
+
+    cub_sort_group(d_cell_dict_lower, d_lower_y_lower, d_upper_y_lower,
+                   d_cell_ptr_lower, total_dict_lower, ncx_lower);
+
+    cub_sort_group(d_cell_dict_upper, d_lower_y_upper, d_upper_y_upper,
+                   d_cell_ptr_upper, total_dict_upper, ncx_upper);
+
+    /* Enforce non-decreasing upper_bounds_y per cell (required by query binary search). */
+    const int grid_lower = (total_dict_lower > 1 && ncx_lower > 0) ? ceildiv(ncx_lower, block_size) : 0;
+    const int grid_upper = (total_dict_upper > 1 && ncx_upper > 0) ? ceildiv(ncx_upper, block_size) : 0;
 
     if (grid_lower > 0) {
-        sort_cells_by_lower_z_kernel<<<grid_lower, block_size, 0, stream>>>(
-                d_cell_ptr_lower, d_cell_dict_lower, d_lower_y_lower, d_upper_y_lower, ncx_lower);
-
         fix_upper_bounds_z_kernel<<<grid_lower, block_size, 0, stream>>>(
                 d_cell_ptr_lower, d_upper_y_lower, ncx_lower);
     }
-
     if (grid_upper > 0) {
-        sort_cells_by_lower_z_kernel<<<grid_upper, block_size, 0, stream>>>(
-                d_cell_ptr_upper, d_cell_dict_upper, d_lower_y_upper, d_upper_y_upper, ncx_upper);
-
         fix_upper_bounds_z_kernel<<<grid_upper, block_size, 0, stream>>>(
                 d_cell_ptr_upper, d_upper_y_upper, ncx_upper);
     }
-
-    cudaStreamSynchronize(stream);
 
     /* ══════════════════════════════════════════════════════════════════════════
      * Assemble result: copy map structs (with device pointers) to device memory

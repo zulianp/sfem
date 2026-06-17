@@ -97,10 +97,7 @@ boxes_t copy_boxes_to_device(const boxes_t *h_boxes, cudaStream_t stream) {
     cudaMallocAsync((void **)&d_boxes.max_y, bounds_bytes, stream);
     cudaMallocAsync((void **)&d_boxes.max_z, bounds_bytes, stream);
 
-    /* ── wait for all allocations to complete ── */
-    cudaStreamSynchronize(stream);
-
-    /* ── async H→D copies ── */
+    /* ── async H→D copies (stream-ordered after the mallocs above) ── */
     cudaMemcpyAsync(d_boxes.min_x, h_boxes->min_x, bounds_bytes, cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(d_boxes.min_y, h_boxes->min_y, bounds_bytes, cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(d_boxes.min_z, h_boxes->min_z, bounds_bytes, cudaMemcpyHostToDevice, stream);
@@ -122,8 +119,6 @@ void free_boxes_device(boxes_t     *d_boxes,  //
     cudaFreeAsync(d_boxes->max_x, stream);
     cudaFreeAsync(d_boxes->max_y, stream);
     cudaFreeAsync(d_boxes->max_z, stream);
-
-    cudaStreamSynchronize(stream);  // ensure all frees are complete before setting pointers to NULL
 
     d_boxes->min_x = NULL;
     d_boxes->min_y = NULL;
@@ -359,7 +354,6 @@ mesh_tri3_geom_device_t copy_mesh_tri3_geom_to_device(const mesh_tri3_geom_t *h_
     const size_t ec_bytes = (size_t)nelements * 9 * sizeof(geom_t);
 
     cudaMallocAsync((void **)&d_geom.element_coords, ec_bytes, stream);
-    cudaStreamSynchronize(stream);
     cudaMemcpyAsync(d_geom.element_coords, h_geom->element_coords, ec_bytes, cudaMemcpyHostToDevice, stream);
 
     RETURN_FROM_FUNCTION(d_geom);

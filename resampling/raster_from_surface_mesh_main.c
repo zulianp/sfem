@@ -370,15 +370,15 @@ int main_raster_from_surface_mesh(int argc, char* argv[]) {  //
 
 #ifdef SFEM_ENABLE_CUDA
     if (info.use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA) {
-        tri3_raster_mesh_cell_quad_gpu(0,               //
-                                       mesh.nelements,  //
-                                       &mesh,           //
-                                       nlocal,          //
-                                       stride,          //
-                                       origin,          //
-                                       delta,           //
-                                       NULL,            //
-                                       field);          //
+        tri3_raster_mesh_cell_quad_full_gpu(0,               //
+                                            mesh.nelements,  //
+                                            &mesh,           //
+                                            nlocal,          //
+                                            stride,          //
+                                            origin,          //
+                                            delta,           //
+                                            NULL,            //
+                                            field);          //
     } else
 #endif
     {
