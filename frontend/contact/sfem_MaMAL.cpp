@@ -1021,6 +1021,79 @@ namespace sfem {
             }
         }
 
+        real_t augmented_lagrangian_line_search_step(const std::shared_ptr<Memory>& mem) {
+            static const int    n_line_search_steps         = 12;
+            static const real_t steps[n_line_search_steps]  = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01};
+            real_t              values[n_line_search_steps] = {0};
+
+            f->value_steps(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
+
+            printf("MaMAL::nonlinear_cycle step fun: [\n");
+            for (int i = 0; i < n_line_search_steps; ++i) {
+                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            }
+            printf("]\n");
+
+            const int       dim        = contact_jacobi_data->surface->spatial_dimension();
+            const ptrdiff_t n_contact  = contact_jacobi_data->coupling_matrix->rows();
+            const auto      cm         = contact_jacobi_data->coupling_matrix;
+            const idx_t*    nm         = contact_jacobi_data->surface->node_mapping()->data();
+            const real_t*   disp       = mem->solution->data();
+            const real_t*   inc        = mem->correction->data();
+            real_t*         local_disp = contact_hessian_local_x[0]->data();
+            real_t*         local_inc  = contact_hessian_local_y[0]->data();
+
+            assert(dim == 3);
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                const ptrdiff_t global_dof = nm[i] * dim;
+                const ptrdiff_t local_dof  = i * dim;
+                local_disp[local_dof + 0]  = disp[global_dof + 0];
+                local_disp[local_dof + 1]  = disp[global_dof + 1];
+                local_disp[local_dof + 2]  = disp[global_dof + 2];
+                local_inc[local_dof + 0]   = inc[global_dof + 0];
+                local_inc[local_dof + 1]   = inc[global_dof + 1];
+                local_inc[local_dof + 2]   = inc[global_dof + 2];
+            }
+
+            contact_objective_steps(dim,
+                                    n_contact,
+                                    cm->row_ptr->data(),
+                                    cm->col_idx->data(),
+                                    cm->values->data(),
+                                    contact_jacobi_data->distances->data(),
+                                    contact_jacobi_data->agumentation->data(),
+                                    contact_jacobi_data->normals->data(),
+                                    contact_jacobi_data->mass_vector->data(),
+                                    contact_penalty,
+                                    local_disp,
+                                    local_inc,
+                                    n_line_search_steps,
+                                    steps,
+                                    values);
+
+            int    best_step_idx = 0;
+            real_t best_value    = values[best_step_idx];
+            for (int i = 1; i < n_line_search_steps; ++i) {
+                if (values[i] < best_value) {
+                    best_value    = values[i];
+                    best_step_idx = i;
+                }
+            }
+
+            printf("MaMAL::nonlinear_cycle step fun + contact: [\n");
+            for (int i = 0; i < n_line_search_steps; ++i) {
+                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            }
+            printf("]\n");
+
+            printf("MaMAL::nonlinear_cycle step fun + contact best: %e -> %e\n",
+                   (double)steps[best_step_idx],
+                   (double)best_value);
+
+            return steps[best_step_idx];
+        }
+
         void nonlinear_cycle() {
             nonlinear_smooth(memory[0]->solution);
 
@@ -1042,9 +1115,8 @@ namespace sfem {
                     blas->zeros(mem->correction->size(), mem->correction->data());
                     data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
 
-                    // TODO: Line search using augmented lagrangian energy as well as the function energy
-
-                    blas->axpy(mem->solution->size(), 0.4, mem->correction->data(), mem->solution->data());
+                    const real_t step = augmented_lagrangian_line_search_step(mem);
+                    blas->axpy(mem->solution->size(), step, mem->correction->data(), mem->solution->data());
                 }
             }
 
