@@ -650,6 +650,7 @@ namespace sfem {
             auto jacobi                  = sfem::create_shiftable_block_sym_jacobi<real_t>(fs->block_size(), diag, mask, es);
             jacobi->relaxation_parameter = real_t(1) / fs->block_size();
             smoothers[level]->set_preconditioner_op(jacobi);
+            smoothers[level]->set_max_it(100);
         }
 
         void resample_contact_conditions(const smesh::SharedBuffer<real_t>& displacement) {
@@ -1028,11 +1029,11 @@ namespace sfem {
 
             f->value_steps(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
 
-            printf("MaMAL::nonlinear_cycle step fun: [\n");
-            for (int i = 0; i < n_line_search_steps; ++i) {
-                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
-            }
-            printf("]\n");
+            // printf("MaMAL::nonlinear_cycle step fun: [\n");
+            // for (int i = 0; i < n_line_search_steps; ++i) {
+            //     printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            // }
+            // printf("]\n");
 
             const int       dim        = contact_jacobi_data->surface->spatial_dimension();
             const ptrdiff_t n_contact  = contact_jacobi_data->coupling_matrix->rows();
@@ -1081,11 +1082,11 @@ namespace sfem {
                 }
             }
 
-            printf("MaMAL::nonlinear_cycle step fun + contact: [\n");
-            for (int i = 0; i < n_line_search_steps; ++i) {
-                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
-            }
-            printf("]\n");
+            // printf("MaMAL::nonlinear_cycle step fun + contact: [\n");
+            // for (int i = 0; i < n_line_search_steps; ++i) {
+            //     printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            // }
+            // printf("]\n");
 
             printf("MaMAL::nonlinear_cycle step fun + contact best: %e -> %e\n",
                    (double)steps[best_step_idx],

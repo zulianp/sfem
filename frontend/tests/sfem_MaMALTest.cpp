@@ -15,6 +15,153 @@
 #include "../contact/sfem_MaMAL.cpp"
 #include "../contact/sfem_SelfContact.cpp"
 
+static real_t contact_objective(const ptrdiff_t     nnodes,
+                                const count_t*      rowptr,
+                                const idx_t*        colidx,
+                                const real_t*       vals,
+                                const real_t*       distances,
+                                const real_t*       agumentation,
+                                const real_t* const normals[3],
+                                const real_t*       mass,
+                                const real_t        penalty,
+                                const real_t*       x) {
+    static const real_t zero_step[1] = {0};
+    real_t              value[1]     = {0};
+
+    sfem::contact_objective_steps(3,
+                                  nnodes,
+                                  rowptr,
+                                  colidx,
+                                  vals,
+                                  distances,
+                                  agumentation,
+                                  normals,
+                                  mass,
+                                  penalty,
+                                  x,
+                                  x,
+                                  1,
+                                  zero_step,
+                                  value);
+    return value[0];
+}
+
+static void contact_gradient(const ptrdiff_t     nnodes,
+                             const count_t*      rowptr,
+                             const idx_t*        colidx,
+                             const real_t*       vals,
+                             const real_t*       distances,
+                             const real_t*       agumentation,
+                             const real_t* const normals[3],
+                             const real_t*       mass,
+                             const real_t        penalty,
+                             const real_t*       x,
+                             real_t*             macaulay,
+                             real_t*             grad) {
+    const real_t* const x_soa[3] = {x + 0, x + 1, x + 2};
+
+    sfem::compute_macaulay_term(
+            3, nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, 3, x_soa, macaulay);
+
+    for (ptrdiff_t i = 0; i < 3 * nnodes; ++i) {
+        grad[i] = 0;
+    }
+
+    sfem::assemble_contact_gradient(
+            3, nnodes, penalty, rowptr, colidx, vals, distances, agumentation, normals, mass, macaulay, grad);
+}
+
+static void contact_hessian_apply_aos(const ptrdiff_t     nnodes,
+                                      const count_t*      rowptr,
+                                      const idx_t*        colidx,
+                                      const real_t*       vals,
+                                      const real_t* const normals[3],
+                                      const real_t*       mass,
+                                      const real_t        penalty,
+                                      const real_t*       macaulay,
+                                      const real_t*       x,
+                                      real_t*             y) {
+    const real_t* const x_soa[3] = {x + 0, x + 1, x + 2};
+    real_t* const       y_soa[3] = {y + 0, y + 1, y + 2};
+
+    for (ptrdiff_t i = 0; i < 3 * nnodes; ++i) {
+        y[i] = 0;
+    }
+
+    sfem::contact_hessian_apply(3, nnodes, rowptr, colidx, vals, normals, mass, penalty, macaulay, 3, x_soa, 3, y_soa);
+}
+
+int test_contact_objective_gradient_hessian_finite_differences() {
+    static const ptrdiff_t nnodes = 4;
+    static const ptrdiff_t ndofs  = 3 * nnodes;
+
+    const count_t rowptr[nnodes + 1] = {0, 2, 3, 4, 6};
+    const idx_t   colidx[6]          = {1, 2, 2, 3, 0, 1};
+    const real_t  vals[6]            = {0.35, 0.25, 0.40, 0.55, 0.20, 0.30};
+
+    const real_t nx[nnodes] = {0.84, -0.21, 0.36, -0.48};
+    const real_t ny[nnodes] = {0.28, 0.91, -0.48, 0.64};
+    const real_t nz[nnodes] = {0.46, 0.35, 0.80, 0.60};
+
+    const real_t* const normals[3] = {nx, ny, nz};
+    const real_t        mass[nnodes] = {1.20, 0.85, 1.10, 0.95};
+    const real_t        distances[nnodes] = {-0.35, -0.28, -0.31, -0.25};
+    const real_t        agumentation[nnodes] = {0.40, -0.15, 0.20, -0.10};
+    const real_t        penalty = 17.0;
+
+    const real_t x[ndofs] = {0.12,  -0.08, 0.05,  -0.03, 0.11,  -0.06,
+                             0.07,  0.04,  -0.02, -0.09, 0.06,  0.10};
+    const real_t p[ndofs] = {0.31,  -0.17, 0.23,  -0.29, 0.19,  -0.11,
+                             0.13,  0.07,  -0.37, 0.21,  -0.05, 0.09};
+
+    real_t macaulay[nnodes];
+    real_t grad[ndofs];
+    real_t hp[ndofs];
+
+    contact_gradient(nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, x, macaulay, grad);
+    contact_hessian_apply_aos(nnodes, rowptr, colidx, vals, normals, mass, penalty, macaulay, p, hp);
+
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        SFEM_TEST_ASSERT(macaulay[i] > 1e-2);
+    }
+
+    const real_t eps = 1e-6;
+    real_t       xp[ndofs];
+    real_t       xm[ndofs];
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        xp[i] = x[i] + eps * p[i];
+        xm[i] = x[i] - eps * p[i];
+    }
+
+    const real_t fp = contact_objective(nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, xp);
+    const real_t fm = contact_objective(nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, xm);
+
+    real_t grad_dot_p = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        grad_dot_p += grad[i] * p[i];
+    }
+
+    const real_t fd_grad_dot_p = (fp - fm) / (2 * eps);
+    SFEM_TEST_ASSERT(std::fabs(fd_grad_dot_p - grad_dot_p) < 1e-7);
+
+    real_t macaulay_p[nnodes];
+    real_t macaulay_m[nnodes];
+    real_t grad_p[ndofs];
+    real_t grad_m[ndofs];
+    contact_gradient(nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, xp, macaulay_p, grad_p);
+    contact_gradient(nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, xm, macaulay_m, grad_m);
+
+    real_t max_hessian_error = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        const real_t fd_hp = (grad_p[i] - grad_m[i]) / (2 * eps);
+        max_hessian_error  = std::max(max_hessian_error, std::fabs(fd_hp - hp[i]));
+    }
+
+    SFEM_TEST_ASSERT(max_hessian_error < 1e-7);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::ExecutionSpace es) {
     const ptrdiff_t n  = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
     const ptrdiff_t nx = n;
@@ -147,6 +294,7 @@ int test_mamal_nonlinear_cycle() {
 
 int main(int argc, char* argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
+    SFEM_RUN_TEST(test_contact_objective_gradient_hessian_finite_differences);
     SFEM_RUN_TEST(test_mamal_nonlinear_cycle);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
