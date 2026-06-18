@@ -4,20 +4,21 @@ set -e
 
 
 
- export PATH=$INSTALL_DIR/sfem/bin:$PATH
+ # export PATH=$INSTALL_DIR/sfem/bin:$PATH
 
-
+SFEM_MAX_INNER_IT=4 \
+SFEM_SDF_SCALE=-1 				\
 SFEM_ENABLE_LINE_SEARCH=1		\
-SFEM_MAX_IT=120					\
+SFEM_MAX_IT=20					\
 SFEM_ATOL=1e-7					\
-SFEM_GRID_SHIFT="-0.03"			\
-SFEM_GRID_SCALE="-1"			\
-SFEM_ELEMENT_REFINE_LEVEL=8		\
+SFEM_ELEMENT_REFINE_LEVEL=16		\
 SFEM_STAGNATION_THRESHOLD=10	\
 SFEM_PENALTY_PARAM=100			\
 SFEM_NL_SMOOTH_STEPS=27			\
 SFEM_TRACE_FILE=obs.csv 		\
 	$LAUNCH obs rock ./sdf  dirichlet.yaml rock/contact_boundary output
+
+raw_to_db output/mesh output.vtk -p 'output/out/*.*' 
 
 # # They are all zeros
 # rm -f output/out/contact_stress.{1,2}.raw
