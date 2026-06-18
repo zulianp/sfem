@@ -13,7 +13,7 @@ raw_to_db surf_tri3 surf_tri3.vtk
 
 
 echo "computing SDF..."
-mesh_to_sdf surf_tri3 600 600 600 sdf
+SSDF_MARGIN_Z=0.05 mesh_to_sdf surf_tri3 800 800 200 sdf
 echo "DONE!"
 
 cp smesh.trace.csv sdf.trace.csv
