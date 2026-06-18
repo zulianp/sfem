@@ -729,6 +729,8 @@ namespace sfem {
 
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
+                  } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
