@@ -13,7 +13,7 @@ raw_to_db surf_tri3 surf_tri3.vtk
 
 
 echo "computing SDF..."
-SSDF_SCALE=-1 SSDF_MARGIN=0 mesh_to_sdf surf_tri3 600 600 600 sdf
+mesh_to_sdf surf_tri3 600 600 600 sdf
 echo "DONE!"
 
 cp smesh.trace.csv sdf.trace.csv
@@ -30,4 +30,4 @@ raw_to_db dboundary dboundary.vtk --coords=rock --cell_type=QUAD4
 raw_to_db contact_boundary contact_boundary.vtk  --coords=rock --cell_type=QUAD4
 
 
-# ./sim.sh
+./sim.sh
