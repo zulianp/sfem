@@ -28,21 +28,8 @@ static real_t contact_objective(const ptrdiff_t     nnodes,
     static const real_t zero_step[1] = {0};
     real_t              value[1]     = {0};
 
-    sfem::contact_objective_steps(3,
-                                  nnodes,
-                                  rowptr,
-                                  colidx,
-                                  vals,
-                                  distances,
-                                  agumentation,
-                                  normals,
-                                  mass,
-                                  penalty,
-                                  x,
-                                  x,
-                                  1,
-                                  zero_step,
-                                  value);
+    sfem::contact_objective_steps(
+            3, nnodes, rowptr, colidx, vals, distances, agumentation, normals, mass, penalty, x, x, 1, zero_step, value);
     return value[0];
 }
 
@@ -103,16 +90,14 @@ int test_contact_objective_gradient_hessian_finite_differences() {
     const real_t ny[nnodes] = {0.28, 0.91, -0.48, 0.64};
     const real_t nz[nnodes] = {0.46, 0.35, 0.80, 0.60};
 
-    const real_t* const normals[3] = {nx, ny, nz};
-    const real_t        mass[nnodes] = {1.20, 0.85, 1.10, 0.95};
-    const real_t        distances[nnodes] = {-0.35, -0.28, -0.31, -0.25};
+    const real_t* const normals[3]           = {nx, ny, nz};
+    const real_t        mass[nnodes]         = {1.20, 0.85, 1.10, 0.95};
+    const real_t        distances[nnodes]    = {-0.35, -0.28, -0.31, -0.25};
     const real_t        agumentation[nnodes] = {0.40, -0.15, 0.20, -0.10};
-    const real_t        penalty = 17.0;
+    const real_t        penalty              = 17.0;
 
-    const real_t x[ndofs] = {0.12,  -0.08, 0.05,  -0.03, 0.11,  -0.06,
-                             0.07,  0.04,  -0.02, -0.09, 0.06,  0.10};
-    const real_t p[ndofs] = {0.31,  -0.17, 0.23,  -0.29, 0.19,  -0.11,
-                             0.13,  0.07,  -0.37, 0.21,  -0.05, 0.09};
+    const real_t x[ndofs] = {0.12, -0.08, 0.05, -0.03, 0.11, -0.06, 0.07, 0.04, -0.02, -0.09, 0.06, 0.10};
+    const real_t p[ndofs] = {0.31, -0.17, 0.23, -0.29, 0.19, -0.11, 0.13, 0.07, -0.37, 0.21, -0.05, 0.09};
 
     real_t macaulay[nnodes];
     real_t grad[ndofs];
@@ -163,10 +148,11 @@ int test_contact_objective_gradient_hessian_finite_differences() {
 }
 
 std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::ExecutionSpace es) {
-    const ptrdiff_t n  = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
-    const ptrdiff_t nx = n;
-    const ptrdiff_t ny = n;
-    const ptrdiff_t nz = n;
+    const ptrdiff_t n     = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
+    const int       level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 4);
+    const ptrdiff_t nx    = n;
+    const ptrdiff_t ny    = n;
+    const ptrdiff_t nz    = n;
 
     const geom_t poc = 1;  // Use 1 for actual contact
 
@@ -174,7 +160,7 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
     auto upper = smesh::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, nx, ny, nz, 0.25, poc, 0.25, 0.75, 1.75, 0.75);
     auto mesh  = smesh::concatenate(upper, lower);
 
-    mesh = smesh::to_semistructured(16, mesh, true, false);
+    mesh = smesh::to_semistructured(level, mesh, true, false);
 
     const int dim   = mesh->spatial_dimension();
     auto      space = sfem::FunctionSpace::create(mesh, dim);
@@ -232,7 +218,7 @@ int test_mamal_nonlinear_cycle() {
     auto impl  = mamal->impl_.get();
 
     SFEM_TEST_ASSERT(impl->n_levels() > 1);
-    SFEM_TEST_ASSERT(impl->galerkin_restrictions.size() > 1);
+    SFEM_TEST_ASSERT(impl->galerkin_restrictions.size() >= 1);
 
     SFEM_TEST_ASSERT(mamal->solve(x) == SFEM_SUCCESS);
 

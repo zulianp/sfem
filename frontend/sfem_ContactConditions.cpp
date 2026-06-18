@@ -315,6 +315,8 @@ namespace sfem {
                         // Output
                         mass_vector->data());
 
+                SMESH_CHECK_NANS(mass_vector);
+
             } else {
                 auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
                 sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());

@@ -38,7 +38,6 @@ namespace sfem {
         real_t correction_damping{1};
         real_t min_correction_damping{1e-2};
         real_t augmentation_relaxation{1};
-        int    line_search_steps{1};
         int    contact_update_frequency{0};
         int    contact_jacobi_loops{10};
         bool   line_search_recompute_contact{false};
@@ -54,7 +53,6 @@ namespace sfem {
             correction_damping       = smesh::Env::read("SFEM_MAMAL_CORRECTION_DAMPING", correction_damping);
             min_correction_damping   = smesh::Env::read("SFEM_MAMAL_MIN_CORRECTION_DAMPING", min_correction_damping);
             augmentation_relaxation  = smesh::Env::read("SFEM_MAMAL_AUGMENTATION_RELAXATION", augmentation_relaxation);
-            line_search_steps        = smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_STEPS", line_search_steps);
             contact_update_frequency = smesh::Env::read("SFEM_MAMAL_CONTACT_UPDATE_FREQUENCY", contact_update_frequency);
             contact_jacobi_loops     = smesh::Env::read("SFEM_MAMAL_CONTACT_JACOBI_LOOPS", contact_jacobi_loops);
             line_search_recompute_contact =
@@ -585,6 +583,7 @@ namespace sfem {
             contact_grad       = sfem::create_buffer<real_t>(space->n_dofs(), es);
             contact_local_grad = sfem::create_buffer<real_t>(contact->mass_vector()->size() * spatial_dim, es);
             macaulay           = sfem::create_buffer<real_t>(contact->mass_vector()->size(), es);
+            sfem::blas<real_t>(es)->zeros(agumentation->size(), agumentation->data());
 
             smoothers = sfem::create_gmg_default_smoothers_and_solver(data, operators, 3, false);
 
@@ -650,7 +649,7 @@ namespace sfem {
             auto jacobi                  = sfem::create_shiftable_block_sym_jacobi<real_t>(fs->block_size(), diag, mask, es);
             jacobi->relaxation_parameter = real_t(1) / fs->block_size();
             smoothers[level]->set_preconditioner_op(jacobi);
-            smoothers[level]->set_max_it(100);
+            smoothers[level]->set_max_it(100000);
         }
 
         void resample_contact_conditions(const smesh::SharedBuffer<real_t>& displacement) {
@@ -1022,18 +1021,66 @@ namespace sfem {
             }
         }
 
+        real_t contact_penetration_norm(const SharedBuffer<real_t>& x) {
+            auto blas = sfem::blas<real_t>(f->execution_space());
+            compute_penetration_from_global_displacement(
+                    *contact_jacobi_data, x->data(), contact_local_grad->data(), macaulay->data());
+            return blas->norm2(macaulay->size(), macaulay->data());
+        }
+
+        real_t augmented_lagrangian_value(const SharedBuffer<real_t>& x) {
+            static const real_t zero_step[1] = {0};
+            real_t              value        = 0;
+            f->value_steps(x->data(), x->data(), 1, zero_step, &value);
+
+            const int           dim        = contact_jacobi_data->surface->spatial_dimension();
+            const ptrdiff_t     n_contact  = contact_jacobi_data->coupling_matrix->rows();
+            const auto          cm         = contact_jacobi_data->coupling_matrix;
+            const idx_t* const  nm         = contact_jacobi_data->surface->node_mapping()->data();
+            const real_t* const disp       = x->data();
+            real_t* const       local_disp = contact_hessian_local_x[0]->data();
+
+            assert(dim == 3);
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                const ptrdiff_t global_dof = nm[i] * dim;
+                const ptrdiff_t local_dof  = i * dim;
+                local_disp[local_dof + 0]  = disp[global_dof + 0];
+                local_disp[local_dof + 1]  = disp[global_dof + 1];
+                local_disp[local_dof + 2]  = disp[global_dof + 2];
+            }
+
+            contact_objective_steps(dim,
+                                    n_contact,
+                                    cm->row_ptr->data(),
+                                    cm->col_idx->data(),
+                                    cm->values->data(),
+                                    contact_jacobi_data->distances->data(),
+                                    contact_jacobi_data->agumentation->data(),
+                                    contact_jacobi_data->normals->data(),
+                                    contact_jacobi_data->mass_vector->data(),
+                                    contact_penalty,
+                                    local_disp,
+                                    local_disp,
+                                    1,
+                                    zero_step,
+                                    &value);
+
+            return value;
+        }
+
         real_t augmented_lagrangian_line_search_step(const std::shared_ptr<Memory>& mem) {
-            static const int    n_line_search_steps         = 12;
-            static const real_t steps[n_line_search_steps]  = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01};
+            static const int    n_line_search_steps         = 13;
+            static const real_t steps[n_line_search_steps]  = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.09, 0.08, 0.};
             real_t              values[n_line_search_steps] = {0};
 
             f->value_steps(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
 
-            // printf("MaMAL::nonlinear_cycle step fun: [\n");
-            // for (int i = 0; i < n_line_search_steps; ++i) {
-            //     printf("%e -> %e\n", (double)steps[i], (double)values[i]);
-            // }
-            // printf("]\n");
+            printf("MaMAL::nonlinear_cycle step fun: [\n");
+            for (int i = 0; i < n_line_search_steps; ++i) {
+                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            }
+            printf("]\n");
 
             const int       dim        = contact_jacobi_data->surface->spatial_dimension();
             const ptrdiff_t n_contact  = contact_jacobi_data->coupling_matrix->rows();
@@ -1082,17 +1129,30 @@ namespace sfem {
                 }
             }
 
-            // printf("MaMAL::nonlinear_cycle step fun + contact: [\n");
-            // for (int i = 0; i < n_line_search_steps; ++i) {
-            //     printf("%e -> %e\n", (double)steps[i], (double)values[i]);
-            // }
-            // printf("]\n");
+            printf("MaMAL::nonlinear_cycle step fun + contact: [\n");
+            for (int i = 0; i < n_line_search_steps; ++i) {
+                printf("%e -> %e\n", (double)steps[i], (double)values[i]);
+            }
+            printf("]\n");
 
             printf("MaMAL::nonlinear_cycle step fun + contact best: %e -> %e\n",
                    (double)steps[best_step_idx],
                    (double)best_value);
 
             return steps[best_step_idx];
+        }
+
+        void smooth_candidate_correction(const std::shared_ptr<Memory>& mem) {
+            auto            blas = sfem::blas<real_t>(f->execution_space());
+            const ptrdiff_t n    = mem->solution->size();
+            const real_t*   sol  = mem->solution->data();
+            real_t* const   cand = mem->work->data();
+            real_t* const   corr = mem->correction->data();
+
+            blas->copy(n, sol, cand);
+            blas->axpy(n, 1, corr, cand);
+            nonlinear_smooth(mem->work);
+            blas->zaxpby(n, 1, cand, -1, sol, corr);
         }
 
         void nonlinear_cycle() {
@@ -1116,7 +1176,20 @@ namespace sfem {
                     blas->zeros(mem->correction->size(), mem->correction->data());
                     data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
 
-                    const real_t step = augmented_lagrangian_line_search_step(mem);
+                    // smooth_candidate_correction(mem);
+                    // const real_t current_energy        = augmented_lagrangian_value(mem->solution);
+                    // const real_t candidate_energy      = augmented_lagrangian_value(mem->work);
+                    // const real_t current_penetration   = contact_penetration_norm(mem->solution);
+                    // const real_t candidate_penetration = contact_penetration_norm(mem->work);
+                    // printf("MaMAL::nonlinear_cycle candidate energy %e -> %e penetration %e -> %e\n",
+                    //        (double)current_energy,
+                    //        (double)candidate_energy,
+                    //        (double)current_penetration,
+                    //        (double)candidate_penetration);
+
+                    // const real_t step = augmented_lagrangian_line_search_step(mem);
+
+                    const real_t step = smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_STEP", real_t(1.0));
                     blas->axpy(mem->solution->size(), step, mem->correction->data(), mem->solution->data());
                 }
             }
