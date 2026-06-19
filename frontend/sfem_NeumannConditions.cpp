@@ -480,12 +480,10 @@ namespace sfem {
         return no_op();
     }
 
+#ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
-#ifdef SFEM_ENABLE_CUDA
-        return std::make_shared<GPUNeumannConditions>(nc);
-#else
         return nc;
-#endif
     }
+#endif
 
 }  // namespace sfem

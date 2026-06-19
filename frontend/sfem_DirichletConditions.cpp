@@ -654,12 +654,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+#ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
-#ifdef SFEM_ENABLE_CUDA
-        return std::make_shared<GPUDirichletConditions>(dc);
-#else
         return dc;
-#endif
     }
+#endif
 
 }  // namespace sfem

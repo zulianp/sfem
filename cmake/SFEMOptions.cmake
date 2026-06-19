@@ -26,6 +26,13 @@ option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
 option(SFEM_ENABLE_SSDF "Enable SSDF library" OFF)
+set(_SFEM_ENABLE_CUBIQL_DEFAULT ${SFEM_ENABLE_SSDF})
+option(SFEM_ENABLE_CUBIQL "Enable cuBQL acceleration in SSDF" ${_SFEM_ENABLE_CUBIQL_DEFAULT})
+unset(_SFEM_ENABLE_CUBIQL_DEFAULT)
+if(SFEM_ENABLE_SSDF AND NOT SFEM_ENABLE_CUBIQL)
+    message(STATUS "SFEM_ENABLE_CUBIQL enabled because SFEM_ENABLE_SSDF is ON")
+    set(SFEM_ENABLE_CUBIQL ON CACHE BOOL "Enable cuBQL acceleration in SSDF" FORCE)
+endif()
 option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
@@ -111,6 +118,3 @@ if(SFEM_ENABLE_AVX2)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
 endif()
-
-
-

@@ -9,6 +9,8 @@
 #include "packed_elements.hpp"
 #include "sshex8.hpp"
 
+#include <math.h>
+
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))
 #endif
