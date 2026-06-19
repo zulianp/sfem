@@ -2,9 +2,18 @@
 
 set -e
 
+host=`hostname -s`
 
+if [[ "$host" == "daint-ln002" ]];
+then
+	echo "$host"
+	export OMP_NUM_THREADS=72
+	export OMP_PROC_BIND=true
+else
+	echo "$host"
+fi
 
- # export PATH=$INSTALL_DIR/sfem/bin:$PATH
+set -x
 
 SFEM_COARSE_OP_TYPE=MF 			\
 SFEM_MAX_INNER_IT=4 			\
@@ -16,7 +25,7 @@ SFEM_STAGNATION_THRESHOLD=10	\
 SFEM_PENALTY_PARAM=100			\
 SFEM_NL_SMOOTH_STEPS=27			\
 SFEM_TRACE_FILE=obs.csv 		\
-	$LAUNCH obs rock ./sdf  dirichlet.yaml rock/contact_boundary output
+	$LAUNCH obs rock ./sdf dirichlet.yaml rock/contact_boundary output
 
 raw_to_db output/mesh output.vtk -p 'output/out/*.*' 
 
