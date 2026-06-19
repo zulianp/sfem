@@ -205,7 +205,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     f->hessian_block_diag_sym(nullptr, diag->data());
     f->constraints_mask(mask->data());
 
-    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg(linear_op, es);
     cg->apply(rhs->data(), x->data());
 

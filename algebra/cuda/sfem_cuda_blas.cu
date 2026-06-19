@@ -278,19 +278,19 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
 template <typename T>
 class BLAS {
 public:
-    static float dot(const ptrdiff_t n, const T *const l, const T *const r) {
+    static T dot(const ptrdiff_t n, const T *const l, const T *const r) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        double *d_result = 0;
-        cudaMalloc((void **)&d_result, sizeof(double));
-        cudaMemset((void *)d_result, 0, sizeof(double));
+        T *d_result = 0;
+        cudaMalloc((void **)&d_result, sizeof(T));
+        cudaMemset((void *)d_result, 0, sizeof(T));
 
         tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
         SFEM_DEBUG_SYNCHRONIZE();
 
-        double ret = 0;
-        cudaMemcpy(&ret, d_result, sizeof(double), cudaMemcpyDeviceToHost);
+        T ret = 0;
+        cudaMemcpy(&ret, d_result, sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(d_result);
         return ret;
     }
@@ -522,7 +522,7 @@ namespace sfem {
 
         tpl.norm2 = [](const ptrdiff_t n, const T *const x) -> T {
             T ret = 0;
-            BLASImpl<T>::nrm2(n, x, &ret);
+            BLAS<T>::nrm2(n, x, &ret);
             return ret;
         };
 
@@ -531,11 +531,11 @@ namespace sfem {
 
         tpl.destroy = &d_destroy;
         tpl.values  = &tvalues<T>;
-        tpl.dot     = &BLASImpl<T>::dot;
-        tpl.axpby   = &BLASImpl<T>::axpby;
-        tpl.axpy    = &BLASImpl<T>::axpy;
-        tpl.scal    = &BLASImpl<T>::scal;
-        tpl.zaxpby  = &BLASImpl<T>::zaxpby;
+        tpl.dot     = &BLAS<T>::dot;
+        tpl.axpby   = &BLAS<T>::axpby;
+        tpl.axpy    = &BLAS<T>::axpy;
+        tpl.scal    = &BLAS<T>::scal;
+        tpl.zaxpby  = &BLAS<T>::zaxpby;
     }
 
     template struct CUDA_BLAS<double>;
