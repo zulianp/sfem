@@ -6,6 +6,7 @@ matplotlib
 matplotlib-inline
 meshio
 netCDF4
+networkx
 numba
 numpy
 rich
