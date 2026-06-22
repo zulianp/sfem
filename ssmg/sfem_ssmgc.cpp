@@ -321,7 +321,7 @@ namespace sfem {
             int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 40);
             int    max_it               = smesh::Env::read("SFEM_MAX_IT", 15);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
             real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
             real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
@@ -334,8 +334,8 @@ namespace sfem {
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
-            std::string coarse_op_type =
-                    smesh::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? op_type::BSR : op_type::MATRIX_FREE);
+            std::string coarse_op_type = smesh::Env::read_string(
+                    "SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? op_type::BSR : op_type::MATRIX_FREE);
             std::string debug_folder = "debug_ssmgc";
             std::string fine_op_type = op_type::MATRIX_FREE;
 
