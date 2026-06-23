@@ -178,7 +178,7 @@ def main():
         help="Element type to generate. May be repeated or comma-separated. Default: all supported elements.",
     )
     parser.add_argument("--quadrature-order", type=int, default=None)
-    parser.add_argument("--vector-size", type=int, default=8)
+    parser.add_argument("--vector-size", type=int, default=16)
     parser.add_argument("--compile", action="store_true")
     args = parser.parse_args()
 

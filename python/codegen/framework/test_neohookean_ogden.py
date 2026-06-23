@@ -346,7 +346,7 @@ def nonaffine_hex8_coords():
     return tuple(tuple(coord) for coord in coords)
 
 
-def generated_neohookean_weak_form_files(element_type, prefix, vector_size=8, local_prefix=None):
+def generated_neohookean_weak_form_files(element_type, prefix, vector_size=16, local_prefix=None):
     specialization = sfem_soa_element_specialization(element_type, vector_size=vector_size)
     dim = specialization.dim
     F = sp.Matrix(
