@@ -13,6 +13,7 @@ from symbolic import (
     KernelExpressions,
     generate_sfem_soa_cpp_files_for_element,
     matrix_inner,
+    sfem_supported_element_types,
     sfem_soa_element_specialization,
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
@@ -58,6 +59,16 @@ def build_combined_graph(forms):
     )
 
 
+def element_prefix(element_type):
+    return "generated_neohookean_ogden_%s" % element_type.lower()
+
+
+def local_family_prefix(specialization):
+    quadrature_rule = specialization.quadrature_rule
+    family = "tensor_product" if quadrature_rule.is_tensor_product else "simplex"
+    return "generated_neohookean_ogden_d%d_%s" % (quadrature_rule.dim, family)
+
+
 def build_sfem_soa_files(forms, specialization):
     weak_form = forms["weak_form"]
 
@@ -80,7 +91,8 @@ def build_sfem_soa_files(forms, specialization):
                 output_mode="accumulate",
             ),
         ),
-        prefix="generated_neohookean_ogden",
+        prefix=element_prefix(specialization.element_type),
+        local_prefix=local_family_prefix(specialization),
         specialization=specialization,
     )
 
@@ -121,6 +133,21 @@ def summary_markdown(graph, specialization):
     return "\n".join(lines)
 
 
+def parse_element_types(values):
+    if not values:
+        return sfem_supported_element_types()
+    element_types = []
+    for value in values:
+        for item in value.split(","):
+            element_type = item.strip().upper()
+            if not element_type:
+                continue
+            if element_type == "ALL":
+                return sfem_supported_element_types()
+            element_types.append(element_type)
+    return tuple(dict.fromkeys(element_types))
+
+
 def compile_source(source_path, compiler):
     object_path = source_path + ".o"
     subprocess.run(
@@ -144,40 +171,52 @@ def compile_source(source_path, compiler):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", required=True)
-    parser.add_argument("--element-type", default="TRI3")
+    parser.add_argument(
+        "--element-type",
+        action="append",
+        default=None,
+        help="Element type to generate. May be repeated or comma-separated. Default: all supported elements.",
+    )
     parser.add_argument("--quadrature-order", type=int, default=None)
     parser.add_argument("--vector-size", type=int, default=8)
     parser.add_argument("--compile", action="store_true")
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
-    specialization = sfem_soa_element_specialization(
-        args.element_type,
-        args.vector_size,
-        args.quadrature_order,
-    )
-    forms = build_neohookean_forms(specialization)
-    graph = build_combined_graph(forms)
-
-    sfem_files = build_sfem_soa_files(
-        forms,
-        specialization,
-    )
-
-    outputs = [
-        (
-            "neohookean_ogden_summary.md",
-            summary_markdown(graph, specialization),
-        ),
-        (
-            "neohookean_ogden_reduced_outputs.txt",
-            "\n\n".join(str(output) for output in graph.reduced_outputs) + "\n",
-        ),
-    ]
-    outputs.extend((file.path, file.source) for file in sfem_files)
+    outputs = {}
+    compile_paths = []
+    for element_type in parse_element_types(args.element_type):
+        specialization = sfem_soa_element_specialization(
+            element_type,
+            args.vector_size,
+            args.quadrature_order,
+        )
+        forms = build_neohookean_forms(specialization)
+        graph = build_combined_graph(forms)
+        sfem_files = build_sfem_soa_files(forms, specialization)
+        file_prefix = "neohookean_ogden_%s" % specialization.element_type.lower()
+        generated_outputs = [
+            (
+                "%s_summary.md" % file_prefix,
+                summary_markdown(graph, specialization),
+            ),
+            (
+                "%s_reduced_outputs.txt" % file_prefix,
+                "\n\n".join(str(output) for output in graph.reduced_outputs) + "\n",
+            ),
+        ]
+        generated_outputs.extend((file.path, file.source) for file in sfem_files)
+        for filename, source in generated_outputs:
+            existing = outputs.get(filename)
+            if existing is not None and existing != source:
+                raise RuntimeError("conflicting generated source for %s" % filename)
+            outputs[filename] = source
+        compile_paths.append(
+            os.path.join(args.out_dir, "%s_operator.cpp" % element_prefix(specialization.element_type))
+        )
 
     written_paths = []
-    for filename, source in outputs:
+    for filename, source in sorted(outputs.items()):
         path = os.path.join(args.out_dir, filename)
         write_text(path, source)
         written_paths.append(path)
@@ -190,9 +229,6 @@ def main():
         compiler = shutil.which("c++")
         if compiler is None:
             raise RuntimeError("c++ compiler is not available")
-        compile_paths = [
-            os.path.join(args.out_dir, "generated_neohookean_ogden_operator.cpp"),
-        ]
         print("Compiled:")
         for path in compile_paths:
             print("  %s" % compile_source(path, compiler))

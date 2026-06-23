@@ -31,6 +31,7 @@ from symbolic import (
     directional_derivative,
     displacement_gradient_from_reference,
     execution_scope,
+    generate_cpp_kernel,
     gradient_from_energy,
     hessian_action_from_energy,
     jacobian_action_from_residual,
@@ -103,6 +104,48 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertIsInstance(graph.reduced_outputs[0], ast.Assignment)
         self.assertEqual(graph.reduced_outputs[0].lhs, out)
         self.assertEqual(graph.cost.stores, 1)
+
+    def test_expression_cost_counts_log_and_trigonometric_functions(self):
+        x, y, z = sp.symbols("x y z")
+
+        graph = (
+            KernelExpressions()
+            .add(
+                ExpressionRole.OPERATOR_EVALUATION,
+                sp.log(x)
+                + sp.sin(y)
+                + sp.cos(x * y)
+                + sp.atan(z)
+                + sp.tanh(x + z)
+            )
+            .build_graph(data_symbols=(x, y, z))
+        )
+
+        self.assertEqual(graph.cost.logs, 1)
+        self.assertEqual(graph.cost.trigs, 4)
+        self.assertGreaterEqual(graph.cost.flops, 20 + 4 * 24)
+
+    def test_generated_cpp_uses_specialized_pow_helpers_for_integer_exponents(self):
+        x, y = sp.symbols("x y")
+        graph = (
+            KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2)
+            .build_graph(data_symbols=(x, y))
+        )
+
+        generated = generate_cpp_kernel(
+            graph,
+            function_name="pow_specialized_kernel",
+        )
+
+        self.assertIn("static SFEM_INLINE T pow_2", generated.source)
+        self.assertIn("static SFEM_INLINE T pow_3", generated.source)
+        self.assertIn("static SFEM_INLINE T pow_m2", generated.source)
+        self.assertIn("pow_2(", generated.source)
+        self.assertIn("pow_3(", generated.source)
+        self.assertIn("pow_m2(", generated.source)
+        self.assertNotIn("pow(x", generated.source)
+        self.assertNotIn("pow(y", generated.source)
 
     def test_tags_loop_symbols(self):
         i, x = sp.symbols("i x")

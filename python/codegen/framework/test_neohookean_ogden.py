@@ -334,7 +334,19 @@ def deformed_element_coords(element_type):
     )
 
 
-def generated_neohookean_weak_form_files(element_type, prefix, vector_size=8):
+def nonaffine_hex8_coords():
+    coords = [list(coord) for coord in reference_element_coords("HEX8")]
+    coords[5][0] += 0.04
+    coords[5][2] -= 0.03
+    coords[6][0] += 0.06
+    coords[6][1] -= 0.04
+    coords[6][2] += 0.12
+    coords[7][1] += 0.03
+    coords[7][2] += 0.05
+    return tuple(tuple(coord) for coord in coords)
+
+
+def generated_neohookean_weak_form_files(element_type, prefix, vector_size=8, local_prefix=None):
     specialization = sfem_soa_element_specialization(element_type, vector_size=vector_size)
     dim = specialization.dim
     F = sp.Matrix(
@@ -359,6 +371,7 @@ def generated_neohookean_weak_form_files(element_type, prefix, vector_size=8):
         ),
         prefix=prefix,
         specialization=specialization,
+        local_prefix=local_prefix,
     )
 
 
@@ -412,26 +425,38 @@ def call_generated_neohookean_kernel(
     direction,
     mu,
     lmbda,
+    isoparametric=False,
 ):
     dim = quadrature_rule.dim
     n_shape = quadrature_rule.n_shape
     pointer_type = ctypes.POINTER(ctypes.c_double)
     geometry = [c_double_array(stream) for stream in element_geometry_stream_values(quadrature_rule, coords)]
+    coordinates = [c_double_array(stream) for stream in field_stream_values(coords)]
     u_streams = [c_double_array(stream) for stream in field_stream_values(displacement)]
     h_streams = [c_double_array(stream) for stream in field_stream_values(direction)] if direction is not None else []
     outputs = [c_double_array((0.0,)) for _ in range(n_shape * dim)]
-    function = getattr(library, "%s_%s_%s_soa" % (prefix, element_type.lower(), form_name))
+    function = getattr(
+        library,
+        "%s_%s_%s_%ssoa"
+        % (
+            prefix,
+            element_type.lower(),
+            form_name,
+            "isoparametric_" if isoparametric else "",
+        ),
+    )
     function.restype = ctypes.c_int
-    pointer_count = len(geometry) + len(u_streams) + len(h_streams) + len(outputs)
+    geometry_or_coordinates = coordinates if isoparametric else geometry
+    pointer_count = len(geometry_or_coordinates) + len(u_streams) + len(h_streams) + len(outputs)
     function.argtypes = (
         [ctypes.c_ssize_t]
-        + [pointer_type] * len(geometry)
+        + [pointer_type] * len(geometry_or_coordinates)
         + [ctypes.c_double, ctypes.c_double]
-        + [pointer_type] * (pointer_count - len(geometry))
+        + [pointer_type] * (pointer_count - len(geometry_or_coordinates))
     )
     status = function(
         ctypes.c_ssize_t(1),
-        *geometry,
+        *geometry_or_coordinates,
         ctypes.c_double(mu),
         ctypes.c_double(lmbda),
         *u_streams,
@@ -619,7 +644,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            "return generated_quad4_tensor_product_quad4_objective_soa_impl<4, 4, 8>",
+            "return sfem::codegen::generated_quad4_tensor_product_quad4_objective_soa_impl<real_t, 4, 4, 8>",
             operator_source,
         )
         self.assertIn("const scalar_t *const SFEM_RESTRICT shape_1d", local_source)
@@ -712,7 +737,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            "return generated_hex8_tensor_product_hex8_objective_soa_impl<8, 8, 8>",
+            "return sfem::codegen::generated_hex8_tensor_product_hex8_objective_soa_impl<real_t, 8, 8, 8>",
             operator_source,
         )
         self.assertNotIn("grad_ref_data", local_source)
@@ -800,13 +825,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("scalar_t trial_grad[4];", local_source)
         self.assertIn("scalar_t material[4];", local_source)
         self.assertIn("scalar_t loperand[4];", local_source)
+        self.assertNotIn("scalar_t F[4];", local_source)
+        self.assertNotIn("F[0] = 1.0 + grad_u[0];", local_source)
         self.assertIn("scalar_t element_vector[N_SHAPE * 2];", local_source)
         self.assertIn(
             "element_vector[shape * 2 + 0] = loperand[0] * grad_ref_x[q * N_SHAPE + shape]",
             local_source,
         )
         self.assertIn("outx0[lane] += element_vector[0];", local_source)
-        self.assertIn("generated_weak_neohookean_tri3_apply_soa_impl<1, 3, 8>", operator_source)
+        self.assertIn("generated_weak_neohookean_tri3_apply_soa_impl<real_t, 1, 3, 8>", operator_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
@@ -940,7 +967,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_hex27_weak_neohookean_hex27_shape_1d", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_hex27_grad_1d", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_hex27_q_weight_1d", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl<27, 27, 8>", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl<real_t, 27, 27, 8>", operator_source)
         self.assertIn("static constexpr int N_QP_1D = 3;", local_source)
         self.assertIn("static constexpr int N_SHAPE_1D = 3;", local_source)
         self.assertIn("const int sx = shape % N_SHAPE_1D;", local_source)
@@ -978,6 +1005,43 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 text=True,
             )
+
+    def test_generated_tensor_product_shared_local_supports_hex8_and_hex27(self):
+        local_prefix = "generated_neohookean_ogden_d3_tensor_product"
+        source_by_element = {}
+        for element_type in ("HEX8", "HEX27"):
+            specialization, generated_files = generated_neohookean_weak_form_files(
+                element_type,
+                "generated_neohookean_ogden_%s" % element_type.lower(),
+                vector_size=8,
+                local_prefix=local_prefix,
+            )
+            del specialization
+            source_by_path = {generated.path: generated.source for generated in generated_files}
+            operator_source = source_by_path[
+                "generated_neohookean_ogden_%s_operator.cpp" % element_type.lower()
+            ]
+            self.assertIn('#include "%s_local.hpp"' % local_prefix, operator_source)
+            self.assertIn(
+                "%s_%s_apply_soa_impl<real_t, %d, %d, 8>"
+                % (
+                    "generated_neohookean_ogden_%s" % element_type.lower(),
+                    element_type.lower(),
+                    8 if element_type == "HEX8" else 27,
+                    8 if element_type == "HEX8" else 27,
+                ),
+                operator_source,
+            )
+            source_by_element[element_type] = source_by_path["%s_local.hpp" % local_prefix]
+
+        self.assertEqual(source_by_element["HEX8"], source_by_element["HEX27"])
+        shared_local = source_by_element["HEX8"]
+        self.assertIn("u_streams[N_SHAPE * 3]", shared_local)
+        self.assertIn("out_streams[N_SHAPE * 3]", shared_local)
+        self.assertIn("sfem_generated_integer_root(N_QP, 3)", shared_local)
+        self.assertIn("sfem_generated_integer_root(N_SHAPE, 3)", shared_local)
+        self.assertNotIn("static_assert(N_SHAPE == 8", shared_local)
+        self.assertNotIn("static_assert(N_SHAPE == 27", shared_local)
 
     def test_generated_neohookean_action_matches_python_reference(self):
         compiler = shutil.which("c++")
@@ -1073,6 +1137,95 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                                     max_abs_difference(actual_apply, expected_apply),
                                     1.0e-10 * apply_scale,
                                 )
+
+    def test_generated_isoparametric_neohookean_action_matches_python_reference(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        prefix = "generated_hex8_neohookean_isoparametric_action"
+        specialization, generated_files = generated_neohookean_weak_form_files(
+            "HEX8",
+            prefix,
+            vector_size=8,
+        )
+        quadrature_rule = specialization.quadrature_rule
+        coords = nonaffine_hex8_coords()
+        displacement = shear_displacement(coords)
+        direction = tuple((0.03 * xyz[2], -0.02 * xyz[0], 0.04 * xyz[1]) for xyz in coords)
+        mu = 1.7
+        lmbda = 2.3
+
+        source_by_path = {generated.path: generated.source for generated in generated_files}
+        operator_source = source_by_path["%s_operator.cpp" % prefix]
+        self.assertIn(
+            'extern "C" int %s_hex8_gradient_isoparametric_soa' % prefix,
+            operator_source,
+        )
+        self.assertIn("const real_t *const SFEM_RESTRICT x0", operator_source)
+        self.assertIn("block_coordinate_streams[N_SHAPE * 3]", operator_source)
+        self.assertIn("block_jacobian_determinant0[lane] = J00 * (J11 * J22", operator_source)
+
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+            library = compile_generated_shared_library(
+                compiler,
+                tmpdir,
+                generated_files,
+                "%s_operator.cpp" % prefix,
+                "lib%s.%s" % (prefix, "dylib" if sys.platform == "darwin" else "so"),
+            )
+            expected_gradient = reference_neohookean_gradient(
+                quadrature_rule,
+                coords,
+                displacement,
+                mu,
+                lmbda,
+            )
+            actual_gradient = call_generated_neohookean_kernel(
+                library,
+                prefix,
+                "HEX8",
+                "gradient",
+                quadrature_rule,
+                coords,
+                displacement,
+                None,
+                mu,
+                lmbda,
+                isoparametric=True,
+            )
+            gradient_scale = max(1.0, max_abs_value(expected_gradient))
+            self.assertLessEqual(
+                max_abs_difference(actual_gradient, expected_gradient),
+                1.0e-10 * gradient_scale,
+            )
+
+            expected_apply = reference_neohookean_apply(
+                quadrature_rule,
+                coords,
+                displacement,
+                direction,
+                mu,
+                lmbda,
+            )
+            actual_apply = call_generated_neohookean_kernel(
+                library,
+                prefix,
+                "HEX8",
+                "apply",
+                quadrature_rule,
+                coords,
+                displacement,
+                direction,
+                mu,
+                lmbda,
+                isoparametric=True,
+            )
+            apply_scale = max(1.0, max_abs_value(expected_apply))
+            self.assertLessEqual(
+                max_abs_difference(actual_apply, expected_apply),
+                1.0e-10 * apply_scale,
+            )
 
     def test_passes_neohookean_ogden_strain_energy_to_framework(self):
         mu, lmbda = sp.symbols("mu lambda")
@@ -1413,40 +1566,56 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         source_by_path = {generated.path: generated.source for generated in generated_files}
         operator_source = source_by_path["generated_neohookean_ogden_operator.cpp"]
         local_source = source_by_path["generated_neohookean_ogden_local.hpp"]
+        math_source = source_by_path["kernel_math.hpp"]
+        diagnostics_source = source_by_path["kernel_diagnostics.hpp"]
 
-        self.assertIn("template <int N_QP, int N_SHAPE, int VECTOR_SIZE>", operator_source)
+        self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", operator_source)
+        self.assertIn('#include "kernel_math.hpp"', local_source)
+        self.assertIn("static SFEM_INLINE T pow_2", math_source)
+        self.assertIn("static SFEM_INLINE T pow_m2", math_source)
         self.assertIn("generated_neohookean_ogden_tri3_grad_ref", operator_source)
         self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
-        self.assertIn("#ifndef SFEM_KERNEL_DIAGNOSTICS_DEFINED", operator_source)
-        self.assertIn("struct SfemKernelDiagnostics", operator_source)
-        self.assertIn("add_instructions_per_qp_lane", operator_source)
-        self.assertIn("mul_instructions_per_qp_lane", operator_source)
-        self.assertIn("div_instructions_per_qp_lane", operator_source)
-        self.assertIn("sqrt_instructions_per_qp_lane", operator_source)
-        self.assertIn("pow_instructions_per_qp_lane", operator_source)
-        self.assertIn("load_instructions_per_qp_lane", operator_source)
-        self.assertIn("store_instructions_per_qp_lane", operator_source)
-        self.assertIn("double add_cpi", operator_source)
-        self.assertIn("double div_cpi", operator_source)
-        self.assertIn("int vector_size", operator_source)
-        self.assertIn("geometry_streams", operator_source)
-        self.assertIn("reference_scalars", operator_source)
-        self.assertIn("output_reads_per_element", operator_source)
+        self.assertIn('#include "kernel_diagnostics.hpp"', operator_source)
+        self.assertNotIn("struct SfemKernelDiagnostics", operator_source)
+        self.assertIn("#ifndef SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP", diagnostics_source)
+        self.assertIn("namespace sfem", diagnostics_source)
+        self.assertIn("namespace codegen", diagnostics_source)
+        self.assertIn("struct KernelDiagnostics", diagnostics_source)
+        self.assertIn("add_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("mul_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("div_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("sqrt_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("pow_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("log_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("trig_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("load_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("store_instructions_per_qp_lane", diagnostics_source)
+        self.assertIn("double add_cpi", diagnostics_source)
+        self.assertIn("double div_cpi", diagnostics_source)
+        self.assertIn("double log_cpi", diagnostics_source)
+        self.assertIn("double trig_cpi", diagnostics_source)
+        self.assertIn("int vector_size", diagnostics_source)
+        self.assertIn("geometry_streams", diagnostics_source)
+        self.assertIn("reference_scalars", diagnostics_source)
+        self.assertIn("output_reads_per_element", diagnostics_source)
         self.assertIn(
-            'extern "C" const SfemKernelDiagnostics *generated_neohookean_ogden_tri3_apply_soa_diagnostics',
+            'extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_tri3_apply_soa_diagnostics',
             operator_source,
         )
         self.assertIn(
             'extern "C" double generated_neohookean_ogden_tri3_apply_soa_arithmetic_intensity',
             operator_source,
         )
-        self.assertIn("SfemKernelDiagnostics_total_bytes", operator_source)
+        self.assertIn("KernelDiagnostics_total_bytes", diagnostics_source)
         self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)
         self.assertIn('extern "C" int generated_neohookean_ogden_tri3_apply_soa', operator_source)
         self.assertIn(
-            "return generated_neohookean_ogden_tri3_apply_soa_impl<1, 3, 8>",
+            "return sfem::codegen::generated_neohookean_ogden_tri3_apply_soa_impl<real_t, 1, 3, 8>",
             operator_source,
         )
+        self.assertNotIn("accumulator_t", operator_source)
+        self.assertNotIn("accumulator_t", local_source)
+        self.assertNotIn("typedef double scalar_t;", local_source)
         self.assertIn("generated_neohookean_ogden_tri3_grad_ref", operator_source)
         self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
         self.assertIn("static_assert(N_QP == 1", operator_source)
@@ -1464,14 +1633,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             1,
         )[1]
         apply_wrapper_source = apply_wrapper_source.split(
-            "return generated_neohookean_ogden_tri3_apply_soa_impl",
+            "return sfem::codegen::generated_neohookean_ogden_tri3_apply_soa_impl",
             1,
         )[0]
         self.assertNotIn("grad_ref", apply_wrapper_source)
         self.assertNotIn("qw", apply_wrapper_source)
         self.assertIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
         self.assertIn("#pragma omp simd", local_source)
-        self.assertIn("template <int N_QP, int N_SHAPE, int VECTOR_SIZE>", local_source)
+        self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", local_source)
         self.assertIn("generated_neohookean_ogden_apply_block", local_source)
         self.assertIn("const int q", local_source)
         self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_data", local_source)

@@ -8,7 +8,7 @@ Refactor the code generation so that SfemKernelDiagnostics has its own file and 
 also use namespace sfem::codegen as a namespace and rename SfemKernelDiagnostics to KernelDiagnostics
 
 
-Maintain a minimal high-level code-gen framework usage example of a mooney-rivlin material in python/codegen/framework/docs/ the example includes a python file mooney_rivlin.py, mooney_rivlin.md with the exaplanation, mooney_rivlin.sh to run the code-gen and compile the code to a shared object.
+Maintain a minimal high-level code-gen framework usage example of an incompressible mooney-rivlin material in python/codegen/framework/docs/ the example includes a python file mooney_rivlin.py, mooney_rivlin.md with the exaplanation, mooney_rivlin.sh to run the code-gen and compile the code to a shared object.
 
 
 The log function is missing from the ExpressionCost? Make sure to include also trigonometric functions
