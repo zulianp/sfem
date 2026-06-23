@@ -26,8 +26,11 @@ The deformation gradient does not have to be a forced intermediate evaluation, l
 scalar_t should be a template parameter of the local kernels, accumulator_t is not necessary just use scalar_t there as well
 
 
-The mesh level loops should reflect the API used in SFEM where we can pass the coefficient vectors and have gather/scatter phases around the assembly. 
+The mesh level loops should reflect the API used in SFEM where we can pass the coefficient vectors and have gather/scatter phases around the assembly. The vectorized buffers are constructed on the fly before calling the local micro-kernels.
+Specialize for affine elements (one Jacobian per element) and iso-parametric elements (jacobians are computed on the fly from coordinates).
 
+
+Set up a benchmark using the sfem/smesh Mesh to generate the mesh and report the throughputs and dof rates
 
 
 

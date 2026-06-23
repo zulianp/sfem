@@ -468,6 +468,77 @@ def call_generated_neohookean_kernel(
     return read_field_stream_values(outputs, dim, n_shape)
 
 
+def c_pointer_array(arrays, ctype):
+    pointer_type = ctypes.POINTER(ctype)
+    return (pointer_type * len(arrays))(*arrays)
+
+
+def call_generated_neohookean_mesh_kernel(
+    library,
+    prefix,
+    element_type,
+    form_name,
+    quadrature_rule,
+    coords,
+    displacement,
+    direction,
+    mu,
+    lmbda,
+    geometry_mode,
+):
+    dim = quadrature_rule.dim
+    n_shape = quadrature_rule.n_shape
+    real_pointer = ctypes.POINTER(ctypes.c_double)
+    idx_pointer = ctypes.POINTER(ctypes.c_ssize_t)
+    element_arrays = [(ctypes.c_ssize_t * 1)(shape) for shape in range(n_shape)]
+    elements = (idx_pointer * n_shape)(*element_arrays)
+    coordinate_arrays = [c_double_array(component_values) for component_values in zip(*coords)]
+    points = c_pointer_array(coordinate_arrays, ctypes.c_double)
+    u_global = [c_double_array(component_values) for component_values in zip(*displacement)]
+    h_global = [c_double_array(component_values) for component_values in zip(*direction)] if direction is not None else []
+    outputs = [c_double_array((0.0,) * n_shape) for _ in range(dim)]
+    function = getattr(
+        library,
+        "%s_%s_%s_%s_mesh_soa" % (prefix, element_type.lower(), form_name, geometry_mode),
+    )
+    function.restype = ctypes.c_int
+    base_argtypes = [ctypes.c_ssize_t, ctypes.c_ssize_t, ctypes.POINTER(idx_pointer)]
+    base_args = [ctypes.c_ssize_t(1), ctypes.c_ssize_t(n_shape), elements]
+    if geometry_mode == "affine":
+        geometry_streams = element_geometry_stream_values(quadrature_rule, coords)
+        g_adjugate = c_double_array(tuple(stream[0] for stream in geometry_streams[: dim * dim]))
+        g_determinant = c_double_array((geometry_streams[-1][0],))
+        base_argtypes.extend((real_pointer, real_pointer))
+        base_args.extend((g_adjugate, g_determinant))
+    elif geometry_mode == "isoparametric":
+        base_argtypes.append(ctypes.POINTER(real_pointer))
+        base_args.append(points)
+    else:
+        raise ValueError("unsupported mesh geometry mode")
+
+    function.argtypes = (
+        base_argtypes
+        + [ctypes.c_double, ctypes.c_double, ctypes.c_ssize_t]
+        + [real_pointer] * dim
+        + ([ctypes.c_ssize_t] + [real_pointer] * dim if direction is not None else [])
+        + [ctypes.c_ssize_t]
+        + [real_pointer] * dim
+    )
+    status = function(
+        *base_args,
+        ctypes.c_double(mu),
+        ctypes.c_double(lmbda),
+        ctypes.c_ssize_t(1),
+        *u_global,
+        *([ctypes.c_ssize_t(1)] + h_global if direction is not None else []),
+        ctypes.c_ssize_t(1),
+        *outputs,
+    )
+    if status != 0:
+        raise RuntimeError("generated mesh kernel returned status %d" % status)
+    return tuple(tuple(outputs[component][shape] for component in range(dim)) for shape in range(n_shape))
+
+
 def compiler_vectorization_flags(compiler):
     version = subprocess.run(
         [compiler, "--version"],
@@ -1165,6 +1236,30 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const real_t *const SFEM_RESTRICT x0", operator_source)
         self.assertIn("block_coordinate_streams[N_SHAPE * 3]", operator_source)
         self.assertIn("block_jacobian_determinant0[lane] = J00 * (J11 * J22", operator_source)
+        self.assertIn(
+            'extern "C" int %s_hex8_gradient_affine_mesh_soa' % prefix,
+            operator_source,
+        )
+        self.assertIn(
+            'extern "C" int %s_hex8_gradient_isoparametric_mesh_soa' % prefix,
+            operator_source,
+        )
+        self.assertIn("idx_t **const SFEM_RESTRICT elements", operator_source)
+        self.assertIn("g_jacobian_adjugate[(evbegin + lane) * 9 + 0]", operator_source)
+        self.assertIn("geom_t **const SFEM_RESTRICT points", operator_source)
+        self.assertIn("#pragma omp atomic update", operator_source)
+        mesh_impl_signature = operator_source.split(
+            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl" % prefix,
+            1,
+        )[1].split(") {", 1)[0]
+        self.assertNotIn("shape_1d", mesh_impl_signature)
+        self.assertNotIn("grad_1d", mesh_impl_signature)
+        self.assertNotIn("q_weight_1d", mesh_impl_signature)
+        self.assertIn(
+            "const scalar_t *const SFEM_RESTRICT shape_1d = sfem::codegen::%s_hex8_shape_1d;"
+            % prefix,
+            operator_source,
+        )
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             library = compile_generated_shared_library(
@@ -1225,6 +1320,74 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             self.assertLessEqual(
                 max_abs_difference(actual_apply, expected_apply),
                 1.0e-10 * apply_scale,
+            )
+
+            actual_mesh_gradient = call_generated_neohookean_mesh_kernel(
+                library,
+                prefix,
+                "HEX8",
+                "gradient",
+                quadrature_rule,
+                coords,
+                displacement,
+                None,
+                mu,
+                lmbda,
+                "isoparametric",
+            )
+            self.assertLessEqual(
+                max_abs_difference(actual_mesh_gradient, expected_gradient),
+                1.0e-10 * gradient_scale,
+            )
+
+            actual_mesh_apply = call_generated_neohookean_mesh_kernel(
+                library,
+                prefix,
+                "HEX8",
+                "apply",
+                quadrature_rule,
+                coords,
+                displacement,
+                direction,
+                mu,
+                lmbda,
+                "isoparametric",
+            )
+            self.assertLessEqual(
+                max_abs_difference(actual_mesh_apply, expected_apply),
+                1.0e-10 * apply_scale,
+            )
+
+            affine_coords = deformed_element_coords("HEX8")
+            affine_displacement = shear_displacement(affine_coords)
+            affine_direction = tuple(
+                (0.03 * xyz[2], -0.02 * xyz[0], 0.04 * xyz[1]) for xyz in affine_coords
+            )
+            expected_affine_apply = reference_neohookean_apply(
+                quadrature_rule,
+                affine_coords,
+                affine_displacement,
+                affine_direction,
+                mu,
+                lmbda,
+            )
+            actual_affine_mesh_apply = call_generated_neohookean_mesh_kernel(
+                library,
+                prefix,
+                "HEX8",
+                "apply",
+                quadrature_rule,
+                affine_coords,
+                affine_displacement,
+                affine_direction,
+                mu,
+                lmbda,
+                "affine",
+            )
+            affine_apply_scale = max(1.0, max_abs_value(expected_affine_apply))
+            self.assertLessEqual(
+                max_abs_difference(actual_affine_mesh_apply, expected_affine_apply),
+                1.0e-10 * affine_apply_scale,
             )
 
     def test_passes_neohookean_ogden_strain_energy_to_framework(self):
