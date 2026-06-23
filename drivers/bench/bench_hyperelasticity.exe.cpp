@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "hex8_inline_cpu.hpp"
+#include "kernel_diagnostics.hpp"
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
@@ -12,6 +14,84 @@
 #include "sfem_base.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
+
+extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(ptrdiff_t,
+                                                                             ptrdiff_t,
+                                                                             idx_t **,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             real_t,
+                                                                             real_t,
+                                                                             ptrdiff_t,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             ptrdiff_t,
+                                                                             real_t *,
+                                                                             real_t *,
+                                                                             real_t *);
+
+extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(ptrdiff_t,
+                                                                                    ptrdiff_t,
+                                                                                    idx_t **,
+                                                                                    geom_t **,
+                                                                                    real_t,
+                                                                                    real_t,
+                                                                                    ptrdiff_t,
+                                                                                    const real_t *,
+                                                                                    const real_t *,
+                                                                                    const real_t *,
+                                                                                    ptrdiff_t,
+                                                                                    real_t *,
+                                                                                    real_t *,
+                                                                                    real_t *);
+
+extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(ptrdiff_t,
+                                                                          ptrdiff_t,
+                                                                          idx_t **,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          real_t,
+                                                                          real_t,
+                                                                          ptrdiff_t,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          ptrdiff_t,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          ptrdiff_t,
+                                                                          real_t *,
+                                                                          real_t *,
+                                                                          real_t *);
+
+extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(ptrdiff_t,
+                                                                                 ptrdiff_t,
+                                                                                 idx_t **,
+                                                                                 geom_t **,
+                                                                                 real_t,
+                                                                                 real_t,
+                                                                                 ptrdiff_t,
+                                                                                 const real_t *,
+                                                                                 const real_t *,
+                                                                                 const real_t *,
+                                                                                 ptrdiff_t,
+                                                                                 const real_t *,
+                                                                                 const real_t *,
+                                                                                 const real_t *,
+                                                                                 ptrdiff_t,
+                                                                                 real_t *,
+                                                                                 real_t *,
+                                                                                 real_t *);
+
+extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics();
+
+extern "C" double generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity(ptrdiff_t, size_t, size_t, size_t);
+
+extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics();
+
+extern "C" double generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity(ptrdiff_t, size_t, size_t, size_t);
 
 namespace {
 
@@ -67,7 +147,56 @@ namespace {
         const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
         const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
 
-        printf("%-18s %12.6e %16.3f %13.3f\n", name, seconds_per_call, melements_per_s, mdofs_per_s);
+        printf("%-18s %12.6e %16.3f %13.3f %10s %13s\n", name, seconds_per_call, melements_per_s, mdofs_per_s, "-", "-");
+    }
+
+    using ArithmeticIntensity = double (*)(ptrdiff_t, size_t, size_t, size_t);
+
+    void print_generated_rate(const char *const                             name,
+                              const double                                  elapsed,
+                              const ptrdiff_t                               nelements,
+                              const ptrdiff_t                               ndofs,
+                              const int                                     repeat,
+                              const sfem::codegen::KernelDiagnostics *const diagnostics,
+                              const ArithmeticIntensity                     arithmetic_intensity) {
+        const double seconds_per_call = elapsed / repeat;
+        const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
+        const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
+        const double ai               = arithmetic_intensity(nelements, sizeof(real_t), sizeof(real_t), sizeof(real_t));
+        const double gflops_per_s =
+                1e-9 * sfem::codegen::KernelDiagnostics_total_flops(diagnostics, nelements) / seconds_per_call;
+
+        printf("%-18s %12.6e %16.3f %13.3f %10.3f %13.3f\n",
+               name,
+               seconds_per_call,
+               melements_per_s,
+               mdofs_per_s,
+               ai,
+               gflops_per_s);
+    }
+
+    void compute_hex8_affine_geometry(const std::shared_ptr<sfem::Mesh> &mesh,
+                                      real_t *const                      adjugate,
+                                      real_t *const                      determinant) {
+        const ptrdiff_t nelements = mesh->n_elements();
+        idx_t **const   elements  = mesh->elements(0)->data();
+        geom_t **const  points    = mesh->points()->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            real_t x[8];
+            real_t y[8];
+            real_t z[8];
+
+            for (int v = 0; v < 8; ++v) {
+                const idx_t node = elements[v][e];
+                x[v]             = points[0][node];
+                y[v]             = points[1][node];
+                z[v]             = points[2][node];
+            }
+
+            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, &adjugate[e * 9], &determinant[e]);
+        }
     }
 
 }  // namespace
@@ -89,7 +218,10 @@ int main(int argc, char *argv[]) {
     const real_t      nonlinear_tol      = smesh::Env::read("SFEM_NL_TOL", 1e-9);
     const real_t      displacement_value = smesh::Env::read("SFEM_DISPLACEMENT", 0.05);
     const real_t      damping            = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
+    const real_t      mu                 = smesh::Env::read("SFEM_SHEAR_MODULUS", 1.0);
+    const real_t      lambda             = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", 1.0);
     const std::string operator_name      = smesh::Env::read_string("SFEM_OPERATOR", "NeoHookeanOgden");
+    const std::string codegen_geometry   = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "affine");
 
     const auto element_type = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
     auto       mesh         = sfem::Mesh::create_cube(
@@ -98,6 +230,12 @@ int main(int argc, char *argv[]) {
     const int block_size = mesh->spatial_dimension();
     if (block_size != 3) {
         SFEM_ERROR("bench_hyperelasticity.exe requires a three-dimensional mesh\n");
+    }
+    if (mesh->element_type(0) != smesh::HEX8) {
+        SFEM_ERROR("generated solve path currently requires SFEM_ELEM_TYPE=HEX8\n");
+    }
+    if (codegen_geometry != "affine" && codegen_geometry != "isoparametric") {
+        SFEM_ERROR("SFEM_CODEGEN_GEOMETRY must be affine or isoparametric\n");
     }
 
     auto fs = sfem::FunctionSpace::create(mesh, block_size);
@@ -134,13 +272,13 @@ int main(int argc, char *argv[]) {
     f->apply_zero_constraints(trial->data());
 
     f->update(x->data());
-    auto linear_op = sfem::create_linear_operator("MF", f, x, sfem::EXECUTION_SPACE_HOST);
+    auto baseline_linear_op = sfem::create_linear_operator("MF", f, x, sfem::EXECUTION_SPACE_HOST);
 
     for (int i = 0; i < warmup; ++i) {
         blas->zeros(ndofs, rhs->data());
         f->gradient(x->data(), rhs->data());
         blas->zeros(ndofs, output->data());
-        linear_op->apply(trial->data(), output->data());
+        baseline_linear_op->apply(trial->data(), output->data());
     }
 
     sfem::device_synchronize();
@@ -155,10 +293,140 @@ int main(int argc, char *argv[]) {
     blas->zeros(ndofs, output->data());
     const double apply_t0 = MPI_Wtime();
     for (int i = 0; i < repeat; ++i) {
-        linear_op->apply(trial->data(), output->data());
+        baseline_linear_op->apply(trial->data(), output->data());
     }
     sfem::device_synchronize();
     const double apply_t1 = MPI_Wtime();
+
+    double generated_affine_gradient_elapsed = 0;
+    double generated_affine_apply_elapsed    = 0;
+    double generated_iso_gradient_elapsed    = 0;
+    double generated_iso_apply_elapsed       = 0;
+
+    auto adjugate    = sfem::create_host_buffer<real_t>(nelements * 9);
+    auto determinant = sfem::create_host_buffer<real_t>(nelements);
+    compute_hex8_affine_geometry(mesh, adjugate->data(), determinant->data());
+
+    {
+        idx_t **const  elements = mesh->elements(0)->data();
+        geom_t **const points   = mesh->points()->data();
+        const real_t  *ux       = &x->data()[0];
+        const real_t  *uy       = &x->data()[1];
+        const real_t  *uz       = &x->data()[2];
+        const real_t  *hx       = &trial->data()[0];
+        const real_t  *hy       = &trial->data()[1];
+        const real_t  *hz       = &trial->data()[2];
+        real_t        *outx     = &output->data()[0];
+        real_t        *outy     = &output->data()[1];
+        real_t        *outz     = &output->data()[2];
+
+        for (int i = 0; i < warmup; ++i) {
+            blas->zeros(ndofs, output->data());
+            generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
+                                                                          mesh->n_nodes(),
+                                                                          elements,
+                                                                          adjugate->data(),
+                                                                          determinant->data(),
+                                                                          mu,
+                                                                          lambda,
+                                                                          3,
+                                                                          ux,
+                                                                          uy,
+                                                                          uz,
+                                                                          3,
+                                                                          outx,
+                                                                          outy,
+                                                                          outz);
+            blas->zeros(ndofs, output->data());
+            generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
+                                                                       mesh->n_nodes(),
+                                                                       elements,
+                                                                       adjugate->data(),
+                                                                       determinant->data(),
+                                                                       mu,
+                                                                       lambda,
+                                                                       3,
+                                                                       ux,
+                                                                       uy,
+                                                                       uz,
+                                                                       3,
+                                                                       hx,
+                                                                       hy,
+                                                                       hz,
+                                                                       3,
+                                                                       outx,
+                                                                       outy,
+                                                                       outz);
+            blas->zeros(ndofs, output->data());
+            generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(
+                    nelements, mesh->n_nodes(), elements, points, mu, lambda, 3, ux, uy, uz, 3, outx, outy, outz);
+            blas->zeros(ndofs, output->data());
+            generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(
+                    nelements, mesh->n_nodes(), elements, points, mu, lambda, 3, ux, uy, uz, 3, hx, hy, hz, 3, outx, outy, outz);
+        }
+
+        blas->zeros(ndofs, output->data());
+        double t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
+                                                                          mesh->n_nodes(),
+                                                                          elements,
+                                                                          adjugate->data(),
+                                                                          determinant->data(),
+                                                                          mu,
+                                                                          lambda,
+                                                                          3,
+                                                                          ux,
+                                                                          uy,
+                                                                          uz,
+                                                                          3,
+                                                                          outx,
+                                                                          outy,
+                                                                          outz);
+        }
+        generated_affine_gradient_elapsed = MPI_Wtime() - t0;
+
+        blas->zeros(ndofs, output->data());
+        t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
+                                                                       mesh->n_nodes(),
+                                                                       elements,
+                                                                       adjugate->data(),
+                                                                       determinant->data(),
+                                                                       mu,
+                                                                       lambda,
+                                                                       3,
+                                                                       ux,
+                                                                       uy,
+                                                                       uz,
+                                                                       3,
+                                                                       hx,
+                                                                       hy,
+                                                                       hz,
+                                                                       3,
+                                                                       outx,
+                                                                       outy,
+                                                                       outz);
+        }
+        generated_affine_apply_elapsed = MPI_Wtime() - t0;
+
+        blas->zeros(ndofs, output->data());
+        t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(
+                    nelements, mesh->n_nodes(), elements, points, mu, lambda, 3, ux, uy, uz, 3, outx, outy, outz);
+        }
+        generated_iso_gradient_elapsed = MPI_Wtime() - t0;
+
+        blas->zeros(ndofs, output->data());
+        t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(
+                    nelements, mesh->n_nodes(), elements, points, mu, lambda, 3, ux, uy, uz, 3, hx, hy, hz, 3, outx, outy, outz);
+        }
+        generated_iso_apply_elapsed = MPI_Wtime() - t0;
+    }
 
     printf("operator %s\n", operator_name.c_str());
     printf("element_type %s\n", type_to_string(mesh->element_type(0)));
@@ -167,12 +435,138 @@ int main(int argc, char *argv[]) {
     printf("#dofs %ld\n", static_cast<long>(ndofs));
     printf("#left_nodes %ld\n", static_cast<long>(boundary.left->size()));
     printf("#right_nodes %ld\n", static_cast<long>(boundary.right->size()));
-    printf("\n%-18s %12s %16s %13s\n", "Operation", "Time [s]", "Rate [MElem/s]", "Rate [MDOF/s]");
-    printf("-----------------------------------------------------------------\n");
+    printf("\n%-18s %12s %16s %13s %10s %13s\n",
+           "Operation",
+           "Time [s]",
+           "Rate [MElem/s]",
+           "Rate [MDOF/s]",
+           "AI",
+           "Rate [GFLOP/s]");
+    printf("----------------------------------------------------------------------------------------\n");
     print_rate("gradient", gradient_t1 - gradient_t0, nelements, ndofs, repeat);
     print_rate("hessian_apply", apply_t1 - apply_t0, nelements, ndofs, repeat);
+    const auto *const gradient_diagnostics = generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics();
+    const auto *const apply_diagnostics    = generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics();
 
-    auto cg = sfem::create_cg<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
+    print_generated_rate("gen_affine_grad",
+                         generated_affine_gradient_elapsed,
+                         nelements,
+                         ndofs,
+                         repeat,
+                         gradient_diagnostics,
+                         generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity);
+    print_generated_rate("gen_affine_apply",
+                         generated_affine_apply_elapsed,
+                         nelements,
+                         ndofs,
+                         repeat,
+                         apply_diagnostics,
+                         generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity);
+    print_generated_rate("gen_iso_grad",
+                         generated_iso_gradient_elapsed,
+                         nelements,
+                         ndofs,
+                         repeat,
+                         gradient_diagnostics,
+                         generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity);
+    print_generated_rate("gen_iso_apply",
+                         generated_iso_apply_elapsed,
+                         nelements,
+                         ndofs,
+                         repeat,
+                         apply_diagnostics,
+                         generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity);
+
+    idx_t **const  elements           = mesh->elements(0)->data();
+    geom_t **const points             = mesh->points()->data();
+    const bool     use_isoparametric  = codegen_geometry == "isoparametric";
+    const auto     generated_gradient = [&](const real_t *const state, real_t *const out) {
+        blas->zeros(ndofs, out);
+        if (use_isoparametric) {
+            generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(nelements,
+                                                                                 mesh->n_nodes(),
+                                                                                 elements,
+                                                                                 points,
+                                                                                 mu,
+                                                                                 lambda,
+                                                                                 3,
+                                                                                 &state[0],
+                                                                                 &state[1],
+                                                                                 &state[2],
+                                                                                 3,
+                                                                                 &out[0],
+                                                                                 &out[1],
+                                                                                 &out[2]);
+        } else {
+            generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
+                                                                          mesh->n_nodes(),
+                                                                          elements,
+                                                                          adjugate->data(),
+                                                                          determinant->data(),
+                                                                          mu,
+                                                                          lambda,
+                                                                          3,
+                                                                          &state[0],
+                                                                          &state[1],
+                                                                          &state[2],
+                                                                          3,
+                                                                          &out[0],
+                                                                          &out[1],
+                                                                          &out[2]);
+        }
+        f->constraints_gradient(state, out);
+    };
+
+    auto generated_linear_op = sfem::make_op<real_t>(
+            ndofs,
+            ndofs,
+            [&](const real_t *const direction, real_t *const out) {
+                blas->zeros(ndofs, out);
+                if (use_isoparametric) {
+                    generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(nelements,
+                                                                                      mesh->n_nodes(),
+                                                                                      elements,
+                                                                                      points,
+                                                                                      mu,
+                                                                                      lambda,
+                                                                                      3,
+                                                                                      &x->data()[0],
+                                                                                      &x->data()[1],
+                                                                                      &x->data()[2],
+                                                                                      3,
+                                                                                      &direction[0],
+                                                                                      &direction[1],
+                                                                                      &direction[2],
+                                                                                      3,
+                                                                                      &out[0],
+                                                                                      &out[1],
+                                                                                      &out[2]);
+                } else {
+                    generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
+                                                                               mesh->n_nodes(),
+                                                                               elements,
+                                                                               adjugate->data(),
+                                                                               determinant->data(),
+                                                                               mu,
+                                                                               lambda,
+                                                                               3,
+                                                                               &x->data()[0],
+                                                                               &x->data()[1],
+                                                                               &x->data()[2],
+                                                                               3,
+                                                                               &direction[0],
+                                                                               &direction[1],
+                                                                               &direction[2],
+                                                                               3,
+                                                                               &out[0],
+                                                                               &out[1],
+                                                                               &out[2]);
+                }
+                f->copy_constrained_dofs(direction, out);
+            },
+            sfem::EXECUTION_SPACE_HOST);
+
+    auto cg = sfem::create_cg<real_t>(generated_linear_op, sfem::EXECUTION_SPACE_HOST);
     cg->set_max_it(linear_max_it);
     cg->set_rtol(linear_rtol);
     cg->set_atol(1e-12);
@@ -180,15 +574,14 @@ int main(int argc, char *argv[]) {
 
     printf("\n%-10s %-8s %-14s %-12s %-14s\n", "Newton", "CG", "Residual", "Time [s]", "Rate [MDOF/s]");
     printf("-----------------------------------------------------------------\n");
+    printf("solve_operator generated_neohookean_ogden_hex8_%s\n", codegen_geometry.c_str());
 
     int       completed_newton = 0;
     ptrdiff_t total_cg_it      = 0;
     double    solve_t0         = MPI_Wtime();
     for (int i = 0; i < nl_max_it; ++i) {
         const double iteration_t0 = MPI_Wtime();
-        f->update(x->data());
-        blas->zeros(ndofs, rhs->data());
-        f->gradient(x->data(), rhs->data());
+        generated_gradient(x->data(), rhs->data());
 
         const real_t residual = blas->norm2(ndofs, rhs->data());
         if (residual < nonlinear_tol) {
@@ -212,8 +605,7 @@ int main(int argc, char *argv[]) {
     }
     const double solve_time = MPI_Wtime() - solve_t0;
 
-    blas->zeros(ndofs, rhs->data());
-    f->gradient(x->data(), rhs->data());
+    generated_gradient(x->data(), rhs->data());
     const real_t final_residual = blas->norm2(ndofs, rhs->data());
 
     printf("\nnewton_iterations %d\n", completed_newton);

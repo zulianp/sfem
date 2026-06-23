@@ -30,7 +30,7 @@ The mesh level loops should reflect the API used in SFEM where we can pass the c
 Specialize for affine elements (one Jacobian per element) and iso-parametric elements (jacobians are computed on the fly from coordinates).
 
 
-Set up a benchmark using the sfem/smesh Mesh to generate the mesh and report the throughputs and dof rates
+Set up a benchmark using the sfem/smesh Mesh to generate the mesh and report the throughputs and dof rates and solve a basic problem with Newton/CG 
 
 
 

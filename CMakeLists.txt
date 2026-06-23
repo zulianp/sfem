@@ -357,6 +357,19 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
+if(TARGET bench_hyperelasticity)
+    target_sources(
+        bench_hyperelasticity
+        PRIVATE
+            python/codegen/framework/prova/generated_neohookean_ogden_hex8_operator.cpp)
+    target_include_directories(
+        bench_hyperelasticity
+        PRIVATE python/codegen/framework/prova)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(bench_hyperelasticity PRIVATE -O3)
+    endif()
+endif()
+
 if(SFEM_ENABLE_TESTING)
     enable_testing()
 

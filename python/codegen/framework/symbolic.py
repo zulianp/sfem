@@ -1114,7 +1114,7 @@ class SfemElementQuadratureRule:
 @dataclass(frozen=True)
 class SfemSoAElementSpecialization:
     quadrature_rule: SfemElementQuadratureRule
-    vector_size: int = 8
+    vector_size: int = 16
 
     def __post_init__(self):
         object.__setattr__(self, "vector_size", int(self.vector_size))
@@ -1337,7 +1337,7 @@ def sfem_supported_element_types():
     return ("TRI3", "TRI6", "QUAD4", "TET4", "TET10", "HEX8", "HEX27")
 
 
-def sfem_soa_element_specializations(element_types=None, vector_size=8, quadrature_order=None):
+def sfem_soa_element_specializations(element_types=None, vector_size=16, quadrature_order=None):
     element_types = sfem_supported_element_types() if element_types is None else tuple(element_types)
     return tuple(
         sfem_soa_element_specialization(element_type, vector_size, quadrature_order)
@@ -1345,7 +1345,7 @@ def sfem_soa_element_specializations(element_types=None, vector_size=8, quadratu
     )
 
 
-def sfem_soa_element_specialization(element_type, vector_size=8, quadrature_order=None):
+def sfem_soa_element_specialization(element_type, vector_size=16, quadrature_order=None):
     return SfemSoAElementSpecialization(
         sfem_element_quadrature_rule(element_type, quadrature_order),
         vector_size,
@@ -1917,7 +1917,7 @@ def generate_sfem_soa_cpp_files(
     dim,
     n_nodes,
     n_qp=1,
-    vector_size=8,
+    vector_size=16,
     array_inputs=None,
     element_type=None,
     quadrature_order=None,
@@ -2054,6 +2054,13 @@ def _sfem_soa_local_header(
         "",
         "#include <math.h>",
         "#include <stddef.h>",
+        "#if defined(__has_include)",
+        '#if __has_include("sfem_base.hpp")',
+        '#include "sfem_base.hpp"',
+        "#define SFEM_GENERATED_SCALAR_T",
+        "#endif",
+        "#endif",
+        "",
         '#include "%s"' % math_name,
         "",
         "#ifndef SFEM_INLINE",
