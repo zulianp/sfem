@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 from enum import Enum
+import math
 from typing import Iterable, Mapping, Optional, Tuple, Union
 
 import sympy as sp
@@ -759,6 +760,650 @@ class GeneratedKernelCode:
 
 
 @dataclass(frozen=True)
+class GeneratedKernelFile:
+    path: str
+    source: str
+
+
+@dataclass(frozen=True)
+class SfemSoAArrayInput:
+    name: str
+    size: int
+    scalar_type: str = "scalar_t"
+    layout: str = "element_stream"
+    n_qp: int = 1
+    n_shape: int = 1
+    components: Optional[int] = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "name", str(self.name))
+        object.__setattr__(self, "size", int(self.size))
+        object.__setattr__(self, "n_qp", int(self.n_qp))
+        object.__setattr__(self, "n_shape", int(self.n_shape))
+        components = self.size if self.components is None else int(self.components)
+        object.__setattr__(self, "components", components)
+        if self.size <= 0:
+            raise ValueError("SoA array input size must be positive")
+        if self.n_qp <= 0:
+            raise ValueError("SoA array input n_qp must be positive")
+        if self.n_shape <= 0:
+            raise ValueError("SoA array input n_shape must be positive")
+        if self.components <= 0:
+            raise ValueError("SoA array input components must be positive")
+        if self.layout not in ("element_stream", "reference_qp_shape"):
+            raise ValueError("SoA array input layout must be 'element_stream' or 'reference_qp_shape'")
+        if self.layout == "reference_qp_shape":
+            expected_size = self.n_qp * self.n_shape * self.components
+            if self.size != expected_size:
+                raise ValueError(
+                    "reference_qp_shape input size must equal n_qp * n_shape * components"
+                )
+
+    @property
+    def is_reference_qp_shape(self):
+        return self.layout == "reference_qp_shape"
+
+    @property
+    def local_size(self):
+        if self.is_reference_qp_shape:
+            return self.n_shape * self.components
+        return self.size
+
+
+def sfem_soa_array_input(name, size, scalar_type="scalar_t"):
+    return SfemSoAArrayInput(name, size, scalar_type)
+
+
+def sfem_soa_reference_input(name, n_qp, n_shape, components, scalar_type="scalar_t"):
+    return SfemSoAArrayInput(
+        name,
+        int(n_qp) * int(n_shape) * int(components),
+        scalar_type,
+        "reference_qp_shape",
+        n_qp,
+        n_shape,
+        components,
+    )
+
+
+@dataclass(frozen=True)
+class SfemSoAKernelForm:
+    name: str
+    expression_graph: Optional["ExpressionGraph"] = None
+    has_direction: bool = False
+    output_mode: str = "accumulate"
+    weak_form: Optional["SfemSoAWeakForm"] = None
+
+    def __post_init__(self):
+        if self.output_mode not in ("assign", "accumulate"):
+            raise ValueError("output_mode must be 'assign' or 'accumulate'")
+        if self.expression_graph is None and self.weak_form is None:
+            raise ValueError("SfemSoAKernelForm requires expression_graph or weak_form")
+
+
+def sfem_soa_kernel_form(
+    name,
+    expression_graph=None,
+    has_direction=False,
+    output_mode="accumulate",
+    weak_form=None,
+):
+    return SfemSoAKernelForm(name, expression_graph, has_direction, output_mode, weak_form)
+
+
+@dataclass(frozen=True)
+class SfemSoAWeakForm:
+    energy_density: sp.Expr
+    deformation_gradient: Tuple[sp.Expr, ...]
+    dim: int
+
+    def __post_init__(self):
+        dim = int(self.dim)
+        deformation_gradient = tuple(self.deformation_gradient)
+        object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "energy_density", sp.sympify(self.energy_density))
+        object.__setattr__(self, "deformation_gradient", deformation_gradient)
+        if dim <= 0:
+            raise ValueError("weak form dim must be positive")
+        if len(deformation_gradient) != dim * dim:
+            raise ValueError("deformation_gradient must have dim * dim entries")
+
+    def deformation_gradient_matrix(self):
+        return sp.Matrix(self.dim, self.dim, self.deformation_gradient)
+
+    def first_piola(self):
+        variables = self.deformation_gradient
+        return sp.Matrix(
+            self.dim,
+            self.dim,
+            [sp.diff(self.energy_density, variable) for variable in variables],
+        )
+
+    def linearized_first_piola(self, trial_gradient):
+        trial_gradient = tuple(trial_gradient)
+        if len(trial_gradient) != self.dim * self.dim:
+            raise ValueError("trial_gradient must have dim * dim entries")
+        P = self.first_piola()
+        variables = self.deformation_gradient
+        return sp.Matrix(
+            self.dim,
+            self.dim,
+            [
+                directional_derivative(P[i, j], variables, trial_gradient)
+                for i in range(self.dim)
+                for j in range(self.dim)
+            ],
+        )
+
+    def diagnostic_expressions(self, has_direction=False):
+        expressions = [self.energy_density]
+        expressions.extend(tuple(self.first_piola()))
+        if has_direction:
+            trial_gradient = tuple(
+                sp.symbols("trial_grad[%d]" % i)
+                for i in range(self.dim * self.dim)
+            )
+            expressions.extend(tuple(self.linearized_first_piola(trial_gradient)))
+        return tuple(expressions)
+
+
+def sfem_soa_weak_form(energy_density, deformation_gradient):
+    deformation_gradient = _as_matrix(deformation_gradient, "deformation_gradient")
+    if deformation_gradient.shape[0] != deformation_gradient.shape[1]:
+        raise ValueError("deformation_gradient must be square")
+    return SfemSoAWeakForm(
+        energy_density,
+        tuple(deformation_gradient),
+        deformation_gradient.shape[0],
+    )
+
+
+@dataclass(frozen=True)
+class SfemElementQuadratureRule:
+    element_type: str
+    dim: int
+    n_shape: int
+    weights: Tuple[float, ...]
+    reference_gradients: Tuple[float, ...]
+    order: int = 1
+    tensor_product_shape_values_1d: Tuple[float, ...] = ()
+    tensor_product_shape_gradients_1d: Tuple[float, ...] = ()
+    tensor_product_weights_1d: Tuple[float, ...] = ()
+    tensor_product_dim: int = 0
+
+    def __post_init__(self):
+        element_type = str(self.element_type).upper()
+        dim = int(self.dim)
+        n_shape = int(self.n_shape)
+        weights = tuple(float(value) for value in self.weights)
+        reference_gradients = tuple(float(value) for value in self.reference_gradients)
+        tensor_product_shape_values_1d = tuple(
+            float(value) for value in self.tensor_product_shape_values_1d
+        )
+        tensor_product_shape_gradients_1d = tuple(
+            float(value) for value in self.tensor_product_shape_gradients_1d
+        )
+        tensor_product_weights_1d = tuple(
+            float(value) for value in self.tensor_product_weights_1d
+        )
+        tensor_product_dim = int(self.tensor_product_dim)
+        object.__setattr__(self, "element_type", element_type)
+        object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "n_shape", n_shape)
+        object.__setattr__(self, "weights", weights)
+        object.__setattr__(self, "reference_gradients", reference_gradients)
+        object.__setattr__(self, "order", int(self.order))
+        object.__setattr__(
+            self,
+            "tensor_product_shape_values_1d",
+            tensor_product_shape_values_1d,
+        )
+        object.__setattr__(
+            self,
+            "tensor_product_shape_gradients_1d",
+            tensor_product_shape_gradients_1d,
+        )
+        object.__setattr__(self, "tensor_product_weights_1d", tensor_product_weights_1d)
+        object.__setattr__(self, "tensor_product_dim", tensor_product_dim)
+        if dim <= 0:
+            raise ValueError("element quadrature dim must be positive")
+        if n_shape <= 0:
+            raise ValueError("element quadrature n_shape must be positive")
+        if not weights:
+            raise ValueError("element quadrature rule must have at least one point")
+        expected = len(weights) * n_shape * dim
+        if len(reference_gradients) != expected:
+            raise ValueError(
+                "reference_gradients must have N_QP * N_SHAPE * dim entries"
+            )
+        has_tensor_product_data = (
+            bool(tensor_product_shape_values_1d)
+            or bool(tensor_product_shape_gradients_1d)
+            or bool(tensor_product_weights_1d)
+            or tensor_product_dim != 0
+        )
+        if has_tensor_product_data:
+            if tensor_product_dim != dim:
+                raise ValueError("tensor_product_dim must match dim")
+            if not tensor_product_weights_1d:
+                raise ValueError("tensor-product quadrature must provide 1D weights")
+            n_qp_1d = len(tensor_product_weights_1d)
+            expected_1d = n_qp_1d * self.tensor_product_n_shape_1d
+            if len(tensor_product_shape_values_1d) != expected_1d:
+                raise ValueError("tensor-product shape values must be N_QP_1D * N_SHAPE_1D")
+            if len(tensor_product_shape_gradients_1d) != expected_1d:
+                raise ValueError("tensor-product shape gradients must be N_QP_1D * N_SHAPE_1D")
+            if n_shape != self.tensor_product_n_shape_1d ** dim:
+                raise ValueError("tensor-product n_shape does not match 1D shape count")
+            if len(weights) != n_qp_1d ** dim:
+                raise ValueError("tensor-product weights do not match 1D quadrature count")
+
+    @property
+    def n_qp(self):
+        return len(self.weights)
+
+    @property
+    def is_tensor_product(self):
+        return bool(self.tensor_product_weights_1d)
+
+    @property
+    def tensor_product_n_qp_1d(self):
+        return len(self.tensor_product_weights_1d)
+
+    @property
+    def tensor_product_n_shape_1d(self):
+        if not self.tensor_product_weights_1d:
+            return 0
+        return len(self.tensor_product_shape_values_1d) // len(self.tensor_product_weights_1d)
+
+
+@dataclass(frozen=True)
+class SfemSoAElementSpecialization:
+    quadrature_rule: SfemElementQuadratureRule
+    vector_size: int = 8
+
+    def __post_init__(self):
+        object.__setattr__(self, "vector_size", int(self.vector_size))
+        if self.vector_size <= 0:
+            raise ValueError("vector_size must be positive")
+
+    @property
+    def element_type(self):
+        return self.quadrature_rule.element_type
+
+    @property
+    def dim(self):
+        return self.quadrature_rule.dim
+
+    @property
+    def n_shape(self):
+        return self.quadrature_rule.n_shape
+
+    @property
+    def n_qp(self):
+        return self.quadrature_rule.n_qp
+
+    def reference_shape_gradient_input(self, name="grad_ref"):
+        return sfem_soa_reference_input(name, self.n_qp, self.n_shape, self.dim)
+
+    def adjugate_geometry_inputs(
+        self,
+        grad_ref_name="grad_ref",
+        adjugate_name="jacobian_adjugate",
+        determinant_name="jacobian_determinant",
+    ):
+        return sfem_soa_adjugate_geometry_inputs(
+            self,
+            grad_ref_name=grad_ref_name,
+            adjugate_name=adjugate_name,
+            determinant_name=determinant_name,
+        )
+
+
+def sfem_element_quadrature_rule(element_type, order=None):
+    element_type = str(element_type).upper()
+    if order is None:
+        order = (
+            3
+            if element_type == "HEX27"
+            else 2
+            if element_type in ("QUAD4", "HEX8", "TRI6", "TET10")
+            else 1
+        )
+    order = int(order)
+
+    if element_type == "TRI3":
+        weights = (0.5,)
+        gradients = (-1.0, -1.0, 1.0, 0.0, 0.0, 1.0)
+        return SfemElementQuadratureRule(element_type, 2, 3, weights, gradients, order)
+
+    if element_type == "TET4":
+        weights = (1.0 / 6.0,)
+        gradients = (
+            -1.0,
+            -1.0,
+            -1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+        )
+        return SfemElementQuadratureRule(element_type, 3, 4, weights, gradients, order)
+
+    if element_type == "TRI6":
+        if order != 2:
+            raise ValueError("TRI6 currently supports quadrature order 2")
+        points = (
+            (1.0 / 6.0, 1.0 / 6.0),
+            (2.0 / 3.0, 1.0 / 6.0),
+            (1.0 / 6.0, 2.0 / 3.0),
+        )
+        weights = (1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0)
+        gradients = []
+        for x, y in points:
+            gradients.extend(_tri6_reference_gradients(x, y))
+        return SfemElementQuadratureRule(element_type, 2, 6, weights, gradients, order)
+
+    if element_type == "TET10":
+        if order != 2:
+            raise ValueError("TET10 currently supports quadrature order 2")
+        a = 0.5854101966249685
+        b = 0.1381966011250105
+        points = (
+            (b, b, b),
+            (a, b, b),
+            (b, a, b),
+            (b, b, a),
+        )
+        weights = (1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0)
+        gradients = []
+        for x, y, z in points:
+            gradients.extend(_tet10_reference_gradients(x, y, z))
+        return SfemElementQuadratureRule(element_type, 3, 10, weights, gradients, order)
+
+    if element_type == "QUAD4":
+        points, weights_1d = _sfem_unit_interval_gauss_rule(order)
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
+        gradients = []
+        weights = []
+        for y, wy in zip(points, weights_1d):
+            for x, wx in zip(points, weights_1d):
+                weights.append(wx * wy)
+                gradients.extend(
+                    (
+                        -(1.0 - y),
+                        -(1.0 - x),
+                        1.0 - y,
+                        -x,
+                        y,
+                        x,
+                        -y,
+                        1.0 - x,
+                    )
+                )
+        return SfemElementQuadratureRule(
+            element_type,
+            2,
+            4,
+            weights,
+            gradients,
+            order,
+            shape_values_1d,
+            shape_gradients_1d,
+            weights_1d,
+            2,
+        )
+
+    if element_type == "HEX8":
+        points, weights_1d = _sfem_unit_interval_gauss_rule(order)
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
+        gradients = []
+        weights = []
+        for z, wz in zip(points, weights_1d):
+            for y, wy in zip(points, weights_1d):
+                for x, wx in zip(points, weights_1d):
+                    weights.append(wx * wy * wz)
+                    xm = 1.0 - x
+                    ym = 1.0 - y
+                    zm = 1.0 - z
+                    gradients.extend(
+                        (
+                            -ym * zm,
+                            -xm * zm,
+                            -xm * ym,
+                            ym * zm,
+                            -x * zm,
+                            -x * ym,
+                            y * zm,
+                            x * zm,
+                            -x * y,
+                            -y * zm,
+                            xm * zm,
+                            -xm * y,
+                            -ym * z,
+                            -xm * z,
+                            xm * ym,
+                            ym * z,
+                            -x * z,
+                            x * ym,
+                            y * z,
+                            x * z,
+                            x * y,
+                            -y * z,
+                            xm * z,
+                            xm * y,
+                        )
+                    )
+        return SfemElementQuadratureRule(
+            element_type,
+            3,
+            8,
+            weights,
+            gradients,
+            order,
+            shape_values_1d,
+            shape_gradients_1d,
+            weights_1d,
+            3,
+        )
+
+    if element_type == "HEX27":
+        if order != 3:
+            raise ValueError("HEX27 currently supports quadrature order 3")
+        points, weights_1d = _sfem_unit_interval_gauss_rule(order)
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q2_1d_shapes(points)
+        gradients, weights = _sfem_tensor_product_hex_gradients_and_weights(
+            shape_values_1d,
+            shape_gradients_1d,
+            weights_1d,
+            3,
+        )
+        return SfemElementQuadratureRule(
+            element_type,
+            3,
+            27,
+            weights,
+            gradients,
+            order,
+            shape_values_1d,
+            shape_gradients_1d,
+            weights_1d,
+            3,
+        )
+
+    raise ValueError("unsupported element type '%s'" % element_type)
+
+
+def sfem_supported_element_types():
+    return ("TRI3", "TRI6", "QUAD4", "TET4", "TET10", "HEX8", "HEX27")
+
+
+def sfem_soa_element_specializations(element_types=None, vector_size=8, quadrature_order=None):
+    element_types = sfem_supported_element_types() if element_types is None else tuple(element_types)
+    return tuple(
+        sfem_soa_element_specialization(element_type, vector_size, quadrature_order)
+        for element_type in element_types
+    )
+
+
+def sfem_soa_element_specialization(element_type, vector_size=8, quadrature_order=None):
+    return SfemSoAElementSpecialization(
+        sfem_element_quadrature_rule(element_type, quadrature_order),
+        vector_size,
+    )
+
+
+def _tri6_reference_gradients(x, y):
+    return (
+        -3.0 + 4.0 * x + 4.0 * y,
+        -3.0 + 4.0 * x + 4.0 * y,
+        4.0 * x - 1.0,
+        0.0,
+        0.0,
+        4.0 * y - 1.0,
+        4.0 - 8.0 * x - 4.0 * y,
+        -4.0 * x,
+        4.0 * y,
+        4.0 * x,
+        -4.0 * y,
+        4.0 - 4.0 * x - 8.0 * y,
+    )
+
+
+def _tet10_reference_gradients(x, y, z):
+    dx = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        4.0 * x - 1.0,
+        0.0,
+        0.0,
+        -8.0 * x - 4.0 * y - 4.0 * z + 4.0,
+        4.0 * y,
+        -4.0 * y,
+        -4.0 * z,
+        4.0 * z,
+        0.0,
+    )
+    dy = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        0.0,
+        4.0 * y - 1.0,
+        0.0,
+        -4.0 * x,
+        4.0 * x,
+        -8.0 * y - 4.0 * x - 4.0 * z + 4.0,
+        -4.0 * z,
+        0.0,
+        4.0 * z,
+    )
+    dz = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        0.0,
+        0.0,
+        4.0 * z - 1.0,
+        -4.0 * x,
+        0.0,
+        -4.0 * y,
+        -8.0 * z - 4.0 * x - 4.0 * y + 4.0,
+        4.0 * x,
+        4.0 * y,
+    )
+    gradients = []
+    for i in range(10):
+        gradients.extend((dx[i], dy[i], dz[i]))
+    return tuple(gradients)
+
+
+def sfem_soa_adjugate_geometry_inputs(
+    specialization,
+    grad_ref_name="grad_ref",
+    adjugate_name="jacobian_adjugate",
+    determinant_name="jacobian_determinant",
+):
+    if isinstance(specialization, SfemSoAElementSpecialization):
+        dim = specialization.dim
+        n_qp = specialization.n_qp
+        n_shape = specialization.n_shape
+    elif isinstance(specialization, SfemElementQuadratureRule):
+        dim = specialization.dim
+        n_qp = specialization.n_qp
+        n_shape = specialization.n_shape
+    else:
+        raise TypeError("specialization must be SfemSoAElementSpecialization or SfemElementQuadratureRule")
+    return (
+        sfem_soa_reference_input(grad_ref_name, n_qp, n_shape, dim),
+        sfem_soa_array_input(adjugate_name, dim * dim),
+        sfem_soa_array_input(determinant_name, 1),
+    )
+
+
+def _sfem_unit_interval_gauss_rule(order):
+    if order == 1:
+        return (0.5,), (1.0,)
+    if order == 2:
+        offset = 0.5 / math.sqrt(3.0)
+        return (0.5 - offset, 0.5 + offset), (0.5, 0.5)
+    if order == 3:
+        offset = 0.5 * math.sqrt(3.0 / 5.0)
+        return (0.5 - offset, 0.5, 0.5 + offset), (5.0 / 18.0, 4.0 / 9.0, 5.0 / 18.0)
+    raise ValueError("unsupported quadrature order %d" % order)
+
+
+def _sfem_lagrange_q1_1d_shapes(points):
+    shape_values = []
+    shape_gradients = []
+    for x in points:
+        shape_values.extend((1.0 - x, x))
+        shape_gradients.extend((-1.0, 1.0))
+    return tuple(shape_values), tuple(shape_gradients)
+
+
+def _sfem_lagrange_q2_1d_shapes(points):
+    shape_values = []
+    shape_gradients = []
+    for x in points:
+        shape_values.extend(
+            (
+                2.0 * x * x - 3.0 * x + 1.0,
+                4.0 * x - 4.0 * x * x,
+                2.0 * x * x - x,
+            )
+        )
+        shape_gradients.extend((4.0 * x - 3.0, 4.0 - 8.0 * x, 4.0 * x - 1.0))
+    return tuple(shape_values), tuple(shape_gradients)
+
+
+def _sfem_tensor_product_hex_gradients_and_weights(
+    shape_values_1d,
+    shape_gradients_1d,
+    weights_1d,
+    n_shape_1d,
+):
+    n_qp_1d = len(weights_1d)
+    gradients = []
+    weights = []
+    for qz in range(n_qp_1d):
+        for qy in range(n_qp_1d):
+            for qx in range(n_qp_1d):
+                weights.append(weights_1d[qx] * weights_1d[qy] * weights_1d[qz])
+                for sz in range(n_shape_1d):
+                    for sy in range(n_shape_1d):
+                        for sx in range(n_shape_1d):
+                            sxv = shape_values_1d[qx * n_shape_1d + sx]
+                            syv = shape_values_1d[qy * n_shape_1d + sy]
+                            szv = shape_values_1d[qz * n_shape_1d + sz]
+                            dx = shape_gradients_1d[qx * n_shape_1d + sx] * syv * szv
+                            dy = sxv * shape_gradients_1d[qy * n_shape_1d + sy] * szv
+                            dz = sxv * syv * shape_gradients_1d[qz * n_shape_1d + sz]
+                            gradients.extend((dx, dy, dz))
+    return tuple(gradients), tuple(weights)
+
+
+@dataclass(frozen=True)
 class ExpressionCost:
     adds: int = 0
     muls: int = 0
@@ -1085,21 +1730,1418 @@ def generate_cpp_kernel(
         'extern "C" void %s(%s) {' % (function_name, ", ".join(arguments)),
     ]
 
-    for statement in statements:
-        expression = sp.ccode(statement.expression)
-        if statement.kind == "intermediate":
-            target = _cpp_symbol(statement.target, output_name)
-            lines.append("    const %s %s = %s;" % (scalar_type, target, expression))
-        elif statement.augmented:
-            target = _cpp_lvalue(statement.target, output_name)
-            lines.append("    %s += %s;" % (target, expression))
-        else:
-            target = _cpp_lvalue(statement.target, output_name)
-            lines.append("    %s = %s;" % (target, expression))
+    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
 
     lines.append("}")
     lines.append("")
     return GeneratedKernelCode("c++", function_name, "\n".join(lines))
+
+
+def generate_openmp_cpp_kernel(
+    expression_graph,
+    function_name="generated_openmp_kernel",
+    wrapper_name=None,
+    scalar_type="double",
+    index_type="ptrdiff_t",
+    output_name="out",
+):
+    wrapper_name = wrapper_name or _cpp_wrapper_name(function_name)
+    element_function_name = "%s_element" % function_name
+    statements = expression_graph.evaluation_plan.statements
+    temporary_symbols = set(expression_graph.evaluation_plan.temporary_symbols)
+    input_symbols, output_targets = _kernel_io_symbols(statements, temporary_symbols)
+    element_arguments = _kernel_arguments(
+        input_symbols,
+        output_targets,
+        scalar_type,
+        output_name,
+    )
+    batch_arguments = _openmp_kernel_arguments(
+        input_symbols,
+        output_targets,
+        scalar_type,
+        index_type,
+        output_name,
+    )
+    element_call_arguments = _openmp_element_call_arguments(
+        input_symbols,
+        output_targets,
+        output_name,
+    )
+
+    lines = [
+        "#include <stddef.h>",
+        "#include <math.h>",
+        "",
+        'extern "C" void %s(%s) {' % (element_function_name, ", ".join(element_arguments)),
+    ]
+    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
+    lines.extend(
+        [
+            "}",
+            "",
+            'extern "C" void %s(%s) {' % (function_name, ", ".join(batch_arguments)),
+            "#pragma omp parallel for",
+            "    for (%s e = 0; e < nelements; ++e) {" % index_type,
+            "        %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
+            "    }",
+            "}",
+            "",
+            "struct %s {" % wrapper_name,
+            "    void apply(%s) const {" % ", ".join(batch_arguments),
+            "        %s(%s);" % (function_name, ", ".join(_openmp_wrapper_call_arguments(batch_arguments))),
+            "    }",
+            "};",
+            "",
+        ]
+    )
+    return GeneratedKernelCode("c++", function_name, "\n".join(lines))
+
+
+def generate_sfem_soa_cpp_files(
+    forms,
+    *,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp=1,
+    vector_size=8,
+    array_inputs=None,
+    element_type=None,
+    quadrature_order=None,
+    quadrature_rule=None,
+):
+    forms = tuple(forms)
+    if quadrature_rule is None and element_type is not None:
+        quadrature_rule = sfem_element_quadrature_rule(element_type, quadrature_order)
+    if quadrature_rule is not None:
+        dim = quadrature_rule.dim
+        n_nodes = quadrature_rule.n_shape
+        n_qp = quadrature_rule.n_qp
+    n_qp = int(n_qp)
+    array_inputs = tuple(
+        array_inputs
+        if array_inputs is not None
+        else (sfem_soa_reference_input("grad_ref", n_qp, n_nodes, dim),)
+    )
+    if dim < 1 or dim > 3:
+        raise ValueError("SoA backend currently supports dimensions 1, 2, and 3")
+    if n_nodes <= 0:
+        raise ValueError("n_nodes must be positive")
+    if n_qp <= 0:
+        raise ValueError("n_qp must be positive")
+    if vector_size <= 0:
+        raise ValueError("vector_size must be positive")
+    for array_input in _sfem_soa_reference_inputs(array_inputs):
+        if array_input.n_qp != n_qp:
+            raise ValueError(
+                "reference input '%s' has n_qp=%d, expected %d"
+                % (array_input.name, array_input.n_qp, n_qp)
+            )
+        if array_input.n_shape != n_nodes:
+            raise ValueError(
+                "reference input '%s' has n_shape=%d, expected %d"
+                % (array_input.name, array_input.n_shape, n_nodes)
+            )
+    if quadrature_rule is not None:
+        _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs)
+
+    local_name = "%s_local.hpp" % prefix
+    operator_name = "%s_operator.cpp" % prefix
+    return (
+        GeneratedKernelFile(
+            local_name,
+            _sfem_soa_local_header(
+                forms,
+                prefix,
+                dim,
+                n_nodes,
+                array_inputs,
+                quadrature_rule,
+            ),
+        ),
+        GeneratedKernelFile(
+            operator_name,
+            _sfem_soa_operator_source(
+                forms,
+                prefix,
+                dim,
+                n_nodes,
+                n_qp,
+                vector_size,
+                local_name,
+                array_inputs,
+                quadrature_rule,
+            ),
+        ),
+    )
+
+
+def generate_sfem_soa_cpp_files_for_element(
+    forms,
+    *,
+    prefix,
+    specialization,
+    array_inputs=None,
+):
+    if isinstance(specialization, SfemElementQuadratureRule):
+        specialization = SfemSoAElementSpecialization(specialization)
+    if not isinstance(specialization, SfemSoAElementSpecialization):
+        raise TypeError("specialization must be an SfemSoAElementSpecialization")
+    array_inputs = (
+        specialization.adjugate_geometry_inputs()
+        if array_inputs is None
+        else tuple(array_inputs)
+    )
+    return generate_sfem_soa_cpp_files(
+        forms,
+        prefix=prefix,
+        dim=specialization.dim,
+        n_nodes=specialization.n_shape,
+        n_qp=specialization.n_qp,
+        vector_size=specialization.vector_size,
+        array_inputs=array_inputs,
+        quadrature_rule=specialization.quadrature_rule,
+    )
+
+
+def _sfem_soa_local_header(forms, prefix, dim, n_nodes, array_inputs, quadrature_rule):
+    guard = "%s_LOCAL_HPP" % _cpp_macro_name(prefix)
+    lines = [
+        "#ifndef %s" % guard,
+        "#define %s" % guard,
+        "",
+        "#include <math.h>",
+        "#include <stddef.h>",
+        "",
+        "#ifndef SFEM_INLINE",
+        "#define SFEM_INLINE inline",
+        "#endif",
+        "",
+        "#ifndef SFEM_RESTRICT",
+        "#define SFEM_RESTRICT",
+        "#endif",
+        "",
+        "#ifndef SFEM_GENERATED_SCALAR_T",
+        "#define SFEM_GENERATED_SCALAR_T",
+        "typedef double scalar_t;",
+        "typedef double real_t;",
+        "typedef double accumulator_t;",
+        "#endif",
+        "",
+    ]
+
+    for form in forms:
+        lines.extend(
+            _sfem_soa_block_function(
+                form,
+                prefix,
+                dim,
+                n_nodes,
+                array_inputs,
+                quadrature_rule,
+            )
+        )
+        lines.append("")
+
+    lines.extend(["#endif", ""])
+    return "\n".join(lines)
+
+
+def _sfem_soa_block_function(form, prefix, dim, n_nodes, array_inputs, quadrature_rule):
+    name = "%s_%s_block" % (prefix, form.name)
+    element_inputs = _sfem_soa_element_inputs(array_inputs)
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    use_tensor_product_reference = (
+        quadrature_rule is not None
+        and quadrature_rule.is_tensor_product
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    use_reference_gradient_vectors = (
+        form.weak_form is not None
+        and not use_tensor_product_reference
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    params = ["const ptrdiff_t nelems", "const int q"]
+    params.extend(
+        "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, stream)
+        for array_input in element_inputs
+        for stream in _soa_array_stream_names(array_input)
+    )
+    if use_tensor_product_reference:
+        params.extend(
+            (
+                "const scalar_t *const SFEM_RESTRICT shape_1d",
+                "const scalar_t *const SFEM_RESTRICT grad_1d",
+            )
+        )
+    elif use_reference_gradient_vectors:
+        params.extend(_sfem_reference_gradient_vector_params(dim))
+    else:
+        params.extend(
+            "const %s *const SFEM_RESTRICT %s"
+            % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
+            for array_input in reference_inputs
+        )
+    params.extend(("const scalar_t qw", "const scalar_t mu", "const scalar_t lmbda"))
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s" % name
+        for name in _field_stream_names("u", dim, n_nodes)
+    )
+    if form.has_direction:
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % name
+            for name in _field_stream_names("h", dim, n_nodes)
+        )
+    params.extend(
+        "accumulator_t *const SFEM_RESTRICT %s" % name
+        for name in _output_stream_names(form, dim, n_nodes)
+    )
+
+    lines = [
+        "template <int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "static SFEM_INLINE void %s(" % name,
+    ]
+    for idx, param in enumerate(params):
+        comma = "," if idx + 1 < len(params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    static_assert(N_QP > 0, \"N_QP must be positive\");",
+            "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");" % n_nodes,
+            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
+        ]
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            [
+                "    static constexpr int N_QP_1D = %d;"
+                % quadrature_rule.tensor_product_n_qp_1d,
+                "    static constexpr int N_SHAPE_1D = %d;"
+                % quadrature_rule.tensor_product_n_shape_1d,
+            ]
+        )
+        lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
+    lines.extend(
+        [
+            "#pragma omp simd",
+            "    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "        scalar_t u[N_SHAPE * %d];" % dim,
+        ]
+    )
+    for array_input in array_inputs:
+        if form.weak_form is not None and array_input.is_reference_qp_shape:
+            continue
+        if array_input.is_reference_qp_shape:
+            array_decl = "%s %s[N_SHAPE * %d];" % (
+                array_input.scalar_type,
+                array_input.name,
+                array_input.components,
+            )
+        else:
+            array_decl = "%s %s[%d];" % (
+                array_input.scalar_type,
+                array_input.name,
+                array_input.local_size,
+            )
+        lines.insert(
+            -1,
+            "        %s" % array_decl,
+        )
+    if form.has_direction:
+        lines.append("        scalar_t du[N_SHAPE * %d];" % dim)
+
+    for array_input in element_inputs:
+        for i, stream in enumerate(_soa_array_stream_names(array_input)):
+            lines.append("        %s[%d] = %s[lane];" % (array_input.name, i, stream))
+    if form.weak_form is not None:
+        pass
+    elif use_tensor_product_reference:
+        _append_tensor_product_reference_gradient_lines(
+            lines,
+            reference_inputs[0].name,
+            quadrature_rule,
+        )
+    else:
+        for array_input in reference_inputs:
+            source = _sfem_soa_reference_param_name(array_input)
+            for shape in range(array_input.n_shape):
+                for component in range(array_input.components):
+                    local_idx = shape * array_input.components + component
+                    lines.append(
+                        "        %s[%d] = %s[(q * N_SHAPE + %d) * %d + %d];"
+                        % (
+                            array_input.name,
+                            local_idx,
+                            source,
+                            shape,
+                            array_input.components,
+                            component,
+                        )
+                    )
+
+    for node in range(n_nodes):
+        for d in range(dim):
+            idx = node * dim + d
+            component = _component_name(d)
+            lines.append("        u[%d] = u%s%d[lane];" % (idx, component, node))
+            if form.has_direction:
+                lines.append("        du[%d] = h%s%d[lane];" % (idx, component, node))
+
+    if form.weak_form is not None:
+        _append_sfem_soa_weak_form_lines(
+            lines,
+            form,
+            dim,
+            n_nodes,
+            reference_inputs,
+            use_tensor_product_reference,
+            quadrature_rule,
+        )
+        lines.extend(["    }", "}"])
+        return lines
+
+    output_count = len(form.expression_graph.evaluation_plan.outputs)
+    lines.append("        scalar_t element_vector[%d];" % max(1, output_count))
+    _append_sfem_soa_statement_lines(lines, form.expression_graph, "element_vector")
+    _append_sfem_soa_output_lines(lines, form, dim, n_nodes)
+    lines.extend(["    }", "}"])
+    return lines
+
+
+def _append_sfem_soa_weak_form_lines(
+    lines,
+    form,
+    dim,
+    n_nodes,
+    reference_inputs,
+    use_tensor_product_reference,
+    quadrature_rule,
+):
+    weak_form = form.weak_form
+    if weak_form.dim != dim:
+        raise ValueError("weak form dim does not match SoA kernel dim")
+    if form.name not in ("objective", "gradient", "apply"):
+        raise ValueError("weak form kernel name must be objective, gradient, or apply")
+    if form.name == "apply" and not form.has_direction:
+        raise ValueError("weak form apply kernel requires has_direction=True")
+    if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
+        raise ValueError("weak form kernels require one grad_ref reference input")
+
+    def reference_gradient(component):
+        if use_tensor_product_reference:
+            return _tensor_product_dynamic_reference_gradient_expr(dim, component)
+        return "%s[q * N_SHAPE + shape]" % _sfem_reference_gradient_vector_name(component)
+
+    lines.extend(
+        [
+            "        scalar_t grad_u_ref[%d];" % (dim * dim),
+            "        scalar_t grad_u[%d];" % (dim * dim),
+        ]
+    )
+    if form.has_direction:
+        lines.extend(
+            [
+                "        scalar_t grad_h_ref[%d];" % (dim * dim),
+                "        scalar_t trial_grad[%d];" % (dim * dim),
+            ]
+        )
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            lines.append("        grad_u_ref[%d] = 0.0;" % idx)
+            if form.has_direction:
+                lines.append("        grad_h_ref[%d] = 0.0;" % idx)
+
+    lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
+    if use_tensor_product_reference:
+        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "            "))
+    for row in range(dim):
+        for col in range(dim):
+            lines.append(
+                "            grad_u_ref[%d] += u[shape * %d + %d] * %s;"
+                % (row * dim + col, dim, row, reference_gradient(col))
+            )
+            if form.has_direction:
+                lines.append(
+                    "            grad_h_ref[%d] += du[shape * %d + %d] * %s;"
+                    % (row * dim + col, dim, row, reference_gradient(col))
+                )
+    lines.append("        }")
+
+    lines.append("        const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant[0];")
+    for row in range(dim):
+        for col in range(dim):
+            terms = [
+                "grad_u_ref[%d] * jacobian_adjugate[%d]"
+                % (row * dim + k, k * dim + col)
+                for k in range(dim)
+            ]
+            lines.append(
+                "        grad_u[%d] = (%s) * inv_jacobian_determinant;"
+                % (row * dim + col, " + ".join(terms))
+            )
+            if form.has_direction:
+                terms = [
+                    "grad_h_ref[%d] * jacobian_adjugate[%d]"
+                    % (row * dim + k, k * dim + col)
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "        trial_grad[%d] = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
+                )
+
+    lines.append("        scalar_t F[%d];" % (dim * dim))
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            identity = "1.0 + " if row == col else ""
+            lines.append("        F[%d] = %sgrad_u[%d];" % (idx, identity, idx))
+
+    if form.name == "objective":
+        _append_cse_array_assignments(
+            lines,
+            [weak_form.energy_density],
+            ["value[lane] %s" % ("+=" if form.output_mode == "accumulate" else "=")],
+            "weak_obj_tmp",
+            scale="qw * jacobian_determinant[0]",
+        )
+        return
+
+    material = (
+        weak_form.linearized_first_piola(
+            tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim))
+        )
+        if form.name == "apply"
+        else weak_form.first_piola()
+    )
+    lines.append("        scalar_t element_vector[N_SHAPE * %d];" % dim)
+    lines.append("        scalar_t loperand[%d];" % (dim * dim))
+    _append_transformed_loperand_lines(lines, material, dim, "weak_mat_tmp")
+
+    lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
+    if use_tensor_product_reference:
+        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "            "))
+    for row in range(dim):
+        terms = [
+            "loperand[%d] * %s" % (row * dim + col, reference_gradient(col))
+            for col in range(dim)
+        ]
+        lines.append(
+            "            element_vector[shape * %d + %d] = %s;"
+            % (dim, row, " + ".join(terms))
+        )
+    lines.append("        }")
+    for node in range(n_nodes):
+        for row in range(dim):
+            stream = "out%s%d" % (_component_name(row), node)
+            op = "+=" if form.output_mode == "accumulate" else "="
+            lines.append(
+                "        %s[lane] %s element_vector[%d];"
+                % (stream, op, node * dim + row)
+            )
+
+
+def _append_transformed_loperand_lines(lines, material, dim, temporary_prefix):
+    material_exprs = tuple(material)
+    material_names = ["material[%d] =" % i for i in range(dim * dim)]
+    lines.append("        scalar_t material[%d];" % (dim * dim))
+    _append_cse_array_assignments(lines, material_exprs, material_names, temporary_prefix)
+    for row in range(dim):
+        for col in range(dim):
+            terms = [
+                "material[%d] * jacobian_adjugate[%d]"
+                % (row * dim + k, col * dim + k)
+                for k in range(dim)
+            ]
+            lines.append(
+                "        loperand[%d] = qw * (%s);"
+                % (row * dim + col, " + ".join(terms))
+            )
+
+
+def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix, scale=None):
+    temps, reduced = sp.cse(
+        tuple(expressions),
+        symbols=sp.numbered_symbols("%s" % temporary_prefix),
+    )
+    for symbol, expression in temps:
+        lines.append("        const scalar_t %s = %s;" % (symbol, sp.ccode(expression)))
+    for target, expression in zip(targets, reduced):
+        if scale is not None:
+            lines.append("        %s %s * (%s);" % (target, scale, sp.ccode(expression)))
+        else:
+            lines.append("        %s %s;" % (target, sp.ccode(expression)))
+
+
+def _append_sfem_soa_statement_lines(lines, expression_graph, output_name):
+    output_index = 0
+    for statement in expression_graph.evaluation_plan.statements:
+        expression = sp.ccode(statement.expression)
+        if statement.kind == "intermediate":
+            lines.append("        const scalar_t %s = %s;" % (statement.target, expression))
+        else:
+            lines.append("        %s[%d] = %s;" % (output_name, output_index, expression))
+            output_index += 1
+
+
+def _tensor_product_q_index_lines(dim, indent):
+    if dim == 2:
+        return (
+            "%sconst int qx = q %% N_QP_1D;" % indent,
+            "%sconst int qy = q / N_QP_1D;" % indent,
+        )
+    if dim == 3:
+        return (
+            "%sconst int qx = q %% N_QP_1D;" % indent,
+            "%sconst int qy = (q / N_QP_1D) %% N_QP_1D;" % indent,
+            "%sconst int qz = q / (N_QP_1D * N_QP_1D);" % indent,
+        )
+    raise ValueError("tensor-product reference generation requires dim 2 or 3")
+
+
+def _tensor_product_node_coords(quadrature_rule):
+    dim = quadrature_rule.dim
+    n_shape_1d = quadrature_rule.tensor_product_n_shape_1d
+    if n_shape_1d == 2 and dim == 2:
+        return ((0, 0), (1, 0), (1, 1), (0, 1))
+    if n_shape_1d == 2 and dim == 3:
+        return (
+            (0, 0, 0),
+            (1, 0, 0),
+            (1, 1, 0),
+            (0, 1, 0),
+            (0, 0, 1),
+            (1, 0, 1),
+            (1, 1, 1),
+            (0, 1, 1),
+        )
+    if dim == 2:
+        return tuple(
+            (sx, sy)
+            for sy in range(n_shape_1d)
+            for sx in range(n_shape_1d)
+        )
+    if dim == 3:
+        return tuple(
+            (sx, sy, sz)
+            for sz in range(n_shape_1d)
+            for sy in range(n_shape_1d)
+            for sx in range(n_shape_1d)
+        )
+    raise ValueError("tensor-product node ordering requires dim 2 or 3")
+
+
+def _tensor_product_shape_index_lines(quadrature_rule, indent):
+    dim = quadrature_rule.dim
+    n_shape_1d = quadrature_rule.tensor_product_n_shape_1d
+    if n_shape_1d == 2 and dim == 2:
+        return (
+            "%sconst int sx = ((shape + 1) >> 1) & 1;" % indent,
+            "%sconst int sy = shape >> 1;" % indent,
+        )
+    if n_shape_1d == 2 and dim == 3:
+        return (
+            "%sconst int sx = ((shape + 1) >> 1) & 1;" % indent,
+            "%sconst int sy = (shape >> 1) & 1;" % indent,
+            "%sconst int sz = shape >> 2;" % indent,
+        )
+    if dim == 2:
+        return (
+            "%sconst int sx = shape %% N_SHAPE_1D;" % indent,
+            "%sconst int sy = shape / N_SHAPE_1D;" % indent,
+        )
+    if dim == 3:
+        return (
+            "%sconst int sx = shape %% N_SHAPE_1D;" % indent,
+            "%sconst int sy = (shape / N_SHAPE_1D) %% N_SHAPE_1D;" % indent,
+            "%sconst int sz = shape / (N_SHAPE_1D * N_SHAPE_1D);" % indent,
+        )
+    raise ValueError("tensor-product shape indices require dim 2 or 3")
+
+
+def _sfem_reference_gradient_vector_name(component):
+    return "grad_ref_%s" % _component_name(component)
+
+
+def _sfem_reference_gradient_vector_params(dim):
+    return tuple(
+        "const scalar_t *const SFEM_RESTRICT %s"
+        % _sfem_reference_gradient_vector_name(component)
+        for component in range(dim)
+    )
+
+
+def _tensor_product_1d_factor(axis, node_axis, derivative_axis):
+    qp_name = ("qx", "qy", "qz")[axis]
+    table_name = "grad_1d" if axis == derivative_axis else "shape_1d"
+    return "%s[%s * N_SHAPE_1D + %d]" % (table_name, qp_name, node_axis)
+
+
+def _tensor_product_dynamic_reference_gradient_expr(dim, derivative_axis):
+    factors = []
+    for axis in range(dim):
+        qp_name = ("qx", "qy", "qz")[axis]
+        shape_name = ("sx", "sy", "sz")[axis]
+        table_name = "grad_1d" if axis == derivative_axis else "shape_1d"
+        factors.append("%s[%s * N_SHAPE_1D + %s]" % (table_name, qp_name, shape_name))
+    return " * ".join(factors)
+
+
+def _tensor_product_quadrature_weight_expr(dim):
+    factors = ["q_weight_1d[%s]" % name for name in ("qx", "qy", "qz")[:dim]]
+    return " * ".join(factors)
+
+
+def _append_tensor_product_reference_gradient_lines(lines, name, quadrature_rule):
+    for shape, coords in enumerate(_tensor_product_node_coords(quadrature_rule)):
+        for component in range(quadrature_rule.dim):
+            factors = [
+                _tensor_product_1d_factor(axis, coords[axis], component)
+                for axis in range(quadrature_rule.dim)
+            ]
+            lines.append(
+                "        %s[%d] = %s;"
+                % (name, shape * quadrature_rule.dim + component, " * ".join(factors))
+            )
+
+
+def _append_sfem_soa_output_lines(lines, form, dim, n_nodes):
+    output_count = len(form.expression_graph.evaluation_plan.outputs)
+    if output_count == 1:
+        op = "+=" if form.output_mode == "accumulate" else "="
+        lines.append("        value[lane] %s element_vector[0];" % op)
+        return
+
+    if output_count != dim * n_nodes:
+        raise ValueError(
+            "SoA form '%s' has %d outputs, expected 1 or dim*n_nodes=%d"
+            % (form.name, output_count, dim * n_nodes)
+        )
+
+    for node in range(n_nodes):
+        for d in range(dim):
+            stream = "out%s%d" % (_component_name(d), node)
+            idx = node * dim + d
+            op = "+=" if form.output_mode == "accumulate" else "="
+            lines.append("        %s[lane] %s element_vector[%d];" % (stream, op, idx))
+
+
+def _sfem_soa_operator_source(
+    forms,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    local_name,
+    array_inputs,
+    quadrature_rule,
+):
+    lines = [
+        '#include "%s"' % local_name,
+        "",
+        "#ifndef SFEM_SUCCESS",
+        "#define SFEM_SUCCESS 0",
+        "#endif",
+        "",
+        "#ifndef MIN",
+        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
+        "#endif",
+        "",
+        "#ifdef _OPENMP",
+        "#include <omp.h>",
+        "#endif",
+        "",
+    ]
+    if quadrature_rule is not None:
+        lines.extend(_sfem_soa_quadrature_rule_lines(prefix, quadrature_rule))
+        lines.append("")
+    lines.extend(_sfem_soa_diagnostics_type_lines(prefix))
+    lines.append("")
+
+    for form in forms:
+        lines.extend(
+            _sfem_soa_diagnostics_lines(
+                form,
+                prefix,
+                dim,
+                n_nodes,
+                n_qp,
+                vector_size,
+                array_inputs,
+                quadrature_rule,
+            )
+        )
+        lines.append("")
+        lines.extend(
+            _sfem_soa_operator_function(
+                form,
+                prefix,
+                dim,
+                n_nodes,
+                n_qp,
+                vector_size,
+                array_inputs,
+                quadrature_rule,
+            )
+        )
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _sfem_soa_operator_function(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    array_inputs,
+    quadrature_rule,
+):
+    function_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
+    implementation_name = "%s_impl" % function_name
+    block_name = "%s_%s_block" % (prefix, form.name)
+    element_inputs = _sfem_soa_element_inputs(array_inputs)
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    use_tensor_product_reference = (
+        quadrature_rule is not None
+        and quadrature_rule.is_tensor_product
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    use_reference_gradient_vectors = (
+        form.weak_form is not None
+        and not use_tensor_product_reference
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    base_params = ["const ptrdiff_t nelements"]
+    base_params.extend(
+        "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, stream)
+        for array_input in element_inputs
+        for stream in _soa_array_stream_names(array_input)
+    )
+    if use_tensor_product_reference:
+        reference_params = (
+            "const scalar_t *const SFEM_RESTRICT shape_1d",
+            "const scalar_t *const SFEM_RESTRICT grad_1d",
+        )
+        quadrature_weight_param = "const scalar_t *const SFEM_RESTRICT q_weight_1d"
+    elif use_reference_gradient_vectors:
+        reference_params = _sfem_reference_gradient_vector_params(dim)
+        quadrature_weight_param = "const scalar_t *const SFEM_RESTRICT q_weight"
+    else:
+        reference_params = tuple(
+            "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, array_input.name)
+            for array_input in reference_inputs
+        )
+        quadrature_weight_param = "const scalar_t *const SFEM_RESTRICT q_weight"
+    material_params = ["const scalar_t mu", "const scalar_t lmbda"]
+    field_params = []
+    field_params.extend(
+        "const real_t *const SFEM_RESTRICT %s" % name
+        for name in _field_stream_names("u", dim, n_nodes)
+    )
+    if form.has_direction:
+        field_params.extend(
+            "const real_t *const SFEM_RESTRICT %s" % name
+            for name in _field_stream_names("h", dim, n_nodes)
+        )
+    output_params = tuple(
+        "real_t *const SFEM_RESTRICT %s" % name
+        for name in _output_stream_names(form, dim, n_nodes)
+    )
+    if quadrature_rule is None:
+        impl_params = tuple(base_params) + reference_params + (
+            "const scalar_t qw",
+        ) + tuple(material_params) + tuple(field_params) + output_params
+        wrapper_params = impl_params
+    else:
+        impl_params = tuple(base_params) + reference_params + (
+            quadrature_weight_param,
+        ) + tuple(material_params) + tuple(field_params) + output_params
+        wrapper_params = tuple(base_params) + tuple(material_params) + tuple(field_params) + output_params
+
+    lines = [
+        "template <int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "static SFEM_INLINE int %s(" % implementation_name,
+    ]
+    for idx, param in enumerate(impl_params):
+        comma = "," if idx + 1 < len(impl_params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    static_assert(N_QP == %d, \"N_QP does not match generated geometry streams\");" % n_qp,
+            "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");" % n_nodes,
+            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
+        ]
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            [
+                "    static constexpr int N_QP_1D = %d;"
+                % quadrature_rule.tensor_product_n_qp_1d,
+                "    static constexpr int N_SHAPE_1D = %d;"
+                % quadrature_rule.tensor_product_n_shape_1d,
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+        ]
+    )
+
+    block_streams = []
+    for array_input in element_inputs:
+        for stream in _soa_array_stream_names(array_input):
+            block_streams.append(stream)
+            lines.append("        %s block_%s[VECTOR_SIZE];" % (array_input.scalar_type, stream))
+    for stream in _field_stream_names("u", dim, n_nodes):
+        block_streams.append(stream)
+        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    if form.has_direction:
+        for stream in _field_stream_names("h", dim, n_nodes):
+            block_streams.append(stream)
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    for stream in _output_stream_names(form, dim, n_nodes):
+        block_streams.append(stream)
+        lines.append("        accumulator_t block_%s[VECTOR_SIZE];" % stream)
+
+    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    for stream in _field_stream_names("u", dim, n_nodes):
+        lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+    if form.has_direction:
+        for stream in _field_stream_names("h", dim, n_nodes):
+            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+    for stream in _output_stream_names(form, dim, n_nodes):
+        if form.output_mode == "accumulate":
+            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+        else:
+            lines.append("            block_%s[lane] = 0;" % stream)
+    lines.append("        }")
+
+    lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+    if use_tensor_product_reference:
+        lines.extend(_tensor_product_q_index_lines(dim, "            "))
+        lines.append(
+            "            const scalar_t tensor_q_weight = %s;"
+            % _tensor_product_quadrature_weight_expr(dim)
+        )
+    if element_inputs:
+        lines.extend(["#pragma omp simd", "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        for array_input in element_inputs:
+            for stream in _soa_array_stream_names(array_input):
+                lines.append(
+                    "                block_%s[lane] = %s[(ptrdiff_t)q * nelements + evbegin + lane];"
+                    % (stream, stream)
+                )
+        lines.append("            }")
+
+    call_args = ["nelems", "q"]
+    call_args.extend(
+        "block_%s" % stream
+        for array_input in element_inputs
+        for stream in _soa_array_stream_names(array_input)
+    )
+    if use_tensor_product_reference:
+        call_args.extend(("shape_1d", "grad_1d"))
+    elif use_reference_gradient_vectors:
+        call_args.extend(
+            _sfem_reference_gradient_vector_name(component)
+            for component in range(dim)
+        )
+    else:
+        call_args.extend(array_input.name for array_input in reference_inputs)
+    if quadrature_rule is None:
+        call_args.extend(("qw", "mu", "lmbda"))
+    elif use_tensor_product_reference:
+        call_args.extend(("tensor_q_weight", "mu", "lmbda"))
+    else:
+        call_args.extend(("q_weight[q]", "mu", "lmbda"))
+    call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
+    if form.has_direction:
+        call_args.extend("block_%s" % stream for stream in _field_stream_names("h", dim, n_nodes))
+    call_args.extend("block_%s" % stream for stream in _output_stream_names(form, dim, n_nodes))
+    lines.extend(
+        [
+            "",
+            "            %s<N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_name, ", ".join(call_args)),
+            "        }",
+            "",
+        ]
+    )
+
+    lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    for stream in _output_stream_names(form, dim, n_nodes):
+        lines.append("            %s[evbegin + lane] = block_%s[lane];" % (stream, stream))
+    lines.extend(["        }", "    }", "", "    return SFEM_SUCCESS;", "}", ""])
+
+    lines.append('extern "C" int %s(' % function_name)
+    for idx, param in enumerate(wrapper_params):
+        comma = "," if idx + 1 < len(wrapper_params) else ""
+        lines.append("        %s%s" % (param, comma))
+    if quadrature_rule is None:
+        wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    else:
+        wrapper_args = _sfem_soa_specialized_wrapper_arguments(
+            prefix,
+            quadrature_rule,
+            wrapper_params,
+            reference_inputs,
+            use_reference_gradient_vectors,
+        )
+    lines.extend(
+        [
+            ") {",
+            "    return %s<%d, %d, %d>(%s);"
+            % (
+                implementation_name,
+                n_qp,
+                n_nodes,
+                vector_size,
+                ", ".join(wrapper_args),
+            ),
+            "}",
+        ]
+    )
+    return lines
+
+
+def _field_stream_names(prefix, dim, n_nodes):
+    return tuple(
+        "%s%s%d" % (prefix, _component_name(d), node)
+        for node in range(n_nodes)
+        for d in range(dim)
+    )
+
+
+def _soa_array_stream_names(array_input):
+    return tuple("%s%d" % (array_input.name, i) for i in range(array_input.size))
+
+
+def _sfem_soa_element_inputs(array_inputs):
+    return tuple(array_input for array_input in array_inputs if not array_input.is_reference_qp_shape)
+
+
+def _sfem_soa_reference_inputs(array_inputs):
+    return tuple(array_input for array_input in array_inputs if array_input.is_reference_qp_shape)
+
+
+def _sfem_soa_reference_param_name(array_input):
+    return "%s_data" % array_input.name
+
+
+def _sfem_soa_diagnostics_type_lines(prefix):
+    struct_name = _sfem_soa_diagnostics_struct_name(prefix)
+    return [
+        "#ifndef SFEM_KERNEL_DIAGNOSTICS_DEFINED",
+        "#define SFEM_KERNEL_DIAGNOSTICS_DEFINED",
+        "struct %s {" % struct_name,
+        "    const char *kernel_name;",
+        "    const char *element_type;",
+        "    int dim;",
+        "    int n_qp;",
+        "    int n_shape;",
+        "    int vector_size;",
+        "    int quadrature_order;",
+        "    long add_instructions_per_qp_lane;",
+        "    long mul_instructions_per_qp_lane;",
+        "    long div_instructions_per_qp_lane;",
+        "    long sqrt_instructions_per_qp_lane;",
+        "    long pow_instructions_per_qp_lane;",
+        "    long load_instructions_per_qp_lane;",
+        "    long store_instructions_per_qp_lane;",
+        "    long flops_per_qp_lane;",
+        "    long temporaries;",
+        "    long estimated_registers;",
+        "    int geometry_streams;",
+        "    int reference_scalars;",
+        "    int quadrature_weight_scalars;",
+        "    int material_scalars;",
+        "    int u_streams;",
+        "    int h_streams;",
+        "    int output_streams;",
+        "    int output_reads_per_element;",
+        "    int output_writes_per_element;",
+        "    double add_cpi;",
+        "    double mul_cpi;",
+        "    double div_cpi;",
+        "    double sqrt_cpi;",
+        "    double pow_cpi;",
+        "    double load_cpi;",
+        "    double store_cpi;",
+        "};",
+        "",
+        "static SFEM_INLINE double %s_total_flops(" % struct_name,
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements) {",
+        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "    return n * (double)d->n_qp * (double)d->flops_per_qp_lane;",
+        "}",
+        "",
+        "static SFEM_INLINE size_t %s_total_bytes(" % struct_name,
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    (void)accumulator_bytes;",
+        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "    const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;",
+        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "    const size_t output_bytes = n * (size_t)d->output_streams * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "}",
+        "",
+        "static SFEM_INLINE double %s_arithmetic_intensity(" % struct_name,
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const size_t bytes = %s_total_bytes(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "    return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "}",
+        "#endif",
+    ]
+
+
+def _sfem_soa_diagnostics_lines(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    array_inputs,
+    quadrature_rule,
+):
+    public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
+    struct_name = _sfem_soa_diagnostics_struct_name(prefix)
+    variable_name = "%s_diagnostics_data" % public_name
+    if form.expression_graph is not None:
+        cost = form.expression_graph.cost
+    elif form.weak_form is not None:
+        diagnostic_graph = (
+            KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, form.weak_form.diagnostic_expressions(form.has_direction))
+            .build_graph(
+                data_symbols=form.weak_form.deformation_gradient,
+                temporary_prefix="weak_diag_tmp",
+            )
+        )
+        cost = diagnostic_graph.cost
+    else:
+        cost = ExpressionCost()
+    element_inputs = _sfem_soa_element_inputs(array_inputs)
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    geometry_streams = sum(array_input.size for array_input in element_inputs)
+    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
+        reference_scalars = (
+            len(quadrature_rule.tensor_product_shape_values_1d)
+            + len(quadrature_rule.tensor_product_shape_gradients_1d)
+        )
+        quadrature_weight_scalars = len(quadrature_rule.tensor_product_weights_1d)
+    else:
+        reference_scalars = sum(array_input.size for array_input in reference_inputs)
+        quadrature_weight_scalars = n_qp if quadrature_rule is not None else 1
+    output_streams = len(_output_stream_names(form, dim, n_nodes))
+    output_reads = output_streams if form.output_mode == "accumulate" else 0
+    output_writes = output_streams
+    u_streams = dim * n_nodes
+    h_streams = dim * n_nodes if form.has_direction else 0
+    element_type = quadrature_rule.element_type if quadrature_rule is not None else "GENERIC"
+    quadrature_order = quadrature_rule.order if quadrature_rule is not None else 0
+    lines = [
+        "static const %s %s = {" % (struct_name, variable_name),
+        '    "%s",' % public_name,
+        '    "%s",' % element_type,
+        "    %d," % dim,
+        "    %d," % n_qp,
+        "    %d," % n_nodes,
+        "    %d," % vector_size,
+        "    %d," % quadrature_order,
+        "    %d," % cost.adds,
+        "    %d," % cost.muls,
+        "    %d," % cost.divs,
+        "    %d," % cost.sqrts,
+        "    %d," % cost.pows,
+        "    %d," % cost.loads,
+        "    %d," % cost.stores,
+        "    %d," % cost.flops,
+        "    %d," % cost.temporaries,
+        "    %d," % cost.estimated_registers,
+        "    %d," % geometry_streams,
+        "    %d," % reference_scalars,
+        "    %d," % quadrature_weight_scalars,
+        "    2,",
+        "    %d," % u_streams,
+        "    %d," % h_streams,
+        "    %d," % output_streams,
+        "    %d," % output_reads,
+        "    %d," % output_writes,
+        "    1.0,",
+        "    1.0,",
+        "    8.0,",
+        "    12.0,",
+        "    16.0,",
+        "    1.0,",
+        "    1.0",
+        "};",
+        "",
+        'extern "C" const %s *%s_diagnostics(void) {' % (struct_name, public_name),
+        "    return &%s;" % variable_name,
+        "}",
+        "",
+        'extern "C" double %s_arithmetic_intensity(' % public_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    return %s_arithmetic_intensity(&%s, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % (struct_name, variable_name),
+        "}",
+    ]
+    return lines
+
+
+def _sfem_soa_diagnostics_struct_name(prefix):
+    return "SfemKernelDiagnostics"
+
+
+def _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs):
+    if quadrature_rule.dim != dim:
+        raise ValueError(
+            "quadrature rule dimension %d does not match dim=%d"
+            % (quadrature_rule.dim, dim)
+        )
+    if quadrature_rule.n_shape != n_nodes:
+        raise ValueError(
+            "quadrature rule n_shape %d does not match n_nodes=%d"
+            % (quadrature_rule.n_shape, n_nodes)
+        )
+    if quadrature_rule.n_qp != n_qp:
+        raise ValueError(
+            "quadrature rule n_qp %d does not match n_qp=%d"
+            % (quadrature_rule.n_qp, n_qp)
+        )
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
+        raise ValueError("element-specialized wrappers currently require one grad_ref reference input")
+    grad_ref = reference_inputs[0]
+    if grad_ref.components != dim or grad_ref.n_shape != n_nodes or grad_ref.n_qp != n_qp:
+        raise ValueError("grad_ref reference input does not match quadrature rule")
+
+
+def _sfem_soa_quadrature_rule_lines(prefix, quadrature_rule):
+    if quadrature_rule.is_tensor_product:
+        shape_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "shape_1d")
+        grad_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "grad_1d")
+        weight_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight_1d")
+        return [
+            "static const scalar_t %s[%d] = {%s};"
+            % (
+                shape_name,
+                len(quadrature_rule.tensor_product_shape_values_1d),
+                _cpp_scalar_initializer_list(quadrature_rule.tensor_product_shape_values_1d),
+            ),
+            "static const scalar_t %s[%d] = {%s};"
+            % (
+                grad_name,
+                len(quadrature_rule.tensor_product_shape_gradients_1d),
+                _cpp_scalar_initializer_list(quadrature_rule.tensor_product_shape_gradients_1d),
+            ),
+            "static const scalar_t %s[%d] = {%s};"
+            % (
+                weight_name,
+                len(quadrature_rule.tensor_product_weights_1d),
+                _cpp_scalar_initializer_list(quadrature_rule.tensor_product_weights_1d),
+            ),
+        ]
+    grad_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "grad_ref")
+    weight_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
+    lines = [
+        "static const scalar_t %s[%d] = {%s};"
+        % (
+            grad_name,
+            len(quadrature_rule.reference_gradients),
+            _cpp_scalar_initializer_list(quadrature_rule.reference_gradients),
+        ),
+        "static const scalar_t %s[%d] = {%s};"
+        % (
+            weight_name,
+            len(quadrature_rule.weights),
+            _cpp_scalar_initializer_list(quadrature_rule.weights),
+        ),
+    ]
+    for component in range(quadrature_rule.dim):
+        vector_name = _sfem_soa_quadrature_array_name(
+            prefix,
+            quadrature_rule,
+            _sfem_reference_gradient_vector_name(component),
+        )
+        vector_values = _sfem_reference_gradient_component_values(quadrature_rule, component)
+        lines.append(
+            "static const scalar_t %s[%d] = {%s};"
+            % (
+                vector_name,
+                len(vector_values),
+                _cpp_scalar_initializer_list(vector_values),
+            )
+        )
+    return lines
+
+
+def _sfem_reference_gradient_component_values(quadrature_rule, component):
+    values = []
+    for q in range(quadrature_rule.n_qp):
+        for shape in range(quadrature_rule.n_shape):
+            values.append(
+                quadrature_rule.reference_gradients[
+                    (q * quadrature_rule.n_shape + shape) * quadrature_rule.dim
+                    + component
+                ]
+            )
+    return tuple(values)
+
+
+def _sfem_soa_specialized_wrapper_arguments(
+    prefix,
+    quadrature_rule,
+    wrapper_params,
+    reference_inputs,
+    use_reference_gradient_vectors=False,
+):
+    arguments = [_cpp_argument_name(param) for param in wrapper_params]
+    if quadrature_rule.is_tensor_product:
+        offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
+        arguments.insert(
+            offset,
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "shape_1d"),
+        )
+        arguments.insert(
+            offset + 1,
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "grad_1d"),
+        )
+        arguments.insert(
+            offset + 2,
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight_1d"),
+        )
+        return tuple(arguments)
+    if use_reference_gradient_vectors:
+        offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
+        for component in range(quadrature_rule.dim):
+            arguments.insert(
+                offset + component,
+                _sfem_soa_quadrature_array_name(
+                    prefix,
+                    quadrature_rule,
+                    _sfem_reference_gradient_vector_name(component),
+                ),
+            )
+        arguments.insert(
+            offset + quadrature_rule.dim,
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight"),
+        )
+        return tuple(arguments)
+    for array_input in reference_inputs:
+        arguments.insert(
+            1 + _sfem_soa_element_stream_count_from_params(wrapper_params),
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, array_input.name),
+        )
+    arguments.insert(
+        1 + _sfem_soa_element_stream_count_from_params(wrapper_params) + len(reference_inputs),
+        _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight"),
+    )
+    return tuple(arguments)
+
+
+def _sfem_soa_element_stream_count_from_params(params):
+    count = 0
+    for param in params[1:]:
+        name = _cpp_argument_name(param)
+        if name in ("mu", "lmbda"):
+            break
+        count += 1
+    return count
+
+
+def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
+    if quadrature_rule is None:
+        return "%s_%s_soa" % (prefix, form_name)
+    return "%s_%s_%s_soa" % (
+        prefix,
+        quadrature_rule.element_type.lower(),
+        form_name,
+    )
+
+
+def _sfem_soa_quadrature_array_name(prefix, quadrature_rule, name):
+    return "%s_%s_%s" % (
+        prefix,
+        quadrature_rule.element_type.lower(),
+        name,
+    )
+
+
+def _cpp_scalar_initializer_list(values):
+    return ", ".join(_cpp_scalar_literal(value) for value in values)
+
+
+def _cpp_scalar_literal(value):
+    value = float(value)
+    if value == 0.0:
+        return "0.0"
+    return "%.17g" % value
+
+
+def _output_stream_names(form, dim, n_nodes):
+    if form.weak_form is not None:
+        if form.name == "objective":
+            return ("value",)
+        return tuple(
+            "out%s%d" % (_component_name(d), node)
+            for node in range(n_nodes)
+            for d in range(dim)
+        )
+    output_count = len(form.expression_graph.evaluation_plan.outputs)
+    if output_count == 1:
+        return ("value",)
+    return tuple(
+        "out%s%d" % (_component_name(d), node)
+        for node in range(n_nodes)
+        for d in range(dim)
+    )
+
+
+def _component_name(component):
+    return ("x", "y", "z")[component]
+
+
+def _append_statement_lines(lines, statements, scalar_type, output_name, indent):
+    for statement in statements:
+        expression = sp.ccode(statement.expression)
+        if statement.kind == "intermediate":
+            target = _cpp_symbol(statement.target, output_name)
+            lines.append("%sconst %s %s = %s;" % (indent, scalar_type, target, expression))
+        elif statement.augmented:
+            target = _cpp_lvalue(statement.target, output_name)
+            lines.append("%s%s += %s;" % (indent, target, expression))
+        else:
+            target = _cpp_lvalue(statement.target, output_name)
+            lines.append("%s%s = %s;" % (indent, target, expression))
 
 
 def _normalize_kernel_expression(expr):
@@ -1156,6 +3198,78 @@ def _kernel_arguments(input_symbols, output_targets, scalar_type, output_name):
     return arguments
 
 
+def _openmp_kernel_arguments(
+    input_symbols,
+    output_targets,
+    scalar_type,
+    index_type,
+    output_name,
+):
+    input_arrays, input_scalars = _group_kernel_symbols(input_symbols)
+    direct_output_targets, needs_output_array = _direct_output_targets(
+        output_targets,
+    )
+    output_arrays, output_scalars = _group_kernel_symbols(direct_output_targets)
+    arguments = ["%s nelements" % index_type]
+
+    for base in sorted(input_arrays):
+        arguments.append("const %s * const %s" % (scalar_type, base))
+        arguments.append("%s %s_stride" % (index_type, base))
+    for symbol in sorted(input_scalars, key=str):
+        arguments.append("%s %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
+    for base in sorted(output_arrays):
+        arguments.append("%s * const %s" % (scalar_type, base))
+        arguments.append("%s %s_stride" % (index_type, base))
+    for symbol in sorted(output_scalars, key=str):
+        arguments.append("%s * const %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
+
+    if needs_output_array or (not output_arrays and not output_scalars):
+        arguments.append("%s * const %s" % (scalar_type, output_name))
+        arguments.append("%s %s_stride" % (index_type, output_name))
+
+    return arguments
+
+
+def _openmp_element_call_arguments(input_symbols, output_targets, output_name):
+    input_arrays, input_scalars = _group_kernel_symbols(input_symbols)
+    direct_output_targets, needs_output_array = _direct_output_targets(
+        output_targets,
+    )
+    output_arrays, output_scalars = _group_kernel_symbols(direct_output_targets)
+    arguments = []
+
+    for base in sorted(input_arrays):
+        arguments.append("%s + e * %s_stride" % (base, base))
+    for symbol in sorted(input_scalars, key=str):
+        arguments.append(_cpp_symbol(symbol, output_name))
+    for base in sorted(output_arrays):
+        arguments.append("%s + e * %s_stride" % (base, base))
+    for symbol in sorted(output_scalars, key=str):
+        arguments.append(_cpp_symbol(symbol, output_name))
+
+    if needs_output_array or (not output_arrays and not output_scalars):
+        arguments.append("%s + e * %s_stride" % (output_name, output_name))
+
+    return arguments
+
+
+def _openmp_wrapper_call_arguments(arguments):
+    return tuple(_cpp_argument_name(argument) for argument in arguments)
+
+
+def _cpp_argument_name(argument):
+    return argument.replace("*", " ").split()[-1]
+
+
+def _direct_output_targets(output_targets):
+    direct_output_targets = tuple(
+        target
+        for target in output_targets
+        if not (isinstance(target, str) and target.startswith("output:"))
+    )
+    return direct_output_targets, len(direct_output_targets) != len(output_targets)
+
+
 def _group_kernel_symbols(symbols):
     arrays = {}
     scalars = []
@@ -1195,6 +3309,24 @@ def _cpp_lvalue(symbol, output_name):
     if base is not None:
         return _cpp_symbol(symbol, output_name)
     return "*%s" % _cpp_symbol(symbol, output_name)
+
+
+def _cpp_wrapper_name(function_name):
+    words = []
+    for word in str(function_name).replace("-", "_").split("_"):
+        if word:
+            words.append(word[0].upper() + word[1:])
+    return "%sOperator" % "".join(words)
+
+
+def _cpp_macro_name(name):
+    chars = []
+    for char in str(name):
+        if char.isalnum():
+            chars.append(char.upper())
+        else:
+            chars.append("_")
+    return "".join(chars)
 
 
 def _flatten_expression(expression):
