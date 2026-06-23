@@ -1,3 +1,5 @@
+import ctypes
+import math
 import os
 import re
 import shutil
@@ -46,6 +48,399 @@ def neohookean_ogden_energy(F, mu, lmbda):
     return mu * sp.Rational(1, 2) * (I1 - dim) - mu * logJ + (
         lmbda * sp.Rational(1, 2) * logJ * logJ
     )
+
+
+def matrix_determinant(A):
+    dim = len(A)
+    if dim == 2:
+        return A[0][0] * A[1][1] - A[0][1] * A[1][0]
+    if dim == 3:
+        return (
+            A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+            - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+            + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0])
+        )
+    raise ValueError("unsupported matrix dimension")
+
+
+def matrix_inverse(A):
+    det = matrix_determinant(A)
+    if abs(det) == 0.0:
+        raise ValueError("singular matrix")
+    dim = len(A)
+    if dim == 2:
+        return (
+            (A[1][1] / det, -A[0][1] / det),
+            (-A[1][0] / det, A[0][0] / det),
+        )
+    if dim == 3:
+        c00 = A[1][1] * A[2][2] - A[1][2] * A[2][1]
+        c01 = -(A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        c02 = A[1][0] * A[2][1] - A[1][1] * A[2][0]
+        c10 = -(A[0][1] * A[2][2] - A[0][2] * A[2][1])
+        c11 = A[0][0] * A[2][2] - A[0][2] * A[2][0]
+        c12 = -(A[0][0] * A[2][1] - A[0][1] * A[2][0])
+        c20 = A[0][1] * A[1][2] - A[0][2] * A[1][1]
+        c21 = -(A[0][0] * A[1][2] - A[0][2] * A[1][0])
+        c22 = A[0][0] * A[1][1] - A[0][1] * A[1][0]
+        return (
+            (c00 / det, c10 / det, c20 / det),
+            (c01 / det, c11 / det, c21 / det),
+            (c02 / det, c12 / det, c22 / det),
+        )
+    raise ValueError("unsupported matrix dimension")
+
+
+def matrix_transpose(A):
+    return tuple(tuple(A[row][col] for row in range(len(A))) for col in range(len(A[0])))
+
+
+def matrix_multiply(A, B):
+    rows = len(A)
+    cols = len(B[0])
+    inner = len(B)
+    return tuple(
+        tuple(sum(A[row][k] * B[k][col] for k in range(inner)) for col in range(cols))
+        for row in range(rows)
+    )
+
+
+def matrix_add(A, B):
+    return tuple(
+        tuple(A[row][col] + B[row][col] for col in range(len(A[0])))
+        for row in range(len(A))
+    )
+
+
+def matrix_scale(alpha, A):
+    return tuple(tuple(alpha * value for value in row) for row in A)
+
+
+def neohookean_first_piola(F, mu, lmbda):
+    det_F = matrix_determinant(F)
+    F_inv = matrix_inverse(F)
+    F_inv_t = matrix_transpose(F_inv)
+    pressure = lmbda * math.log(det_F) - mu
+    return matrix_add(matrix_scale(mu, F), matrix_scale(pressure, F_inv_t))
+
+
+def neohookean_linearized_first_piola(F, dF, mu, lmbda):
+    det_F = matrix_determinant(F)
+    F_inv = matrix_inverse(F)
+    F_inv_t = matrix_transpose(F_inv)
+    dF_t = matrix_transpose(dF)
+    trace_F_inv_dF = sum(
+        F_inv[row][col] * dF[col][row]
+        for row in range(len(F))
+        for col in range(len(F))
+    )
+    pressure = lmbda * math.log(det_F) - mu
+    dF_inv_t = matrix_scale(-1.0, matrix_multiply(matrix_multiply(F_inv_t, dF_t), F_inv_t))
+    return matrix_add(
+        matrix_add(matrix_scale(mu, dF), matrix_scale(lmbda * trace_F_inv_dF, F_inv_t)),
+        matrix_scale(pressure, dF_inv_t),
+    )
+
+
+def reference_gradients_at_q(quadrature_rule, q):
+    dim = quadrature_rule.dim
+    n_shape = quadrature_rule.n_shape
+    return tuple(
+        tuple(
+            quadrature_rule.reference_gradients[(q * n_shape + shape) * dim + component]
+            for component in range(dim)
+        )
+        for shape in range(n_shape)
+    )
+
+
+def physical_jacobian(coords, grad_ref):
+    dim = len(coords[0])
+    return tuple(
+        tuple(
+            sum(coords[shape][row] * grad_ref[shape][col] for shape in range(len(coords)))
+            for col in range(dim)
+        )
+        for row in range(dim)
+    )
+
+
+def displacement_reference_gradient(values, grad_ref):
+    dim = len(values[0])
+    return tuple(
+        tuple(
+            sum(values[shape][row] * grad_ref[shape][col] for shape in range(len(values)))
+            for col in range(dim)
+        )
+        for row in range(dim)
+    )
+
+
+def identity_plus(A):
+    dim = len(A)
+    return tuple(
+        tuple((1.0 if row == col else 0.0) + A[row][col] for col in range(dim))
+        for row in range(dim)
+    )
+
+
+def reference_neohookean_gradient(quadrature_rule, coords, displacement, mu, lmbda):
+    dim = quadrature_rule.dim
+    n_shape = quadrature_rule.n_shape
+    result = [[0.0 for _ in range(dim)] for _ in range(n_shape)]
+    for q, qw in enumerate(quadrature_rule.weights):
+        grad_ref = reference_gradients_at_q(quadrature_rule, q)
+        J = physical_jacobian(coords, grad_ref)
+        det_J = matrix_determinant(J)
+        adjugate = matrix_scale(det_J, matrix_inverse(J))
+        grad_u_ref = displacement_reference_gradient(displacement, grad_ref)
+        grad_u = matrix_multiply(grad_u_ref, matrix_scale(1.0 / det_J, adjugate))
+        P = neohookean_first_piola(identity_plus(grad_u), mu, lmbda)
+        loperand = matrix_scale(qw, matrix_multiply(P, matrix_transpose(adjugate)))
+        for shape in range(n_shape):
+            for row in range(dim):
+                result[shape][row] += sum(
+                    loperand[row][col] * grad_ref[shape][col] for col in range(dim)
+                )
+    return tuple(tuple(row) for row in result)
+
+
+def reference_neohookean_apply(quadrature_rule, coords, displacement, direction, mu, lmbda):
+    dim = quadrature_rule.dim
+    n_shape = quadrature_rule.n_shape
+    result = [[0.0 for _ in range(dim)] for _ in range(n_shape)]
+    for q, qw in enumerate(quadrature_rule.weights):
+        grad_ref = reference_gradients_at_q(quadrature_rule, q)
+        J = physical_jacobian(coords, grad_ref)
+        det_J = matrix_determinant(J)
+        adjugate = matrix_scale(det_J, matrix_inverse(J))
+        transform = matrix_scale(1.0 / det_J, adjugate)
+        grad_u = matrix_multiply(displacement_reference_gradient(displacement, grad_ref), transform)
+        trial_grad = matrix_multiply(displacement_reference_gradient(direction, grad_ref), transform)
+        dP = neohookean_linearized_first_piola(identity_plus(grad_u), trial_grad, mu, lmbda)
+        loperand = matrix_scale(qw, matrix_multiply(dP, matrix_transpose(adjugate)))
+        for shape in range(n_shape):
+            for row in range(dim):
+                result[shape][row] += sum(
+                    loperand[row][col] * grad_ref[shape][col] for col in range(dim)
+                )
+    return tuple(tuple(row) for row in result)
+
+
+def element_geometry_stream_values(quadrature_rule, coords):
+    dim = quadrature_rule.dim
+    adjugate_streams = [[] for _ in range(dim * dim)]
+    determinant_stream = []
+    for q in range(quadrature_rule.n_qp):
+        grad_ref = reference_gradients_at_q(quadrature_rule, q)
+        J = physical_jacobian(coords, grad_ref)
+        det_J = matrix_determinant(J)
+        adjugate = matrix_scale(det_J, matrix_inverse(J))
+        determinant_stream.append(det_J)
+        for row in range(dim):
+            for col in range(dim):
+                adjugate_streams[row * dim + col].append(adjugate[row][col])
+    return adjugate_streams + [determinant_stream]
+
+
+def field_stream_values(values):
+    dim = len(values[0])
+    return [[values[shape][component]] for shape in range(len(values)) for component in range(dim)]
+
+
+def read_field_stream_values(streams, dim, n_shape):
+    return tuple(
+        tuple(streams[shape * dim + component][0] for component in range(dim))
+        for shape in range(n_shape)
+    )
+
+
+def affine_coords(reference_coords, A, b):
+    dim = len(reference_coords[0])
+    return tuple(
+        tuple(b[row] + sum(A[row][col] * coord[col] for col in range(dim)) for row in range(dim))
+        for coord in reference_coords
+    )
+
+
+def shear_displacement(coords):
+    dim = len(coords[0])
+    values = []
+    for coord in coords:
+        if dim == 2:
+            values.append((0.17 * coord[1], -0.05 * coord[0]))
+        else:
+            values.append((0.17 * coord[1] + 0.03 * coord[2], -0.04 * coord[0], 0.02 * coord[1]))
+    return tuple(values)
+
+
+def max_abs_difference(left, right):
+    return max(
+        abs(left[shape][component] - right[shape][component])
+        for shape in range(len(left))
+        for component in range(len(left[0]))
+    )
+
+
+def max_abs_value(values):
+    return max(
+        abs(values[shape][component])
+        for shape in range(len(values))
+        for component in range(len(values[0]))
+    )
+
+
+def c_double_array(values):
+    return (ctypes.c_double * len(values))(*values)
+
+
+def reference_element_coords(element_type):
+    if element_type == "TRI3":
+        return ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    if element_type == "TET4":
+        return (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+        )
+    if element_type == "HEX8":
+        return (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (1.0, 1.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+            (1.0, 0.0, 1.0),
+            (1.0, 1.0, 1.0),
+            (0.0, 1.0, 1.0),
+        )
+    raise ValueError("unsupported element type")
+
+
+def deformed_element_coords(element_type):
+    coords = reference_element_coords(element_type)
+    dim = len(coords[0])
+    if dim == 2:
+        return affine_coords(coords, ((1.23, 0.19), (0.11, 0.94)), (0.07, -0.03))
+    return affine_coords(
+        coords,
+        (
+            (1.21, 0.13, 0.08),
+            (0.07, 0.97, 0.14),
+            (0.04, 0.09, 1.16),
+        ),
+        (0.05, -0.02, 0.04),
+    )
+
+
+def generated_neohookean_weak_form_files(element_type, prefix, vector_size=8):
+    specialization = sfem_soa_element_specialization(element_type, vector_size=vector_size)
+    dim = specialization.dim
+    F = sp.Matrix(
+        dim,
+        dim,
+        tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
+    )
+    weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
+    return specialization, generate_sfem_soa_cpp_files_for_element(
+        (
+            sfem_soa_kernel_form(
+                "gradient",
+                weak_form=weak_form,
+                output_mode="accumulate",
+            ),
+            sfem_soa_kernel_form(
+                "apply",
+                weak_form=weak_form,
+                has_direction=True,
+                output_mode="accumulate",
+            ),
+        ),
+        prefix=prefix,
+        specialization=specialization,
+    )
+
+
+def compile_generated_shared_library(compiler, tmpdir, generated_files, operator_filename, library_name):
+    for generated in generated_files:
+        with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
+            output.write(generated.source)
+
+    library_path = os.path.join(tmpdir, library_name)
+    source_path = os.path.join(tmpdir, operator_filename)
+    if sys.platform == "darwin":
+        command = [
+            compiler,
+            "-std=c++11",
+            "-O3",
+            "-fPIC",
+            "-dynamiclib",
+            source_path,
+            "-o",
+            library_path,
+        ]
+    else:
+        command = [
+            compiler,
+            "-std=c++11",
+            "-O3",
+            "-fPIC",
+            "-shared",
+            source_path,
+            "-o",
+            library_path,
+        ]
+    subprocess.run(
+        command,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return ctypes.CDLL(library_path)
+
+
+def call_generated_neohookean_kernel(
+    library,
+    prefix,
+    element_type,
+    form_name,
+    quadrature_rule,
+    coords,
+    displacement,
+    direction,
+    mu,
+    lmbda,
+):
+    dim = quadrature_rule.dim
+    n_shape = quadrature_rule.n_shape
+    pointer_type = ctypes.POINTER(ctypes.c_double)
+    geometry = [c_double_array(stream) for stream in element_geometry_stream_values(quadrature_rule, coords)]
+    u_streams = [c_double_array(stream) for stream in field_stream_values(displacement)]
+    h_streams = [c_double_array(stream) for stream in field_stream_values(direction)] if direction is not None else []
+    outputs = [c_double_array((0.0,)) for _ in range(n_shape * dim)]
+    function = getattr(library, "%s_%s_%s_soa" % (prefix, element_type.lower(), form_name))
+    function.restype = ctypes.c_int
+    pointer_count = len(geometry) + len(u_streams) + len(h_streams) + len(outputs)
+    function.argtypes = (
+        [ctypes.c_ssize_t]
+        + [pointer_type] * len(geometry)
+        + [ctypes.c_double, ctypes.c_double]
+        + [pointer_type] * (pointer_count - len(geometry))
+    )
+    status = function(
+        ctypes.c_ssize_t(1),
+        *geometry,
+        ctypes.c_double(mu),
+        ctypes.c_double(lmbda),
+        *u_streams,
+        *h_streams,
+        *outputs,
+    )
+    if status != 0:
+        raise RuntimeError("generated kernel returned status %d" % status)
+    return read_field_stream_values(outputs, dim, n_shape)
 
 
 def compiler_vectorization_flags(compiler):
@@ -583,6 +978,101 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 text=True,
             )
+
+    def test_generated_neohookean_action_matches_python_reference(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        mu = 1.7
+        lmbda = 2.3
+        for element_type in ("TRI3", "TET4", "HEX8"):
+            with self.subTest(element_type=element_type):
+                prefix = "generated_%s_neohookean_action" % element_type.lower()
+                specialization, generated_files = generated_neohookean_weak_form_files(
+                    element_type,
+                    prefix,
+                    vector_size=8,
+                )
+                quadrature_rule = specialization.quadrature_rule
+                with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+                    library = compile_generated_shared_library(
+                        compiler,
+                        tmpdir,
+                        generated_files,
+                        "%s_operator.cpp" % prefix,
+                        "lib%s.%s"
+                        % (
+                            prefix,
+                            "dylib" if sys.platform == "darwin" else "so",
+                        ),
+                    )
+                    for geometry_name, coords in (
+                        ("reference", reference_element_coords(element_type)),
+                        ("deformed", deformed_element_coords(element_type)),
+                    ):
+                        dim = quadrature_rule.dim
+                        zero = tuple((0.0,) * dim for _ in range(quadrature_rule.n_shape))
+                        shear = shear_displacement(coords)
+                        for displacement_name, displacement in (
+                            ("zero", zero),
+                            ("shear", shear),
+                        ):
+                            with self.subTest(
+                                element_type=element_type,
+                                geometry=geometry_name,
+                                displacement=displacement_name,
+                            ):
+                                expected_gradient = reference_neohookean_gradient(
+                                    quadrature_rule,
+                                    coords,
+                                    displacement,
+                                    mu,
+                                    lmbda,
+                                )
+                                actual_gradient = call_generated_neohookean_kernel(
+                                    library,
+                                    prefix,
+                                    element_type,
+                                    "gradient",
+                                    quadrature_rule,
+                                    coords,
+                                    displacement,
+                                    None,
+                                    mu,
+                                    lmbda,
+                                )
+                                gradient_scale = max(1.0, max_abs_value(expected_gradient))
+                                self.assertLessEqual(
+                                    max_abs_difference(actual_gradient, expected_gradient),
+                                    1.0e-10 * gradient_scale,
+                                )
+
+                                expected_apply = reference_neohookean_apply(
+                                    quadrature_rule,
+                                    coords,
+                                    displacement,
+                                    shear,
+                                    mu,
+                                    lmbda,
+                                )
+                                actual_apply = call_generated_neohookean_kernel(
+                                    library,
+                                    prefix,
+                                    element_type,
+                                    "apply",
+                                    quadrature_rule,
+                                    coords,
+                                    displacement,
+                                    shear,
+                                    mu,
+                                    lmbda,
+                                )
+                                apply_scale = max(1.0, max_abs_value(expected_apply))
+                                self.assertLessEqual(
+                                    max_abs_difference(actual_apply, expected_apply),
+                                    1.0e-10 * apply_scale,
+                                )
 
     def test_passes_neohookean_ogden_strain_energy_to_framework(self):
         mu, lmbda = sp.symbols("mu lambda")
