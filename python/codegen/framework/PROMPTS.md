@@ -20,7 +20,10 @@ pow(x, y) substituion with sepcialized inline function pow_y(x) (e.g., `pow_2(x)
 The code now assumes that the elements are affine (as there is one jacobian per element), this is good and we should keep it. At the same time we should support iso-parametric elements where we pass the x,y,z coordinates and evaluate geometric jacobian related quantities per quadrature point. This should not affect local functions, as these quantities can be precomputed outside.
 
 
+The deformation gradient does not have to be a forced intermediate evaluation, let sympy figure it out
 
+
+scalar_t should be a template parameter of the local kernels, accumulator_t is not necessary just use scalar_t there as well
 
 
 The mesh level loops should reflect the API used in SFEM where we can pass the coefficient vectors and have gather/scatter phases around the assembly. 
