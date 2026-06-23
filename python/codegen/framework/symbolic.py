@@ -2067,6 +2067,8 @@ def _sfem_soa_local_header(
         "#ifndef SFEM_GENERATED_SCALAR_T",
         "#define SFEM_GENERATED_SCALAR_T",
         "typedef double real_t;",
+        "typedef ptrdiff_t idx_t;",
+        "typedef double geom_t;",
         "#endif",
         "",
     ]
@@ -2871,6 +2873,39 @@ def _sfem_soa_operator_source(
                     isoparametric_geometry=True,
                 )
             )
+        if quadrature_rule is not None and _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
+            lines.append("")
+            lines.extend(
+                _sfem_soa_mesh_operator_function(
+                    form,
+                    prefix,
+                    dim,
+                    n_nodes,
+                    n_qp,
+                    vector_size,
+                    local_prefix,
+                    array_inputs,
+                    quadrature_rule,
+                    use_shared_weak_local,
+                    geometry_mode="affine",
+                )
+            )
+            lines.append("")
+            lines.extend(
+                _sfem_soa_mesh_operator_function(
+                    form,
+                    prefix,
+                    dim,
+                    n_nodes,
+                    n_qp,
+                    vector_size,
+                    local_prefix,
+                    array_inputs,
+                    quadrature_rule,
+                    use_shared_weak_local,
+                    geometry_mode="isoparametric",
+                )
+            )
         lines.append("")
 
     return "\n".join(lines)
@@ -3192,6 +3227,365 @@ def _sfem_soa_operator_function(
             reference_inputs,
             use_reference_gradient_vectors,
         )
+    lines.extend(
+        [
+            ") {",
+            "    return sfem::codegen::%s<real_t, %d, %d, %d>(%s);"
+            % (
+                implementation_name,
+                n_qp,
+                n_nodes,
+                vector_size,
+                ", ".join(wrapper_args),
+            ),
+            "}",
+        ]
+    )
+    return lines
+
+
+def _sfem_soa_mesh_operator_function(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    local_prefix,
+    array_inputs,
+    quadrature_rule,
+    use_shared_weak_local=False,
+    geometry_mode="affine",
+):
+    if geometry_mode not in ("affine", "isoparametric"):
+        raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
+    if quadrature_rule is None:
+        raise ValueError("mesh SoA wrappers require an element quadrature rule")
+
+    function_name = _sfem_soa_mesh_public_function_name(
+        prefix,
+        form.name,
+        quadrature_rule,
+        geometry_mode,
+    )
+    implementation_name = "%s_impl" % function_name
+    block_name = "%s_%s_block" % (local_prefix, form.name)
+    element_inputs = _sfem_soa_element_inputs(array_inputs)
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    use_tensor_product_reference = (
+        quadrature_rule.is_tensor_product
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    use_reference_gradient_vectors = (
+        form.weak_form is not None
+        and not use_tensor_product_reference
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+
+    base_params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+    ]
+    if geometry_mode == "affine":
+        base_params.extend(
+            (
+                "const real_t *const SFEM_RESTRICT g_jacobian_adjugate",
+                "const real_t *const SFEM_RESTRICT g_jacobian_determinant",
+            )
+        )
+    else:
+        base_params.append("geom_t **const SFEM_RESTRICT points")
+
+    material_params = ("const scalar_t mu", "const scalar_t lmbda")
+    field_params = ["const ptrdiff_t u_stride"]
+    field_params.extend(
+        "const real_t *const SFEM_RESTRICT u%s" % _component_name(d)
+        for d in range(dim)
+    )
+    if form.has_direction:
+        field_params.append("const ptrdiff_t h_stride")
+        field_params.extend(
+            "const real_t *const SFEM_RESTRICT h%s" % _component_name(d)
+            for d in range(dim)
+        )
+    if form.name == "objective":
+        output_params = ("real_t *const SFEM_RESTRICT value",)
+    else:
+        output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
+            "real_t *const SFEM_RESTRICT out%s" % _component_name(d)
+            for d in range(dim)
+        )
+
+    impl_params = (
+        tuple(base_params)
+        + tuple(material_params)
+        + tuple(field_params)
+        + tuple(output_params)
+    )
+    wrapper_params = _sfem_soa_public_wrapper_params(
+        tuple(base_params) + tuple(material_params) + tuple(field_params) + tuple(output_params)
+    )
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "static SFEM_INLINE int %s(" % implementation_name,
+    ]
+    for idx, param in enumerate(impl_params):
+        comma = "," if idx + 1 < len(impl_params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    static_assert(N_QP == %d, \"N_QP does not match generated mesh wrapper\");" % n_qp,
+            "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated mesh wrapper\");" % n_nodes,
+            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
+            "    (void)nnodes;",
+        ]
+    )
+    if geometry_mode == "isoparametric":
+        for d in range(dim):
+            lines.append(
+                "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
+                % (_component_name(d), d)
+            )
+    lines.extend(
+        _sfem_soa_mesh_reference_alias_lines(
+            prefix,
+            quadrature_rule,
+            reference_inputs,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+        )
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            [
+                "    static constexpr int N_QP_1D = %d;"
+                % quadrature_rule.tensor_product_n_qp_1d,
+                "    static constexpr int N_SHAPE_1D = %d;"
+                % quadrature_rule.tensor_product_n_shape_1d,
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
+        ]
+    )
+
+    if geometry_mode == "isoparametric":
+        for stream in _coordinate_stream_names(dim, n_nodes):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    for array_input in element_inputs:
+        for stream in _soa_array_stream_names(array_input):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    for stream in _field_stream_names("u", dim, n_nodes):
+        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    if form.has_direction:
+        for stream in _field_stream_names("h", dim, n_nodes):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    for stream in _output_stream_names(form, dim, n_nodes):
+        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+
+    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    for shape in range(n_nodes):
+        lines.append(
+            "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            % (shape, shape)
+        )
+    lines.append("        }")
+
+    if geometry_mode == "affine":
+        lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        for i, stream in enumerate(_soa_array_stream_names(sfem_soa_array_input("jacobian_adjugate", dim * dim))):
+            lines.append(
+                "            block_%s[lane] = g_jacobian_adjugate[(evbegin + lane) * %d + %d];"
+                % (stream, dim * dim, i)
+            )
+        lines.append("            block_jacobian_determinant0[lane] = g_jacobian_determinant[evbegin + lane];")
+        lines.append("        }")
+
+    if geometry_mode == "isoparametric":
+        lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        for shape in range(n_nodes):
+            for d in range(dim):
+                stream = "%s%d" % (_component_name(d), shape)
+                lines.append(
+                    "            block_%s[lane] = %s[ev[lane * N_SHAPE + %d]];"
+                    % (stream, _component_name(d), shape)
+                )
+        lines.append("        }")
+
+    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    for shape in range(n_nodes):
+        for d in range(dim):
+            component = _component_name(d)
+            lines.append(
+                "            block_u%s%d[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride];"
+                % (component, shape, component, shape)
+            )
+            if form.has_direction:
+                lines.append(
+                    "            block_h%s%d[lane] = h%s[ev[lane * N_SHAPE + %d] * h_stride];"
+                    % (component, shape, component, shape)
+                )
+    for stream in _output_stream_names(form, dim, n_nodes):
+        lines.append("            block_%s[lane] = 0;" % stream)
+    lines.append("        }")
+
+    if use_stream_arrays:
+        lines.append("")
+        lines.append(
+            "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
+            % (
+                dim,
+                ", ".join(
+                    "block_%s" % stream
+                    for stream in _field_stream_names("u", dim, n_nodes)
+                ),
+            )
+        )
+        if form.has_direction:
+            lines.append(
+                "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(
+                        "block_%s" % stream
+                        for stream in _field_stream_names("h", dim, n_nodes)
+                    ),
+                )
+            )
+        if form.name != "objective":
+            lines.append(
+                "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(
+                        "block_%s" % stream
+                        for stream in _output_stream_names(form, dim, n_nodes)
+                    ),
+                )
+            )
+
+    if geometry_mode == "isoparametric":
+        lines.append("")
+        lines.append(
+            "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
+            % (
+                dim,
+                ", ".join(
+                    "block_%s" % stream
+                    for stream in _coordinate_stream_names(dim, n_nodes)
+                ),
+            )
+        )
+
+    lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+    if use_tensor_product_reference:
+        lines.extend(_tensor_product_q_index_lines(dim, "            "))
+        lines.append(
+            "            const scalar_t tensor_q_weight = %s;"
+            % _tensor_product_quadrature_weight_expr(dim)
+        )
+    if geometry_mode == "isoparametric":
+        lines.extend(
+            _sfem_soa_isoparametric_geometry_lines(
+                dim,
+                n_nodes,
+                quadrature_rule,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_inputs,
+            )
+        )
+
+    call_args = ["nelems", "q"]
+    call_args.extend(
+        "block_%s" % stream
+        for array_input in element_inputs
+        for stream in _soa_array_stream_names(array_input)
+    )
+    if use_tensor_product_reference:
+        call_args.extend(("shape_1d", "grad_1d"))
+    elif use_reference_gradient_vectors:
+        call_args.extend(_sfem_reference_gradient_vector_name(component) for component in range(dim))
+    else:
+        call_args.extend(array_input.name for array_input in reference_inputs)
+    if use_tensor_product_reference:
+        call_args.extend(("tensor_q_weight", "mu", "lmbda"))
+    else:
+        call_args.extend(("q_weight[q]", "mu", "lmbda"))
+    if use_stream_arrays:
+        call_args.append("block_u_streams")
+        if form.has_direction:
+            call_args.append("block_h_streams")
+        if form.name == "objective":
+            call_args.append("block_value")
+        else:
+            call_args.append("block_out_streams")
+    else:
+        call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
+        if form.has_direction:
+            call_args.extend("block_%s" % stream for stream in _field_stream_names("h", dim, n_nodes))
+        call_args.extend("block_%s" % stream for stream in _output_stream_names(form, dim, n_nodes))
+    lines.extend(
+        [
+            "",
+            "            %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_name, ", ".join(call_args)),
+            "        }",
+            "",
+        ]
+    )
+
+    if form.name == "objective":
+        lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        lines.append("            value[evbegin + lane] += block_value[lane];")
+        lines.append("        }")
+    else:
+        lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+        for shape in range(n_nodes):
+            for d in range(dim):
+                component = _component_name(d)
+                lines.extend(
+                    [
+                        "#pragma omp atomic update",
+                        "            out%s[ev[lane * N_SHAPE + %d] * out_stride] += block_out%s%d[lane];"
+                        % (component, shape, component, shape),
+                        "",
+                    ]
+                )
+        lines.append("        }")
+
+    lines.extend(
+        [
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+
+    wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    lines.append('extern "C" int %s(' % function_name)
+    for idx, param in enumerate(wrapper_params):
+        comma = "," if idx + 1 < len(wrapper_params) else ""
+        lines.append("        %s%s" % (param, comma))
     lines.extend(
         [
             ") {",
@@ -3635,6 +4029,65 @@ def _sfem_soa_public_wrapper_params(params):
     return tuple(param.replace("scalar_t", "real_t") for param in params)
 
 
+def _sfem_soa_mesh_reference_alias_lines(
+    prefix,
+    quadrature_rule,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+):
+    lines = []
+    if use_tensor_product_reference:
+        for name in ("shape_1d", "grad_1d", "q_weight_1d"):
+            lines.append(
+                "    const scalar_t *const SFEM_RESTRICT %s = %s;"
+                % (
+                    name,
+                    _sfem_codegen_qualified_name(
+                        _sfem_soa_quadrature_array_name(prefix, quadrature_rule, name)
+                    ),
+                )
+            )
+        return lines
+    if use_reference_gradient_vectors:
+        for component in range(quadrature_rule.dim):
+            name = _sfem_reference_gradient_vector_name(component)
+            lines.append(
+                "    const scalar_t *const SFEM_RESTRICT %s = %s;"
+                % (
+                    name,
+                    _sfem_codegen_qualified_name(
+                        _sfem_soa_quadrature_array_name(prefix, quadrature_rule, name)
+                    ),
+                )
+            )
+        lines.append(
+            "    const scalar_t *const SFEM_RESTRICT q_weight = %s;"
+            % _sfem_codegen_qualified_name(
+                _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
+            )
+        )
+        return lines
+    for array_input in reference_inputs:
+        lines.append(
+            "    const %s *const SFEM_RESTRICT %s = %s;"
+            % (
+                array_input.scalar_type,
+                array_input.name,
+                _sfem_codegen_qualified_name(
+                    _sfem_soa_quadrature_array_name(prefix, quadrature_rule, array_input.name)
+                ),
+            )
+        )
+    lines.append(
+        "    const scalar_t *const SFEM_RESTRICT q_weight = %s;"
+        % _sfem_codegen_qualified_name(
+            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
+        )
+    )
+    return lines
+
+
 def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
     if quadrature_rule is None:
         return "%s_%s_soa" % (prefix, form_name)
@@ -3652,6 +4105,17 @@ def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_r
         prefix,
         quadrature_rule.element_type.lower(),
         form_name,
+    )
+
+
+def _sfem_soa_mesh_public_function_name(prefix, form_name, quadrature_rule, geometry_mode):
+    if quadrature_rule is None:
+        return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
+    return "%s_%s_%s_%s_mesh_soa" % (
+        prefix,
+        quadrature_rule.element_type.lower(),
+        form_name,
+        geometry_mode,
     )
 
 
