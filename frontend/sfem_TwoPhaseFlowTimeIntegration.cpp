@@ -1,5 +1,7 @@
 #include "sfem_TwoPhaseFlowTimeIntegration.hpp"
 
+#include "sfem_DirichletConditions.hpp"
+#include "sfem_FunctionSpace.hpp"
 #include "sfem_base.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
@@ -9,78 +11,52 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <limits>
 
 namespace sfem {
     class TwoPhaseFlowTimeIntegration::Impl {
     public:
         Impl(const std::shared_ptr<smesh::Mesh> &mesh,
-             const TwoPhaseFlowTimeConfig &config)
-            : mesh(mesh), config(config) {}
+             const std::shared_ptr<Buffer<real_t>> &initial_state,
+             const std::shared_ptr<DirichletConditions> &dirichlet,
+             BoundaryUpdate boundary_update)
+            : mesh(mesh),
+              initial_state(initial_state),
+              dirichlet(dirichlet),
+              boundary_update(std::move(boundary_update)) {}
 
         std::shared_ptr<smesh::Mesh> mesh;
-        TwoPhaseFlowTimeConfig config;
+        std::shared_ptr<Buffer<real_t>> initial_state;
         std::shared_ptr<Buffer<real_t>> accepted;
         std::shared_ptr<Buffer<real_t>> trial;
-        std::shared_ptr<Buffer<idx_t>> left_nodes;
-        std::shared_ptr<Buffer<idx_t>> right_nodes;
+        std::shared_ptr<DirichletConditions> dirichlet;
+        BoundaryUpdate boundary_update;
         real_t time{0};
         ptrdiff_t step{0};
-
-        int find_boundary_nodes() {
-            const ptrdiff_t nnodes = mesh->n_nodes();
-            const smesh::geom_t *const x = mesh->points()->data()[0];
-            smesh::geom_t xmin = std::numeric_limits<smesh::geom_t>::max();
-            smesh::geom_t xmax = std::numeric_limits<smesh::geom_t>::lowest();
-            for (ptrdiff_t node = 0; node < nnodes; ++node) {
-                xmin = std::min(xmin, x[node]);
-                xmax = std::max(xmax, x[node]);
-            }
-            const smesh::geom_t tolerance =
-                    std::max<smesh::geom_t>(1, std::abs(xmax - xmin)) *
-                    64 * std::numeric_limits<smesh::geom_t>::epsilon();
-            ptrdiff_t nleft = 0;
-            ptrdiff_t nright = 0;
-            for (ptrdiff_t node = 0; node < nnodes; ++node) {
-                nleft += std::abs(x[node] - xmin) <= tolerance;
-                nright += std::abs(x[node] - xmax) <= tolerance;
-            }
-            left_nodes = create_host_buffer<idx_t>(nleft);
-            right_nodes = create_host_buffer<idx_t>(nright);
-            nleft = 0;
-            nright = 0;
-            for (ptrdiff_t node = 0; node < nnodes; ++node) {
-                if (std::abs(x[node] - xmin) <= tolerance) {
-                    left_nodes->data()[nleft++] = node;
-                }
-                if (std::abs(x[node] - xmax) <= tolerance) {
-                    right_nodes->data()[nright++] = node;
-                }
-            }
-            return SFEM_SUCCESS;
-        }
     };
 
     TwoPhaseFlowTimeIntegration::TwoPhaseFlowTimeIntegration(
             const std::shared_ptr<smesh::Mesh> &mesh,
-            const TwoPhaseFlowTimeConfig &config)
-        : impl_(std::make_unique<Impl>(mesh, config)) {}
+            const std::shared_ptr<Buffer<real_t>> &initial_state,
+            const std::shared_ptr<DirichletConditions> &dirichlet,
+            BoundaryUpdate boundary_update)
+        : impl_(std::make_unique<Impl>(
+                  mesh, initial_state, dirichlet, std::move(boundary_update))) {}
 
     TwoPhaseFlowTimeIntegration::~TwoPhaseFlowTimeIntegration() = default;
 
     int TwoPhaseFlowTimeIntegration::initialize() {
         const ptrdiff_t ndofs = 2 * impl_->mesh->n_nodes();
+        if (!impl_->initial_state || impl_->initial_state->size() != ndofs ||
+            !impl_->dirichlet) {
+            return SFEM_FAILURE;
+        }
         impl_->accepted = create_host_buffer<real_t>(ndofs);
         impl_->trial = create_host_buffer<real_t>(ndofs);
-        for (ptrdiff_t node = 0; node < impl_->mesh->n_nodes(); ++node) {
-            impl_->accepted->data()[2 * node + 0] =
-                    impl_->config.initial_water_pressure;
-            impl_->accepted->data()[2 * node + 1] =
-                    impl_->config.initial_co2_pressure;
-        }
+        std::copy(impl_->initial_state->data(),
+                  impl_->initial_state->data() + ndofs,
+                  impl_->accepted->data());
         impl_->time = 0;
         impl_->step = 0;
-        impl_->find_boundary_nodes();
         apply_boundary(0, impl_->accepted->data());
         std::copy(impl_->accepted->data(),
                   impl_->accepted->data() + ndofs,
@@ -91,83 +67,27 @@ namespace sfem {
     void TwoPhaseFlowTimeIntegration::apply_boundary(
             const real_t time,
             real_t *const state) const {
-        const real_t ramp =
-                impl_->config.ramp_duration > 0
-                        ? std::min<real_t>(1, std::max<real_t>(0, time / impl_->config.ramp_duration))
-                        : 1;
-        const real_t left_co2 =
-                impl_->config.initial_co2_pressure +
-                ramp * (impl_->config.injection_co2_pressure -
-                        impl_->config.initial_co2_pressure);
-        for (size_t i = 0; i < impl_->left_nodes->size(); ++i) {
-            const idx_t node = impl_->left_nodes->data()[i];
-            state[2 * node + 0] = impl_->config.initial_water_pressure;
-            state[2 * node + 1] = left_co2;
+        if (impl_->boundary_update) {
+            impl_->boundary_update(time, *impl_->dirichlet);
         }
-        for (size_t i = 0; i < impl_->right_nodes->size(); ++i) {
-            const idx_t node = impl_->right_nodes->data()[i];
-            state[2 * node + 0] = impl_->config.initial_water_pressure;
-            state[2 * node + 1] = impl_->config.initial_co2_pressure;
-        }
+        impl_->dirichlet->apply(state);
     }
 
     void TwoPhaseFlowTimeIntegration::constrain_residual(
+            const real_t *const state,
             real_t *const residual) const {
-        for (size_t i = 0; i < impl_->left_nodes->size(); ++i) {
-            const idx_t node = impl_->left_nodes->data()[i];
-            residual[2 * node + 0] = 0;
-            residual[2 * node + 1] = 0;
-        }
-        for (size_t i = 0; i < impl_->right_nodes->size(); ++i) {
-            const idx_t node = impl_->right_nodes->data()[i];
-            residual[2 * node + 0] = 0;
-            residual[2 * node + 1] = 0;
-        }
+        impl_->dirichlet->gradient(state, residual);
     }
 
     void TwoPhaseFlowTimeIntegration::constrain_direction(
             real_t *const direction) const {
-        constrain_residual(direction);
+        impl_->dirichlet->apply_value(0, direction);
     }
 
     void TwoPhaseFlowTimeIntegration::constrain_linear(
             const real_t *const direction,
             real_t *const output) const {
-        for (size_t i = 0; i < impl_->left_nodes->size(); ++i) {
-            const idx_t node = impl_->left_nodes->data()[i];
-            output[2 * node + 0] = direction[2 * node + 0];
-            output[2 * node + 1] = direction[2 * node + 1];
-        }
-        for (size_t i = 0; i < impl_->right_nodes->size(); ++i) {
-            const idx_t node = impl_->right_nodes->data()[i];
-            output[2 * node + 0] = direction[2 * node + 0];
-            output[2 * node + 1] = direction[2 * node + 1];
-        }
-    }
-
-    TwoPhaseFlowBalance TwoPhaseFlowTimeIntegration::balance(
-            const real_t *const residual) const {
-        TwoPhaseFlowBalance result;
-        const ptrdiff_t nnodes = impl_->mesh->n_nodes();
-        for (ptrdiff_t node = 0; node < nnodes; ++node) {
-            result.total[0] += residual[2 * node + 0];
-            result.total[1] += residual[2 * node + 1];
-        }
-        for (size_t i = 0; i < impl_->left_nodes->size(); ++i) {
-            const idx_t node = impl_->left_nodes->data()[i];
-            result.left[0] += residual[2 * node + 0];
-            result.left[1] += residual[2 * node + 1];
-        }
-        for (size_t i = 0; i < impl_->right_nodes->size(); ++i) {
-            const idx_t node = impl_->right_nodes->data()[i];
-            result.right[0] += residual[2 * node + 0];
-            result.right[1] += residual[2 * node + 1];
-        }
-        result.interior[0] =
-                result.total[0] - result.left[0] - result.right[0];
-        result.interior[1] =
-                result.total[1] - result.left[1] - result.right[1];
-        return result;
+        impl_->dirichlet->copy_constrained_dofs(direction, output);
     }
 
     int TwoPhaseFlowTimeIntegration::advance(
@@ -229,7 +149,6 @@ namespace sfem {
         impl_->accepted = state;
         impl_->trial = create_host_buffer<real_t>(state->size());
         std::copy(state->data(), state->data() + state->size(), impl_->trial->data());
-        impl_->find_boundary_nodes();
         apply_boundary(impl_->time, impl_->accepted->data());
         return SFEM_SUCCESS;
     }
