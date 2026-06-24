@@ -76,6 +76,24 @@ from .constitutive import (
     TwoPhaseFlowConstitutiveState,
     TwoPhaseFlowParameters,
 )
+from .twophaseflow import (
+    TwoPhaseFlowImplicitEulerModel,
+    TwoPhaseFlowImplicitEulerState,
+    TwoPhaseFlowJacobianAction,
+)
+from .residual import (
+    CoupledResidualKernels,
+    CoupledResidualSystem,
+    ResidualField,
+    ResidualJacobianBlock,
+    coupled_residual_system,
+)
+from .residual_codegen import (
+    WeakResidualCoefficients,
+    coupled_residual_weak_coefficients,
+    generate_coupled_residual_sfem_files,
+    weak_residual_coefficients,
+)
 
 __all__ = [
     "DeformationGradient",
@@ -152,4 +170,16 @@ __all__ = [
     "TwoPhaseFlowConstitutiveModel",
     "TwoPhaseFlowConstitutiveState",
     "TwoPhaseFlowParameters",
+    "TwoPhaseFlowImplicitEulerModel",
+    "TwoPhaseFlowImplicitEulerState",
+    "TwoPhaseFlowJacobianAction",
+    "CoupledResidualKernels",
+    "CoupledResidualSystem",
+    "ResidualField",
+    "ResidualJacobianBlock",
+    "coupled_residual_system",
+    "WeakResidualCoefficients",
+    "coupled_residual_weak_coefficients",
+    "generate_coupled_residual_sfem_files",
+    "weak_residual_coefficients",
 ]

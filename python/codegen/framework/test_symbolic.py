@@ -125,6 +125,18 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(graph.cost.trigs, 4)
         self.assertGreaterEqual(graph.cost.flops, 20 + 4 * 24)
 
+    def test_expression_cost_counts_exponential_separately(self):
+        x = sp.symbols("x")
+        graph = (
+            KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, sp.exp(x))
+            .build_graph(data_symbols=(x,))
+        )
+
+        self.assertEqual(graph.cost.exps, 1)
+        self.assertEqual(graph.cost.pows, 0)
+        self.assertEqual(graph.cost.flops, 20)
+
     def test_generated_cpp_uses_specialized_pow_helpers_for_integer_exponents(self):
         x, y = sp.symbols("x y")
         graph = (

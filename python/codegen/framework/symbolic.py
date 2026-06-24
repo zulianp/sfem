@@ -1504,6 +1504,7 @@ class ExpressionCost:
     divs: int = 0
     sqrts: int = 0
     pows: int = 0
+    exps: int = 0
     logs: int = 0
     trigs: int = 0
     loads: int = 0
@@ -1519,6 +1520,7 @@ class ExpressionCost:
             + 8 * self.divs
             + 12 * self.sqrts
             + self.pows
+            + 20 * self.exps
             + 20 * self.logs
             + 24 * self.trigs
         )
@@ -4544,6 +4546,7 @@ def _sfem_soa_diagnostics_header():
         "    long div_instructions_per_qp_lane;",
         "    long sqrt_instructions_per_qp_lane;",
         "    long pow_instructions_per_qp_lane;",
+        "    long exp_instructions_per_qp_lane;",
         "    long log_instructions_per_qp_lane;",
         "    long trig_instructions_per_qp_lane;",
         "    long load_instructions_per_qp_lane;",
@@ -4565,6 +4568,7 @@ def _sfem_soa_diagnostics_header():
         "    double div_cpi;",
         "    double sqrt_cpi;",
         "    double pow_cpi;",
+        "    double exp_cpi;",
         "    double log_cpi;",
         "    double trig_cpi;",
         "    double load_cpi;",
@@ -4673,6 +4677,7 @@ def _sfem_soa_diagnostics_lines(
         "    %d," % cost.divs,
         "    %d," % cost.sqrts,
         "    %d," % cost.pows,
+        "    %d," % cost.exps,
         "    %d," % cost.logs,
         "    %d," % cost.trigs,
         "    %d," % cost.loads,
@@ -4694,6 +4699,7 @@ def _sfem_soa_diagnostics_lines(
         "    8.0,",
         "    12.0,",
         "    16.0,",
+        "    20.0,",
         "    20.0,",
         "    24.0,",
         "    1.0,",
@@ -5671,7 +5677,7 @@ def _build_evaluation_plan(
         lhs = _lhs(output)
         output_statements.append(
             EvaluationStatement(
-                target=lhs if lhs is not None else output_node,
+                target=lhs if lhs is not None else "output:%d" % idx,
                 expression=expr,
                 kind="output",
                 dependencies=_dependencies(expr),
@@ -5862,16 +5868,17 @@ def _match_objects(node, expression, symbolic_objects):
 
 
 def _expression_cost(intermediates, reduced_outputs, data_symbols, estimated_registers):
-    adds = muls = divs = sqrts = pows = logs = trigs = stores = 0
+    adds = muls = divs = sqrts = pows = exps = logs = trigs = stores = 0
     loaded = set()
 
     for _, expr in intermediates:
-        a, m, d, s, p, log_count, trig_count = _op_counts(expr)
+        a, m, d, s, p, exp_count, log_count, trig_count = _op_counts(expr)
         adds += a
         muls += m
         divs += d
         sqrts += s
         pows += p
+        exps += exp_count
         logs += log_count
         trigs += trig_count
         loaded.update(expr.free_symbols)
@@ -5879,12 +5886,13 @@ def _expression_cost(intermediates, reduced_outputs, data_symbols, estimated_reg
 
     for output in reduced_outputs:
         expr = _rhs(output)
-        a, m, d, s, p, log_count, trig_count = _op_counts(expr)
+        a, m, d, s, p, exp_count, log_count, trig_count = _op_counts(expr)
         adds += a
         muls += m
         divs += d
         sqrts += s
         pows += p
+        exps += exp_count
         logs += log_count
         trigs += trig_count
         loaded.update(expr.free_symbols)
@@ -5898,6 +5906,7 @@ def _expression_cost(intermediates, reduced_outputs, data_symbols, estimated_reg
         divs=divs,
         sqrts=sqrts,
         pows=pows,
+        exps=exps,
         logs=logs,
         trigs=trigs,
         loads=loads,
@@ -5908,7 +5917,7 @@ def _expression_cost(intermediates, reduced_outputs, data_symbols, estimated_reg
 
 
 def _statement_cost(expression, data_symbols, stores):
-    adds, muls, divs, sqrts, pows, logs, trigs = _op_counts(expression)
+    adds, muls, divs, sqrts, pows, exps, logs, trigs = _op_counts(expression)
     loaded = expression.free_symbols
     loads = len(loaded.intersection(data_symbols)) if data_symbols else len(loaded)
     return ExpressionCost(
@@ -5917,6 +5926,7 @@ def _statement_cost(expression, data_symbols, stores):
         divs=divs,
         sqrts=sqrts,
         pows=pows,
+        exps=exps,
         logs=logs,
         trigs=trigs,
         loads=loads,
@@ -5927,7 +5937,7 @@ def _statement_cost(expression, data_symbols, stores):
 
 
 def _op_counts(expression):
-    adds = muls = divs = sqrts = pows = logs = trigs = 0
+    adds = muls = divs = sqrts = pows = exps = logs = trigs = 0
     trig_functions = {
         sp.sin,
         sp.cos,
@@ -5958,9 +5968,11 @@ def _op_counts(expression):
         elif getattr(node, "is_Function", False):
             if node.func == sp.log:
                 logs += 1
+            elif node.func == sp.exp:
+                exps += 1
             elif node.func in trig_functions:
                 trigs += 1
             elif node.func == sp.sqrt:
                 sqrts += 1
 
-    return adds, muls, divs, sqrts, pows, logs, trigs
+    return adds, muls, divs, sqrts, pows, exps, logs, trigs
