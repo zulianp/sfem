@@ -1,3 +1,5 @@
+<!-- ENERGY BASED MATERIALS -->
+
 The mesh level kernels have unnecessary template parameters, the sizes are known. Only keep scalar_t has the template parameter, and instantiate for double and float, expose the C ABI for both
 
 
@@ -14,3 +16,8 @@ Create a script codegen_perf.py to run and extract performance metrics with llvm
 
 
 Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.hpp for one example, an call the generated kernels accordingly
+
+
+<!-- RESIDUAL BASED MATERIALS -->
+
+
