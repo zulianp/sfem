@@ -549,13 +549,20 @@ def compiler_vectorization_flags(compiler):
         text=True,
     ).stdout.lower()
     if "clang" in version:
-        return ["-O3", "-Rpass=loop-vectorize"], "clang"
+        return ["-O3", "-Rpass=loop-vectorize", "-Werror=pass-failed"], "clang"
     if "gcc" in version or "g++" in version:
         return ["-O3", "-fopt-info-vec-optimized"], "gcc"
     return None, "unknown"
 
 
-def assert_generated_lane_loops_vectorized(test_case, compiler, source_path, object_path):
+def assert_generated_lane_loops_vectorized(
+    test_case,
+    compiler,
+    source_path,
+    object_path,
+    local_header="generated_neohookean_ogden_local.hpp",
+    minimum_matches=3,
+):
     flags, compiler_kind = compiler_vectorization_flags(compiler)
     if flags is None:
         test_case.skipTest("compiler does not expose a supported vectorization report")
@@ -577,15 +584,15 @@ def assert_generated_lane_loops_vectorized(test_case, compiler, source_path, obj
     )
     report = completed.stdout + completed.stderr
     if compiler_kind == "clang":
-        pattern = r"generated_neohookean_ogden_local\.hpp:\d+:\d+: remark: vectorized loop"
+        pattern = r"%s:\d+:\d+: remark: vectorized loop" % re.escape(local_header)
     else:
-        pattern = r"generated_neohookean_ogden_local\.hpp:.*loop vectorized"
+        pattern = r"%s:.*loop vectorized" % re.escape(local_header)
 
     matches = re.findall(pattern, report)
     test_case.assertGreaterEqual(
         len(matches),
-        3,
-        "expected objective, gradient, and apply local lane loops to be vectorized; "
+        minimum_matches,
+        "expected generated local lane loops to be vectorized; "
         "compiler report was:\n%s" % report,
     )
 
@@ -967,15 +974,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const scalar_t *const SFEM_RESTRICT shape_1d", local_source)
         self.assertIn("const scalar_t *const SFEM_RESTRICT grad_1d", local_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
-        self.assertIn("scalar_t value_x[Q * S]", local_source)
-        self.assertIn("scalar_t stage_x[Q * S]", local_source)
+        self.assertIn("scalar_t value_x[Q * S * VECTOR_SIZE]", local_source)
+        self.assertIn("scalar_t stage_x[Q * S * VECTOR_SIZE]", local_source)
+        self.assertIn("for (ptrdiff_t lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
-            "generated_quad4_weak_neohookean_tensor_gradient<scalar_t, N_QP, N_SHAPE>",
+            "generated_quad4_weak_neohookean_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
             local_source,
         )
         self.assertIn(
-            "generated_quad4_weak_neohookean_tensor_test<scalar_t, N_QP, N_SHAPE>",
+            "generated_quad4_weak_neohookean_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
             local_source,
         )
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
@@ -985,20 +993,13 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
-            subprocess.run(
-                [
-                    compiler,
-                    "-std=c++11",
-                    "-O3",
-                    "-c",
-                    os.path.join(tmpdir, "generated_quad4_weak_neohookean_operator.cpp"),
-                    "-o",
-                    os.path.join(tmpdir, "generated_quad4_weak_neohookean_operator.o"),
-                ],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+            assert_generated_lane_loops_vectorized(
+                self,
+                compiler,
+                os.path.join(tmpdir, "generated_quad4_weak_neohookean_operator.cpp"),
+                os.path.join(tmpdir, "generated_quad4_weak_neohookean_operator.o"),
+                local_header="generated_quad4_weak_neohookean_local.hpp",
+                minimum_matches=3,
             )
 
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
@@ -1044,16 +1045,17 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("static constexpr int N_QP_1D = 3;", local_source)
         self.assertIn("static constexpr int N_SHAPE_1D = 3;", local_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
-        self.assertIn("scalar_t value_x[Q * S * S]", local_source)
-        self.assertIn("scalar_t value_xy[Q * Q * S]", local_source)
-        self.assertIn("scalar_t stage_xy_x[Q * S * S]", local_source)
+        self.assertIn("scalar_t value_x[Q * S * S * VECTOR_SIZE]", local_source)
+        self.assertIn("scalar_t value_xy[Q * Q * S * VECTOR_SIZE]", local_source)
+        self.assertIn("scalar_t stage_xy_x[Q * S * S * VECTOR_SIZE]", local_source)
+        self.assertIn("for (ptrdiff_t lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
-            "generated_hex27_weak_neohookean_tensor_gradient<scalar_t, N_QP, N_SHAPE>",
+            "generated_hex27_weak_neohookean_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
             local_source,
         )
         self.assertIn(
-            "generated_hex27_weak_neohookean_tensor_test<scalar_t, N_QP, N_SHAPE>",
+            "generated_hex27_weak_neohookean_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
             local_source,
         )
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)

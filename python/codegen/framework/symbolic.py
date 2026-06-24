@@ -2107,7 +2107,7 @@ def _sfem_soa_local_header(
         and quadrature_rule.is_tensor_product
         and any(form.weak_form is not None for form in forms)
     ):
-        lines.extend(_sfem_tensor_product_sum_factorization_helpers(prefix, dim))
+        lines.extend(_sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim))
         lines.append("")
 
     for form in forms:
@@ -2126,6 +2126,283 @@ def _sfem_soa_local_header(
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
+
+
+def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
+    if dim not in (2, 3):
+        raise ValueError("tensor-product sum factorization supports dimensions 2 and 3")
+
+    p = prefix
+    lines = [
+        "template <int N_SHAPE_1D>",
+        "static SFEM_INLINE int %s_tensor_shape_index(" % p,
+    ]
+    if dim == 2:
+        lines.extend(
+            [
+                "        const int sx,",
+                "        const int sy) {",
+                "    return N_SHAPE_1D == 2 ? (sy == 0 ? sx : (sx == 0 ? 3 : 2))",
+                "                           : sx + N_SHAPE_1D * sy;",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "        const int sx,",
+                "        const int sy,",
+                "        const int sz) {",
+                "    return N_SHAPE_1D == 2",
+                "               ? (sy == 0 ? sx : (sx == 0 ? 3 : 2)) + 4 * sz",
+                "               : sx + N_SHAPE_1D * (sy + N_SHAPE_1D * sz);",
+            ]
+        )
+    lines.extend(["}", ""])
+
+    if dim == 2:
+        lines.extend(
+            [
+                "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+                "static SFEM_INLINE void %s_tensor_gradient(" % p,
+                "        const ptrdiff_t nelems,",
+                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
+                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
+                "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],",
+                "        const int component,",
+                "        scalar_t *const SFEM_RESTRICT gradient) {",
+                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
+                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
+                "    scalar_t value_x[Q * S * VECTOR_SIZE];",
+                "    scalar_t grad_x[Q * S * VECTOR_SIZE];",
+                "    for (int qx = 0; qx < Q; ++qx) {",
+                "        for (int sy = 0; sy < S; ++sy) {",
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                scalar_t v = 0; scalar_t gx = 0;",
+                "                for (int sx = 0; sx < S; ++sx) {",
+                "                    const int shape = %s_tensor_shape_index<S>(sx, sy);" % p,
+                "                    const scalar_t u = streams[shape * 2 + component][lane];",
+                "                    v += u * shape_1d[qx * S + sx];",
+                "                    gx += u * grad_1d[qx * S + sx];",
+                "                }",
+                "                const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
+                "                value_x[i] = v; grad_x[i] = gx;",
+                "            }",
+                "        }",
+                "    }",
+                "    for (int qy = 0; qy < Q; ++qy) {",
+                "        for (int qx = 0; qx < Q; ++qx) {",
+                "            const int q = qx + Q * qy;",
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                scalar_t gx = 0; scalar_t gy = 0;",
+                "                for (int sy = 0; sy < S; ++sy) {",
+                "                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
+                "                    gx += grad_x[i] * shape_1d[qy * S + sy];",
+                "                    gy += value_x[i] * grad_1d[qy * S + sy];",
+                "                }",
+                "                gradient[(q * 2 + 0) * VECTOR_SIZE + lane] = gx;",
+                "                gradient[(q * 2 + 1) * VECTOR_SIZE + lane] = gy;",
+                "            }",
+                "        }",
+                "    }",
+                "}",
+                "",
+                "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+                "static SFEM_INLINE void %s_tensor_test(" % p,
+                "        const ptrdiff_t nelems,",
+                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
+                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
+                "        const scalar_t *const SFEM_RESTRICT flux,",
+                "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2],",
+                "        const int component) {",
+                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
+                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
+                "    scalar_t stage_x[Q * S * VECTOR_SIZE];",
+                "    scalar_t stage_y[Q * S * VECTOR_SIZE];",
+                "    for (int qx = 0; qx < Q; ++qx) {",
+                "        for (int sy = 0; sy < S; ++sy) {",
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                scalar_t tx = 0; scalar_t ty = 0;",
+                "                for (int qy = 0; qy < Q; ++qy) {",
+                "                    const int q = qx + Q * qy;",
+                "                    tx += flux[(q * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
+                "                    ty += flux[(q * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];",
+                "                }",
+                "                const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
+                "                stage_x[i] = tx; stage_y[i] = ty;",
+                "            }",
+                "        }",
+                "    }",
+                "    for (int sy = 0; sy < S; ++sy) {",
+                "        for (int sx = 0; sx < S; ++sx) {",
+                "            const int shape = %s_tensor_shape_index<S>(sx, sy);" % p,
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                scalar_t value = 0;",
+                "                for (int qx = 0; qx < Q; ++qx) {",
+                "                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
+                "                    value += stage_x[i] * grad_1d[qx * S + sx]",
+                "                           + stage_y[i] * shape_1d[qx * S + sx];",
+                "                }",
+                "                out_streams[shape * 2 + component][lane] += value;",
+                "            }",
+                "        }",
+                "    }",
+                "}",
+            ]
+        )
+        return lines
+
+    lines.extend(
+        [
+            "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+            "static SFEM_INLINE void %s_tensor_gradient(" % p,
+            "        const ptrdiff_t nelems,",
+            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
+            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
+            "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],",
+            "        const int component,",
+            "        scalar_t *const SFEM_RESTRICT gradient) {",
+            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
+            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
+            "    scalar_t value_x[Q * S * S * VECTOR_SIZE];",
+            "    scalar_t grad_x[Q * S * S * VECTOR_SIZE];",
+            "    scalar_t value_xy[Q * Q * S * VECTOR_SIZE];",
+            "    scalar_t grad_x_xy[Q * Q * S * VECTOR_SIZE];",
+            "    scalar_t grad_y_xy[Q * Q * S * VECTOR_SIZE];",
+            "    for (int qx = 0; qx < Q; ++qx) {",
+            "        for (int sy = 0; sy < S; ++sy) {",
+            "            for (int sz = 0; sz < S; ++sz) {",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t v = 0; scalar_t gx = 0;",
+            "                    for (int sx = 0; sx < S; ++sx) {",
+            "                        const int shape = %s_tensor_shape_index<S>(sx, sy, sz);" % p,
+            "                        const scalar_t u = streams[shape * 3 + component][lane];",
+            "                        v += u * shape_1d[qx * S + sx];",
+            "                        gx += u * grad_1d[qx * S + sx];",
+            "                    }",
+            "                    const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
+            "                    value_x[i] = v; grad_x[i] = gx;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "    for (int qx = 0; qx < Q; ++qx) {",
+            "        for (int qy = 0; qy < Q; ++qy) {",
+            "            for (int sz = 0; sz < S; ++sz) {",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t v = 0; scalar_t gx = 0; scalar_t gy = 0;",
+            "                    for (int sy = 0; sy < S; ++sy) {",
+            "                        const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
+            "                        v += value_x[i] * shape_1d[qy * S + sy];",
+            "                        gx += grad_x[i] * shape_1d[qy * S + sy];",
+            "                        gy += value_x[i] * grad_1d[qy * S + sy];",
+            "                    }",
+            "                    const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
+            "                    value_xy[j] = v; grad_x_xy[j] = gx; grad_y_xy[j] = gy;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "    for (int qz = 0; qz < Q; ++qz) {",
+            "        for (int qy = 0; qy < Q; ++qy) {",
+            "            for (int qx = 0; qx < Q; ++qx) {",
+            "                const int q = qx + Q * (qy + Q * qz);",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t gx = 0; scalar_t gy = 0; scalar_t gz = 0;",
+            "                    for (int sz = 0; sz < S; ++sz) {",
+            "                        const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
+            "                        gx += grad_x_xy[j] * shape_1d[qz * S + sz];",
+            "                        gy += grad_y_xy[j] * shape_1d[qz * S + sz];",
+            "                        gz += value_xy[j] * grad_1d[qz * S + sz];",
+            "                    }",
+            "                    gradient[(q * 3 + 0) * VECTOR_SIZE + lane] = gx;",
+            "                    gradient[(q * 3 + 1) * VECTOR_SIZE + lane] = gy;",
+            "                    gradient[(q * 3 + 2) * VECTOR_SIZE + lane] = gz;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "}",
+            "",
+            "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+            "static SFEM_INLINE void %s_tensor_test(" % p,
+            "        const ptrdiff_t nelems,",
+            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
+            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
+            "        const scalar_t *const SFEM_RESTRICT flux,",
+            "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3],",
+            "        const int component) {",
+            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
+            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
+            "    scalar_t stage_x[Q * Q * S * VECTOR_SIZE];",
+            "    scalar_t stage_y[Q * Q * S * VECTOR_SIZE];",
+            "    scalar_t stage_z[Q * Q * S * VECTOR_SIZE];",
+            "    scalar_t stage_xy_x[Q * S * S * VECTOR_SIZE];",
+            "    scalar_t stage_xy_y[Q * S * S * VECTOR_SIZE];",
+            "    scalar_t stage_xy_z[Q * S * S * VECTOR_SIZE];",
+            "    for (int qx = 0; qx < Q; ++qx) {",
+            "        for (int qy = 0; qy < Q; ++qy) {",
+            "            for (int sz = 0; sz < S; ++sz) {",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t tx = 0; scalar_t ty = 0; scalar_t tz = 0;",
+            "                    for (int qz = 0; qz < Q; ++qz) {",
+            "                        const int q = qx + Q * (qy + Q * qz);",
+            "                        tx += flux[(q * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
+            "                        ty += flux[(q * 3 + 1) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
+            "                        tz += flux[(q * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];",
+            "                    }",
+            "                    const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
+            "                    stage_x[i] = tx; stage_y[i] = ty; stage_z[i] = tz;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "    for (int qx = 0; qx < Q; ++qx) {",
+            "        for (int sy = 0; sy < S; ++sy) {",
+            "            for (int sz = 0; sz < S; ++sz) {",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t tx = 0; scalar_t ty = 0; scalar_t tz = 0;",
+            "                    for (int qy = 0; qy < Q; ++qy) {",
+            "                        const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
+            "                        tx += stage_x[i] * shape_1d[qy * S + sy];",
+            "                        ty += stage_y[i] * grad_1d[qy * S + sy];",
+            "                        tz += stage_z[i] * shape_1d[qy * S + sy];",
+            "                    }",
+            "                    const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
+            "                    stage_xy_x[j] = tx; stage_xy_y[j] = ty; stage_xy_z[j] = tz;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "    for (int sz = 0; sz < S; ++sz) {",
+            "        for (int sy = 0; sy < S; ++sy) {",
+            "            for (int sx = 0; sx < S; ++sx) {",
+            "                const int shape = %s_tensor_shape_index<S>(sx, sy, sz);" % p,
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    scalar_t value = 0;",
+            "                    for (int qx = 0; qx < Q; ++qx) {",
+            "                        const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
+            "                        value += stage_xy_x[j] * grad_1d[qx * S + sx]",
+            "                               + (stage_xy_y[j] + stage_xy_z[j]) * shape_1d[qx * S + sx];",
+            "                    }",
+            "                    out_streams[shape * 3 + component][lane] += value;",
+            "                }",
+            "            }",
+            "        }",
+            "    }",
+            "}",
+        ]
+    )
+    return lines
 
 
 def _sfem_tensor_product_sum_factorization_helpers(prefix, dim):
@@ -2528,6 +2805,17 @@ def _sfem_soa_block_function(
                     ", ".join(_output_stream_names(form, dim, n_nodes)),
                 )
             )
+    if form.weak_form is not None and use_tensor_product_reference:
+        _append_sfem_soa_tensor_weak_form_lines(
+            lines,
+            form,
+            prefix,
+            dim,
+            use_stream_arrays,
+        )
+        lines.append("}")
+        return lines
+
     lines.extend(
         [
             "#pragma omp simd",
@@ -2629,6 +2917,158 @@ def _sfem_soa_block_function(
     _append_sfem_soa_output_lines(lines, form, dim, n_nodes)
     lines.extend(["    }", "}"])
     return lines
+
+
+def _append_sfem_soa_tensor_weak_form_lines(
+    lines,
+    form,
+    prefix,
+    dim,
+    use_stream_arrays,
+):
+    weak_form = form.weak_form
+    u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
+    h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
+    out_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+    block_extent = "N_QP * %d * VECTOR_SIZE" % (dim * dim)
+
+    lines.append("    scalar_t grad_u_ref_q[%s];" % block_extent)
+    if form.has_direction:
+        lines.append("    scalar_t grad_h_ref_q[%s];" % block_extent)
+    if form.name != "objective":
+        lines.append("    scalar_t loperand_q[%s];" % block_extent)
+
+    for row in range(dim):
+        output_offset = "%d * N_QP * %d * VECTOR_SIZE" % (row, dim)
+        lines.append(
+            "    %s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
+            % (prefix, u_streams, row, output_offset)
+        )
+        if form.has_direction:
+            lines.append(
+                "    %s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
+                % (prefix, h_streams, row, output_offset)
+            )
+
+    lines.append("    for (int q = 0; q < N_QP; ++q) {")
+    lines.extend(_tensor_product_q_index_lines(dim, "        "))
+    lines.append(
+        "        const scalar_t qw = %s;"
+        % _tensor_product_quadrature_weight_expr(dim)
+    )
+    lines.extend(
+        [
+            "#pragma omp simd",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+        ]
+    )
+    for component in range(dim * dim):
+        lines.append(
+            "            const scalar_t jacobian_adjugate_lane%d = jacobian_adjugate%d[geometry_offset];"
+            % (component, component)
+        )
+    lines.append(
+        "            const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];"
+    )
+    lines.append("            scalar_t grad_u_ref[%d];" % (dim * dim))
+    for row in range(dim):
+        for col in range(dim):
+            component = row * dim + col
+            lines.append(
+                "            grad_u_ref[%d] = grad_u_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane];"
+                % (component, row, dim, col)
+            )
+    if form.has_direction:
+        lines.append("            scalar_t grad_h_ref[%d];" % (dim * dim))
+        for row in range(dim):
+            for col in range(dim):
+                component = row * dim + col
+                lines.append(
+                    "            grad_h_ref[%d] = grad_h_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane];"
+                    % (component, row, dim, col)
+                )
+
+    lines.append("            scalar_t grad_u[%d];" % (dim * dim))
+    if form.has_direction:
+        lines.append("            scalar_t trial_grad[%d];" % (dim * dim))
+
+    def geometry_value(name, component):
+        return "%s_lane%d" % (name, component)
+
+    lines.append(
+        "            const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant_lane0;"
+    )
+    for row in range(dim):
+        for col in range(dim):
+            terms = [
+                "grad_u_ref[%d] * %s"
+                % (
+                    row * dim + k,
+                    geometry_value("jacobian_adjugate", k * dim + col),
+                )
+                for k in range(dim)
+            ]
+            lines.append(
+                "            grad_u[%d] = (%s) * inv_jacobian_determinant;"
+                % (row * dim + col, " + ".join(terms))
+            )
+            if form.has_direction:
+                terms = [
+                    "grad_h_ref[%d] * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "            trial_grad[%d] = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
+                )
+
+    deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
+        weak_form,
+        "grad_u",
+    )
+    if form.name == "objective":
+        _append_cse_array_assignments(
+            lines,
+            [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
+            ["value[lane] %s" % ("+=" if form.output_mode == "accumulate" else "=")],
+            "weak_obj_tmp",
+            scale="qw * jacobian_determinant_lane0",
+        )
+        lines.extend(["        }", "    }"])
+        return
+
+    material = (
+        weak_form.linearized_first_piola(
+            tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim))
+        )
+        if form.name == "apply"
+        else weak_form.first_piola()
+    ).xreplace(deformation_gradient_substitutions)
+    lines.append("            scalar_t loperand[%d];" % (dim * dim))
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+    )
+    for row in range(dim):
+        for col in range(dim):
+            lines.append(
+                "            loperand_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane] = loperand[%d];"
+                % (row, dim, col, row * dim + col)
+            )
+    lines.extend(["        }", "    }"])
+    for row in range(dim):
+        lines.append(
+            "    %s_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
+            % (prefix, row, dim, out_streams, row)
+        )
 
 
 def _append_sfem_soa_weak_form_lines(
