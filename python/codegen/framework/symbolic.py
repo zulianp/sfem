@@ -4136,30 +4136,30 @@ def _sfem_soa_mesh_operator_function(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const real_t *const SFEM_RESTRICT g_%s" % stream
+            "const scalar_t *const SFEM_RESTRICT g_%s" % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
     else:
-        base_params.append("geom_t **const SFEM_RESTRICT points")
+        base_params.append("const scalar_t *const *const SFEM_RESTRICT points")
 
     material_params = ("const scalar_t mu", "const scalar_t lmbda")
     field_params = ["const ptrdiff_t u_stride"]
     field_params.extend(
-        "const real_t *const SFEM_RESTRICT u%s" % _component_name(d)
+        "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
         for d in range(dim)
     )
     if form.has_direction:
         field_params.append("const ptrdiff_t h_stride")
         field_params.extend(
-            "const real_t *const SFEM_RESTRICT h%s" % _component_name(d)
+            "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
             for d in range(dim)
         )
     if form.name == "objective":
-        output_params = ("real_t *const SFEM_RESTRICT value",)
+        output_params = ("scalar_t *const SFEM_RESTRICT value",)
     else:
         output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
-            "real_t *const SFEM_RESTRICT out%s" % _component_name(d)
+            "scalar_t *const SFEM_RESTRICT out%s" % _component_name(d)
             for d in range(dim)
         )
 
@@ -4169,15 +4169,13 @@ def _sfem_soa_mesh_operator_function(
         + tuple(field_params)
         + tuple(output_params)
     )
-    wrapper_params = _sfem_soa_public_wrapper_params(
-        tuple(base_params) + tuple(material_params) + tuple(field_params) + tuple(output_params)
-    )
+    wrapper_params = impl_params
 
     lines = [
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "template <typename scalar_t>",
         "static SFEM_INLINE int %s(" % implementation_name,
     ]
     for idx, param in enumerate(impl_params):
@@ -4186,16 +4184,16 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "    static_assert(N_QP == %d, \"N_QP does not match generated mesh wrapper\");" % n_qp,
-            "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated mesh wrapper\");" % n_nodes,
-            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_nodes,
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
             "    (void)nnodes;",
         ]
     )
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
+                "    const scalar_t *const SFEM_RESTRICT %s = points[%d];"
                 % (_component_name(d), d)
             )
     lines.extend(
@@ -4452,24 +4450,28 @@ def _sfem_soa_mesh_operator_function(
     )
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    lines.append('extern "C" int %s(' % function_name)
-    for idx, param in enumerate(wrapper_params):
-        comma = "," if idx + 1 < len(wrapper_params) else ""
-        lines.append("        %s%s" % (param, comma))
-    lines.extend(
-        [
-            ") {",
-            "    return sfem::codegen::%s<real_t, %d, %d, %d>(%s);"
-            % (
-                implementation_name,
-                n_qp,
-                n_nodes,
-                vector_size,
-                ", ".join(wrapper_args),
-            ),
-            "}",
-        ]
-    )
+    for public_name, scalar_type in (
+        (function_name, "double"),
+        ("%s_float" % function_name, "float"),
+    ):
+        concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
+        lines.append('extern "C" int %s(' % public_name)
+        for idx, param in enumerate(concrete_params):
+            comma = "," if idx + 1 < len(concrete_params) else ""
+            lines.append("        %s%s" % (param, comma))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (
+                    implementation_name,
+                    scalar_type,
+                    ", ".join(wrapper_args),
+                ),
+                "}",
+                "",
+            ]
+        )
     return lines
 
 
@@ -4899,6 +4901,15 @@ def _sfem_soa_public_wrapper_params(params):
     return tuple(param.replace("scalar_t", "real_t") for param in params)
 
 
+def _sfem_soa_concrete_scalar_params(params, scalar_type):
+    return tuple(
+        param.replace("scalar_t", scalar_type)
+        .replace("real_t", scalar_type)
+        .replace("geom_t", scalar_type)
+        for param in params
+    )
+
+
 def _sfem_soa_mesh_reference_alias_lines(
     prefix,
     quadrature_rule,
@@ -4908,51 +4919,52 @@ def _sfem_soa_mesh_reference_alias_lines(
 ):
     lines = []
     if use_tensor_product_reference:
-        for name in ("shape_1d", "grad_1d", "q_weight_1d"):
+        tensor_data = (
+            ("shape_1d", quadrature_rule.tensor_product_shape_values_1d),
+            ("grad_1d", quadrature_rule.tensor_product_shape_gradients_1d),
+            ("q_weight_1d", quadrature_rule.tensor_product_weights_1d),
+        )
+        for name, values in tensor_data:
             lines.append(
-                "    const scalar_t *const SFEM_RESTRICT %s = %s;"
-                % (
-                    name,
-                    _sfem_codegen_qualified_name(
-                        _sfem_soa_quadrature_array_name(prefix, quadrature_rule, name)
-                    ),
-                )
+                "    static const scalar_t %s[%d] = {%s};"
+                % (name, len(values), _cpp_scalar_initializer_list(values))
             )
         return lines
     if use_reference_gradient_vectors:
         for component in range(quadrature_rule.dim):
             name = _sfem_reference_gradient_vector_name(component)
+            values = _sfem_reference_gradient_component_values(
+                quadrature_rule,
+                component,
+            )
             lines.append(
-                "    const scalar_t *const SFEM_RESTRICT %s = %s;"
-                % (
-                    name,
-                    _sfem_codegen_qualified_name(
-                        _sfem_soa_quadrature_array_name(prefix, quadrature_rule, name)
-                    ),
-                )
+                "    static const scalar_t %s[%d] = {%s};"
+                % (name, len(values), _cpp_scalar_initializer_list(values))
             )
         lines.append(
-            "    const scalar_t *const SFEM_RESTRICT q_weight = %s;"
-            % _sfem_codegen_qualified_name(
-                _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
+            "    static const scalar_t q_weight[%d] = {%s};"
+            % (
+                len(quadrature_rule.weights),
+                _cpp_scalar_initializer_list(quadrature_rule.weights),
             )
         )
         return lines
     for array_input in reference_inputs:
+        if array_input.name != "grad_ref":
+            raise ValueError("mesh reference aliases require grad_ref")
         lines.append(
-            "    const %s *const SFEM_RESTRICT %s = %s;"
+            "    static const scalar_t %s[%d] = {%s};"
             % (
-                array_input.scalar_type,
                 array_input.name,
-                _sfem_codegen_qualified_name(
-                    _sfem_soa_quadrature_array_name(prefix, quadrature_rule, array_input.name)
-                ),
+                len(quadrature_rule.reference_gradients),
+                _cpp_scalar_initializer_list(quadrature_rule.reference_gradients),
             )
         )
     lines.append(
-        "    const scalar_t *const SFEM_RESTRICT q_weight = %s;"
-        % _sfem_codegen_qualified_name(
-            _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
+        "    static const scalar_t q_weight[%d] = {%s};"
+        % (
+            len(quadrature_rule.weights),
+            _cpp_scalar_initializer_list(quadrature_rule.weights),
         )
     )
     return lines
