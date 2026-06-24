@@ -1,0 +1,194 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand{\grad}{\nabla}
+\newcommand{\divergence}{\nabla\!\cdot}
+
+\begin{document}
+
+\section*{Immiscible two-phase flow without gravity}
+
+Let $\Omega\subset\mathbb{R}^{d}$ be the porous domain and
+$t\in(0,T]$.  The phases are water ($w$) and carbon dioxide ($c$).
+The primary unknowns are their pressures
+\[
+    p_w,p_c:\Omega\times(0,T]\longrightarrow\mathbb{R}.
+\]
+There is no dissolved carbon dioxide, no mass transfer between phases,
+and gravity is neglected.  The capillary pressure (suction) is
+\[
+    s = p_c-p_w,\qquad s\geq 0.
+\]
+The water and carbon-dioxide saturations satisfy
+\[
+    S_w=S_w(s),\qquad S_c=1-S_w,\qquad
+    S_w,S_c\in[0,1].
+\]
+
+\subsection*{Mass conservation}
+
+For each phase $\alpha\in\{w,c\}$, define its Darcy velocity by
+\[
+    \boldsymbol{u}_{\alpha}
+    =
+    -\frac{k_{r\alpha}}{\mu_\alpha}\,
+     \boldsymbol{K}_{\mathrm{int}}\grad p_\alpha ,
+\]
+where $n$ is the porosity, $\boldsymbol{K}_{\mathrm{int}}$ is the
+intrinsic-permeability tensor, $\mu_\alpha$ is the dynamic viscosity,
+and $k_{r\alpha}$ is the relative permeability.  With no source terms,
+the phase mass balances are
+\[
+    \frac{\partial}{\partial t}\left(nS_\alpha\rho_\alpha\right)
+    +\divergence\left(\rho_\alpha\boldsymbol{u}_\alpha\right)=0.
+\]
+Thus, the coupled pressure system is
+\begin{align}
+    \frac{\partial}{\partial t}
+    \left[
+        nS_w(p_c-p_w)\rho_w(p_w)
+    \right]
+    -
+    \divergence\left[
+        \rho_w(p_w)
+        \frac{k_{rw}(S_w(p_c-p_w))}{\mu_w}
+        \boldsymbol{K}_{\mathrm{int}}\grad p_w
+    \right]
+    &=0,
+    \label{eq:water_mass}
+    \\
+    \frac{\partial}{\partial t}
+    \left[
+        n\bigl(1-S_w(p_c-p_w)\bigr)\rho_c(p_c)
+    \right]
+    -
+    \divergence\left[
+        \rho_c(p_c)
+        \frac{k_{rc}(S_w(p_c-p_w))}{\mu_c}
+        \boldsymbol{K}_{\mathrm{int}}\grad p_c
+    \right]
+    &=0.
+    \label{eq:co2_mass}
+\end{align}
+
+\subsection*{Constitutive laws}
+
+The water-retention law is
+\[
+    S_w(s)
+    =
+    S_{\mathrm{res}}
+    +(1-S_{\mathrm{res}})
+    \left[
+        1+\left(\frac{s}{P_r}\right)^m
+    \right]^{\frac{1}{m}-1},
+\]
+where $S_{\mathrm{res}}\in[0,1)$ is the residual water saturation,
+$P_r>0$ is a reference capillary pressure, and $m>0$ is a model
+parameter.
+
+The compressible phase densities are
+\[
+    \rho_w(p_w)
+    =
+    \rho_{w0}
+    \exp\left[\kappa_T(p_w-p_{wr})\right],
+    \qquad
+    \rho_c(p_c)
+    =
+    \frac{M_c}{ZRT}\,p_c.
+\]
+Here $\rho_{w0}$ is a reference water density, $\kappa_T$ is the water
+compressibility, $p_{wr}$ is the reference water pressure, $M_c$ is
+the molar mass of carbon dioxide, $Z$ is its compressibility factor,
+$R$ is the universal gas constant, and $T$ is the absolute
+temperature.
+
+For a given $S_w$, define the effective water saturation
+\[
+    S_e=\frac{S_w-S_{\mathrm{res}}}{1-S_{\mathrm{res}}}.
+\]
+The relative permeabilities are
+\begin{align*}
+    k_{rw}(S_w)
+    &=
+    \sqrt{S_w}
+    \left\{
+        1-
+        \left[
+            1-S_w^{1/C_{kw,1}}
+        \right]^{C_{kw,1}}
+    \right\}^{2},
+    \\
+    k_{rc}(S_w)
+    &=
+    (1-S_e)^{C_{ka,1}}
+    \left(1-S_e^{C_{ka,2}}\right).
+\end{align*}
+
+Equations~\eqref{eq:water_mass}--\eqref{eq:co2_mass}, together with
+these constitutive laws and appropriate initial and boundary
+conditions, determine $p_w$ and $p_c$.
+
+
+\subsection*{Initial-boundary value problem}
+
+Let the boundary be decomposed into the disjoint left, right, and
+impermeable parts
+\[
+    \partial\Omega
+    =
+    \overline{\Gamma_L\cup\Gamma_R\cup\Gamma_N}.
+\]
+Initially, the pressure fields are uniform:
+\[
+    p_w(\boldsymbol{x},0)=15\,\mathrm{MPa},
+    \qquad
+    p_c(\boldsymbol{x},0)
+    =
+    p_w(\boldsymbol{x},0)+0.1\,\mathrm{MPa}
+    =
+    15.1\,\mathrm{MPa},
+    \qquad \boldsymbol{x}\in\Omega.
+\]
+The right boundary is held at the initial reservoir pressures,
+\[
+    p_w(\boldsymbol{x},t)=15\,\mathrm{MPa},
+    \qquad
+    p_c(\boldsymbol{x},t)=15.1\,\mathrm{MPa},
+    \qquad
+    (\boldsymbol{x},t)\in\Gamma_R\times(0,T].
+\]
+Carbon dioxide is injected through the left boundary by prescribing a
+pressure history $p_{\mathrm{inj}}(t)$:
+\begin{align*}
+    p_c(\boldsymbol{x},t)=p_{\mathrm{inj}}(t),
+    \qquad
+    (\boldsymbol{x},t)&\in\Gamma_L\times(0,T],\\
+    p_{\mathrm{inj}}(0)&=15.1\,\mathrm{MPa},
+    &
+    p_{\mathrm{inj}}(t_1)&=20\,\mathrm{MPa}.
+\end{align*}
+For example, a linear pressure ramp followed by a hold is
+\[
+    p_{\mathrm{inj}}(t)
+    =
+    15.1\,\mathrm{MPa}
+    +
+    4.9\,\mathrm{MPa}\,
+    \min\left(\frac{t}{t_1},1\right).
+\]
+No water crosses the injection boundary, and the remaining boundary is
+impermeable to both phases:
+\begin{align*}
+    \rho_w\boldsymbol{u}_w\cdot\boldsymbol{n}&=0
+    &&\text{on }\Gamma_L\times(0,T],\\
+    \rho_\alpha\boldsymbol{u}_\alpha\cdot\boldsymbol{n}&=0,
+    \quad \alpha\in\{w,c\},
+    &&\text{on }\Gamma_N\times(0,T].
+\end{align*}
+
+
+\end{document}
