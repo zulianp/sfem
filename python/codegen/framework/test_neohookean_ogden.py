@@ -886,11 +886,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_weak_neohookean_tri3_grad_ref_x", operator_source)
         self.assertIn("generated_weak_neohookean_tri3_grad_ref_y", operator_source)
         self.assertIn(
-            "grad_u_ref[0] += u[shape * 2 + 0] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_u_ref[0] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
         self.assertIn(
-            "grad_h_ref[0] += du[shape * 2 + 0] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_h_ref[0] += weak_h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
         self.assertIn("scalar_t trial_grad[4];", local_source)
@@ -898,12 +898,13 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("scalar_t loperand[4];", local_source)
         self.assertNotIn("scalar_t F[4];", local_source)
         self.assertNotIn("F[0] = 1.0 + grad_u[0];", local_source)
-        self.assertIn("scalar_t element_vector[N_SHAPE * 2];", local_source)
+        self.assertNotIn("scalar_t u[N_SHAPE", local_source)
+        self.assertNotIn("scalar_t du[N_SHAPE", local_source)
+        self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
         self.assertIn(
-            "element_vector[shape * 2 + 0] = loperand[0] * grad_ref_x[q * N_SHAPE + shape]",
+            "weak_out_streams[shape * 2 + 0][lane] += loperand[0] * grad_ref_x[q * N_SHAPE + shape]",
             local_source,
         )
-        self.assertIn("outx0[lane] += element_vector[0];", local_source)
         self.assertIn("generated_weak_neohookean_tri3_apply_soa_impl<real_t, 1, 3, 8>", operator_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
@@ -970,13 +971,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const int sx = ((shape + 1) >> 1) & 1;", local_source)
         self.assertIn("const int sy = shape >> 1;", local_source)
         self.assertIn(
-            "grad_u_ref[0] += u[shape * 2 + 0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy];",
+            "grad_u_ref[0] += weak_u_streams[shape * 2 + 0][lane] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy];",
             local_source,
         )
         self.assertIn(
-            "element_vector[shape * 2 + 0] = loperand[0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy]",
+            "weak_out_streams[shape * 2 + 0][lane] += loperand[0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy]",
             local_source,
         )
+        self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
@@ -1048,13 +1050,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("grad_ref[", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
-            "grad_u_ref[0] += u[shape * 3 + 0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy] * shape_1d[qz * N_SHAPE_1D + sz];",
+            "grad_u_ref[0] += weak_u_streams[shape * 3 + 0][lane] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy] * shape_1d[qz * N_SHAPE_1D + sz];",
             local_source,
         )
         self.assertIn(
-            "element_vector[shape * 3 + 0] = loperand[0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy] * shape_1d[qz * N_SHAPE_1D + sz]",
+            "weak_out_streams[shape * 3 + 0][lane] += loperand[0] * grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy] * shape_1d[qz * N_SHAPE_1D + sz]",
             local_source,
         )
+        self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
@@ -1111,6 +1114,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("out_streams[N_SHAPE * 3]", shared_local)
         self.assertIn("sfem_generated_integer_root(N_QP, 3)", shared_local)
         self.assertIn("sfem_generated_integer_root(N_SHAPE, 3)", shared_local)
+        self.assertNotIn("scalar_t u[N_SHAPE", shared_local)
+        self.assertNotIn("scalar_t du[N_SHAPE", shared_local)
+        self.assertNotIn("scalar_t element_vector[N_SHAPE", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 8", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 27", shared_local)
 

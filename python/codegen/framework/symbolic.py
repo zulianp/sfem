@@ -2244,15 +2244,40 @@ def _sfem_soa_block_function(
                 ]
             )
         lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
+    if form.weak_form is not None and not use_stream_arrays:
+        lines.append(
+            "    const scalar_t *const weak_u_streams[N_SHAPE * %d] = {%s};"
+            % (
+                dim,
+                ", ".join(_field_stream_names("u", dim, n_nodes)),
+            )
+        )
+        if form.has_direction:
+            lines.append(
+                "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(_field_stream_names("h", dim, n_nodes)),
+                )
+            )
+        if form.name != "objective":
+            lines.append(
+                "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(_output_stream_names(form, dim, n_nodes)),
+                )
+            )
     lines.extend(
         [
             "#pragma omp simd",
             "    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "        scalar_t u[N_SHAPE * %d];" % dim,
         ]
     )
+    if form.weak_form is None:
+        lines.append("        scalar_t u[N_SHAPE * %d];" % dim)
     for array_input in array_inputs:
-        if form.weak_form is not None and array_input.is_reference_qp_shape:
+        if form.weak_form is not None:
             continue
         if array_input.is_reference_qp_shape:
             array_decl = "%s %s[N_SHAPE * %d];" % (
@@ -2266,16 +2291,19 @@ def _sfem_soa_block_function(
                 array_input.name,
                 array_input.local_size,
             )
-        lines.insert(
-            -1,
-            "        %s" % array_decl,
-        )
-    if form.has_direction:
+        lines.append("        %s" % array_decl)
+    if form.has_direction and form.weak_form is None:
         lines.append("        scalar_t du[N_SHAPE * %d];" % dim)
 
     for array_input in element_inputs:
         for i, stream in enumerate(_soa_array_stream_names(array_input)):
-            lines.append("        %s[%d] = %s[lane];" % (array_input.name, i, stream))
+            if form.weak_form is not None:
+                lines.append(
+                    "        const scalar_t %s_lane%d = %s[lane];"
+                    % (array_input.name, i, stream)
+                )
+            else:
+                lines.append("        %s[%d] = %s[lane];" % (array_input.name, i, stream))
     if form.weak_form is not None:
         pass
     elif use_tensor_product_reference:
@@ -2302,27 +2330,28 @@ def _sfem_soa_block_function(
                         )
                     )
 
-    if use_stream_arrays:
-        lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
-        for d in range(dim):
-            lines.append(
-                "            u[shape * %d + %d] = u_streams[shape * %d + %d][lane];"
-                % (dim, d, dim, d)
-            )
-            if form.has_direction:
+    if form.weak_form is None:
+        if use_stream_arrays:
+            lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
+            for d in range(dim):
                 lines.append(
-                    "            du[shape * %d + %d] = h_streams[shape * %d + %d][lane];"
+                    "            u[shape * %d + %d] = u_streams[shape * %d + %d][lane];"
                     % (dim, d, dim, d)
                 )
-        lines.append("        }")
-    else:
-        for node in range(n_nodes):
-            for d in range(dim):
-                idx = node * dim + d
-                component = _component_name(d)
-                lines.append("        u[%d] = u%s%d[lane];" % (idx, component, node))
                 if form.has_direction:
-                    lines.append("        du[%d] = h%s%d[lane];" % (idx, component, node))
+                    lines.append(
+                        "            du[shape * %d + %d] = h_streams[shape * %d + %d][lane];"
+                        % (dim, d, dim, d)
+                    )
+            lines.append("        }")
+        else:
+            for node in range(n_nodes):
+                for d in range(dim):
+                    idx = node * dim + d
+                    component = _component_name(d)
+                    lines.append("        u[%d] = u%s%d[lane];" % (idx, component, node))
+                    if form.has_direction:
+                        lines.append("        du[%d] = h%s%d[lane];" % (idx, component, node))
 
     if form.weak_form is not None:
         _append_sfem_soa_weak_form_lines(
@@ -2371,6 +2400,18 @@ def _append_sfem_soa_weak_form_lines(
             return _tensor_product_dynamic_reference_gradient_expr(dim, component)
         return "%s[q * N_SHAPE + shape]" % _sfem_reference_gradient_vector_name(component)
 
+    def field_value(field, row):
+        stream_prefix = "" if use_stream_arrays else "weak_"
+        return "%s%s_streams[shape * %d + %d][lane]" % (
+            stream_prefix,
+            field,
+            dim,
+            row,
+        )
+
+    def geometry_value(name, component):
+        return "%s_lane%d" % (name, component)
+
     lines.extend(
         [
             "        scalar_t grad_u_ref[%d];" % (dim * dim),
@@ -2400,22 +2441,28 @@ def _append_sfem_soa_weak_form_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "            grad_u_ref[%d] += u[shape * %d + %d] * %s;"
-                % (row * dim + col, dim, row, reference_gradient(col))
+                "            grad_u_ref[%d] += %s * %s;"
+                % (row * dim + col, field_value("u", row), reference_gradient(col))
             )
             if form.has_direction:
                 lines.append(
-                    "            grad_h_ref[%d] += du[shape * %d + %d] * %s;"
-                    % (row * dim + col, dim, row, reference_gradient(col))
+                    "            grad_h_ref[%d] += %s * %s;"
+                    % (row * dim + col, field_value("h", row), reference_gradient(col))
                 )
     lines.append("        }")
 
-    lines.append("        const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant[0];")
+    lines.append(
+        "        const scalar_t inv_jacobian_determinant = 1.0 / %s;"
+        % geometry_value("jacobian_determinant", 0)
+    )
     for row in range(dim):
         for col in range(dim):
             terms = [
-                "grad_u_ref[%d] * jacobian_adjugate[%d]"
-                % (row * dim + k, k * dim + col)
+                "grad_u_ref[%d] * %s"
+                % (
+                    row * dim + k,
+                    geometry_value("jacobian_adjugate", k * dim + col),
+                )
                 for k in range(dim)
             ]
             lines.append(
@@ -2424,8 +2471,11 @@ def _append_sfem_soa_weak_form_lines(
             )
             if form.has_direction:
                 terms = [
-                    "grad_h_ref[%d] * jacobian_adjugate[%d]"
-                    % (row * dim + k, k * dim + col)
+                    "grad_h_ref[%d] * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
                     for k in range(dim)
                 ]
                 lines.append(
@@ -2444,7 +2494,7 @@ def _append_sfem_soa_weak_form_lines(
             [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
             ["value[lane] %s" % ("+=" if form.output_mode == "accumulate" else "=")],
             "weak_obj_tmp",
-            scale="qw * jacobian_determinant[0]",
+            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
         )
         return
 
@@ -2455,9 +2505,14 @@ def _append_sfem_soa_weak_form_lines(
         if form.name == "apply"
         else weak_form.first_piola()
     ).xreplace(deformation_gradient_substitutions)
-    lines.append("        scalar_t element_vector[N_SHAPE * %d];" % dim)
     lines.append("        scalar_t loperand[%d];" % (dim * dim))
-    _append_transformed_loperand_lines(lines, material, dim, "weak_mat_tmp")
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+    )
 
     lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
     if use_tensor_product_reference:
@@ -2470,32 +2525,22 @@ def _append_sfem_soa_weak_form_lines(
             "loperand[%d] * %s" % (row * dim + col, reference_gradient(col))
             for col in range(dim)
         ]
+        op = "+=" if form.output_mode == "accumulate" else "="
+        output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
         lines.append(
-            "            element_vector[shape * %d + %d] = %s;"
-            % (dim, row, " + ".join(terms))
+            "            %s[shape * %d + %d][lane] %s %s;"
+            % (output_streams, dim, row, op, " + ".join(terms))
         )
     lines.append("        }")
-    if use_stream_arrays:
-        lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
-        for row in range(dim):
-            op = "+=" if form.output_mode == "accumulate" else "="
-            lines.append(
-                "            out_streams[shape * %d + %d][lane] %s element_vector[shape * %d + %d];"
-                % (dim, row, op, dim, row)
-            )
-        lines.append("        }")
-    else:
-        for node in range(n_nodes):
-            for row in range(dim):
-                stream = "out%s%d" % (_component_name(row), node)
-                op = "+=" if form.output_mode == "accumulate" else "="
-                lines.append(
-                    "        %s[lane] %s element_vector[%d];"
-                    % (stream, op, node * dim + row)
-                )
 
 
-def _append_transformed_loperand_lines(lines, material, dim, temporary_prefix):
+def _append_transformed_loperand_lines(
+    lines,
+    material,
+    dim,
+    temporary_prefix,
+    geometry_value,
+):
     material_exprs = tuple(material)
     material_names = ["material[%d] =" % i for i in range(dim * dim)]
     lines.append("        scalar_t material[%d];" % (dim * dim))
@@ -2503,8 +2548,11 @@ def _append_transformed_loperand_lines(lines, material, dim, temporary_prefix):
     for row in range(dim):
         for col in range(dim):
             terms = [
-                "material[%d] * jacobian_adjugate[%d]"
-                % (row * dim + k, col * dim + k)
+                "material[%d] * %s"
+                % (
+                    row * dim + k,
+                    geometry_value("jacobian_adjugate", col * dim + k),
+                )
                 for k in range(dim)
             ]
             lines.append(
