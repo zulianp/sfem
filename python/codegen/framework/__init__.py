@@ -71,6 +71,11 @@ from .symbolic import (
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
+from .constitutive import (
+    TwoPhaseFlowConstitutiveModel,
+    TwoPhaseFlowConstitutiveState,
+    TwoPhaseFlowParameters,
+)
 
 __all__ = [
     "DeformationGradient",
@@ -144,4 +149,7 @@ __all__ = [
     "vector_symbols",
     "weak_gradient_from_transformed_first_piola",
     "weak_hessian_action_from_linearized_transformed_first_piola",
+    "TwoPhaseFlowConstitutiveModel",
+    "TwoPhaseFlowConstitutiveState",
+    "TwoPhaseFlowParameters",
 ]
