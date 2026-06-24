@@ -5,6 +5,7 @@
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_Gradient.hpp"
+#include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_Hyperelasticity.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_Laplacian.hpp"
@@ -64,6 +65,7 @@ namespace sfem {
             instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);
+            instance_.private_register_op("GeneratedTwoPhaseFlow", GeneratedTwoPhaseFlow::create);
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 

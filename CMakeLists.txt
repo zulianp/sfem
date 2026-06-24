@@ -129,6 +129,7 @@ list(APPEND SFEM_MODULES
     frontend
     frontend/constraints
     frontend/ops
+    python/codegen/framework/twophaseflow/generated
     frontend/mesh
 )
 
