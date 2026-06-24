@@ -1,4 +1,6 @@
+import ctypes
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -12,7 +14,7 @@ from .residual_codegen import (
     generate_coupled_residual_sfem_files,
     weak_residual_coefficients,
 )
-from .symbolic import ExpressionRole
+from .symbolic import ExpressionRole, sfem_element_quadrature_rule
 
 
 def two_field_diffusion_system(dim=2):
@@ -34,6 +36,157 @@ def two_field_diffusion_system(dim=2):
         + coupling * (v.value - u.value) * v.test_value,
     )
     return system, u, v
+
+
+def _reference_coordinates(element):
+    if element == "TRI3":
+        return ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    if element == "HEX8":
+        return (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (1.0, 1.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+            (1.0, 0.0, 1.0),
+            (1.0, 1.0, 1.0),
+            (0.0, 1.0, 1.0),
+        )
+    raise ValueError(element)
+
+
+def _deform_coordinates(coords):
+    if len(coords[0]) == 2:
+        return tuple((1.2 * x + 0.1 * y, -0.05 * x + 0.9 * y) for x, y in coords)
+    return tuple(
+        (
+            1.1 * x + 0.08 * y,
+            -0.04 * x + 0.95 * y + 0.05 * z,
+            0.03 * x + 1.15 * z,
+        )
+        for x, y, z in coords
+    )
+
+
+def _shape_values(rule, q):
+    if rule.element_type == "TRI3":
+        return (1.0 / 3.0,) * 3
+    if rule.element_type == "TET4":
+        return (0.25,) * 4
+    q1 = rule.tensor_product_n_qp_1d
+    s1 = rule.tensor_product_n_shape_1d
+    qx = q % q1
+    qy = (q // q1) % q1
+    qz = q // (q1 * q1)
+    values = rule.tensor_product_shape_values_1d
+    if rule.dim == 2:
+        shape_indices = ((0, 0), (1, 0), (1, 1), (0, 1))
+        return tuple(
+            values[qx * s1 + sx] * values[qy * s1 + sy]
+            for sx, sy in shape_indices
+        )
+    shape_indices = (
+        (0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0),
+        (0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1),
+    )
+    return tuple(
+        values[qx * s1 + sx]
+        * values[qy * s1 + sy]
+        * values[qz * s1 + sz]
+        for sx, sy, sz in shape_indices
+    )
+
+
+def _adjugate_and_determinant(matrix):
+    if len(matrix) == 2:
+        a, b = matrix[0]
+        c, d = matrix[1]
+        return ((d, -b), (-c, a)), a * d - b * c
+    a, b, c = matrix[0]
+    d, e, f = matrix[1]
+    g, h, i = matrix[2]
+    adj = (
+        (e * i - f * h, c * h - b * i, b * f - c * e),
+        (f * g - d * i, a * i - c * g, c * d - a * f),
+        (d * h - e * g, b * g - a * h, a * e - b * d),
+    )
+    det = a * adj[0][0] + b * adj[1][0] + c * adj[2][0]
+    return adj, det
+
+
+def _diffusion_reference(rule, coords, current, previous, direction=None):
+    dim = rule.dim
+    n_shape = rule.n_shape
+    dt, k_u, k_v, coupling = (0.7, 1.3, 0.8, 0.25)
+    output = [[0.0] * n_shape for _ in range(2)]
+    accumulation_integral = [0.0, 0.0]
+    for q, weight in enumerate(rule.weights):
+        shape = _shape_values(rule, q)
+        grad_ref = [
+            rule.reference_gradients[(q * n_shape + s) * dim:
+                                     (q * n_shape + s + 1) * dim]
+            for s in range(n_shape)
+        ]
+        jacobian = [
+            [
+                sum(coords[s][i] * grad_ref[s][j] for s in range(n_shape))
+                for j in range(dim)
+            ]
+            for i in range(dim)
+        ]
+        adjugate, determinant = _adjugate_and_determinant(jacobian)
+        grad = [
+            [
+                sum(grad_ref[s][k] * adjugate[k][d] for k in range(dim))
+                / determinant
+                for d in range(dim)
+            ]
+            for s in range(n_shape)
+        ]
+        source = direction if direction is not None else current
+        values = [
+            sum(source[f][s] * shape[s] for s in range(n_shape))
+            for f in range(2)
+        ]
+        gradients = [
+            [
+                sum(source[f][s] * grad[s][d] for s in range(n_shape))
+                for d in range(dim)
+            ]
+            for f in range(2)
+        ]
+        if direction is None:
+            old_values = [
+                sum(previous[f][s] * shape[s] for s in range(n_shape))
+                for f in range(2)
+            ]
+            value_coeff = (
+                (values[0] - old_values[0]) / dt
+                + coupling * (values[0] - values[1]),
+                (values[1] - old_values[1]) / dt
+                + coupling * (values[1] - values[0]),
+            )
+        else:
+            value_coeff = (
+                values[0] / dt + coupling * (values[0] - values[1]),
+                values[1] / dt + coupling * (values[1] - values[0]),
+            )
+        grad_coeff = (
+            tuple(k_u * value for value in gradients[0]),
+            tuple(k_v * value for value in gradients[1]),
+        )
+        measure = weight * determinant
+        for field in range(2):
+            accumulation_integral[field] += measure * value_coeff[field]
+            for test in range(n_shape):
+                output[field][test] += measure * (
+                    value_coeff[field] * shape[test]
+                    + sum(
+                        grad_coeff[field][d] * grad[test][d]
+                        for d in range(dim)
+                    )
+                )
+    return output, accumulation_integral
 
 
 class CoupledResidualSystemTest(unittest.TestCase):
@@ -172,25 +325,34 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     path = os.path.join(tmpdir, generated.path)
                     with open(path, "w", encoding="utf-8") as stream:
                         stream.write(generated.source)
-                local_source = files[1].source
-                operator_source = files[2].source
+                diagnostics_source = files[1].source
+                local_source = files[2].source
+                operator_source = files[3].source
                 family = (
                     "tensor_product"
                     if element in ("QUAD4", "HEX8")
                     else "simplex"
                 )
                 self.assertEqual(
-                    files[1].path,
+                    files[2].path,
                     "coupled_diffusion_d%d_%s_local.hpp" % (dim, family),
                 )
                 self.assertEqual(
-                    files[2].path,
+                    files[3].path,
                     "coupled_diffusion_%s_operator.cpp" % element.lower(),
                 )
                 self.assertIn(
                     '#include "coupled_diffusion_d%d_%s_local.hpp"'
                     % (dim, family),
                     operator_source,
+                )
+                self.assertIn(
+                    '#include "kernel_diagnostics.hpp"',
+                    operator_source,
+                )
+                self.assertIn(
+                    "struct KernelDiagnostics",
+                    diagnostics_source,
                 )
                 self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
                 self.assertIn("#pragma omp simd", local_source)
@@ -216,6 +378,21 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
+                    "coupled_diffusion_%s_residual_isoparametric_mesh_soa"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "block_adjugate_data[%d][N_QP * VECTOR_SIZE]"
+                    % (dim * dim),
+                    operator_source,
+                )
+                self.assertIn(
                     "idx_t **const SFEM_RESTRICT elements",
                     operator_source,
                 )
@@ -224,13 +401,55 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn("#pragma omp atomic update", operator_source)
+                self.assertIn(
+                    "coupled_diffusion_%s_residual_element_soa_diagnostics"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "coupled_diffusion_%s_jacobian_u_v_diagnostics"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "coupled_diffusion_%s_jacobian_action_element_soa_arithmetic_intensity"
+                    % element.lower(),
+                    operator_source,
+                )
+                regenerated = generate_coupled_residual_sfem_files(
+                    system,
+                    prefix="coupled_diffusion",
+                    element_type=element,
+                )
+                self.assertEqual(
+                    tuple(file.source for file in files),
+                    tuple(file.source for file in regenerated),
+                )
+                residual_cost = system.build_residual_graph().cost
+                diagnostic_match = re.search(
+                    r"coupled_diffusion_%s_residual_element_soa_diagnostics_data = \{"
+                    r".*?\"%s\",\s*%d,\s*\d+,\s*\d+,\s*16,\s*\d+,"
+                    r"\s*(\d+),\s*(\d+),\s*(\d+),"
+                    % (element.lower(), element, dim),
+                    operator_source,
+                    re.DOTALL,
+                )
+                self.assertIsNotNone(diagnostic_match)
+                self.assertEqual(
+                    tuple(map(int, diagnostic_match.groups())),
+                    (
+                        residual_cost.adds,
+                        residual_cost.muls,
+                        residual_cost.divs,
+                    ),
+                )
                 if element in ("QUAD4", "HEX8"):
                     self.assertIn("_tensor_evaluate", local_source)
                     self.assertIn("_tensor_integrate", local_source)
                 else:
                     self.assertNotIn("_tensor_evaluate", local_source)
                 generated_sources.append(
-                    os.path.join(tmpdir, files[2].path)
+                    os.path.join(tmpdir, files[3].path)
                 )
 
             for index, source in enumerate(generated_sources):
@@ -282,6 +501,178 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     text=True,
                 ).stderr
                 self.assertIn("vectorized loop", report)
+
+    def test_isoparametric_mesh_residual_and_action_match_python_reference(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        for element in ("TRI3", "HEX8"):
+            rule = sfem_element_quadrature_rule(element)
+            system, _, _ = two_field_diffusion_system(rule.dim)
+            files = generate_coupled_residual_sfem_files(
+                system,
+                prefix="coupled_diffusion",
+                element_type=element,
+                vector_size=16,
+            )
+            with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+                for generated in files:
+                    with open(
+                        os.path.join(tmpdir, generated.path),
+                        "w",
+                        encoding="utf-8",
+                    ) as stream:
+                        stream.write(generated.source)
+                library_path = os.path.join(
+                    tmpdir,
+                    "libresidual.%s"
+                    % ("dylib" if os.uname().sysname == "Darwin" else "so"),
+                )
+                command = [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fPIC",
+                    os.path.join(
+                        tmpdir,
+                        "coupled_diffusion_%s_operator.cpp" % element.lower(),
+                    ),
+                    "-o",
+                    library_path,
+                ]
+                command.insert(
+                    -2,
+                    "-dynamiclib"
+                    if os.uname().sysname == "Darwin"
+                    else "-shared",
+                )
+                subprocess.run(
+                    command,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                library = ctypes.CDLL(library_path)
+                n_shape = rule.n_shape
+                current = (
+                    tuple(1.0 + 0.12 * s for s in range(n_shape)),
+                    tuple(0.7 - 0.05 * s for s in range(n_shape)),
+                )
+                previous = (
+                    tuple(value - 0.03 for value in current[0]),
+                    tuple(value + 0.02 for value in current[1]),
+                )
+                direction = (
+                    tuple(0.04 * (s + 1) for s in range(n_shape)),
+                    tuple(-0.025 * (s + 1) for s in range(n_shape)),
+                )
+                for coords in (
+                    _reference_coordinates(element),
+                    _deform_coordinates(_reference_coordinates(element)),
+                ):
+                    for form, trial in (
+                        ("residual", None),
+                        ("jacobian_action", direction),
+                    ):
+                        expected, accumulation = _diffusion_reference(
+                            rule,
+                            coords,
+                            current,
+                            previous,
+                            trial,
+                        )
+                        actual = self._call_isoparametric_mesh_kernel(
+                            library,
+                            element,
+                            form,
+                            coords,
+                            current,
+                            previous,
+                            trial,
+                        )
+                        for field in range(2):
+                            for value, reference in zip(actual[field], expected[field]):
+                                self.assertAlmostEqual(value, reference, places=11)
+                            self.assertAlmostEqual(
+                                sum(actual[field]),
+                                accumulation[field],
+                                places=11,
+                            )
+
+    def _call_isoparametric_mesh_kernel(
+        self,
+        library,
+        element,
+        form,
+        coords,
+        current,
+        previous,
+        direction,
+    ):
+        scalar = ctypes.c_double
+        index = ctypes.c_long
+        n_shape = len(coords)
+        dim = len(coords[0])
+        element_storage = [(index * 1)(shape) for shape in range(n_shape)]
+        elements = (ctypes.POINTER(index) * n_shape)(
+            *(ctypes.cast(values, ctypes.POINTER(index)) for values in element_storage)
+        )
+        point_storage = [
+            (scalar * n_shape)(*(coords[s][d] for s in range(n_shape)))
+            for d in range(dim)
+        ]
+        points = (ctypes.POINTER(scalar) * dim)(
+            *(ctypes.cast(values, ctypes.POINTER(scalar)) for values in point_storage)
+        )
+        current_storage = [(scalar * n_shape)(*values) for values in current]
+        previous_storage = [(scalar * n_shape)(*values) for values in previous]
+        output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
+        function = getattr(
+            library,
+            "coupled_diffusion_%s_%s_isoparametric_mesh_soa"
+            % (element.lower(), form),
+        )
+        args = [
+            ctypes.c_long(1),
+            ctypes.c_long(n_shape),
+            elements,
+            points,
+            scalar(0.7),
+            scalar(1.3),
+            scalar(0.8),
+            scalar(0.25),
+            ctypes.c_long(1),
+            current_storage[0],
+            current_storage[1],
+            ctypes.c_long(1),
+            previous_storage[0],
+            previous_storage[1],
+        ]
+        if direction is not None:
+            direction_storage = [
+                (scalar * n_shape)(*values) for values in direction
+            ]
+            args.extend(
+                (
+                    ctypes.c_long(1),
+                    direction_storage[0],
+                    direction_storage[1],
+                )
+            )
+        args.extend(
+            (
+                ctypes.c_long(1),
+                output_storage[0],
+                output_storage[1],
+            )
+        )
+        self.assertEqual(function(*args), 0)
+        return tuple(
+            tuple(values[shape] for shape in range(n_shape))
+            for values in output_storage
+        )
 
     def test_reports_invalid_fields_dimensions_and_symbols(self):
         with self.assertRaisesRegex(ValueError, "dimension"):

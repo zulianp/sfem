@@ -126,6 +126,7 @@ def clean_generated_files(out_dir):
         "generated_two_phase_flow_*_operator.cpp",
         "generated_two_phase_flow_*_operator.o",
         "kernel_math.hpp",
+        "kernel_diagnostics.hpp",
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):

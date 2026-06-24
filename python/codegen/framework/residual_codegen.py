@@ -5,8 +5,10 @@ import sympy as sp
 from .residual import CoupledResidualSystem
 from .symbolic import (
     GeneratedKernelFile,
+    KernelExpressions,
     _cpp_scalar_initializer_list,
     _sfem_ccode,
+    _sfem_soa_diagnostics_header,
     _sfem_math_header_source,
     sfem_soa_element_specialization,
 )
@@ -111,8 +113,13 @@ def generate_coupled_residual_sfem_files(
         specialization,
         local_name,
     )
+    diagnostics_name = "kernel_diagnostics.hpp"
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile(
+            diagnostics_name,
+            "\n".join(_sfem_soa_diagnostics_header()),
+        ),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
     )
@@ -547,6 +554,7 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
     element = rule.element_type.lower()
     lines = [
         '#include "%s"' % local_name,
+        '#include "kernel_diagnostics.hpp"',
         "",
         "#ifndef SFEM_SUCCESS",
         "#define SFEM_SUCCESS 0",
@@ -564,6 +572,8 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
     ]
     lines.extend(_reference_data_lines(prefix, rule))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
+    lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
+    lines.append("")
     for form, has_direction in (("residual", False), ("jacobian_action", True)):
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
@@ -655,6 +665,147 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
             )
         )
     return "\n".join(lines)
+
+
+def _residual_diagnostics_lines(system, prefix, specialization):
+    rule = specialization.quadrature_rule
+    diagnostics = [
+        (
+            "%s_residual_element_soa" % prefix,
+            system.build_residual_graph("residual_diagnostics_tmp").cost,
+            False,
+        )
+    ]
+    block_expressions = system.jacobian_blocks()
+    for block in block_expressions:
+        graph = (
+            KernelExpressions()
+            .jacobian_action(block.expression, block.name)
+            .build_graph(
+                data_symbols=system.jacobian_action_data_symbols(),
+                temporary_prefix="%s_diagnostics_tmp" % block.name,
+            )
+        )
+        diagnostics.append(
+            (
+                "%s_%s" % (prefix, block.name),
+                graph.cost,
+                True,
+            )
+        )
+    diagnostics.append(
+        (
+            "%s_jacobian_action_element_soa" % prefix,
+            system.build_jacobian_action_graph(
+                temporary_prefix="jacobian_action_diagnostics_tmp"
+            ).cost,
+            True,
+        )
+    )
+    lines = []
+    for public_name, cost, has_direction in diagnostics:
+        if lines:
+            lines.append("")
+        lines.extend(
+            _kernel_diagnostics_lines(
+                system,
+                public_name,
+                cost,
+                specialization,
+                has_direction,
+            )
+        )
+    return lines
+
+
+def _kernel_diagnostics_lines(
+    system,
+    public_name,
+    cost,
+    specialization,
+    has_direction,
+):
+    rule = specialization.quadrature_rule
+    n_fields = len(system.fields)
+    field_streams = n_fields * rule.n_shape
+    geometry_streams = system.dim * system.dim + 1
+    if rule.is_tensor_product:
+        reference_scalars = (
+            len(rule.tensor_product_shape_values_1d)
+            + len(rule.tensor_product_shape_gradients_1d)
+        )
+        quadrature_weight_scalars = len(rule.tensor_product_weights_1d)
+    else:
+        reference_scalars = (
+            len(_simplex_shape_values(rule)) + len(rule.reference_gradients)
+        )
+        quadrature_weight_scalars = len(rule.weights)
+    variable_name = "%s_diagnostics_data" % public_name
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "static const KernelDiagnostics %s = {" % variable_name,
+        '    "%s",' % public_name,
+        '    "%s",' % rule.element_type,
+        "    %d," % system.dim,
+        "    %d," % rule.n_qp,
+        "    %d," % rule.n_shape,
+        "    %d," % specialization.vector_size,
+        "    %d," % rule.order,
+        "    %d," % cost.adds,
+        "    %d," % cost.muls,
+        "    %d," % cost.divs,
+        "    %d," % cost.sqrts,
+        "    %d," % cost.pows,
+        "    %d," % cost.exps,
+        "    %d," % cost.logs,
+        "    %d," % cost.trigs,
+        "    %d," % cost.loads,
+        "    %d," % cost.stores,
+        "    %d," % cost.flops,
+        "    %d," % cost.temporaries,
+        "    %d," % cost.estimated_registers,
+        "    %d," % geometry_streams,
+        "    %d," % reference_scalars,
+        "    %d," % quadrature_weight_scalars,
+        "    %d," % len(system.parameters),
+        "    %d," % (2 * field_streams),
+        "    %d," % (field_streams if has_direction else 0),
+        "    %d," % field_streams,
+        "    1,",
+        "    1,",
+        "    1.0,",
+        "    1.0,",
+        "    8.0,",
+        "    12.0,",
+        "    16.0,",
+        "    20.0,",
+        "    20.0,",
+        "    24.0,",
+        "    1.0,",
+        "    1.0",
+        "};",
+        "",
+        "} // namespace codegen",
+        "} // namespace sfem",
+        "",
+        'extern "C" const sfem::codegen::KernelDiagnostics *%s_diagnostics(void) {'
+        % public_name,
+        "    return &sfem::codegen::%s;" % variable_name,
+        "}",
+        "",
+        'extern "C" double %s_arithmetic_intensity(' % public_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(",
+        "            &sfem::codegen::%s," % variable_name,
+        "            nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "}",
+    ]
+    return lines
 
 
 def _mesh_operator_source(
@@ -900,7 +1051,324 @@ def _mesh_operator_source(
                 "",
             ]
         )
+    lines.extend(
+        _isoparametric_mesh_operator_source(
+            system,
+            prefix,
+            local_prefix,
+            specialization,
+            form,
+            has_direction,
+        )
+    )
     return lines
+
+
+def _isoparametric_mesh_operator_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    form,
+    has_direction,
+):
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    n_qp = rule.n_qp
+    vector_size = specialization.vector_size
+    impl = "%s_%s_isoparametric_mesh_soa_impl" % (prefix, form)
+    block = "%s_%s_block" % (local_prefix, form)
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const scalar_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend(
+        "const scalar_t %s" % parameter for parameter in system.parameters
+    )
+    params.append("const ptrdiff_t current_stride")
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s" % field.name
+        for field in system.fields
+    )
+    params.append("const ptrdiff_t previous_stride")
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+        for field in system.fields
+    )
+    if has_direction:
+        params.append("const ptrdiff_t direction_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
+            for field in system.fields
+        )
+    params.append("const ptrdiff_t out_stride")
+    params.extend(
+        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
+        for field in system.fields
+    )
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s(" % impl,
+    ]
+    for index, param in enumerate(params):
+        lines.append(
+            "        %s%s" % (param, "," if index + 1 < len(params) else "")
+        )
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(_mesh_reference_data_lines(rule))
+    lines.append(
+        "    static const scalar_t geometry_grad_ref[%d] = {%s};"
+        % (
+            len(rule.reference_gradients),
+            _cpp_scalar_initializer_list(rule.reference_gradients),
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
+            "        scalar_t block_coordinates[%d * N_SHAPE][VECTOR_SIZE];"
+            % dim,
+            "        scalar_t block_adjugate_data[%d][N_QP * VECTOR_SIZE];"
+            % (dim * dim),
+            "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
+        ]
+    )
+    if has_direction:
+        lines.append(
+            "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    lines.extend(
+        [
+            "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
+            "",
+            "#pragma omp simd",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            % (shape, shape)
+        )
+    lines.extend(["        }", "", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    for shape in range(n_shape):
+        node = "ev[lane * N_SHAPE + %d]" % shape
+        for d in range(dim):
+            lines.append(
+                "            block_coordinates[%d][lane] = points[%d][%s];"
+                % (shape * dim + d, d, node)
+            )
+        for field_index, field in enumerate(system.fields):
+            stream = shape * n_fields + field_index
+            lines.append(
+                "            block_current[%d][lane] = %s[%s * current_stride];"
+                % (stream, field.name, node)
+            )
+            lines.append(
+                "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
+                % (stream, field.name, node)
+            )
+            if has_direction:
+                lines.append(
+                    "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
+                    % (stream, field.name, node)
+                )
+            lines.append("            block_output[%d][lane] = 0;" % stream)
+    lines.extend(
+        [
+            "        }",
+            "",
+            "        for (int q = 0; q < N_QP; ++q) {",
+            "#pragma omp simd",
+            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for i in range(dim):
+        for j in range(dim):
+            terms = [
+                "block_coordinates[%d][lane] * geometry_grad_ref[(q * N_SHAPE + %d) * %d + %d]"
+                % (shape * dim + i, shape, dim, j)
+                for shape in range(n_shape)
+            ]
+            lines.append(
+                "                const scalar_t J%d%d = %s;"
+                % (i, j, " + ".join(terms))
+            )
+    lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
+    lines.extend(
+        [
+            "            }",
+            "        }",
+            "",
+            "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
+            % ", ".join(
+                "block_current[%d]" % i for i in range(n_fields * n_shape)
+            ),
+            "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
+            % ", ".join(
+                "block_previous[%d]" % i for i in range(n_fields * n_shape)
+            ),
+        ]
+    )
+    if has_direction:
+        lines.append(
+            "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
+            % ", ".join(
+                "block_direction[%d]" % i
+                for i in range(n_fields * n_shape)
+            )
+        )
+    lines.extend(
+        [
+            "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
+            % ", ".join(
+                "block_output[%d]" % i for i in range(n_fields * n_shape)
+            ),
+            "        const scalar_t *const block_adjugate[%d] = {%s};"
+            % (
+                dim * dim,
+                ", ".join(
+                    "block_adjugate_data[%d]" % i for i in range(dim * dim)
+                ),
+            ),
+        ]
+    )
+    call_args = [
+        "nelems",
+        "VECTOR_SIZE",
+        "block_adjugate",
+        "block_determinant",
+    ]
+    if rule.is_tensor_product:
+        call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
+    else:
+        call_args.extend(("shape", "grad_ref", "q_weight"))
+    call_args.extend(("block_current_streams", "block_previous_streams"))
+    if has_direction:
+        call_args.append("block_direction_streams")
+    call_args.extend(map(str, system.parameters))
+    call_args.append("block_output_streams")
+    lines.extend(
+        [
+            "",
+            "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block, ", ".join(call_args)),
+            "",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for shape in range(n_shape):
+        for field_index, field in enumerate(system.fields):
+            stream = shape * n_fields + field_index
+            lines.extend(
+                [
+                    "#pragma omp atomic update",
+                    "            %s_out[ev[lane * N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
+                    % (field.name, shape, stream),
+                ]
+            )
+    lines.extend(
+        [
+            "        }",
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    function = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("scalar_t", scalar_type) for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append(
+                "        %s%s"
+                % (param, "," if index + 1 < len(typed_params) else "")
+            )
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(map(str, system.parameters))
+        call_args.append("current_stride")
+        call_args.extend(field.name for field in system.fields)
+        call_args.append("previous_stride")
+        call_args.extend("%s_old" % field.name for field in system.fields)
+        if has_direction:
+            call_args.append("direction_stride")
+            call_args.extend(
+                "%s_direction" % field.name for field in system.fields
+            )
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _isoparametric_geometry_assignment_lines(dim, indent):
+    index = "q * VECTOR_SIZE + lane"
+    if dim == 1:
+        return [
+            "%sblock_adjugate_data[0][%s] = 1;" % (indent, index),
+            "%sblock_determinant[%s] = J00;" % (indent, index),
+        ]
+    if dim == 2:
+        return [
+            "%sblock_adjugate_data[0][%s] = J11;" % (indent, index),
+            "%sblock_adjugate_data[1][%s] = -J01;" % (indent, index),
+            "%sblock_adjugate_data[2][%s] = -J10;" % (indent, index),
+            "%sblock_adjugate_data[3][%s] = J00;" % (indent, index),
+            "%sblock_determinant[%s] = J00 * J11 - J01 * J10;"
+            % (indent, index),
+        ]
+    return [
+        "%sblock_adjugate_data[0][%s] = J11 * J22 - J12 * J21;" % (indent, index),
+        "%sblock_adjugate_data[1][%s] = J02 * J21 - J01 * J22;" % (indent, index),
+        "%sblock_adjugate_data[2][%s] = J01 * J12 - J02 * J11;" % (indent, index),
+        "%sblock_adjugate_data[3][%s] = J12 * J20 - J10 * J22;" % (indent, index),
+        "%sblock_adjugate_data[4][%s] = J00 * J22 - J02 * J20;" % (indent, index),
+        "%sblock_adjugate_data[5][%s] = J02 * J10 - J00 * J12;" % (indent, index),
+        "%sblock_adjugate_data[6][%s] = J10 * J21 - J11 * J20;" % (indent, index),
+        "%sblock_adjugate_data[7][%s] = J01 * J20 - J00 * J21;" % (indent, index),
+        "%sblock_adjugate_data[8][%s] = J00 * J11 - J01 * J10;" % (indent, index),
+        "%sblock_determinant[%s] = J00 * (J11 * J22 - J12 * J21)"
+        " - J01 * (J10 * J22 - J12 * J20)"
+        " + J02 * (J10 * J21 - J11 * J20);"
+        % (indent, index),
+    ]
 
 
 def _mesh_reference_data_lines(rule):
