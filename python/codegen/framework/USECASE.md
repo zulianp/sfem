@@ -159,8 +159,7 @@ Acceptance:
 
 - Solve each time step with damped Newton using the generated residual and
   Jacobian action.
-- Use CG only when the generated Jacobian is demonstrably symmetric positive
-  definite; otherwise use an SFEM nonsymmetric Krylov solver.
+- Use BiCGStab if it converges; otherwise extend SFEM solvers with an efficient GMRES implementation (SFEM style)
 - Implement residual-based backtracking, admissibility checks, and configurable
   nonlinear/linear tolerances.
 - Reject failed steps and retry with a reduced time step.
