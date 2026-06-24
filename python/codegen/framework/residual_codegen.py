@@ -664,6 +664,14 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                 has_direction,
             )
         )
+        lines.extend(
+            _aos_dispatch_source(
+                system,
+                prefix,
+                form,
+                has_direction,
+            )
+        )
     return "\n".join(lines)
 
 
@@ -1061,6 +1069,62 @@ def _mesh_operator_source(
             has_direction,
         )
     )
+    return lines
+
+
+def _aos_dispatch_source(system, prefix, form, has_direction):
+    target = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
+    function = "%s_%s_isoparametric_mesh_aos" % (prefix, form)
+    lines = []
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        params = [
+            "const ptrdiff_t nelements",
+            "const ptrdiff_t nnodes",
+            "idx_t **const SFEM_RESTRICT elements",
+            "const %s *const *const SFEM_RESTRICT points" % scalar_type,
+            "const %s *const SFEM_RESTRICT parameters" % scalar_type,
+            "const %s *const SFEM_RESTRICT current" % scalar_type,
+            "const %s *const SFEM_RESTRICT previous" % scalar_type,
+        ]
+        if has_direction:
+            params.append(
+                "const %s *const SFEM_RESTRICT direction" % scalar_type
+            )
+        params.append("%s *const SFEM_RESTRICT output" % scalar_type)
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(params):
+            lines.append(
+                "        %s%s" % (param, "," if index + 1 < len(params) else "")
+            )
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(
+            "parameters[%d]" % index
+            for index in range(len(system.parameters))
+        )
+        call_args.extend(
+            (
+                "2",
+                "current + 0",
+                "current + 1",
+                "2",
+                "previous + 0",
+                "previous + 1",
+            )
+        )
+        if has_direction:
+            call_args.extend(
+                ("2", "direction + 0", "direction + 1")
+            )
+        call_args.extend(("2", "output + 0", "output + 1"))
+        lines.extend(
+            [
+                ") {",
+                "    return %s%s(%s);"
+                % (target, suffix, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
     return lines
 
 

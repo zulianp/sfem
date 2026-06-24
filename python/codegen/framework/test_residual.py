@@ -592,8 +592,22 @@ class CoupledResidualSystemTest(unittest.TestCase):
                             previous,
                             trial,
                         )
+                        actual_affine = self._call_affine_mesh_kernel(
+                            library,
+                            element,
+                            form,
+                            coords,
+                            current,
+                            previous,
+                            trial,
+                        )
                         for field in range(2):
                             for value, reference in zip(actual[field], expected[field]):
+                                self.assertAlmostEqual(value, reference, places=11)
+                            for value, reference in zip(
+                                actual_affine[field],
+                                expected[field],
+                            ):
                                 self.assertAlmostEqual(value, reference, places=11)
                             self.assertAlmostEqual(
                                 sum(actual[field]),
@@ -650,6 +664,96 @@ class CoupledResidualSystemTest(unittest.TestCase):
             previous_storage[0],
             previous_storage[1],
         ]
+        if direction is not None:
+            direction_storage = [
+                (scalar * n_shape)(*values) for values in direction
+            ]
+            args.extend(
+                (
+                    ctypes.c_long(1),
+                    direction_storage[0],
+                    direction_storage[1],
+                )
+            )
+        args.extend(
+            (
+                ctypes.c_long(1),
+                output_storage[0],
+                output_storage[1],
+            )
+        )
+        self.assertEqual(function(*args), 0)
+        return tuple(
+            tuple(values[shape] for shape in range(n_shape))
+            for values in output_storage
+        )
+
+    def _call_affine_mesh_kernel(
+        self,
+        library,
+        element,
+        form,
+        coords,
+        current,
+        previous,
+        direction,
+    ):
+        scalar = ctypes.c_double
+        index = ctypes.c_long
+        rule = sfem_element_quadrature_rule(element)
+        n_shape = rule.n_shape
+        dim = rule.dim
+        grad_ref = [
+            rule.reference_gradients[s * dim:(s + 1) * dim]
+            for s in range(n_shape)
+        ]
+        jacobian = [
+            [
+                sum(coords[s][i] * grad_ref[s][j] for s in range(n_shape))
+                for j in range(dim)
+            ]
+            for i in range(dim)
+        ]
+        adjugate, determinant = _adjugate_and_determinant(jacobian)
+        geometry_storage = [
+            (scalar * 1)(adjugate[i][j])
+            for i in range(dim)
+            for j in range(dim)
+        ]
+        determinant_storage = (scalar * 1)(determinant)
+        element_storage = [(index * 1)(shape) for shape in range(n_shape)]
+        elements = (ctypes.POINTER(index) * n_shape)(
+            *(ctypes.cast(values, ctypes.POINTER(index)) for values in element_storage)
+        )
+        current_storage = [(scalar * n_shape)(*values) for values in current]
+        previous_storage = [(scalar * n_shape)(*values) for values in previous]
+        output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
+        function = getattr(
+            library,
+            "coupled_diffusion_%s_%s_affine_mesh_soa"
+            % (element.lower(), form),
+        )
+        args = [
+            ctypes.c_long(1),
+            ctypes.c_long(n_shape),
+            elements,
+        ]
+        args.extend(geometry_storage)
+        args.extend(
+            (
+                determinant_storage,
+                scalar(0.7),
+                scalar(1.3),
+                scalar(0.8),
+                scalar(0.25),
+                ctypes.c_long(1),
+                current_storage[0],
+                current_storage[1],
+                ctypes.c_long(1),
+                previous_storage[0],
+                previous_storage[1],
+            )
+        )
         if direction is not None:
             direction_storage = [
                 (scalar * n_shape)(*values) for values in direction
