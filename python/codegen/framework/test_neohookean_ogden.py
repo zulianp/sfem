@@ -506,10 +506,11 @@ def call_generated_neohookean_mesh_kernel(
     base_args = [ctypes.c_ssize_t(1), ctypes.c_ssize_t(n_shape), elements]
     if geometry_mode == "affine":
         geometry_streams = element_geometry_stream_values(quadrature_rule, coords)
-        g_adjugate = c_double_array(tuple(stream[0] for stream in geometry_streams[: dim * dim]))
-        g_determinant = c_double_array((geometry_streams[-1][0],))
-        base_argtypes.extend((real_pointer, real_pointer))
-        base_args.extend((g_adjugate, g_determinant))
+        geometry_arrays = [
+            c_double_array((stream[0],)) for stream in geometry_streams
+        ]
+        base_argtypes.extend([real_pointer] * len(geometry_arrays))
+        base_args.extend(geometry_arrays)
     elif geometry_mode == "isoparametric":
         base_argtypes.append(ctypes.POINTER(real_pointer))
         base_args.append(points)
@@ -1251,7 +1252,19 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("idx_t **const SFEM_RESTRICT elements", operator_source)
-        self.assertIn("g_jacobian_adjugate[(evbegin + lane) * 9 + 0]", operator_source)
+        self.assertIn("const real_t *const SFEM_RESTRICT g_jacobian_adjugate0", operator_source)
+        self.assertIn("g_jacobian_adjugate0 + evbegin", operator_source)
+        self.assertIn("g_jacobian_determinant0 + evbegin", operator_source)
+        affine_mesh_source = operator_source.split(
+            "static SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl" % prefix,
+            1,
+        )[1].split(
+            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl"
+            % prefix,
+            1,
+        )[0]
+        self.assertNotIn("scalar_t block_jacobian_adjugate0[VECTOR_SIZE]", affine_mesh_source)
+        self.assertNotIn("g_jacobian_adjugate[(evbegin + lane)", affine_mesh_source)
         self.assertIn("geom_t **const SFEM_RESTRICT points", operator_source)
         self.assertIn("#pragma omp atomic update", operator_source)
         mesh_impl_signature = operator_source.split(

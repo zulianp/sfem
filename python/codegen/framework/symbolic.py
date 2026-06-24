@@ -3347,10 +3347,9 @@ def _sfem_soa_mesh_operator_function(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            (
-                "const real_t *const SFEM_RESTRICT g_jacobian_adjugate",
-                "const real_t *const SFEM_RESTRICT g_jacobian_determinant",
-            )
+            "const real_t *const SFEM_RESTRICT g_%s" % stream
+            for array_input in element_inputs
+            for stream in _soa_array_stream_names(array_input)
         )
     else:
         base_params.append("geom_t **const SFEM_RESTRICT points")
@@ -3441,9 +3440,10 @@ def _sfem_soa_mesh_operator_function(
     if geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-    for array_input in element_inputs:
-        for stream in _soa_array_stream_names(array_input):
-            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    if geometry_mode == "isoparametric":
+        for array_input in element_inputs:
+            for stream in _soa_array_stream_names(array_input):
+                lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
     for stream in _field_stream_names("u", dim, n_nodes):
         lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
     if form.has_direction:
@@ -3459,16 +3459,6 @@ def _sfem_soa_mesh_operator_function(
             % (shape, shape)
         )
     lines.append("        }")
-
-    if geometry_mode == "affine":
-        lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
-        for i, stream in enumerate(_soa_array_stream_names(sfem_soa_array_input("jacobian_adjugate", dim * dim))):
-            lines.append(
-                "            block_%s[lane] = g_jacobian_adjugate[(evbegin + lane) * %d + %d];"
-                % (stream, dim * dim, i)
-            )
-        lines.append("            block_jacobian_determinant0[lane] = g_jacobian_determinant[evbegin + lane];")
-        lines.append("        }")
 
     if geometry_mode == "isoparametric":
         lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
@@ -3566,11 +3556,18 @@ def _sfem_soa_mesh_operator_function(
         )
 
     call_args = ["nelems", "q"]
-    call_args.extend(
-        "block_%s" % stream
-        for array_input in element_inputs
-        for stream in _soa_array_stream_names(array_input)
-    )
+    if geometry_mode == "affine":
+        call_args.extend(
+            "g_%s + evbegin" % stream
+            for array_input in element_inputs
+            for stream in _soa_array_stream_names(array_input)
+        )
+    else:
+        call_args.extend(
+            "block_%s" % stream
+            for array_input in element_inputs
+            for stream in _soa_array_stream_names(array_input)
+        )
     if use_tensor_product_reference:
         call_args.extend(("shape_1d", "grad_1d"))
     elif use_reference_gradient_vectors:
