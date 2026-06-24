@@ -174,6 +174,24 @@ class CoupledResidualSystemTest(unittest.TestCase):
                         stream.write(generated.source)
                 local_source = files[1].source
                 operator_source = files[2].source
+                family = (
+                    "tensor_product"
+                    if element in ("QUAD4", "HEX8")
+                    else "simplex"
+                )
+                self.assertEqual(
+                    files[1].path,
+                    "coupled_diffusion_d%d_%s_local.hpp" % (dim, family),
+                )
+                self.assertEqual(
+                    files[2].path,
+                    "coupled_diffusion_%s_operator.cpp" % element.lower(),
+                )
+                self.assertIn(
+                    '#include "coupled_diffusion_d%d_%s_local.hpp"'
+                    % (dim, family),
+                    operator_source,
+                )
                 self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
                 self.assertIn("#pragma omp simd", local_source)
                 self.assertNotIn("two_phase", local_source)
@@ -187,6 +205,25 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     % element.lower(),
                     operator_source,
                 )
+                self.assertIn(
+                    "coupled_diffusion_%s_residual_affine_mesh_soa"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "coupled_diffusion_%s_jacobian_action_affine_mesh_soa"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    "idx_t **const SFEM_RESTRICT elements",
+                    operator_source,
+                )
+                self.assertIn(
+                    "block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE]",
+                    operator_source,
+                )
+                self.assertIn("#pragma omp atomic update", operator_source)
                 if element in ("QUAD4", "HEX8"):
                     self.assertIn("_tensor_evaluate", local_source)
                     self.assertIn("_tensor_integrate", local_source)
