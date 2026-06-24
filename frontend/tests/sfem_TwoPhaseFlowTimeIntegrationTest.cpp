@@ -1,5 +1,7 @@
 #include "sfem_test.hpp"
 
+#include "sfem_DirichletConditions.hpp"
+#include "sfem_FunctionSpace.hpp"
 #include "sfem_TwoPhaseFlowTimeIntegration.hpp"
 #include "smesh_mesh.hpp"
 
@@ -9,6 +11,21 @@
 #include <vector>
 
 namespace {
+    struct IntegrationData {
+        std::shared_ptr<sfem::Buffer<real_t>> initial;
+        std::shared_ptr<sfem::DirichletConditions> dirichlet;
+    };
+
+    IntegrationData unconstrained_data(const std::shared_ptr<sfem::Mesh> &mesh) {
+        auto space = sfem::FunctionSpace::create(mesh, 2);
+        auto initial = sfem::create_host_buffer<real_t>(space->n_dofs());
+        for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
+            initial->data()[2 * node + 0] = 15e6;
+            initial->data()[2 * node + 1] = 15.1e6;
+        }
+        return {initial, sfem::DirichletConditions::create(space, {})};
+    }
+
     int predictor(const real_t *const previous,
                   real_t *const trial,
                   const real_t time,
@@ -23,9 +40,8 @@ namespace {
 
 int test_zero_ramp_preserves_uniform_state() {
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 1, 1);
-    sfem::TwoPhaseFlowTimeConfig config;
-    config.injection_co2_pressure = config.initial_co2_pressure;
-    sfem::TwoPhaseFlowTimeIntegration integration(mesh, config);
+    auto data = unconstrained_data(mesh);
+    sfem::TwoPhaseFlowTimeIntegration integration(mesh, data.initial, data.dirichlet);
     SFEM_TEST_ASSERT(integration.initialize() == SFEM_SUCCESS);
     const ptrdiff_t ndofs = 2 * mesh->n_nodes();
     for (int step = 0; step < 4; ++step) {
@@ -38,20 +54,18 @@ int test_zero_ramp_preserves_uniform_state() {
                         }) == SFEM_SUCCESS);
     }
     for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
-        SFEM_TEST_ASSERT(integration.accepted()->data()[2 * node] ==
-                         config.initial_water_pressure);
-        SFEM_TEST_ASSERT(integration.accepted()->data()[2 * node + 1] ==
-                         config.initial_co2_pressure);
+        SFEM_TEST_ASSERT(integration.accepted()->data()[2 * node] == 15e6);
+        SFEM_TEST_ASSERT(integration.accepted()->data()[2 * node + 1] == 15.1e6);
     }
     return SFEM_TEST_SUCCESS;
 }
 
 int test_restart_reproduces_uninterrupted_state() {
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 1, 1);
-    sfem::TwoPhaseFlowTimeConfig config;
+    auto data = unconstrained_data(mesh);
     const ptrdiff_t ndofs = 2 * mesh->n_nodes();
-    sfem::TwoPhaseFlowTimeIntegration uninterrupted(mesh, config);
-    sfem::TwoPhaseFlowTimeIntegration first(mesh, config);
+    sfem::TwoPhaseFlowTimeIntegration uninterrupted(mesh, data.initial, data.dirichlet);
+    sfem::TwoPhaseFlowTimeIntegration first(mesh, data.initial, data.dirichlet);
     uninterrupted.initialize();
     first.initialize();
     auto solve = [=](const real_t *previous, real_t *trial, real_t time, real_t dt) {
@@ -68,7 +82,7 @@ int test_restart_reproduces_uninterrupted_state() {
             std::to_string(static_cast<long>(getpid())));
     SFEM_TEST_ASSERT(first.save_restart(checkpoint) == SFEM_SUCCESS);
 
-    sfem::TwoPhaseFlowTimeIntegration resumed(mesh, config);
+    sfem::TwoPhaseFlowTimeIntegration resumed(mesh, data.initial, data.dirichlet);
     SFEM_TEST_ASSERT(resumed.load_restart(checkpoint) == SFEM_SUCCESS);
     for (int i = 0; i < 2; ++i) {
         resumed.advance(0.25, solve);
@@ -85,8 +99,8 @@ int test_restart_reproduces_uninterrupted_state() {
 
 int test_rejected_step_preserves_accepted_state() {
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
-    sfem::TwoPhaseFlowTimeConfig config;
-    sfem::TwoPhaseFlowTimeIntegration integration(mesh, config);
+    auto data = unconstrained_data(mesh);
+    sfem::TwoPhaseFlowTimeIntegration integration(mesh, data.initial, data.dirichlet);
     integration.initialize();
     const ptrdiff_t ndofs = 2 * mesh->n_nodes();
     std::vector<real_t> before(
@@ -107,25 +121,31 @@ int test_rejected_step_preserves_accepted_state() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_balance_partitions_boundary_and_interior_nodes() {
+int test_dirichlet_gradient_uses_state_mismatch() {
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 1, 1);
-    sfem::TwoPhaseFlowTimeConfig config;
-    sfem::TwoPhaseFlowTimeIntegration integration(mesh, config);
+    auto data = unconstrained_data(mesh);
+    auto nodes = sfem::create_host_buffer<idx_t>(1);
+    nodes->data()[0] = 0;
+    auto space = sfem::FunctionSpace::create(mesh, 2);
+    sfem::DirichletConditions::Condition water{
+            .nodeset = nodes, .value = 15e6, .component = 0};
+    sfem::DirichletConditions::Condition co2{
+            .nodeset = nodes, .value = 15.1e6, .component = 1};
+    data.dirichlet = sfem::DirichletConditions::create(space, {water, co2});
+    sfem::TwoPhaseFlowTimeIntegration integration(mesh, data.initial, data.dirichlet);
     integration.initialize();
-    std::vector<real_t> residual(2 * mesh->n_nodes());
-    for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
-        residual[2 * node + 0] = 1;
-        residual[2 * node + 1] = 2;
-    }
-    const auto balance = integration.balance(residual.data());
-    SFEM_TEST_ASSERT(balance.left[0] == 4);
-    SFEM_TEST_ASSERT(balance.left[1] == 8);
-    SFEM_TEST_ASSERT(balance.right[0] == 4);
-    SFEM_TEST_ASSERT(balance.right[1] == 8);
-    SFEM_TEST_ASSERT(balance.interior[0] == 4);
-    SFEM_TEST_ASSERT(balance.interior[1] == 8);
-    SFEM_TEST_ASSERT(balance.total[0] == 12);
-    SFEM_TEST_ASSERT(balance.total[1] == 24);
+    const ptrdiff_t ndofs = 2 * mesh->n_nodes();
+    std::vector<real_t> state(
+            integration.accepted()->data(),
+            integration.accepted()->data() + ndofs);
+    std::vector<real_t> residual(ndofs, 7);
+    state[0] += 3;
+    state[1] += 5;
+    integration.constrain_residual(state.data(), residual.data());
+    SFEM_TEST_ASSERT(residual[0] == 3);
+    SFEM_TEST_ASSERT(residual[1] == 5);
+    SFEM_TEST_ASSERT(residual[2 * 1 + 0] == 7);
+    SFEM_TEST_ASSERT(residual[2 * 1 + 1] == 7);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -134,7 +154,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_zero_ramp_preserves_uniform_state);
     SFEM_RUN_TEST(test_restart_reproduces_uninterrupted_state);
     SFEM_RUN_TEST(test_rejected_step_preserves_accepted_state);
-    SFEM_RUN_TEST(test_balance_partitions_boundary_and_interior_nodes);
+    SFEM_RUN_TEST(test_dirichlet_gradient_uses_state_mismatch);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

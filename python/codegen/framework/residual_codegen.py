@@ -1197,13 +1197,14 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     lines.extend(_mesh_reference_data_lines(rule))
-    lines.append(
-        "    static const scalar_t geometry_grad_ref[%d] = {%s};"
-        % (
-            len(rule.reference_gradients),
-            _cpp_scalar_initializer_list(rule.reference_gradients),
+    if not rule.is_tensor_product:
+        lines.append(
+            "    static const scalar_t geometry_grad_ref[%d] = {%s};"
+            % (
+                len(rule.reference_gradients),
+                _cpp_scalar_initializer_list(rule.reference_gradients),
+            )
         )
-    )
     lines.extend(
         [
             "",
@@ -1264,6 +1265,26 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "        }",
+        ]
+    )
+    if rule.is_tensor_product:
+        lines.extend(
+            [
+                "",
+                "        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {%s};"
+                % ", ".join(
+                    "block_coordinates[%d]" % i for i in range(dim * n_shape)
+                ),
+                "        scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];",
+                "        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];",
+                "        %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
+                % local_prefix,
+                "                nelems, shape_1d, grad_1d, block_coordinate_streams,",
+                "                coordinate_value, coordinate_grad_ref);",
+            ]
+        )
+    lines.extend(
+        [
             "",
             "        for (int q = 0; q < N_QP; ++q) {",
             "#pragma omp simd",
@@ -1272,14 +1293,21 @@ def _isoparametric_mesh_operator_source(
     )
     for i in range(dim):
         for j in range(dim):
-            terms = [
-                "block_coordinates[%d][lane] * geometry_grad_ref[(q * N_SHAPE + %d) * %d + %d]"
-                % (shape * dim + i, shape, dim, j)
-                for shape in range(n_shape)
-            ]
+            if rule.is_tensor_product:
+                expression = (
+                    "coordinate_grad_ref[((%d * N_QP + q) * DIM + %d) * "
+                    "VECTOR_SIZE + lane]" % (i, j)
+                )
+            else:
+                terms = [
+                    "block_coordinates[%d][lane] * geometry_grad_ref[(q * N_SHAPE + %d) * %d + %d]"
+                    % (shape * dim + i, shape, dim, j)
+                    for shape in range(n_shape)
+                ]
+                expression = " + ".join(terms)
             lines.append(
                 "                const scalar_t J%d%d = %s;"
-                % (i, j, " + ".join(terms))
+                % (i, j, expression)
             )
     lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
     lines.extend(

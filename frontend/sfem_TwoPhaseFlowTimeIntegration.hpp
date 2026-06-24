@@ -12,19 +12,7 @@ namespace smesh {
 }
 
 namespace sfem {
-    struct TwoPhaseFlowBalance {
-        real_t left[2]{0, 0};
-        real_t right[2]{0, 0};
-        real_t interior[2]{0, 0};
-        real_t total[2]{0, 0};
-    };
-
-    struct TwoPhaseFlowTimeConfig {
-        real_t initial_water_pressure{15e6};
-        real_t initial_co2_pressure{15.1e6};
-        real_t injection_co2_pressure{20e6};
-        real_t ramp_duration{1};
-    };
+    class DirichletConditions;
 
     class TwoPhaseFlowTimeIntegration {
     public:
@@ -32,9 +20,13 @@ namespace sfem {
                                              real_t *trial,
                                              real_t time,
                                              real_t dt)>;
+        using BoundaryUpdate =
+                std::function<void(real_t time, DirichletConditions &conditions)>;
 
         TwoPhaseFlowTimeIntegration(const std::shared_ptr<smesh::Mesh> &mesh,
-                                    const TwoPhaseFlowTimeConfig &config);
+                                    const std::shared_ptr<Buffer<real_t>> &initial_state,
+                                    const std::shared_ptr<DirichletConditions> &dirichlet,
+                                    BoundaryUpdate boundary_update = {});
         ~TwoPhaseFlowTimeIntegration();
 
         int initialize();
@@ -43,10 +35,9 @@ namespace sfem {
         int load_restart(const smesh::Path &folder);
 
         void apply_boundary(real_t time, real_t *state) const;
-        void constrain_residual(real_t *residual) const;
+        void constrain_residual(const real_t *state, real_t *residual) const;
         void constrain_direction(real_t *direction) const;
         void constrain_linear(const real_t *direction, real_t *output) const;
-        TwoPhaseFlowBalance balance(const real_t *unconstrained_residual) const;
 
         const std::shared_ptr<Buffer<real_t>> &accepted() const;
         const std::shared_ptr<Buffer<real_t>> &trial() const;
