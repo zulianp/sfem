@@ -152,6 +152,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
         "#define SFEM_GENERATED_SCALAR_T",
         "typedef double real_t;",
         "typedef ptrdiff_t idx_t;",
+        "typedef double geom_t;",
         "#endif",
         "",
         "namespace sfem {",
@@ -1081,7 +1082,7 @@ def _aos_dispatch_source(system, prefix, form, has_direction):
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
             "idx_t **const SFEM_RESTRICT elements",
-            "const %s *const *const SFEM_RESTRICT points" % scalar_type,
+            "const geom_t *const *const SFEM_RESTRICT points",
             "const %s *const SFEM_RESTRICT parameters" % scalar_type,
             "const %s *const SFEM_RESTRICT current" % scalar_type,
             "const %s *const SFEM_RESTRICT previous" % scalar_type,
@@ -1148,7 +1149,7 @@ def _isoparametric_mesh_operator_source(
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
-        "const scalar_t *const *const SFEM_RESTRICT points",
+        "const geom_t *const *const SFEM_RESTRICT points",
     ]
     params.extend(
         "const scalar_t %s" % parameter for parameter in system.parameters
@@ -1545,7 +1546,7 @@ def _tensor_evaluate_2d(prefix):
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
         "static SFEM_INLINE void %s_tensor_evaluate(" % prefix,
         "        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,",
-        "        const scalar_t *const streams[N_FIELDS * N_SHAPE], scalar_t *const value, scalar_t *const gradient) {",
+        "        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value, scalar_t *const gradient) {",
         "    static constexpr int Q = %s_integer_root(N_QP, 2);" % prefix,
         "    static constexpr int S = %s_integer_root(N_SHAPE, 2);" % prefix,
         "    scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];",
@@ -1588,7 +1589,7 @@ def _tensor_evaluate_3d(prefix):
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
         "static SFEM_INLINE void %s_tensor_evaluate(" % prefix,
         "        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,",
-        "        const scalar_t *const streams[N_FIELDS * N_SHAPE], scalar_t *const value, scalar_t *const gradient) {",
+        "        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value, scalar_t *const gradient) {",
         "    static constexpr int Q = %s_integer_root(N_QP, 3);" % prefix,
         "    static constexpr int S = %s_integer_root(N_SHAPE, 3);" % prefix,
         "    scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE], gx[N_FIELDS * Q * S * S * VECTOR_SIZE];",
@@ -1649,7 +1650,7 @@ def _tensor_integrate_2d(prefix):
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
         "static SFEM_INLINE void %s_tensor_integrate(" % prefix,
         "        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,",
-        "        const scalar_t *const value_coeff, const scalar_t *const grad_coeff, scalar_t *const output[N_FIELDS * N_SHAPE]) {",
+        "        const scalar_t *const value_coeff, const scalar_t *const grad_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {",
         "    static constexpr int Q = %s_integer_root(N_QP, 2), S = %s_integer_root(N_SHAPE, 2);"
         % (prefix, prefix),
         "    scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE], sg[N_FIELDS * Q * S * VECTOR_SIZE];",
@@ -1682,7 +1683,7 @@ def _tensor_integrate_3d(prefix):
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
         "static SFEM_INLINE void %s_tensor_integrate(" % prefix,
         "        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,",
-        "        const scalar_t *const value_coeff, const scalar_t *const grad_coeff, scalar_t *const output[N_FIELDS * N_SHAPE]) {",
+        "        const scalar_t *const value_coeff, const scalar_t *const grad_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {",
         "    static constexpr int Q = %s_integer_root(N_QP, 3), S = %s_integer_root(N_SHAPE, 3);"
         % (prefix, prefix),
         "    scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE], z1[N_FIELDS * Q * Q * S * VECTOR_SIZE], z2[N_FIELDS * Q * Q * S * VECTOR_SIZE];",
