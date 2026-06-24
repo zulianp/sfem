@@ -20,6 +20,14 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(ptr
                                                                              idx_t **,
                                                                              const real_t *,
                                                                              const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
+                                                                             const real_t *,
                                                                              real_t,
                                                                              real_t,
                                                                              ptrdiff_t,
@@ -49,6 +57,14 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_
 extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(ptrdiff_t,
                                                                           ptrdiff_t,
                                                                           idx_t **,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
+                                                                          const real_t *,
                                                                           const real_t *,
                                                                           const real_t *,
                                                                           real_t,
@@ -176,7 +192,7 @@ namespace {
     }
 
     void compute_hex8_affine_geometry(const std::shared_ptr<sfem::Mesh> &mesh,
-                                      real_t *const                      adjugate,
+                                      real_t **const                     adjugate,
                                       real_t *const                      determinant) {
         const ptrdiff_t nelements = mesh->n_elements();
         idx_t **const   elements  = mesh->elements(0)->data();
@@ -195,7 +211,11 @@ namespace {
                 z[v]             = points[2][node];
             }
 
-            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, &adjugate[e * 9], &determinant[e]);
+            real_t local_adjugate[9];
+            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, local_adjugate, &determinant[e]);
+            for (int d = 0; d < 9; ++d) {
+                adjugate[d][e] = local_adjugate[d];
+            }
         }
     }
 
@@ -303,7 +323,7 @@ int main(int argc, char *argv[]) {
     double generated_iso_gradient_elapsed    = 0;
     double generated_iso_apply_elapsed       = 0;
 
-    auto adjugate    = sfem::create_host_buffer<real_t>(nelements * 9);
+    auto adjugate    = sfem::create_host_buffer<real_t>(9, nelements);
     auto determinant = sfem::create_host_buffer<real_t>(nelements);
     compute_hex8_affine_geometry(mesh, adjugate->data(), determinant->data());
 
@@ -325,7 +345,15 @@ int main(int argc, char *argv[]) {
             generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
                                                                           mesh->n_nodes(),
                                                                           elements,
-                                                                          adjugate->data(),
+                                                                          adjugate->data()[0],
+                                                                          adjugate->data()[1],
+                                                                          adjugate->data()[2],
+                                                                          adjugate->data()[3],
+                                                                          adjugate->data()[4],
+                                                                          adjugate->data()[5],
+                                                                          adjugate->data()[6],
+                                                                          adjugate->data()[7],
+                                                                          adjugate->data()[8],
                                                                           determinant->data(),
                                                                           mu,
                                                                           lambda,
@@ -341,7 +369,15 @@ int main(int argc, char *argv[]) {
             generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
                                                                        mesh->n_nodes(),
                                                                        elements,
-                                                                       adjugate->data(),
+                                                                       adjugate->data()[0],
+                                                                       adjugate->data()[1],
+                                                                       adjugate->data()[2],
+                                                                       adjugate->data()[3],
+                                                                       adjugate->data()[4],
+                                                                       adjugate->data()[5],
+                                                                       adjugate->data()[6],
+                                                                       adjugate->data()[7],
+                                                                       adjugate->data()[8],
                                                                        determinant->data(),
                                                                        mu,
                                                                        lambda,
@@ -371,7 +407,15 @@ int main(int argc, char *argv[]) {
             generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
                                                                           mesh->n_nodes(),
                                                                           elements,
-                                                                          adjugate->data(),
+                                                                          adjugate->data()[0],
+                                                                          adjugate->data()[1],
+                                                                          adjugate->data()[2],
+                                                                          adjugate->data()[3],
+                                                                          adjugate->data()[4],
+                                                                          adjugate->data()[5],
+                                                                          adjugate->data()[6],
+                                                                          adjugate->data()[7],
+                                                                          adjugate->data()[8],
                                                                           determinant->data(),
                                                                           mu,
                                                                           lambda,
@@ -392,7 +436,15 @@ int main(int argc, char *argv[]) {
             generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
                                                                        mesh->n_nodes(),
                                                                        elements,
-                                                                       adjugate->data(),
+                                                                       adjugate->data()[0],
+                                                                       adjugate->data()[1],
+                                                                       adjugate->data()[2],
+                                                                       adjugate->data()[3],
+                                                                       adjugate->data()[4],
+                                                                       adjugate->data()[5],
+                                                                       adjugate->data()[6],
+                                                                       adjugate->data()[7],
+                                                                       adjugate->data()[8],
                                                                        determinant->data(),
                                                                        mu,
                                                                        lambda,
@@ -501,7 +553,15 @@ int main(int argc, char *argv[]) {
             generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(nelements,
                                                                           mesh->n_nodes(),
                                                                           elements,
-                                                                          adjugate->data(),
+                                                                          adjugate->data()[0],
+                                                                          adjugate->data()[1],
+                                                                          adjugate->data()[2],
+                                                                          adjugate->data()[3],
+                                                                          adjugate->data()[4],
+                                                                          adjugate->data()[5],
+                                                                          adjugate->data()[6],
+                                                                          adjugate->data()[7],
+                                                                          adjugate->data()[8],
                                                                           determinant->data(),
                                                                           mu,
                                                                           lambda,
@@ -545,7 +605,15 @@ int main(int argc, char *argv[]) {
                     generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(nelements,
                                                                                mesh->n_nodes(),
                                                                                elements,
-                                                                               adjugate->data(),
+                                                                               adjugate->data()[0],
+                                                                               adjugate->data()[1],
+                                                                               adjugate->data()[2],
+                                                                               adjugate->data()[3],
+                                                                               adjugate->data()[4],
+                                                                               adjugate->data()[5],
+                                                                               adjugate->data()[6],
+                                                                               adjugate->data()[7],
+                                                                               adjugate->data()[8],
                                                                                determinant->data(),
                                                                                mu,
                                                                                lambda,
