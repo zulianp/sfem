@@ -490,12 +490,17 @@ def call_generated_neohookean_mesh_kernel(
     dim = quadrature_rule.dim
     n_shape = quadrature_rule.n_shape
     real_pointer = ctypes.POINTER(scalar_ctype)
+    geometry_ctype = ctypes.c_double
+    geometry_pointer = ctypes.POINTER(geometry_ctype)
     idx_pointer = ctypes.POINTER(ctypes.c_ssize_t)
     scalar_array = lambda values: (scalar_ctype * len(values))(*values)
     element_arrays = [(ctypes.c_ssize_t * 1)(shape) for shape in range(n_shape)]
     elements = (idx_pointer * n_shape)(*element_arrays)
-    coordinate_arrays = [scalar_array(component_values) for component_values in zip(*coords)]
-    points = c_pointer_array(coordinate_arrays, scalar_ctype)
+    coordinate_arrays = [
+        (geometry_ctype * len(component_values))(*component_values)
+        for component_values in zip(*coords)
+    ]
+    points = c_pointer_array(coordinate_arrays, geometry_ctype)
     u_global = [scalar_array(component_values) for component_values in zip(*displacement)]
     h_global = [scalar_array(component_values) for component_values in zip(*direction)] if direction is not None else []
     outputs = [scalar_array((0.0,) * n_shape) for _ in range(dim)]
@@ -516,7 +521,7 @@ def call_generated_neohookean_mesh_kernel(
         base_argtypes.extend([real_pointer] * len(geometry_arrays))
         base_args.extend(geometry_arrays)
     elif geometry_mode == "isoparametric":
-        base_argtypes.append(ctypes.POINTER(real_pointer))
+        base_argtypes.append(ctypes.POINTER(geometry_pointer))
         base_args.append(points)
     else:
         raise ValueError("unsupported mesh geometry mode")
@@ -1276,7 +1281,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("scalar_t block_jacobian_adjugate0[VECTOR_SIZE]", affine_mesh_source)
         self.assertNotIn("g_jacobian_adjugate[(evbegin + lane)", affine_mesh_source)
         self.assertIn(
-            "const scalar_t *const *const SFEM_RESTRICT points",
+            "const geometry_t *const *const SFEM_RESTRICT points",
+            operator_source,
+        )
+        self.assertIn(
+            "const geom_t *const *const SFEM_RESTRICT points",
             operator_source,
         )
         self.assertIn(
