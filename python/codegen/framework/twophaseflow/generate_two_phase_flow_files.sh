@@ -8,7 +8,8 @@ shift || true
 source "${CODE_DIR:?CODE_DIR must be set}/merge_git_repos/sfem/venv/bin/activate"
 
 cd "$ROOT_DIR"
-python python/codegen/framework/twophaseflow/generate_two_phase_flow_files.py \
+PYTHONPATH="$ROOT_DIR/python${PYTHONPATH:+:$PYTHONPATH}" \
+python -m codegen.framework.materials.two_phase_flow \
     --out-dir "$OUT_DIR" \
     --compile \
     "$@"
