@@ -162,7 +162,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_simplex_jacobian_action_bloc
         const scalar_t *const SFEM_RESTRICT grad_ref,
         const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t *const SFEM_RESTRICT current[2 * N_SHAPE],
-        const scalar_t *const SFEM_RESTRICT previous[2 * N_SHAPE],
         const scalar_t *const SFEM_RESTRICT direction[2 * N_SHAPE],
         const scalar_t porosity,
         const scalar_t S_res,
@@ -209,17 +208,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_simplex_jacobian_action_bloc
             }
             const scalar_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj2) / det;
             const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj3) / det;
-            scalar_t p_w_old = 0;
-            scalar_t p_w_old_grad_0_ref = 0;
-            scalar_t p_w_old_grad_1_ref = 0;
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = previous[trial * N_FIELDS + 0][lane];
-                p_w_old += coeff * shape[q * N_SHAPE + trial];
-                p_w_old_grad_0_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + 0];
-                p_w_old_grad_1_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + 1];
-            }
-            const scalar_t p_w_old_grad_0 = (p_w_old_grad_0_ref * adj0 + p_w_old_grad_1_ref * adj2) / det;
-            const scalar_t p_w_old_grad_1 = (p_w_old_grad_0_ref * adj1 + p_w_old_grad_1_ref * adj3) / det;
             scalar_t p_w_direction = 0;
             scalar_t p_w_direction_grad_0_ref = 0;
             scalar_t p_w_direction_grad_1_ref = 0;
@@ -242,17 +230,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_simplex_jacobian_action_bloc
             }
             const scalar_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
             const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-            scalar_t p_c_old = 0;
-            scalar_t p_c_old_grad_0_ref = 0;
-            scalar_t p_c_old_grad_1_ref = 0;
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = previous[trial * N_FIELDS + 1][lane];
-                p_c_old += coeff * shape[q * N_SHAPE + trial];
-                p_c_old_grad_0_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + 0];
-                p_c_old_grad_1_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + 1];
-            }
-            const scalar_t p_c_old_grad_0 = (p_c_old_grad_0_ref * adj0 + p_c_old_grad_1_ref * adj2) / det;
-            const scalar_t p_c_old_grad_1 = (p_c_old_grad_0_ref * adj1 + p_c_old_grad_1_ref * adj3) / det;
             scalar_t p_c_direction = 0;
             scalar_t p_c_direction_grad_0_ref = 0;
             scalar_t p_c_direction_grad_1_ref = 0;

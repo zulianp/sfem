@@ -185,8 +185,8 @@ static const KernelDiagnostics generated_two_phase_flow_hex8_jacobian_p_w_p_w_di
     10,
     8,
     2,
-    26,
-    32,
+    19,
+    16,
     16,
     16,
     1,
@@ -271,8 +271,8 @@ static const KernelDiagnostics generated_two_phase_flow_hex8_jacobian_p_w_p_c_di
     10,
     8,
     2,
-    26,
-    32,
+    19,
+    16,
     16,
     16,
     1,
@@ -357,8 +357,8 @@ static const KernelDiagnostics generated_two_phase_flow_hex8_jacobian_p_c_p_w_di
     10,
     8,
     2,
-    26,
-    32,
+    21,
+    16,
     16,
     16,
     1,
@@ -443,8 +443,8 @@ static const KernelDiagnostics generated_two_phase_flow_hex8_jacobian_p_c_p_c_di
     10,
     8,
     2,
-    26,
-    32,
+    21,
+    16,
     16,
     16,
     1,
@@ -530,7 +530,7 @@ static const KernelDiagnostics generated_two_phase_flow_hex8_jacobian_action_ele
     8,
     2,
     26,
-    32,
+    16,
     16,
     16,
     1,
@@ -1360,7 +1360,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa(
         const double *const SFEM_RESTRICT adjugate[9],
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT current[16],
-        const double *const SFEM_RESTRICT previous[16],
         const double *const SFEM_RESTRICT direction[16],
         const double porosity,
         const double S_res,
@@ -1390,7 +1389,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa(
         const double K_8,
         double *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<double, 8, 8, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_hex8_hex8_shape_1d_f64, sfem::codegen::generated_two_phase_flow_hex8_hex8_grad_1d_f64, sfem::codegen::generated_two_phase_flow_hex8_hex8_q_weight_1d_f64, current, previous, direction, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<double, 8, 8, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_hex8_hex8_shape_1d_f64, sfem::codegen::generated_two_phase_flow_hex8_hex8_grad_1d_f64, sfem::codegen::generated_two_phase_flow_hex8_hex8_q_weight_1d_f64, current, direction, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, output);
     return SFEM_SUCCESS;
 }
 
@@ -1400,7 +1399,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa_float(
         const float *const SFEM_RESTRICT adjugate[9],
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT current[16],
-        const float *const SFEM_RESTRICT previous[16],
         const float *const SFEM_RESTRICT direction[16],
         const float porosity,
         const float S_res,
@@ -1430,7 +1428,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa_float(
         const float K_8,
         float *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<float, 8, 8, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_hex8_hex8_shape_1d_f32, sfem::codegen::generated_two_phase_flow_hex8_hex8_grad_1d_f32, sfem::codegen::generated_two_phase_flow_hex8_hex8_q_weight_1d_f32, current, previous, direction, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<float, 8, 8, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_hex8_hex8_shape_1d_f32, sfem::codegen::generated_two_phase_flow_hex8_hex8_grad_1d_f32, sfem::codegen::generated_two_phase_flow_hex8_hex8_q_weight_1d_f32, current, direction, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, output);
     return SFEM_SUCCESS;
 }
 
@@ -1481,9 +1479,6 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_affine_mesh
         const ptrdiff_t current_stride,
         const scalar_t *const SFEM_RESTRICT p_w,
         const scalar_t *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT p_w_old,
-        const scalar_t *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const scalar_t *const SFEM_RESTRICT p_w_direction,
         const scalar_t *const SFEM_RESTRICT p_c_direction,
@@ -1506,7 +1501,6 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_affine_mesh
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
@@ -1525,78 +1519,61 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_affine_mesh
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             block_current[0][lane] = p_w[ev[lane * N_SHAPE + 0] * current_stride];
-            block_previous[0][lane] = p_w_old[ev[lane * N_SHAPE + 0] * previous_stride];
             block_direction[0][lane] = p_w_direction[ev[lane * N_SHAPE + 0] * direction_stride];
             block_output[0][lane] = 0;
             block_current[1][lane] = p_c[ev[lane * N_SHAPE + 0] * current_stride];
-            block_previous[1][lane] = p_c_old[ev[lane * N_SHAPE + 0] * previous_stride];
             block_direction[1][lane] = p_c_direction[ev[lane * N_SHAPE + 0] * direction_stride];
             block_output[1][lane] = 0;
             block_current[2][lane] = p_w[ev[lane * N_SHAPE + 1] * current_stride];
-            block_previous[2][lane] = p_w_old[ev[lane * N_SHAPE + 1] * previous_stride];
             block_direction[2][lane] = p_w_direction[ev[lane * N_SHAPE + 1] * direction_stride];
             block_output[2][lane] = 0;
             block_current[3][lane] = p_c[ev[lane * N_SHAPE + 1] * current_stride];
-            block_previous[3][lane] = p_c_old[ev[lane * N_SHAPE + 1] * previous_stride];
             block_direction[3][lane] = p_c_direction[ev[lane * N_SHAPE + 1] * direction_stride];
             block_output[3][lane] = 0;
             block_current[4][lane] = p_w[ev[lane * N_SHAPE + 2] * current_stride];
-            block_previous[4][lane] = p_w_old[ev[lane * N_SHAPE + 2] * previous_stride];
             block_direction[4][lane] = p_w_direction[ev[lane * N_SHAPE + 2] * direction_stride];
             block_output[4][lane] = 0;
             block_current[5][lane] = p_c[ev[lane * N_SHAPE + 2] * current_stride];
-            block_previous[5][lane] = p_c_old[ev[lane * N_SHAPE + 2] * previous_stride];
             block_direction[5][lane] = p_c_direction[ev[lane * N_SHAPE + 2] * direction_stride];
             block_output[5][lane] = 0;
             block_current[6][lane] = p_w[ev[lane * N_SHAPE + 3] * current_stride];
-            block_previous[6][lane] = p_w_old[ev[lane * N_SHAPE + 3] * previous_stride];
             block_direction[6][lane] = p_w_direction[ev[lane * N_SHAPE + 3] * direction_stride];
             block_output[6][lane] = 0;
             block_current[7][lane] = p_c[ev[lane * N_SHAPE + 3] * current_stride];
-            block_previous[7][lane] = p_c_old[ev[lane * N_SHAPE + 3] * previous_stride];
             block_direction[7][lane] = p_c_direction[ev[lane * N_SHAPE + 3] * direction_stride];
             block_output[7][lane] = 0;
             block_current[8][lane] = p_w[ev[lane * N_SHAPE + 4] * current_stride];
-            block_previous[8][lane] = p_w_old[ev[lane * N_SHAPE + 4] * previous_stride];
             block_direction[8][lane] = p_w_direction[ev[lane * N_SHAPE + 4] * direction_stride];
             block_output[8][lane] = 0;
             block_current[9][lane] = p_c[ev[lane * N_SHAPE + 4] * current_stride];
-            block_previous[9][lane] = p_c_old[ev[lane * N_SHAPE + 4] * previous_stride];
             block_direction[9][lane] = p_c_direction[ev[lane * N_SHAPE + 4] * direction_stride];
             block_output[9][lane] = 0;
             block_current[10][lane] = p_w[ev[lane * N_SHAPE + 5] * current_stride];
-            block_previous[10][lane] = p_w_old[ev[lane * N_SHAPE + 5] * previous_stride];
             block_direction[10][lane] = p_w_direction[ev[lane * N_SHAPE + 5] * direction_stride];
             block_output[10][lane] = 0;
             block_current[11][lane] = p_c[ev[lane * N_SHAPE + 5] * current_stride];
-            block_previous[11][lane] = p_c_old[ev[lane * N_SHAPE + 5] * previous_stride];
             block_direction[11][lane] = p_c_direction[ev[lane * N_SHAPE + 5] * direction_stride];
             block_output[11][lane] = 0;
             block_current[12][lane] = p_w[ev[lane * N_SHAPE + 6] * current_stride];
-            block_previous[12][lane] = p_w_old[ev[lane * N_SHAPE + 6] * previous_stride];
             block_direction[12][lane] = p_w_direction[ev[lane * N_SHAPE + 6] * direction_stride];
             block_output[12][lane] = 0;
             block_current[13][lane] = p_c[ev[lane * N_SHAPE + 6] * current_stride];
-            block_previous[13][lane] = p_c_old[ev[lane * N_SHAPE + 6] * previous_stride];
             block_direction[13][lane] = p_c_direction[ev[lane * N_SHAPE + 6] * direction_stride];
             block_output[13][lane] = 0;
             block_current[14][lane] = p_w[ev[lane * N_SHAPE + 7] * current_stride];
-            block_previous[14][lane] = p_w_old[ev[lane * N_SHAPE + 7] * previous_stride];
             block_direction[14][lane] = p_w_direction[ev[lane * N_SHAPE + 7] * direction_stride];
             block_output[14][lane] = 0;
             block_current[15][lane] = p_c[ev[lane * N_SHAPE + 7] * current_stride];
-            block_previous[15][lane] = p_c_old[ev[lane * N_SHAPE + 7] * previous_stride];
             block_direction[15][lane] = p_c_direction[ev[lane * N_SHAPE + 7] * direction_stride];
             block_output[15][lane] = 0;
         }
 
         const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
         const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[6], block_direction[7], block_direction[4], block_direction[5], block_direction[8], block_direction[9], block_direction[10], block_direction[11], block_direction[14], block_direction[15], block_direction[12], block_direction[13]};
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
         const scalar_t *const block_adjugate[9] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin};
 
-        generated_two_phase_flow_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, block_output_streams);
+        generated_two_phase_flow_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1683,9 +1660,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa(
         const ptrdiff_t current_stride,
         const double *const SFEM_RESTRICT p_w,
         const double *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const double *const SFEM_RESTRICT p_w_direction,
         const double *const SFEM_RESTRICT p_c_direction,
@@ -1693,7 +1667,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa(
         double *const SFEM_RESTRICT p_w_out,
         double *const SFEM_RESTRICT p_c_out
 ) {
-    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_float(
@@ -1739,9 +1713,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_flo
         const ptrdiff_t current_stride,
         const float *const SFEM_RESTRICT p_w,
         const float *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const float *const SFEM_RESTRICT p_w_direction,
         const float *const SFEM_RESTRICT p_c_direction,
@@ -1749,7 +1720,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_flo
         float *const SFEM_RESTRICT p_w_out,
         float *const SFEM_RESTRICT p_c_out
 ) {
-    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 namespace sfem {
@@ -1790,9 +1761,6 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_isoparametr
         const ptrdiff_t current_stride,
         const scalar_t *const SFEM_RESTRICT p_w,
         const scalar_t *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT p_w_old,
-        const scalar_t *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const scalar_t *const SFEM_RESTRICT p_w_direction,
         const scalar_t *const SFEM_RESTRICT p_c_direction,
@@ -1818,7 +1786,6 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_isoparametr
         scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
@@ -1840,88 +1807,72 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_isoparametr
             block_coordinates[1][lane] = points[1][ev[lane * N_SHAPE + 0]];
             block_coordinates[2][lane] = points[2][ev[lane * N_SHAPE + 0]];
             block_current[0][lane] = p_w[ev[lane * N_SHAPE + 0] * current_stride];
-            block_previous[0][lane] = p_w_old[ev[lane * N_SHAPE + 0] * previous_stride];
             block_direction[0][lane] = p_w_direction[ev[lane * N_SHAPE + 0] * direction_stride];
             block_output[0][lane] = 0;
             block_current[1][lane] = p_c[ev[lane * N_SHAPE + 0] * current_stride];
-            block_previous[1][lane] = p_c_old[ev[lane * N_SHAPE + 0] * previous_stride];
             block_direction[1][lane] = p_c_direction[ev[lane * N_SHAPE + 0] * direction_stride];
             block_output[1][lane] = 0;
             block_coordinates[3][lane] = points[0][ev[lane * N_SHAPE + 1]];
             block_coordinates[4][lane] = points[1][ev[lane * N_SHAPE + 1]];
             block_coordinates[5][lane] = points[2][ev[lane * N_SHAPE + 1]];
             block_current[2][lane] = p_w[ev[lane * N_SHAPE + 1] * current_stride];
-            block_previous[2][lane] = p_w_old[ev[lane * N_SHAPE + 1] * previous_stride];
             block_direction[2][lane] = p_w_direction[ev[lane * N_SHAPE + 1] * direction_stride];
             block_output[2][lane] = 0;
             block_current[3][lane] = p_c[ev[lane * N_SHAPE + 1] * current_stride];
-            block_previous[3][lane] = p_c_old[ev[lane * N_SHAPE + 1] * previous_stride];
             block_direction[3][lane] = p_c_direction[ev[lane * N_SHAPE + 1] * direction_stride];
             block_output[3][lane] = 0;
             block_coordinates[6][lane] = points[0][ev[lane * N_SHAPE + 2]];
             block_coordinates[7][lane] = points[1][ev[lane * N_SHAPE + 2]];
             block_coordinates[8][lane] = points[2][ev[lane * N_SHAPE + 2]];
             block_current[4][lane] = p_w[ev[lane * N_SHAPE + 2] * current_stride];
-            block_previous[4][lane] = p_w_old[ev[lane * N_SHAPE + 2] * previous_stride];
             block_direction[4][lane] = p_w_direction[ev[lane * N_SHAPE + 2] * direction_stride];
             block_output[4][lane] = 0;
             block_current[5][lane] = p_c[ev[lane * N_SHAPE + 2] * current_stride];
-            block_previous[5][lane] = p_c_old[ev[lane * N_SHAPE + 2] * previous_stride];
             block_direction[5][lane] = p_c_direction[ev[lane * N_SHAPE + 2] * direction_stride];
             block_output[5][lane] = 0;
             block_coordinates[9][lane] = points[0][ev[lane * N_SHAPE + 3]];
             block_coordinates[10][lane] = points[1][ev[lane * N_SHAPE + 3]];
             block_coordinates[11][lane] = points[2][ev[lane * N_SHAPE + 3]];
             block_current[6][lane] = p_w[ev[lane * N_SHAPE + 3] * current_stride];
-            block_previous[6][lane] = p_w_old[ev[lane * N_SHAPE + 3] * previous_stride];
             block_direction[6][lane] = p_w_direction[ev[lane * N_SHAPE + 3] * direction_stride];
             block_output[6][lane] = 0;
             block_current[7][lane] = p_c[ev[lane * N_SHAPE + 3] * current_stride];
-            block_previous[7][lane] = p_c_old[ev[lane * N_SHAPE + 3] * previous_stride];
             block_direction[7][lane] = p_c_direction[ev[lane * N_SHAPE + 3] * direction_stride];
             block_output[7][lane] = 0;
             block_coordinates[12][lane] = points[0][ev[lane * N_SHAPE + 4]];
             block_coordinates[13][lane] = points[1][ev[lane * N_SHAPE + 4]];
             block_coordinates[14][lane] = points[2][ev[lane * N_SHAPE + 4]];
             block_current[8][lane] = p_w[ev[lane * N_SHAPE + 4] * current_stride];
-            block_previous[8][lane] = p_w_old[ev[lane * N_SHAPE + 4] * previous_stride];
             block_direction[8][lane] = p_w_direction[ev[lane * N_SHAPE + 4] * direction_stride];
             block_output[8][lane] = 0;
             block_current[9][lane] = p_c[ev[lane * N_SHAPE + 4] * current_stride];
-            block_previous[9][lane] = p_c_old[ev[lane * N_SHAPE + 4] * previous_stride];
             block_direction[9][lane] = p_c_direction[ev[lane * N_SHAPE + 4] * direction_stride];
             block_output[9][lane] = 0;
             block_coordinates[15][lane] = points[0][ev[lane * N_SHAPE + 5]];
             block_coordinates[16][lane] = points[1][ev[lane * N_SHAPE + 5]];
             block_coordinates[17][lane] = points[2][ev[lane * N_SHAPE + 5]];
             block_current[10][lane] = p_w[ev[lane * N_SHAPE + 5] * current_stride];
-            block_previous[10][lane] = p_w_old[ev[lane * N_SHAPE + 5] * previous_stride];
             block_direction[10][lane] = p_w_direction[ev[lane * N_SHAPE + 5] * direction_stride];
             block_output[10][lane] = 0;
             block_current[11][lane] = p_c[ev[lane * N_SHAPE + 5] * current_stride];
-            block_previous[11][lane] = p_c_old[ev[lane * N_SHAPE + 5] * previous_stride];
             block_direction[11][lane] = p_c_direction[ev[lane * N_SHAPE + 5] * direction_stride];
             block_output[11][lane] = 0;
             block_coordinates[18][lane] = points[0][ev[lane * N_SHAPE + 6]];
             block_coordinates[19][lane] = points[1][ev[lane * N_SHAPE + 6]];
             block_coordinates[20][lane] = points[2][ev[lane * N_SHAPE + 6]];
             block_current[12][lane] = p_w[ev[lane * N_SHAPE + 6] * current_stride];
-            block_previous[12][lane] = p_w_old[ev[lane * N_SHAPE + 6] * previous_stride];
             block_direction[12][lane] = p_w_direction[ev[lane * N_SHAPE + 6] * direction_stride];
             block_output[12][lane] = 0;
             block_current[13][lane] = p_c[ev[lane * N_SHAPE + 6] * current_stride];
-            block_previous[13][lane] = p_c_old[ev[lane * N_SHAPE + 6] * previous_stride];
             block_direction[13][lane] = p_c_direction[ev[lane * N_SHAPE + 6] * direction_stride];
             block_output[13][lane] = 0;
             block_coordinates[21][lane] = points[0][ev[lane * N_SHAPE + 7]];
             block_coordinates[22][lane] = points[1][ev[lane * N_SHAPE + 7]];
             block_coordinates[23][lane] = points[2][ev[lane * N_SHAPE + 7]];
             block_current[14][lane] = p_w[ev[lane * N_SHAPE + 7] * current_stride];
-            block_previous[14][lane] = p_w_old[ev[lane * N_SHAPE + 7] * previous_stride];
             block_direction[14][lane] = p_w_direction[ev[lane * N_SHAPE + 7] * direction_stride];
             block_output[14][lane] = 0;
             block_current[15][lane] = p_c[ev[lane * N_SHAPE + 7] * current_stride];
-            block_previous[15][lane] = p_c_old[ev[lane * N_SHAPE + 7] * previous_stride];
             block_direction[15][lane] = p_c_direction[ev[lane * N_SHAPE + 7] * direction_stride];
             block_output[15][lane] = 0;
         }
@@ -1959,12 +1910,11 @@ static SFEM_INLINE int generated_two_phase_flow_hex8_jacobian_action_isoparametr
         }
 
         const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
         const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[6], block_direction[7], block_direction[4], block_direction[5], block_direction[8], block_direction[9], block_direction[10], block_direction[11], block_direction[14], block_direction[15], block_direction[12], block_direction[13]};
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        generated_two_phase_flow_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, block_output_streams);
+        generated_two_phase_flow_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -2042,9 +1992,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         const ptrdiff_t current_stride,
         const double *const SFEM_RESTRICT p_w,
         const double *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const double *const SFEM_RESTRICT p_w_direction,
         const double *const SFEM_RESTRICT p_c_direction,
@@ -2052,7 +1999,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         double *const SFEM_RESTRICT p_w_out,
         double *const SFEM_RESTRICT p_c_out
 ) {
-    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_float(
@@ -2089,9 +2036,6 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         const ptrdiff_t current_stride,
         const float *const SFEM_RESTRICT p_w,
         const float *const SFEM_RESTRICT p_c,
-        const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t direction_stride,
         const float *const SFEM_RESTRICT p_w_direction,
         const float *const SFEM_RESTRICT p_c_direction,
@@ -2099,7 +2043,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         float *const SFEM_RESTRICT p_w_out,
         float *const SFEM_RESTRICT p_c_out
 ) {
-    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return sfem::codegen::generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
@@ -2109,11 +2053,10 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         const geom_t *const *const SFEM_RESTRICT points,
         const double *const SFEM_RESTRICT parameters,
         const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
         const double *const SFEM_RESTRICT direction,
         double *const SFEM_RESTRICT output
 ) {
-    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[19], parameters[20], parameters[21], parameters[22], parameters[23], parameters[24], parameters[25], 2, current + 0, current + 1, 2, previous + 0, previous + 1, 2, direction + 0, direction + 1, 2, output + 0, output + 1);
+    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[19], parameters[20], parameters[21], parameters[22], parameters[23], parameters[24], parameters[25], 2, current + 0, current + 1, 2, direction + 0, direction + 1, 2, output + 0, output + 1);
 }
 
 extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos_float(
@@ -2123,9 +2066,8 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_
         const geom_t *const *const SFEM_RESTRICT points,
         const float *const SFEM_RESTRICT parameters,
         const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
         const float *const SFEM_RESTRICT direction,
         float *const SFEM_RESTRICT output
 ) {
-    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[19], parameters[20], parameters[21], parameters[22], parameters[23], parameters[24], parameters[25], 2, current + 0, current + 1, 2, previous + 0, previous + 1, 2, direction + 0, direction + 1, 2, output + 0, output + 1);
+    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[19], parameters[20], parameters[21], parameters[22], parameters[23], parameters[24], parameters[25], 2, current + 0, current + 1, 2, direction + 0, direction + 1, 2, output + 0, output + 1);
 }

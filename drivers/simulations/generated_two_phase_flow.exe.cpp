@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    const real_t    initial_dt                   = smesh::Env::read("SFEM_DT", 1);
+    const real_t    initial_dt                   = smesh::Env::read("SFEM_DT", 0.05);
     const real_t    minimum_dt                   = smesh::Env::read("SFEM_MIN_DT", initial_dt / 2048);
     const real_t    end_time                     = smesh::Env::read("SFEM_T_END", 600);
     const int       nonlinear_max_it             = smesh::Env::read("SFEM_NL_MAX_IT", 20);

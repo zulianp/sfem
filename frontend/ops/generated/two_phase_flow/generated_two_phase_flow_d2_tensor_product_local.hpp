@@ -142,10 +142,10 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_residual_bloc
     static constexpr int N_FIELDS = 2;
     scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t previous_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
     generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
             nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
+    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
+    scalar_t previous_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
     generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
             nelems, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
     scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];
@@ -230,7 +230,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
         const scalar_t *const SFEM_RESTRICT current[2 * N_SHAPE],
-        const scalar_t *const SFEM_RESTRICT previous[2 * N_SHAPE],
         const scalar_t *const SFEM_RESTRICT direction[2 * N_SHAPE],
         const scalar_t porosity,
         const scalar_t S_res,
@@ -259,12 +258,8 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
     static constexpr int N_FIELDS = 2;
     scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t previous_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
     generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
             nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
-    generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
-            nelems, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
     scalar_t direction_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t direction_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
     generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
@@ -289,11 +284,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
             const scalar_t p_w_grad_1_ref = current_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
             const scalar_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj2) / det;
             const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj3) / det;
-            const scalar_t p_w_old = previous_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_w_old_grad_0_ref = previous_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_w_old_grad_1_ref = previous_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_w_old_grad_0 = (p_w_old_grad_0_ref * adj0 + p_w_old_grad_1_ref * adj2) / det;
-            const scalar_t p_w_old_grad_1 = (p_w_old_grad_0_ref * adj1 + p_w_old_grad_1_ref * adj3) / det;
             const scalar_t p_w_direction = direction_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
             const scalar_t p_w_direction_grad_0_ref = direction_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
             const scalar_t p_w_direction_grad_1_ref = direction_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
@@ -304,11 +294,6 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
             const scalar_t p_c_grad_1_ref = current_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
             const scalar_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
             const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-            const scalar_t p_c_old = previous_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_c_old_grad_0_ref = previous_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_c_old_grad_1_ref = previous_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_c_old_grad_0 = (p_c_old_grad_0_ref * adj0 + p_c_old_grad_1_ref * adj2) / det;
-            const scalar_t p_c_old_grad_1 = (p_c_old_grad_0_ref * adj1 + p_c_old_grad_1_ref * adj3) / det;
             const scalar_t p_c_direction = direction_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
             const scalar_t p_c_direction_grad_0_ref = direction_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
             const scalar_t p_c_direction_grad_1_ref = direction_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];

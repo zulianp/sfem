@@ -134,6 +134,8 @@ def generate_coupled_residual_sfem_files(
 
 def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs):
     rule = specialization.quadrature_rule
+    residual_dependencies = system.residual_dependencies()
+    action_dependencies = system.jacobian_action_dependencies()
     guard = ("%s_LOCAL_HPP" % local_prefix).upper()
     lines = [
         "#ifndef %s" % guard,
@@ -175,7 +177,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             "%s_residual_block" % local_prefix,
             specialization,
             residual_coeffs,
-            has_direction=False,
+            dependencies=residual_dependencies,
             local_prefix=local_prefix,
         )
     )
@@ -186,7 +188,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             "%s_jacobian_action_block" % local_prefix,
             specialization,
             action_coeffs,
-            has_direction=True,
+            dependencies=action_dependencies,
             local_prefix=local_prefix,
         )
     )
@@ -201,7 +203,7 @@ def _local_function(
     function_name,
     specialization,
     coefficients,
-    has_direction,
+    dependencies,
     local_prefix,
 ):
     rule = specialization.quadrature_rule
@@ -229,21 +231,23 @@ def _local_function(
                 "const scalar_t *const SFEM_RESTRICT q_weight",
             )
         )
-    params.extend(
-        (
+    if dependencies.current:
+        params.append(
             "const scalar_t *const SFEM_RESTRICT current[%d * N_SHAPE]"
-            % n_fields,
-            "const scalar_t *const SFEM_RESTRICT previous[%d * N_SHAPE]"
-            % n_fields,
+            % n_fields
         )
-    )
-    if has_direction:
+    if dependencies.previous:
+        params.append(
+            "const scalar_t *const SFEM_RESTRICT previous[%d * N_SHAPE]"
+            % n_fields
+        )
+    if dependencies.direction:
         params.append(
             "const scalar_t *const SFEM_RESTRICT direction[%d * N_SHAPE]"
             % n_fields
         )
     params.extend(
-        "const scalar_t %s" % parameter for parameter in system.parameters
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
     params.append(
         "scalar_t *const SFEM_RESTRICT output[%d * N_SHAPE]" % n_fields
@@ -267,16 +271,16 @@ def _local_function(
                 system,
                 local_prefix,
                 coefficients,
-                has_direction,
+                dependencies,
             )
         )
     else:
-        lines.extend(_simplex_local_body(system, coefficients, has_direction))
+        lines.extend(_simplex_local_body(system, coefficients, dependencies))
     lines.append("}")
     return lines
 
 
-def _simplex_local_body(system, coefficients, has_direction):
+def _simplex_local_body(system, coefficients, dependencies):
     dim = system.dim
     lines = [
         "    for (int q = 0; q < N_QP; ++q) {",
@@ -290,7 +294,7 @@ def _simplex_local_body(system, coefficients, has_direction):
             "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
             % (i, i)
         )
-    lines.extend(_field_evaluation_lines(system, has_direction, "            ", False))
+    lines.extend(_field_evaluation_lines(system, dependencies, "            ", False))
     lines.extend(
         _coefficient_evaluation_lines(
             system,
@@ -328,29 +332,26 @@ def _simplex_local_body(system, coefficients, has_direction):
     return lines
 
 
-def _tensor_local_body(system, prefix, coefficients, has_direction):
+def _tensor_local_body(system, prefix, coefficients, dependencies):
     dim = system.dim
     n_fields = len(system.fields)
-    lines = [
-        "    scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];",
-        "    scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];",
-        "    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];",
-        "    scalar_t previous_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];",
-        "    %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
-        % prefix,
-        "            nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);",
-        "    %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
-        % prefix,
-        "            nelems, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);",
-    ]
-    if has_direction:
+    lines = []
+    for group, enabled in (
+        ("current", dependencies.current),
+        ("previous", dependencies.previous),
+        ("direction", dependencies.direction),
+    ):
+        if not enabled:
+            continue
         lines.extend(
             [
-                "    scalar_t direction_value[N_FIELDS * N_QP * VECTOR_SIZE];",
-                "    scalar_t direction_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];",
+                "    scalar_t %s_value[N_FIELDS * N_QP * VECTOR_SIZE];" % group,
+                "    scalar_t %s_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];"
+                % group,
                 "    %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
                 % prefix,
-                "            nelems, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);",
+                "            nelems, shape_1d, grad_1d, %s, %s_value, %s_grad_ref);"
+                % (group, group, group),
             ]
         )
     lines.extend(
@@ -391,7 +392,7 @@ def _tensor_local_body(system, prefix, coefficients, has_direction):
             "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
             % (i, i)
         )
-    lines.extend(_tensor_field_alias_lines(system, has_direction))
+    lines.extend(_tensor_field_alias_lines(system, dependencies))
     lines.extend(_coefficient_evaluation_lines(system, coefficients, "            ", "qw"))
     for row in range(n_fields):
         lines.append(
@@ -419,13 +420,18 @@ def _tensor_local_body(system, prefix, coefficients, has_direction):
     return lines
 
 
-def _field_evaluation_lines(system, has_direction, indent, tensor):
+def _field_evaluation_lines(system, dependencies, indent, tensor):
     if tensor:
         raise AssertionError("tensor aliases are emitted separately")
     dim = system.dim
     lines = []
     for field_index, field in enumerate(system.fields):
-        for stem, stream in (("", "current"), ("_old", "previous")):
+        groups = []
+        if dependencies.current:
+            groups.append(("", "current"))
+        if dependencies.previous:
+            groups.append(("_old", "previous"))
+        for stem, stream in groups:
             lines.append("%sscalar_t %s%s = 0;" % (indent, field.name, stem))
             for d in range(dim):
                 lines.append(
@@ -450,7 +456,7 @@ def _field_evaluation_lines(system, has_direction, indent, tensor):
             lines.extend(
                 _physical_gradient_lines(field.name + stem, dim, indent)
             )
-        if has_direction:
+        if dependencies.direction:
             lines.append("%sscalar_t %s_direction = 0;" % (indent, field.name))
             for d in range(dim):
                 lines.append(
@@ -492,11 +498,16 @@ def _physical_gradient_lines(stem, dim, indent):
     return lines
 
 
-def _tensor_field_alias_lines(system, has_direction):
+def _tensor_field_alias_lines(system, dependencies):
     dim = system.dim
     lines = []
     for field_index, field in enumerate(system.fields):
-        for stem, array in (("", "current"), ("_old", "previous")):
+        groups = []
+        if dependencies.current:
+            groups.append(("", "current"))
+        if dependencies.previous:
+            groups.append(("_old", "previous"))
+        for stem, array in groups:
             lines.append(
                 "            const scalar_t %s%s = %s_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
                 % (field.name, stem, array, field_index)
@@ -509,7 +520,7 @@ def _tensor_field_alias_lines(system, has_direction):
             lines.extend(
                 _physical_gradient_lines(field.name + stem, dim, "            ")
             )
-        if has_direction:
+        if dependencies.direction:
             lines.append(
                 "            const scalar_t %s_direction = direction_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
                 % (field.name, field_index)
@@ -582,7 +593,12 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
     lines.append("")
-    for form, has_direction in (("residual", False), ("jacobian_action", True)):
+    form_dependencies = {
+        "residual": system.residual_dependencies(),
+        "jacobian_action": system.jacobian_action_dependencies(),
+    }
+    for form in ("residual", "jacobian_action"):
+        dependencies = form_dependencies[form]
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in (("double", ""), ("float", "_float")):
@@ -593,19 +609,25 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                 "const %s *const SFEM_RESTRICT adjugate[%d]"
                 % (scalar_type, dim * dim),
                 "const %s *const SFEM_RESTRICT determinant" % scalar_type,
-                "const %s *const SFEM_RESTRICT current[%d]"
-                % (scalar_type, n_fields * n_shape),
-                "const %s *const SFEM_RESTRICT previous[%d]"
-                % (scalar_type, n_fields * n_shape),
             ]
-            if has_direction:
+            if dependencies.current:
+                params.append(
+                    "const %s *const SFEM_RESTRICT current[%d]"
+                    % (scalar_type, n_fields * n_shape)
+                )
+            if dependencies.previous:
+                params.append(
+                    "const %s *const SFEM_RESTRICT previous[%d]"
+                    % (scalar_type, n_fields * n_shape)
+                )
+            if dependencies.direction:
                 params.append(
                     "const %s *const SFEM_RESTRICT direction[%d]"
                     % (scalar_type, n_fields * n_shape)
                 )
             params.extend(
                 "const %s %s" % (scalar_type, parameter)
-                for parameter in system.parameters
+                for parameter in dependencies.parameters
             )
             params.append(
                 "%s *const SFEM_RESTRICT output[%d]"
@@ -640,10 +662,13 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                         % (prefix, element, reference_suffix),
                     )
                 )
-            call_args.extend(("current", "previous"))
-            if has_direction:
+            if dependencies.current:
+                call_args.append("current")
+            if dependencies.previous:
+                call_args.append("previous")
+            if dependencies.direction:
                 call_args.append("direction")
-            call_args.extend(map(str, system.parameters))
+            call_args.extend(map(str, dependencies.parameters))
             call_args.append("output")
             lines.extend(
                 [
@@ -669,7 +694,7 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                 local_prefix,
                 specialization,
                 form,
-                has_direction,
+                dependencies,
             )
         )
         lines.extend(
@@ -677,7 +702,7 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                 system,
                 prefix,
                 form,
-                has_direction,
+                dependencies,
             )
         )
     return "\n".join(lines)
@@ -689,7 +714,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
         (
             "%s_residual_element_soa" % prefix,
             system.build_residual_graph("residual_diagnostics_tmp").cost,
-            False,
+            system.residual_dependencies(),
         )
     ]
     block_expressions = system.jacobian_blocks()
@@ -706,7 +731,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
             (
                 "%s_%s" % (prefix, block.name),
                 graph.cost,
-                True,
+                system.dependencies_for_expressions((block.expression,)),
             )
         )
     diagnostics.append(
@@ -715,11 +740,11 @@ def _residual_diagnostics_lines(system, prefix, specialization):
             system.build_jacobian_action_graph(
                 temporary_prefix="jacobian_action_diagnostics_tmp"
             ).cost,
-            True,
+            system.jacobian_action_dependencies(),
         )
     )
     lines = []
-    for public_name, cost, has_direction in diagnostics:
+    for public_name, cost, dependencies in diagnostics:
         if lines:
             lines.append("")
         lines.extend(
@@ -728,7 +753,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
                 public_name,
                 cost,
                 specialization,
-                has_direction,
+                dependencies,
             )
         )
     return lines
@@ -739,7 +764,7 @@ def _kernel_diagnostics_lines(
     public_name,
     cost,
     specialization,
-    has_direction,
+    dependencies,
 ):
     rule = specialization.quadrature_rule
     n_fields = len(system.fields)
@@ -785,9 +810,13 @@ def _kernel_diagnostics_lines(
         "    %d," % geometry_streams,
         "    %d," % reference_scalars,
         "    %d," % quadrature_weight_scalars,
-        "    %d," % len(system.parameters),
-        "    %d," % (2 * field_streams),
-        "    %d," % (field_streams if has_direction else 0),
+        "    %d," % len(dependencies.parameters),
+        "    %d,"
+        % (
+            field_streams
+            * (int(dependencies.current) + int(dependencies.previous))
+        ),
+        "    %d," % (field_streams if dependencies.direction else 0),
         "    %d," % field_streams,
         "    1,",
         "    1,",
@@ -850,7 +879,7 @@ def _mesh_operator_source(
     local_prefix,
     specialization,
     form,
-    has_direction,
+    dependencies,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -890,19 +919,21 @@ def _mesh_operator_source(
         "const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0"
     )
     params.extend(
-        "const scalar_t %s" % parameter for parameter in system.parameters
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    params.append("const ptrdiff_t current_stride")
-    params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s" % field.name
-        for field in system.fields
-    )
-    params.append("const ptrdiff_t previous_stride")
-    params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-        for field in system.fields
-    )
-    if has_direction:
+    if dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    if dependencies.direction:
         params.append("const ptrdiff_t direction_stride")
         params.extend(
             "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
@@ -936,11 +967,17 @@ def _mesh_operator_source(
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
-            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
-            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
         ]
     )
-    if has_direction:
+    if dependencies.current:
+        lines.append(
+            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    if dependencies.previous:
+        lines.append(
+            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    if dependencies.direction:
         lines.append(
             "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
         )
@@ -962,35 +999,34 @@ def _mesh_operator_source(
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
             node = "ev[lane * N_SHAPE + %d]" % shape
-            lines.append(
-                "            block_current[%d][lane] = %s[%s * current_stride];"
-                % (stream, field.name, node)
-            )
-            lines.append(
-                "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
-                % (stream, field.name, node)
-            )
-            if has_direction:
+            if dependencies.current:
+                lines.append(
+                    "            block_current[%d][lane] = %s[%s * current_stride];"
+                    % (stream, field.name, node)
+                )
+            if dependencies.previous:
+                lines.append(
+                    "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
+                    % (stream, field.name, node)
+                )
+            if dependencies.direction:
                 lines.append(
                     "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
                     % (stream, field.name, node)
                 )
             lines.append("            block_output[%d][lane] = 0;" % stream)
-    lines.extend(
-        [
-            "        }",
-            "",
+    lines.extend(["        }", ""])
+    if dependencies.current:
+        lines.append(
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_current[%d]" % i for i in field_stream_order
-            ),
+            % ", ".join("block_current[%d]" % i for i in field_stream_order)
+        )
+    if dependencies.previous:
+        lines.append(
             "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_previous[%d]" % i for i in field_stream_order
-            ),
-        ]
-    )
-    if has_direction:
+            % ", ".join("block_previous[%d]" % i for i in field_stream_order)
+        )
+    if dependencies.direction:
         lines.append(
             "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
@@ -1024,10 +1060,13 @@ def _mesh_operator_source(
         call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
     else:
         call_args.extend(("shape", "grad_ref", "q_weight"))
-    call_args.extend(("block_current_streams", "block_previous_streams"))
-    if has_direction:
+    if dependencies.current:
+        call_args.append("block_current_streams")
+    if dependencies.previous:
+        call_args.append("block_previous_streams")
+    if dependencies.direction:
         call_args.append("block_direction_streams")
-    call_args.extend(map(str, system.parameters))
+    call_args.extend(map(str, dependencies.parameters))
     call_args.append("block_output_streams")
     lines.extend(
         [
@@ -1077,12 +1116,14 @@ def _mesh_operator_source(
             "g_jacobian_adjugate%d" % i for i in range(dim * dim)
         )
         call_args.append("g_jacobian_determinant0")
-        call_args.extend(map(str, system.parameters))
-        call_args.append("current_stride")
-        call_args.extend(field.name for field in system.fields)
-        call_args.append("previous_stride")
-        call_args.extend("%s_old" % field.name for field in system.fields)
-        if has_direction:
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        if dependencies.direction:
             call_args.append("direction_stride")
             call_args.extend(
                 "%s_direction" % field.name for field in system.fields
@@ -1105,13 +1146,13 @@ def _mesh_operator_source(
             local_prefix,
             specialization,
             form,
-            has_direction,
+            dependencies,
         )
     )
     return lines
 
 
-def _aos_dispatch_source(system, prefix, form, has_direction):
+def _aos_dispatch_source(system, prefix, form, dependencies):
     target = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
     function = "%s_%s_isoparametric_mesh_aos" % (prefix, form)
     lines = []
@@ -1122,10 +1163,12 @@ def _aos_dispatch_source(system, prefix, form, has_direction):
             "idx_t **const SFEM_RESTRICT elements",
             "const geom_t *const *const SFEM_RESTRICT points",
             "const %s *const SFEM_RESTRICT parameters" % scalar_type,
-            "const %s *const SFEM_RESTRICT current" % scalar_type,
-            "const %s *const SFEM_RESTRICT previous" % scalar_type,
         ]
-        if has_direction:
+        if dependencies.current:
+            params.append("const %s *const SFEM_RESTRICT current" % scalar_type)
+        if dependencies.previous:
+            params.append("const %s *const SFEM_RESTRICT previous" % scalar_type)
+        if dependencies.direction:
             params.append(
                 "const %s *const SFEM_RESTRICT direction" % scalar_type
             )
@@ -1138,19 +1181,14 @@ def _aos_dispatch_source(system, prefix, form, has_direction):
         call_args = ["nelements", "nnodes", "elements", "points"]
         call_args.extend(
             "parameters[%d]" % index
-            for index in range(len(system.parameters))
+            for index, parameter in enumerate(system.parameters)
+            if parameter in dependencies.parameters
         )
-        call_args.extend(
-            (
-                "2",
-                "current + 0",
-                "current + 1",
-                "2",
-                "previous + 0",
-                "previous + 1",
-            )
-        )
-        if has_direction:
+        if dependencies.current:
+            call_args.extend(("2", "current + 0", "current + 1"))
+        if dependencies.previous:
+            call_args.extend(("2", "previous + 0", "previous + 1"))
+        if dependencies.direction:
             call_args.extend(
                 ("2", "direction + 0", "direction + 1")
             )
@@ -1173,7 +1211,7 @@ def _isoparametric_mesh_operator_source(
     local_prefix,
     specialization,
     form,
-    has_direction,
+    dependencies,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1205,19 +1243,21 @@ def _isoparametric_mesh_operator_source(
         "const geom_t *const *const SFEM_RESTRICT points",
     ]
     params.extend(
-        "const scalar_t %s" % parameter for parameter in system.parameters
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    params.append("const ptrdiff_t current_stride")
-    params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s" % field.name
-        for field in system.fields
-    )
-    params.append("const ptrdiff_t previous_stride")
-    params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-        for field in system.fields
-    )
-    if has_direction:
+    if dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    if dependencies.direction:
         params.append("const ptrdiff_t direction_stride")
         params.extend(
             "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
@@ -1271,11 +1311,17 @@ def _isoparametric_mesh_operator_source(
             "        scalar_t block_adjugate_data[%d][N_QP * VECTOR_SIZE];"
             % (dim * dim),
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
-            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
-            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
         ]
     )
-    if has_direction:
+    if dependencies.current:
+        lines.append(
+            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    if dependencies.previous:
+        lines.append(
+            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    if dependencies.direction:
         lines.append(
             "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
         )
@@ -1302,15 +1348,17 @@ def _isoparametric_mesh_operator_source(
             )
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
-            lines.append(
-                "            block_current[%d][lane] = %s[%s * current_stride];"
-                % (stream, field.name, node)
-            )
-            lines.append(
-                "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
-                % (stream, field.name, node)
-            )
-            if has_direction:
+            if dependencies.current:
+                lines.append(
+                    "            block_current[%d][lane] = %s[%s * current_stride];"
+                    % (stream, field.name, node)
+                )
+            if dependencies.previous:
+                lines.append(
+                    "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
+                    % (stream, field.name, node)
+                )
+            if dependencies.direction:
                 lines.append(
                     "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
                     % (stream, field.name, node)
@@ -1373,20 +1421,18 @@ def _isoparametric_mesh_operator_source(
                 )
         lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
         lines.extend(["            }", "        }"])
-    lines.extend(
-        [
-            "",
+    lines.append("")
+    if dependencies.current:
+        lines.append(
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_current[%d]" % i for i in field_stream_order
-            ),
+            % ", ".join("block_current[%d]" % i for i in field_stream_order)
+        )
+    if dependencies.previous:
+        lines.append(
             "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_previous[%d]" % i for i in field_stream_order
-            ),
-        ]
-    )
-    if has_direction:
+            % ", ".join("block_previous[%d]" % i for i in field_stream_order)
+        )
+    if dependencies.direction:
         lines.append(
             "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
@@ -1419,10 +1465,13 @@ def _isoparametric_mesh_operator_source(
         call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
     else:
         call_args.extend(("shape", "grad_ref", "q_weight"))
-    call_args.extend(("block_current_streams", "block_previous_streams"))
-    if has_direction:
+    if dependencies.current:
+        call_args.append("block_current_streams")
+    if dependencies.previous:
+        call_args.append("block_previous_streams")
+    if dependencies.direction:
         call_args.append("block_direction_streams")
-    call_args.extend(map(str, system.parameters))
+    call_args.extend(map(str, dependencies.parameters))
     call_args.append("block_output_streams")
     lines.extend(
         [
@@ -1468,12 +1517,14 @@ def _isoparametric_mesh_operator_source(
                 % (param, "," if index + 1 < len(typed_params) else "")
             )
         call_args = ["nelements", "nnodes", "elements", "points"]
-        call_args.extend(map(str, system.parameters))
-        call_args.append("current_stride")
-        call_args.extend(field.name for field in system.fields)
-        call_args.append("previous_stride")
-        call_args.extend("%s_old" % field.name for field in system.fields)
-        if has_direction:
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        if dependencies.direction:
             call_args.append("direction_stride")
             call_args.extend(
                 "%s_direction" % field.name for field in system.fields

@@ -32,4 +32,6 @@ In framework create folder tests (where all the test should be moved)
 
 
 <!-- SFEM -->
+
+The generated Op subclass (e.g., GeneratedNeoHookeanOgden) should allow to chose for affine version of the hessian action
 The generated Op subclass should also include the create_from_yaml function (see sfem_LinearElasticity.hpp) to include  the model parameters

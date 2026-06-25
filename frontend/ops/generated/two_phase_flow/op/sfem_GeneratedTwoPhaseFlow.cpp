@@ -9,13 +9,13 @@
 
 extern "C" {
 int generated_two_phase_flow_tri3_residual_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
-int generated_two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, const real_t *, real_t *);
+int generated_two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
 int generated_two_phase_flow_tet4_residual_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
-int generated_two_phase_flow_tet4_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, const real_t *, real_t *);
+int generated_two_phase_flow_tet4_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
 int generated_two_phase_flow_quad4_residual_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
-int generated_two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, const real_t *, real_t *);
+int generated_two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
 int generated_two_phase_flow_hex8_residual_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
-int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, const real_t *, real_t *);
+int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *, const real_t *, const real_t *, real_t *);
 }
 
 namespace sfem {
@@ -164,8 +164,8 @@ namespace sfem {
                       const real_t *const direction,
                       real_t *const out) {
         const real_t *const current = state ? state : impl_->current;
-        if (!current || !impl_->previous) {
-            SFEM_ERROR("GeneratedTwoPhaseFlow requires current and previous states\n");
+        if (!current) {
+            SFEM_ERROR("GeneratedTwoPhaseFlow requires a current state\n");
             return SFEM_FAILURE;
         }
         auto mesh = impl_->space->mesh_ptr();
@@ -176,16 +176,16 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const parameters = storage;
-            const real_t *const previous = impl_->previous;
+
             switch (domain.element_type) {
                 case smesh::TRI3:
-                    return generated_two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, previous, direction, out);
+                    return generated_two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, direction, out);
                 case smesh::TET4:
-                    return generated_two_phase_flow_tet4_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, previous, direction, out);
+                    return generated_two_phase_flow_tet4_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, direction, out);
                 case smesh::QUAD4:
-                    return generated_two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, previous, direction, out);
+                    return generated_two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, direction, out);
                 case smesh::HEX8:
-                    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, previous, direction, out);
+                    return generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, parameters, current, direction, out);
                 default:
                     SFEM_ERROR("GeneratedTwoPhaseFlow does not support element type %d\n",
                                domain.element_type);

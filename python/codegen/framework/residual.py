@@ -69,6 +69,14 @@ class CoupledResidualKernels:
     jacobian_action: GeneratedKernelCode
 
 
+@dataclass(frozen=True)
+class ResidualDependencies:
+    current: bool
+    previous: bool
+    direction: bool
+    parameters: Tuple[sp.Symbol, ...]
+
+
 class CoupledResidualSystem:
     def __init__(self, dim):
         self.dim = int(dim)
@@ -240,19 +248,74 @@ class CoupledResidualSystem:
         )
 
     def residual_data_symbols(self):
-        symbols = []
+        candidates = []
         for field in self._fields:
-            symbols.extend(field.current_symbols)
-            symbols.extend(field.previous_symbols)
-            symbols.extend(field.test_symbols)
-        symbols.extend(self._parameters)
-        return tuple(symbols)
+            candidates.extend(field.current_symbols)
+            candidates.extend(field.previous_symbols)
+            candidates.extend(field.test_symbols)
+        candidates.extend(self._parameters)
+        free_symbols = set().union(
+            *(self._residuals[field.name].free_symbols for field in self._fields)
+        )
+        return tuple(symbol for symbol in candidates if symbol in free_symbols)
 
     def jacobian_action_data_symbols(self):
-        symbols = list(self.residual_data_symbols())
+        candidates = []
         for field in self._fields:
-            symbols.extend(field.direction_symbols)
-        return tuple(symbols)
+            candidates.extend(field.current_symbols)
+            candidates.extend(field.previous_symbols)
+            candidates.extend(field.test_symbols)
+        for field in self._fields:
+            candidates.extend(field.direction_symbols)
+        candidates.extend(self._parameters)
+        free_symbols = set()
+        for block in self.jacobian_blocks():
+            free_symbols.update(block.expression.free_symbols)
+        return tuple(symbol for symbol in candidates if symbol in free_symbols)
+
+    def residual_dependencies(self):
+        return self._dependencies(
+            tuple(self._residuals[field.name] for field in self._fields)
+        )
+
+    def jacobian_action_dependencies(self):
+        return self._dependencies(
+            tuple(
+                sum(
+                    block.expression
+                    for block in self.jacobian_blocks()
+                    if block.row_field == field.name
+                )
+                for field in self._fields
+            )
+        )
+
+    def dependencies_for_expressions(self, expressions):
+        return self._dependencies(tuple(expressions))
+
+    def _dependencies(self, expressions):
+        free_symbols = set()
+        for expression in expressions:
+            free_symbols.update(sp.sympify(expression).free_symbols)
+        return ResidualDependencies(
+            current=any(
+                free_symbols.intersection(field.current_symbols)
+                for field in self._fields
+            ),
+            previous=any(
+                free_symbols.intersection(field.previous_symbols)
+                for field in self._fields
+            ),
+            direction=any(
+                free_symbols.intersection(field.direction_symbols)
+                for field in self._fields
+            ),
+            parameters=tuple(
+                parameter
+                for parameter in self._parameters
+                if parameter in free_symbols
+            ),
+        )
 
     def _validate_complete(self):
         if not self._fields:
