@@ -1,5 +1,6 @@
 #include "sfem_test.hpp"
 
+#include "sfem_API.hpp"
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_OpFactory.hpp"
 #include "smesh_buffer.hpp"
@@ -56,14 +57,9 @@ int test_generated_two_phase_flow_operator() {
     }
 
     op->set_field("previous", previous, 0);
-    op->reset_stats();
-    op->gradient(current->data(), residual->data());
-    op->apply(current->data(), direction->data(), action->data());
-    auto stats = op->stats();
-    SFEM_TEST_ASSERT(stats.residual_calls == 1);
-    SFEM_TEST_ASSERT(stats.jacobian_calls == 1);
-    SFEM_TEST_ASSERT(stats.residual_seconds >= 0);
-    SFEM_TEST_ASSERT(stats.jacobian_seconds >= 0);
+    op->update(previous->data(), current->data());
+    SFEM_TEST_ASSERT(op->gradient(current->data(), residual->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op->apply(current->data(), direction->data(), action->data()) == SFEM_SUCCESS);
 
     const auto p = parameters();
     auto block = mesh->block(0);
@@ -80,12 +76,18 @@ int test_generated_two_phase_flow_operator() {
         SFEM_TEST_ASSERT(close(action->data()[i], action_direct->data()[i]));
     }
 
-    auto linear = op->make_linear_operator(
-            current->data(),
-            [](const real_t *const in, real_t *const out) {
+    auto linear = sfem::make_op<real_t>(
+            ndofs,
+            ndofs,
+            [&](const real_t *const in, real_t *const out) {
+                std::fill(out, out + ndofs, static_cast<real_t>(0));
+                if (op->apply(nullptr, in, out) != SFEM_SUCCESS) {
+                    SFEM_ERROR("GeneratedTwoPhaseFlow Jacobian action failed\n");
+                }
                 out[0] = in[0];
                 out[1] = in[1];
-            });
+            },
+            sfem::EXECUTION_SPACE_HOST);
     std::fill(action->data(), action->data() + ndofs, 0);
     linear->apply(direction->data(), action->data());
     SFEM_TEST_ASSERT(action->data()[0] == direction->data()[0]);
@@ -93,10 +95,6 @@ int test_generated_two_phase_flow_operator() {
     for (ptrdiff_t i = 2; i < ndofs; ++i) {
         SFEM_TEST_ASSERT(close(action->data()[i], action_direct->data()[i]));
     }
-    op->reset_stats();
-    stats = op->stats();
-    SFEM_TEST_ASSERT(stats.residual_calls == 0);
-    SFEM_TEST_ASSERT(stats.jacobian_calls == 0);
 
     return SFEM_TEST_SUCCESS;
 }

@@ -20,7 +20,7 @@ Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.
 
 <!-- RESIDUAL BASED MATERIALS -->
 
-
+The residual code generator injects depencies in kernels that are not actually needed (e.g., see the hessian action passing the old/previous timestep quantities). The symbolic framework must make sure that no unneeded quantities are passed to the kernels.
 
 <!-- BOTH  -->
 
