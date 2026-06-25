@@ -1312,6 +1312,27 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "static const scalar_t shape_1d[4]",
             operator_source,
         )
+        isoparametric_mesh_source = operator_source.split(
+            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl"
+            % prefix,
+            1,
+        )[1].split(
+            'extern "C" int %s_hex8_gradient_isoparametric_mesh_soa' % prefix,
+            1,
+        )[0]
+        self.assertIn(
+            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+            isoparametric_mesh_source,
+        )
+        self.assertIn(
+            "%s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>"
+            % prefix,
+            isoparametric_mesh_source,
+        )
+        self.assertNotIn(
+            "for (int shape = 0; shape < N_SHAPE; ++shape)",
+            isoparametric_mesh_source,
+        )
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             library = compile_generated_shared_library(

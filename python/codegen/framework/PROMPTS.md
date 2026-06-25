@@ -24,4 +24,4 @@ Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.
 
 <!-- BOTH  -->
 
-The mesh-kernels for isoparametric tensor product elements are not exploiting sum factorization for computing the Jacobian (both for hyper elasticity and for residual-based materials). Fix it and make sure that generation code for such things is not duplicated. Currently symbolic.py is the better one to use as a reference.
+The mesh-kernels for isoparametric tensor product elements are not exploiting the tensor product structure for computing the Jacobian in residual_codegen.py. Fix it and make sure that generation code for such things is not duplicated. Currently symbolic.py is the better one to use as a reference. In order to avoid code duplication create the necessary abstractions (you can use new files for this)
