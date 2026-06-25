@@ -4138,7 +4138,7 @@ def _sfem_soa_mesh_operator_function(
             for stream in _soa_array_stream_names(array_input)
         )
     else:
-        base_params.append("const scalar_t *const *const SFEM_RESTRICT points")
+        base_params.append("const geometry_t *const *const SFEM_RESTRICT points")
 
     material_params = ("const scalar_t mu", "const scalar_t lmbda")
     field_params = ["const ptrdiff_t u_stride"]
@@ -4166,13 +4166,19 @@ def _sfem_soa_mesh_operator_function(
         + tuple(field_params)
         + tuple(output_params)
     )
-    wrapper_params = impl_params
+    wrapper_params = tuple(
+        param.replace("geometry_t", "geom_t") for param in impl_params
+    )
 
     lines = [
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "template <typename scalar_t>",
+        (
+            "template <typename scalar_t, typename geometry_t>"
+            if geometry_mode == "isoparametric"
+            else "template <typename scalar_t>"
+        ),
         "static SFEM_INLINE int %s(" % implementation_name,
     ]
     for idx, param in enumerate(impl_params):
@@ -4191,7 +4197,7 @@ def _sfem_soa_mesh_operator_function(
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const scalar_t *const SFEM_RESTRICT %s = points[%d];"
+                "    const geometry_t *const SFEM_RESTRICT %s = points[%d];"
                 % (_component_name(d), d)
             )
     lines.extend(
@@ -4500,10 +4506,11 @@ def _sfem_soa_mesh_operator_function(
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s<%s>(%s);"
+                "    return sfem::codegen::%s<%s%s>(%s);"
                 % (
                     implementation_name,
                     scalar_type,
+                    ", geom_t" if geometry_mode == "isoparametric" else "",
                     ", ".join(wrapper_args),
                 ),
                 "}",
@@ -5022,7 +5029,6 @@ def _sfem_soa_concrete_scalar_params(params, scalar_type):
     return tuple(
         param.replace("scalar_t", scalar_type)
         .replace("real_t", scalar_type)
-        .replace("geom_t", scalar_type)
         for param in params
     )
 

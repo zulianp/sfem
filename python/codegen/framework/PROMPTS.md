@@ -28,3 +28,7 @@ Organize the example materials (e.g., neohookean and twophaseflow) in python/cod
 
 
 Create a script that I can run to generate and install the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
+
+<!-- SMESH -->
+
+Note that PROTEUS_HEX27 has a cartesian node ordering, different from HEX27, add HEX27 in smesh since it is needed

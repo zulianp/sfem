@@ -22,6 +22,8 @@ def strain_energy(F):
 material = gen.HyperelasticMaterial(
     "neohookean_ogden",
     strain_energy,
+    op_name="GeneratedNeoHookeanOgden",
+    parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),
 )
 
 

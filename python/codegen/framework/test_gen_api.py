@@ -22,6 +22,25 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
             self.assertIn("kernel_diagnostics.hpp", names)
+            self.assertIn("sfem_GeneratedNeoHookeanOgden.cpp", names)
+            wrapper = os.path.join(
+                out_dir,
+                "op",
+                "sfem_GeneratedNeoHookeanOgden.cpp",
+            )
+            with open(wrapper, encoding="utf-8") as stream:
+                source = stream.read()
+            header = os.path.join(
+                out_dir,
+                "op",
+                "sfem_GeneratedNeoHookeanOgden.hpp",
+            )
+            with open(header, encoding="utf-8") as stream:
+                self.assertIn("public Op", stream.read())
+            self.assertIn(
+                "generated_neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                source,
+            )
 
     def test_generates_coupled_residual_material(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -39,6 +58,7 @@ class GenApiTest(unittest.TestCase):
                 "generated_two_phase_flow_d2_simplex_local.hpp",
                 names,
             )
+            self.assertIn("sfem_GeneratedTwoPhaseFlow.cpp", names)
 
     def test_rejects_elements_outside_material_contract(self):
         with tempfile.TemporaryDirectory() as out_dir:
