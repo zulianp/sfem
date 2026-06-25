@@ -23,32 +23,32 @@ namespace sfem {
         constexpr int MAX_PARAMETERS = 26;
 
         void seed_parameters(Parameters &parameters) {
-            parameters.set_value("porosity", 0.20000000000000001);
-            parameters.set_value("S_res", 0.10000000000000001);
-            parameters.set_value("P_r", 100000);
-            parameters.set_value("m", 2);
-            parameters.set_value("rho_w0", 1000);
-            parameters.set_value("kappa_T", 1.0000000000000001e-09);
-            parameters.set_value("p_wr", 100000);
-            parameters.set_value("M_c", 0.043999999999999997);
-            parameters.set_value("Z", 1);
-            parameters.set_value("R", 8.3144626180000003);
-            parameters.set_value("T", 300);
-            parameters.set_value("mu_w", 0.001);
-            parameters.set_value("mu_c", 1.5e-05);
-            parameters.set_value("C_kw1", 2);
-            parameters.set_value("C_ka1", 2);
-            parameters.set_value("C_ka2", 2);
+            parameters.set_value("porosity", 0.10000000000000001);
+            parameters.set_value("S_res", 0.39000000000000001);
+            parameters.set_value("P_r", 0.095000000000000001);
+            parameters.set_value("m", 4.2000000000000002);
+            parameters.set_value("rho_w0", 1100);
+            parameters.set_value("kappa_T", 0.000455);
+            parameters.set_value("p_wr", 1);
+            parameters.set_value("M_c", 0.044010000000000001);
+            parameters.set_value("Z", 0.42520000000000002);
+            parameters.set_value("R", 8.3140000000000004e-06);
+            parameters.set_value("T", 333);
+            parameters.set_value("mu_w", 5.2000000000000002);
+            parameters.set_value("mu_c", 1.5);
+            parameters.set_value("C_kw1", 0.52000000000000002);
+            parameters.set_value("C_ka1", 1.8);
+            parameters.set_value("C_ka2", 0.34999999999999998);
             parameters.set_value("dt", 1);
-            parameters.set_value("K_0", 9.9999999999999998e-13);
+            parameters.set_value("K_0", 86.400000000000006);
             parameters.set_value("K_1", 0);
             parameters.set_value("K_2", 0);
             parameters.set_value("K_3", 0);
-            parameters.set_value("K_4", 9.9999999999999998e-13);
+            parameters.set_value("K_4", 86.400000000000006);
             parameters.set_value("K_5", 0);
             parameters.set_value("K_6", 0);
             parameters.set_value("K_7", 0);
-            parameters.set_value("K_8", 9.9999999999999998e-13);
+            parameters.set_value("K_8", 86.400000000000006);
         }
 
         void parameter_array(const Parameters &parameters,

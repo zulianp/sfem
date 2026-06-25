@@ -1,8 +1,5 @@
 <!-- ENERGY BASED MATERIALS -->
 
-The mesh level kernels have unnecessary template parameters, the sizes are known. Only keep scalar_t has the template parameter, and instantiate for double and float, expose the C ABI for both
-
-
 The element type is used twice in function and variable names (e.g., tet10_tet10_), use it once if standard Galerkin. For Petrov-Galerkin you can specify both trial and test.
 
 
@@ -18,6 +15,9 @@ Create a script codegen_perf.py to run and extract performance metrics with llvm
 Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.hpp for one example, an call the generated kernels accordingly
 
 
+@materials Create the material for The Holzapfel-Gasser-Ogden (HGO) strain energy function workflow (see neoohokean_ogden.py for reference)
+
+
 <!-- RESIDUAL BASED MATERIALS -->
 
 The residual code generator injects depencies in kernels that are not actually needed (e.g., see the hessian action passing the old/previous timestep quantities). The symbolic framework must make sure that no unneeded quantities are passed to the kernels.
@@ -28,6 +28,8 @@ Organize the example materials (e.g., neohookean and twophaseflow) in python/cod
 
 
 Create a script that I can run to generate and install the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
+
+In framework create folder tests (where all the test should be moved)
 
 <!-- SMESH -->
 
