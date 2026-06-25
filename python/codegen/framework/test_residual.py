@@ -446,6 +446,30 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 if element in ("QUAD4", "HEX8"):
                     self.assertIn("_tensor_evaluate", local_source)
                     self.assertIn("_tensor_integrate", local_source)
+                    for form in ("residual", "jacobian_action"):
+                        marker = (
+                            "static SFEM_INLINE int "
+                            "coupled_diffusion_%s_%s_isoparametric_mesh_soa_impl"
+                            % (element.lower(), form)
+                        )
+                        section = operator_source.split(marker, 1)[1].split(
+                            'extern "C" int coupled_diffusion_%s_%s_isoparametric_mesh_soa'
+                            % (element.lower(), form),
+                            1,
+                        )[0]
+                        self.assertIn(
+                            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+                            section,
+                        )
+                        self.assertIn(
+                            "_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>",
+                            section,
+                        )
+                        self.assertNotIn("geometry_grad_ref", section)
+                        self.assertNotIn(
+                            "block_coordinates[0][lane] *",
+                            section,
+                        )
                 else:
                     self.assertNotIn("_tensor_evaluate", local_source)
                 generated_sources.append(
@@ -501,6 +525,62 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     text=True,
                 ).stderr
                 self.assertIn("vectorized loop", report)
+
+    def test_hex27_isoparametric_geometry_uses_sum_factorization(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        system, _, _ = two_field_diffusion_system(3)
+        files = generate_coupled_residual_sfem_files(
+            system,
+            prefix="coupled_diffusion_hex27",
+            element_type="HEX27",
+        )
+        operator_source = files[3].source
+        marker = (
+            "static SFEM_INLINE int "
+            "coupled_diffusion_hex27_hex27_residual_isoparametric_mesh_soa_impl"
+        )
+        section = operator_source.split(marker, 1)[1].split(
+            'extern "C" int '
+            "coupled_diffusion_hex27_hex27_residual_isoparametric_mesh_soa",
+            1,
+        )[0]
+        self.assertIn(
+            "_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>",
+            section,
+        )
+        self.assertIn("static constexpr int N_SHAPE = 27;", section)
+        self.assertNotIn("geometry_grad_ref", section)
+
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+            for generated in files:
+                with open(
+                    os.path.join(tmpdir, generated.path),
+                    "w",
+                    encoding="utf-8",
+                ) as stream:
+                    stream.write(generated.source)
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    os.path.join(tmpdir, files[3].path),
+                    "-I",
+                    tmpdir,
+                    "-o",
+                    os.path.join(tmpdir, "hex27.o"),
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
     def test_isoparametric_mesh_residual_and_action_match_python_reference(self):
         compiler = shutil.which("c++")

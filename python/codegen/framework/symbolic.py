@@ -8,6 +8,17 @@ import sympy.codegen.ast as ast
 from sympy.printing.c import C99CodePrinter
 
 try:
+    from .tensor_product_geometry import (
+        isoparametric_adjugate_lines,
+        tensor_product_isoparametric_geometry_lines,
+    )
+except ImportError:
+    from tensor_product_geometry import (
+        isoparametric_adjugate_lines,
+        tensor_product_isoparametric_geometry_lines,
+    )
+
+try:
     import networkx as nx
 except ModuleNotFoundError:
     try:
@@ -3552,33 +3563,17 @@ def _sfem_soa_isoparametric_reference_gradient_expr(
 
 
 def _sfem_soa_adjugate_assignment_lines(dim, indent, index="lane"):
-    if dim == 1:
-        return (
-            "%sblock_jacobian_determinant0[%s] = J00;" % (indent, index),
-            "%sblock_jacobian_adjugate0[%s] = 1.0;" % (indent, index),
-        )
-    if dim == 2:
-        return (
-            "%sblock_jacobian_determinant0[%s] = J00 * J11 - J01 * J10;" % (indent, index),
-            "%sblock_jacobian_adjugate0[%s] = J11;" % (indent, index),
-            "%sblock_jacobian_adjugate1[%s] = -J01;" % (indent, index),
-            "%sblock_jacobian_adjugate2[%s] = -J10;" % (indent, index),
-            "%sblock_jacobian_adjugate3[%s] = J00;" % (indent, index),
-        )
-    if dim == 3:
-        return (
-            "%sblock_jacobian_determinant0[%s] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);" % (indent, index),
-            "%sblock_jacobian_adjugate0[%s] = J11 * J22 - J12 * J21;" % (indent, index),
-            "%sblock_jacobian_adjugate1[%s] = J02 * J21 - J01 * J22;" % (indent, index),
-            "%sblock_jacobian_adjugate2[%s] = J01 * J12 - J02 * J11;" % (indent, index),
-            "%sblock_jacobian_adjugate3[%s] = J12 * J20 - J10 * J22;" % (indent, index),
-            "%sblock_jacobian_adjugate4[%s] = J00 * J22 - J02 * J20;" % (indent, index),
-            "%sblock_jacobian_adjugate5[%s] = J02 * J10 - J00 * J12;" % (indent, index),
-            "%sblock_jacobian_adjugate6[%s] = J10 * J21 - J11 * J20;" % (indent, index),
-            "%sblock_jacobian_adjugate7[%s] = J01 * J20 - J00 * J21;" % (indent, index),
-            "%sblock_jacobian_adjugate8[%s] = J00 * J11 - J01 * J10;" % (indent, index),
-        )
-    raise ValueError("isoparametric geometry supports dimensions 1, 2, and 3")
+    return isoparametric_adjugate_lines(
+        dim,
+        indent,
+        index,
+        lambda component, output_index: (
+            "block_jacobian_adjugate%d[%s]" % (component, output_index)
+        ),
+        lambda output_index: (
+            "block_jacobian_determinant0[%s]" % output_index
+        ),
+    )
 
 
 def _append_sfem_soa_output_lines(lines, form, dim, n_nodes):
@@ -4186,6 +4181,7 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             ") {",
+            "    static constexpr int DIM = %d;" % dim,
             "    static constexpr int N_QP = %d;" % n_qp,
             "    static constexpr int N_SHAPE = %d;" % n_nodes,
             "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
@@ -4313,7 +4309,9 @@ def _sfem_soa_mesh_operator_function(
                 )
             )
 
-    if geometry_mode == "isoparametric":
+    if geometry_mode == "isoparametric" and not (
+        form.weak_form is not None and use_tensor_product_reference
+    ):
         lines.append("")
         lines.append(
             "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
@@ -4335,7 +4333,45 @@ def _sfem_soa_mesh_operator_function(
                 % _tensor_product_quadrature_weight_expr(dim)
             )
 
-    if geometry_mode == "isoparametric" and form.weak_form is not None:
+    if (
+        geometry_mode == "isoparametric"
+        and form.weak_form is not None
+        and use_tensor_product_reference
+    ):
+        def evaluator_lines(streams, gradient, indent):
+            generated = []
+            for component in range(dim):
+                generated.extend(
+                    [
+                        "%s%s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>("
+                        % (indent, local_prefix),
+                        "%s        nelems, shape_1d, grad_1d, %s, %d,"
+                        % (indent, streams, component),
+                        "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"
+                        % (indent, gradient, component),
+                    ]
+                )
+            return generated
+
+        lines.append("")
+        lines.extend(
+            tensor_product_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_nodes,
+                coordinate_streams=[
+                    "block_%s" % stream
+                    for stream in _coordinate_stream_names(dim, n_nodes)
+                ],
+                evaluator_lines=evaluator_lines,
+                adjugate_target=lambda component, index: (
+                    "block_jacobian_adjugate%d[%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_jacobian_determinant0[%s]" % index
+                ),
+            )
+        )
+    elif geometry_mode == "isoparametric" and form.weak_form is not None:
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
         if use_tensor_product_reference:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))

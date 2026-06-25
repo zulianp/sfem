@@ -3,6 +3,10 @@ from dataclasses import dataclass
 import sympy as sp
 
 from .residual import CoupledResidualSystem
+from .tensor_product_geometry import (
+    isoparametric_adjugate_lines,
+    tensor_product_isoparametric_geometry_lines,
+)
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -883,6 +887,7 @@ def _mesh_operator_source(
     lines.extend(
         [
             ") {",
+            "    static constexpr int DIM = %d;" % dim,
             "    static constexpr int N_QP = %d;" % n_qp,
             "    static constexpr int N_SHAPE = %d;" % n_shape,
             "    static constexpr int N_FIELDS = %d;" % n_fields,
@@ -1189,6 +1194,7 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             ") {",
+            "    static constexpr int DIM = %d;" % dim,
             "    static constexpr int N_QP = %d;" % n_qp,
             "    static constexpr int N_SHAPE = %d;" % n_shape,
             "    static constexpr int N_FIELDS = %d;" % n_fields,
@@ -1268,52 +1274,58 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     if rule.is_tensor_product:
+        def evaluator_lines(streams, gradient, indent):
+            return [
+                "%sscalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];"
+                % indent,
+                "%s%s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
+                % (indent, local_prefix),
+                "%s        nelems, shape_1d, grad_1d, %s,"
+                % (indent, streams),
+                "%s        coordinate_value, %s);" % (indent, gradient),
+            ]
+
+        lines.append("")
+        lines.extend(
+            tensor_product_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_shape,
+                coordinate_streams=[
+                    "block_coordinates[%d]" % i for i in range(dim * n_shape)
+                ],
+                evaluator_lines=evaluator_lines,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_determinant[%s]" % index
+                ),
+            )
+        )
+    else:
         lines.extend(
             [
                 "",
-                "        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {%s};"
-                % ", ".join(
-                    "block_coordinates[%d]" % i for i in range(dim * n_shape)
-                ),
-                "        scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];",
-                "        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];",
-                "        %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
-                % local_prefix,
-                "                nelems, shape_1d, grad_1d, block_coordinate_streams,",
-                "                coordinate_value, coordinate_grad_ref);",
+                "        for (int q = 0; q < N_QP; ++q) {",
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             ]
         )
-    lines.extend(
-        [
-            "",
-            "        for (int q = 0; q < N_QP; ++q) {",
-            "#pragma omp simd",
-            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        ]
-    )
-    for i in range(dim):
-        for j in range(dim):
-            if rule.is_tensor_product:
-                expression = (
-                    "coordinate_grad_ref[((%d * N_QP + q) * DIM + %d) * "
-                    "VECTOR_SIZE + lane]" % (i, j)
-                )
-            else:
+        for i in range(dim):
+            for j in range(dim):
                 terms = [
                     "block_coordinates[%d][lane] * geometry_grad_ref[(q * N_SHAPE + %d) * %d + %d]"
                     % (shape * dim + i, shape, dim, j)
                     for shape in range(n_shape)
                 ]
-                expression = " + ".join(terms)
-            lines.append(
-                "                const scalar_t J%d%d = %s;"
-                % (i, j, expression)
-            )
-    lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
+                lines.append(
+                    "                const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
+        lines.extend(["            }", "        }"])
     lines.extend(
         [
-            "            }",
-            "        }",
             "",
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
@@ -1432,36 +1444,15 @@ def _isoparametric_mesh_operator_source(
 
 
 def _isoparametric_geometry_assignment_lines(dim, indent):
-    index = "q * VECTOR_SIZE + lane"
-    if dim == 1:
-        return [
-            "%sblock_adjugate_data[0][%s] = 1;" % (indent, index),
-            "%sblock_determinant[%s] = J00;" % (indent, index),
-        ]
-    if dim == 2:
-        return [
-            "%sblock_adjugate_data[0][%s] = J11;" % (indent, index),
-            "%sblock_adjugate_data[1][%s] = -J01;" % (indent, index),
-            "%sblock_adjugate_data[2][%s] = -J10;" % (indent, index),
-            "%sblock_adjugate_data[3][%s] = J00;" % (indent, index),
-            "%sblock_determinant[%s] = J00 * J11 - J01 * J10;"
-            % (indent, index),
-        ]
-    return [
-        "%sblock_adjugate_data[0][%s] = J11 * J22 - J12 * J21;" % (indent, index),
-        "%sblock_adjugate_data[1][%s] = J02 * J21 - J01 * J22;" % (indent, index),
-        "%sblock_adjugate_data[2][%s] = J01 * J12 - J02 * J11;" % (indent, index),
-        "%sblock_adjugate_data[3][%s] = J12 * J20 - J10 * J22;" % (indent, index),
-        "%sblock_adjugate_data[4][%s] = J00 * J22 - J02 * J20;" % (indent, index),
-        "%sblock_adjugate_data[5][%s] = J02 * J10 - J00 * J12;" % (indent, index),
-        "%sblock_adjugate_data[6][%s] = J10 * J21 - J11 * J20;" % (indent, index),
-        "%sblock_adjugate_data[7][%s] = J01 * J20 - J00 * J21;" % (indent, index),
-        "%sblock_adjugate_data[8][%s] = J00 * J11 - J01 * J10;" % (indent, index),
-        "%sblock_determinant[%s] = J00 * (J11 * J22 - J12 * J21)"
-        " - J01 * (J10 * J22 - J12 * J20)"
-        " + J02 * (J10 * J21 - J11 * J20);"
-        % (indent, index),
-    ]
+    return isoparametric_adjugate_lines(
+        dim,
+        indent,
+        "q * VECTOR_SIZE + lane",
+        lambda component, index: (
+            "block_adjugate_data[%d][%s]" % (component, index)
+        ),
+        lambda index: "block_determinant[%s]" % index,
+    )
 
 
 def _mesh_reference_data_lines(rule):
