@@ -5,6 +5,8 @@ import sympy as sp
 from .residual import CoupledResidualSystem
 from .tensor_product_geometry import (
     isoparametric_adjugate_lines,
+    streams_in_shape_order,
+    tensor_product_cartesian_shape_order,
     tensor_product_isoparametric_geometry_lines,
 )
 from .symbolic import (
@@ -856,6 +858,16 @@ def _mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
+    shape_order = (
+        tensor_product_cartesian_shape_order(dim, n_shape)
+        if rule.is_tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(
+        tuple(range(n_fields * n_shape)),
+        n_fields,
+        shape_order,
+    )
     impl = "%s_%s_affine_mesh_soa_impl" % (prefix, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -970,11 +982,11 @@ def _mesh_operator_source(
             "",
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_current[%d]" % i for i in range(n_fields * n_shape)
+                "block_current[%d]" % i for i in field_stream_order
             ),
             "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_previous[%d]" % i for i in range(n_fields * n_shape)
+                "block_previous[%d]" % i for i in field_stream_order
             ),
         ]
     )
@@ -983,14 +995,14 @@ def _mesh_operator_source(
             "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
                 "block_direction[%d]" % i
-                for i in range(n_fields * n_shape)
+                for i in field_stream_order
             )
         )
     lines.extend(
         [
             "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_output[%d]" % i for i in range(n_fields * n_shape)
+                "block_output[%d]" % i for i in field_stream_order
             ),
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
@@ -1169,6 +1181,21 @@ def _isoparametric_mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
+    shape_order = (
+        tensor_product_cartesian_shape_order(dim, n_shape)
+        if rule.is_tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(
+        tuple(range(n_fields * n_shape)),
+        n_fields,
+        shape_order,
+    )
+    coordinate_stream_order = streams_in_shape_order(
+        tuple(range(dim * n_shape)),
+        dim,
+        shape_order,
+    )
     impl = "%s_%s_isoparametric_mesh_soa_impl" % (prefix, form)
     block = "%s_%s_block" % (local_prefix, form)
     params = [
@@ -1312,7 +1339,8 @@ def _isoparametric_mesh_operator_source(
                 dim=dim,
                 n_shape=n_shape,
                 coordinate_streams=[
-                    "block_coordinates[%d]" % i for i in range(dim * n_shape)
+                    "block_coordinates[%d]" % i
+                    for i in coordinate_stream_order
                 ],
                 evaluator_lines=evaluator_lines,
                 adjugate_target=lambda component, index: (
@@ -1350,11 +1378,11 @@ def _isoparametric_mesh_operator_source(
             "",
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_current[%d]" % i for i in range(n_fields * n_shape)
+                "block_current[%d]" % i for i in field_stream_order
             ),
             "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_previous[%d]" % i for i in range(n_fields * n_shape)
+                "block_previous[%d]" % i for i in field_stream_order
             ),
         ]
     )
@@ -1363,14 +1391,14 @@ def _isoparametric_mesh_operator_source(
             "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
                 "block_direction[%d]" % i
-                for i in range(n_fields * n_shape)
+                for i in field_stream_order
             )
         )
     lines.extend(
         [
             "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
             % ", ".join(
-                "block_output[%d]" % i for i in range(n_fields * n_shape)
+                "block_output[%d]" % i for i in field_stream_order
             ),
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
@@ -1539,9 +1567,6 @@ def _simplex_shape_values(rule):
 
 
 def _tensor_helpers(prefix, dim):
-    # The generated helper performs staged 1D contractions with lane-contiguous
-    # scratch arrays. It supports Q1 and lexicographically ordered higher order
-    # tensor elements.
     lines = [
         "static constexpr int %s_ipow(const int b, const int e) {" % prefix,
         "    return e == 0 ? 1 : b * %s_ipow(b, e - 1);" % prefix,
@@ -1555,20 +1580,8 @@ def _tensor_helpers(prefix, dim):
         % prefix,
         "    return %s_integer_root_search(v, e, 1);" % prefix,
         "}",
-        "",
-        "template <int S>",
-        "static SFEM_INLINE int %s_tensor_index(const int sx, const int sy, const int sz = 0) {"
-        % prefix,
     ]
-    if dim == 2:
-        lines.append(
-            "    return S == 2 ? sx + sy * (3 - 2 * sx) : sx + S * sy;"
-        )
-    else:
-        lines.append(
-            "    return S == 2 ? sx + sy * (3 - 2 * sx) + 4 * sz : sx + S * (sy + S * sz);"
-        )
-    lines.extend(["}", ""])
+    lines.append("")
     lines.extend(_tensor_evaluate_helper(prefix, dim))
     lines.append("")
     lines.extend(_tensor_integrate_helper(prefix, dim))
@@ -1596,7 +1609,7 @@ def _tensor_evaluate_2d(prefix):
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
         "            scalar_t v = 0, g = 0;",
         "            for (int sx = 0; sx < S; ++sx) {",
-        "                const int s = %s_tensor_index<S>(sx, sy);" % prefix,
+        "                const int s = sx + S * sy;",
         "                const scalar_t u = streams[s * N_FIELDS + f][lane];",
         "                v += u * shape_1d[qx * S + sx]; g += u * grad_1d[qx * S + sx];",
         "            }",
@@ -1639,7 +1652,7 @@ def _tensor_evaluate_3d(prefix):
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
         "            scalar_t v = 0, g = 0;",
         "            for (int sx = 0; sx < S; ++sx) {",
-        "                const int s = %s_tensor_index<S>(sx, sy, sz);" % prefix,
+        "                const int s = sx + S * (sy + S * sz);",
         "                const scalar_t u = streams[s * N_FIELDS + f][lane];",
         "                v += u * shape_1d[qx * S + sx]; g += u * grad_1d[qx * S + sx];",
         "            }",
@@ -1706,7 +1719,7 @@ def _tensor_integrate_2d(prefix):
         "        }",
         "    }",
         "    for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
-        "        const int s = %s_tensor_index<S>(sx, sy);" % prefix,
+        "        const int s = sx + S * sy;",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = 0;",
         "            for (int qx = 0; qx < Q; ++qx) { const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;",
@@ -1749,7 +1762,7 @@ def _tensor_integrate_3d(prefix):
         "        }",
         "    }",
         "    for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
-        "        const int s = %s_tensor_index<S>(sx, sy, sz);" % prefix,
+        "        const int s = sx + S * (sy + S * sz);",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = 0;",
         "            for (int qx = 0; qx < Q; ++qx) { const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;",

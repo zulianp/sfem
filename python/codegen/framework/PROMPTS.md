@@ -24,13 +24,12 @@ The residual code generator injects depencies in kernels that are not actually n
 
 <!-- BOTH  -->
 
-Organize the example materials (e.g., neohookean and twophaseflow) in python/codegen/framework/materials and make them as clean as possible (like user intened code), the infrastructure code should be abstracted away and put it in the API module sfem.gen.
-
-
 Create a script that I can run to generate and install the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
 
 In framework create folder tests (where all the test should be moved)
 
 <!-- SMESH -->
 
-Note that PROTEUS_HEX27 has a cartesian node ordering, different from HEX27, add HEX27 in smesh since it is needed
+
+<!-- SFEM -->
+The generated Op subclass should also include the create_from_yaml function (see sfem_LinearElasticity.hpp) to include  the model parameters

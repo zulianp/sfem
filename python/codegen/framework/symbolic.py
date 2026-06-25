@@ -10,11 +10,15 @@ from sympy.printing.c import C99CodePrinter
 try:
     from .tensor_product_geometry import (
         isoparametric_adjugate_lines,
+        streams_in_shape_order,
+        tensor_product_cartesian_shape_order,
         tensor_product_isoparametric_geometry_lines,
     )
 except ImportError:
     from tensor_product_geometry import (
         isoparametric_adjugate_lines,
+        streams_in_shape_order,
+        tensor_product_cartesian_shape_order,
         tensor_product_isoparametric_geometry_lines,
     )
 
@@ -1495,6 +1499,7 @@ def _sfem_tensor_product_hex_gradients_and_weights(
         for qy in range(n_qp_1d):
             for qx in range(n_qp_1d):
                 weights.append(weights_1d[qx] * weights_1d[qy] * weights_1d[qz])
+                qp_gradients = [None] * (n_shape_1d * n_shape_1d * n_shape_1d)
                 for sz in range(n_shape_1d):
                     for sy in range(n_shape_1d):
                         for sx in range(n_shape_1d):
@@ -1504,8 +1509,53 @@ def _sfem_tensor_product_hex_gradients_and_weights(
                             dx = shape_gradients_1d[qx * n_shape_1d + sx] * syv * szv
                             dy = sxv * shape_gradients_1d[qy * n_shape_1d + sy] * szv
                             dz = sxv * syv * shape_gradients_1d[qz * n_shape_1d + sz]
-                            gradients.extend((dx, dy, dz))
+                            shape = _sfem_tensor_hex_shape_index(
+                                n_shape_1d,
+                                sx,
+                                sy,
+                                sz,
+                            )
+                            qp_gradients[shape] = (dx, dy, dz)
+                for gradient in qp_gradients:
+                    gradients.extend(gradient)
     return tuple(gradients), tuple(weights)
+
+
+def _sfem_tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
+    if n_shape_1d == 2:
+        return (sx if sy == 0 else (3 if sx == 0 else 2)) + 4 * sz
+    if n_shape_1d == 3:
+        cartesian_to_hex27 = (
+            0,
+            8,
+            1,
+            11,
+            24,
+            9,
+            3,
+            10,
+            2,
+            16,
+            20,
+            17,
+            23,
+            26,
+            21,
+            19,
+            22,
+            18,
+            4,
+            12,
+            5,
+            15,
+            25,
+            13,
+            7,
+            14,
+            6,
+        )
+        return cartesian_to_hex27[sx + 3 * (sy + 3 * sz)]
+    raise ValueError("unsupported tensor-product hex order")
 
 
 @dataclass(frozen=True)
@@ -2146,31 +2196,7 @@ def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
         raise ValueError("tensor-product sum factorization supports dimensions 2 and 3")
 
     p = prefix
-    lines = [
-        "template <int N_SHAPE_1D>",
-        "static SFEM_INLINE int %s_tensor_shape_index(" % p,
-    ]
-    if dim == 2:
-        lines.extend(
-            [
-                "        const int sx,",
-                "        const int sy) {",
-                "    return N_SHAPE_1D == 2 ? (sy == 0 ? sx : (sx == 0 ? 3 : 2))",
-                "                           : sx + N_SHAPE_1D * sy;",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "        const int sx,",
-                "        const int sy,",
-                "        const int sz) {",
-                "    return N_SHAPE_1D == 2",
-                "               ? (sy == 0 ? sx : (sx == 0 ? 3 : 2)) + 4 * sz",
-                "               : sx + N_SHAPE_1D * (sy + N_SHAPE_1D * sz);",
-            ]
-        )
-    lines.extend(["}", ""])
+    lines = []
 
     if dim == 2:
         lines.extend(
@@ -2193,7 +2219,7 @@ def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
                 "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
                 "                scalar_t v = 0; scalar_t gx = 0;",
                 "                for (int sx = 0; sx < S; ++sx) {",
-                "                    const int shape = %s_tensor_shape_index<S>(sx, sy);" % p,
+                "                    const int shape = sx + S * sy;",
                 "                    const scalar_t u = streams[shape * 2 + component][lane];",
                 "                    v += u * shape_1d[qx * S + sx];",
                 "                    gx += u * grad_1d[qx * S + sx];",
@@ -2250,7 +2276,7 @@ def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
                 "    }",
                 "    for (int sy = 0; sy < S; ++sy) {",
                 "        for (int sx = 0; sx < S; ++sx) {",
-                "            const int shape = %s_tensor_shape_index<S>(sx, sy);" % p,
+                "            const int shape = sx + S * sy;",
                 "#pragma omp simd",
                 "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
                 "                scalar_t value = 0;",
@@ -2292,7 +2318,7 @@ def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    scalar_t v = 0; scalar_t gx = 0;",
             "                    for (int sx = 0; sx < S; ++sx) {",
-            "                        const int shape = %s_tensor_shape_index<S>(sx, sy, sz);" % p,
+            "                        const int shape = sx + S * (sy + S * sz);",
             "                        const scalar_t u = streams[shape * 3 + component][lane];",
             "                        v += u * shape_1d[qx * S + sx];",
             "                        gx += u * grad_1d[qx * S + sx];",
@@ -2398,7 +2424,7 @@ def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
             "    for (int sz = 0; sz < S; ++sz) {",
             "        for (int sy = 0; sy < S; ++sy) {",
             "            for (int sx = 0; sx < S; ++sx) {",
-            "                const int shape = %s_tensor_shape_index<S>(sx, sy, sz);" % p,
+            "                const int shape = sx + S * (sy + S * sz);",
             "#pragma omp simd",
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    scalar_t value = 0;",
@@ -2680,6 +2706,11 @@ def _sfem_soa_block_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    stream_shape_order = (
+        tensor_product_cartesian_shape_order(dim, n_nodes)
+        if use_tensor_product_reference
+        else tuple(range(n_nodes))
+    )
     params = ["const ptrdiff_t nelems"]
     if form.weak_form is not None:
         params.append("const ptrdiff_t geometry_stride")
@@ -2799,7 +2830,13 @@ def _sfem_soa_block_function(
             "    const scalar_t *const weak_u_streams[N_SHAPE * %d] = {%s};"
             % (
                 dim,
-                ", ".join(_field_stream_names("u", dim, n_nodes)),
+                ", ".join(
+                    streams_in_shape_order(
+                        _field_stream_names("u", dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
+                ),
             )
         )
         if form.has_direction:
@@ -2807,7 +2844,13 @@ def _sfem_soa_block_function(
                 "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
                 % (
                     dim,
-                    ", ".join(_field_stream_names("h", dim, n_nodes)),
+                    ", ".join(
+                        streams_in_shape_order(
+                            _field_stream_names("h", dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
+                    ),
                 )
             )
         if form.name != "objective":
@@ -2815,7 +2858,13 @@ def _sfem_soa_block_function(
                 "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
                 % (
                     dim,
-                    ", ".join(_output_stream_names(form, dim, n_nodes)),
+                    ", ".join(
+                        streams_in_shape_order(
+                            _output_stream_names(form, dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
+                    ),
                 )
             )
     if form.weak_form is not None and use_tensor_product_reference:
@@ -3752,6 +3801,11 @@ def _sfem_soa_operator_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    stream_shape_order = (
+        tensor_product_cartesian_shape_order(dim, n_nodes)
+        if use_tensor_product_reference
+        else tuple(range(n_nodes))
+    )
     base_params = ["const ptrdiff_t nelements"]
     if isoparametric_geometry:
         base_params.extend(
@@ -3890,7 +3944,11 @@ def _sfem_soa_operator_function(
                 dim,
                 ", ".join(
                     "block_%s" % stream
-                    for stream in _field_stream_names("u", dim, n_nodes)
+                    for stream in streams_in_shape_order(
+                        _field_stream_names("u", dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
                 ),
             )
         )
@@ -3901,7 +3959,11 @@ def _sfem_soa_operator_function(
                     dim,
                     ", ".join(
                         "block_%s" % stream
-                        for stream in _field_stream_names("h", dim, n_nodes)
+                        for stream in streams_in_shape_order(
+                            _field_stream_names("h", dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
                     ),
                 )
             )
@@ -3914,7 +3976,11 @@ def _sfem_soa_operator_function(
                     dim,
                     ", ".join(
                         "block_%s" % stream
-                        for stream in _output_stream_names(form, dim, n_nodes)
+                        for stream in streams_in_shape_order(
+                            _output_stream_names(form, dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
                     ),
             )
         )
@@ -4125,6 +4191,11 @@ def _sfem_soa_mesh_operator_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    stream_shape_order = (
+        tensor_product_cartesian_shape_order(dim, n_nodes)
+        if use_tensor_product_reference
+        else tuple(range(n_nodes))
+    )
 
     base_params = [
         "const ptrdiff_t nelements",
@@ -4288,7 +4359,11 @@ def _sfem_soa_mesh_operator_function(
                 dim,
                 ", ".join(
                     "block_%s" % stream
-                    for stream in _field_stream_names("u", dim, n_nodes)
+                    for stream in streams_in_shape_order(
+                        _field_stream_names("u", dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
                 ),
             )
         )
@@ -4299,7 +4374,11 @@ def _sfem_soa_mesh_operator_function(
                     dim,
                     ", ".join(
                         "block_%s" % stream
-                        for stream in _field_stream_names("h", dim, n_nodes)
+                        for stream in streams_in_shape_order(
+                            _field_stream_names("h", dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
                     ),
                 )
             )
@@ -4310,7 +4389,11 @@ def _sfem_soa_mesh_operator_function(
                     dim,
                     ", ".join(
                         "block_%s" % stream
-                        for stream in _output_stream_names(form, dim, n_nodes)
+                        for stream in streams_in_shape_order(
+                            _output_stream_names(form, dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
                     ),
                 )
             )
@@ -4366,7 +4449,11 @@ def _sfem_soa_mesh_operator_function(
                 n_shape=n_nodes,
                 coordinate_streams=[
                     "block_%s" % stream
-                    for stream in _coordinate_stream_names(dim, n_nodes)
+                    for stream in streams_in_shape_order(
+                        _coordinate_stream_names(dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
                 ],
                 evaluator_lines=evaluator_lines,
                 adjugate_target=lambda component, index: (
