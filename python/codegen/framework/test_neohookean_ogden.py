@@ -1863,6 +1863,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("KernelDiagnostics_total_bytes", diagnostics_source)
+        self.assertIn("KernelDiagnostics_print_rate", diagnostics_source)
+        self.assertIn("#include <stdio.h>", diagnostics_source)
+        self.assertIn(
+            'extern "C" void generated_neohookean_ogden_tri3_apply_affine_mesh_soa_print_rate',
+            operator_source,
+        )
+        self.assertIn(
+            'extern "C" void generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float_print_rate',
+            operator_source,
+        )
         self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)
         self.assertIn('extern "C" int generated_neohookean_ogden_tri3_apply_soa', operator_source)
         self.assertIn(

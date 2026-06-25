@@ -12,6 +12,7 @@ from .symbolic import (
     KernelExpressions,
     _cpp_scalar_initializer_list,
     _sfem_ccode,
+    _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_math_header_source,
     sfem_soa_element_specialization,
@@ -818,6 +819,26 @@ def _kernel_diagnostics_lines(
         "            nelements, scalar_bytes, real_bytes, accumulator_bytes);",
         "}",
     ]
+    function_names = [public_name]
+    if public_name.endswith("_element_soa"):
+        function_names.extend(
+            (
+                public_name.replace("_element_soa", "_affine_mesh_soa"),
+                public_name.replace(
+                    "_element_soa", "_isoparametric_mesh_soa"
+                ),
+            )
+        )
+    for function_name in function_names:
+        for scalar_type in ("double", "float"):
+            lines.append("")
+            lines.extend(
+                _sfem_soa_diagnostic_print_wrapper_lines(
+                    function_name,
+                    variable_name,
+                    scalar_type,
+                )
+            )
     return lines
 
 

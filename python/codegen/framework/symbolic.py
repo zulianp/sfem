@@ -4561,6 +4561,7 @@ def _sfem_soa_diagnostics_header():
         "#define SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP",
         "",
         "#include <stddef.h>",
+        "#include <stdio.h>",
         "",
         "#ifndef SFEM_INLINE",
         "#define SFEM_INLINE inline",
@@ -4643,10 +4644,56 @@ def _sfem_soa_diagnostics_header():
         "    return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
+        "static SFEM_INLINE void %s_print_rate(" % struct_name,
+        "        const char *const name,",
+        "        const %s *const d," % struct_name,
+        "        const double elapsed,",
+        "        const ptrdiff_t nelements,",
+        "        const ptrdiff_t ndofs,",
+        "        const int repeat,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const double seconds_per_call = repeat > 0 ? elapsed / (double)repeat : 0.0;",
+        "    const double element_rate = seconds_per_call > 0.0 ? 1e-6 * (double)nelements / seconds_per_call : 0.0;",
+        "    const double dof_rate = seconds_per_call > 0.0 ? 1e-6 * (double)ndofs / seconds_per_call : 0.0;",
+        "    const double ai = %s_arithmetic_intensity(" % struct_name,
+        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "    const double gflops = seconds_per_call > 0.0",
+        "            ? 1e-9 * %s_total_flops(d, nelements) / seconds_per_call" % struct_name,
+        "            : 0.0;",
+        '    printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
+        "           name ? name : d->kernel_name,",
+        "           seconds_per_call, element_rate, dof_rate, ai, gflops);",
+        "}",
+        "",
         "} // namespace codegen",
         "} // namespace sfem",
         "",
         "#endif",
+    ]
+
+
+def _sfem_soa_diagnostic_print_wrapper_lines(
+    function_name,
+    variable_name,
+    scalar_type,
+):
+    suffix = "" if scalar_type == "double" else "_float"
+    public_name = "%s%s_print_rate" % (function_name, suffix)
+    return [
+        'extern "C" void %s(' % public_name,
+        "        const double elapsed,",
+        "        const ptrdiff_t nelements,",
+        "        const ptrdiff_t ndofs,",
+        "        const int repeat) {",
+        "    sfem::codegen::KernelDiagnostics_print_rate(",
+        '            "%s%s",' % (function_name, suffix),
+        "            &sfem::codegen::%s," % variable_name,
+        "            elapsed, nelements, ndofs, repeat,",
+        "            sizeof(%s), sizeof(%s), sizeof(%s));"
+        % (scalar_type, scalar_type, scalar_type),
+        "}",
     ]
 
 
@@ -4757,6 +4804,34 @@ def _sfem_soa_diagnostics_lines(
         "    return sfem::codegen::%s_arithmetic_intensity(&sfem::codegen::%s, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % (struct_name, variable_name),
         "}",
     ]
+    function_names = [public_name]
+    if quadrature_rule is not None:
+        function_names.extend(
+            (
+                _sfem_soa_mesh_public_function_name(
+                    prefix,
+                    form.name,
+                    quadrature_rule,
+                    "affine",
+                ),
+                _sfem_soa_mesh_public_function_name(
+                    prefix,
+                    form.name,
+                    quadrature_rule,
+                    "isoparametric",
+                ),
+            )
+        )
+    for function_name in function_names:
+        for scalar_type in ("double", "float"):
+            lines.append("")
+            lines.extend(
+                _sfem_soa_diagnostic_print_wrapper_lines(
+                    function_name,
+                    variable_name,
+                    scalar_type,
+                )
+            )
     return lines
 
 

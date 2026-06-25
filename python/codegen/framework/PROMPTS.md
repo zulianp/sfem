@@ -24,4 +24,7 @@ Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.
 
 <!-- BOTH  -->
 
-The mesh-kernels for isoparametric tensor product elements are not exploiting the tensor product structure for computing the Jacobian in residual_codegen.py. Fix it and make sure that generation code for such things is not duplicated. Currently symbolic.py is the better one to use as a reference. In order to avoid code duplication create the necessary abstractions (you can use new files for this)
+Organize the example materials (e.g., neohookean and twophaseflow) in python/codegen/framework/materials and make them as clean as possible (like user intened code), the infrastructure code should be abstracted away and put it in the API module sfem.gen.
+
+
+Create a script that I can run to generate and install the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 

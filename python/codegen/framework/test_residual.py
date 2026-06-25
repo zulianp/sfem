@@ -416,6 +416,22 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     % element.lower(),
                     operator_source,
                 )
+                self.assertIn(
+                    "KernelDiagnostics_print_rate",
+                    diagnostics_source,
+                )
+                self.assertIn(
+                    'extern "C" void '
+                    "coupled_diffusion_%s_residual_affine_mesh_soa_print_rate"
+                    % element.lower(),
+                    operator_source,
+                )
+                self.assertIn(
+                    'extern "C" void '
+                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+                    % element.lower(),
+                    operator_source,
+                )
                 regenerated = generate_coupled_residual_sfem_files(
                     system,
                     prefix="coupled_diffusion",
