@@ -24,14 +24,31 @@ The residual code generator injects depencies in kernels that are not actually n
 
 <!-- BOTH  -->
 
-Create a script that I can run to generate and install the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
+Create a script that I can run to generate and (re-)install all the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
 
 In framework create folder tests (where all the test should be moved)
+
+
+Lets revisit naming convetions (if incomplete stop and let me know what is missing)
+
+Naming conventions for kernels 
+`<material_name>_<elem_type>_<a|i>_<objective|gradient|hessian_apply|...>[_block_<var_name>][other_qualifiers]`
+
+elem_type is one if the formulation is standard Galerkin, <trial>_<test> if Petrov-Galerkin
+a := affine
+i := isoparametric
+
+naming conversion for micro-kernels (local)
+`<material_name>_<family>_d<dim>_<objective|gradient|hessian_apply|...>[_block_<var_name>][other_qualifiers]`
+
+dim := 1|2|3
+family := simplex|tensor_product
+
 
 <!-- SMESH -->
 
 
 <!-- SFEM -->
 
-The generated Op subclass (e.g., GeneratedNeoHookeanOgden) should allow to chose for affine version of the hessian action
+The generated Op subclass (e.g., GeneratedNeoHookeanOgden) should allow to choose (independently) for affine version of the objective, gradient, and hessian action
 The generated Op subclass should also include the create_from_yaml function (see sfem_LinearElasticity.hpp) to include  the model parameters
