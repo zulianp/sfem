@@ -11,4 +11,4 @@ from sfem import gen  # noqa: E402
 
 
 if __name__ == "__main__":
-    gen.run(material, os.path.join(os.path.dirname(__file__), "prova"))
+    gen.run(material, os.path.join(os.path.dirname(__file__), "../../../frontend/ops/generated/neohookean_ogden"))
