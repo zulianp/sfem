@@ -101,13 +101,14 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa
                                                                                  real_t *,
                                                                                  real_t *);
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics();
-
-extern "C" double generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity(ptrdiff_t, size_t, size_t, size_t);
-
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics();
-
-extern "C" double generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity(ptrdiff_t, size_t, size_t, size_t);
+extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_print_rate(
+        double, ptrdiff_t, ptrdiff_t, int);
+extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_print_rate(
+        double, ptrdiff_t, ptrdiff_t, int);
+extern "C" void generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_print_rate(
+        double, ptrdiff_t, ptrdiff_t, int);
+extern "C" void generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_print_rate(
+        double, ptrdiff_t, ptrdiff_t, int);
 
 namespace {
 
@@ -163,32 +164,13 @@ namespace {
         const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
         const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
 
-        printf("%-18s %12.6e %16.3f %13.3f %10s %13s\n", name, seconds_per_call, melements_per_s, mdofs_per_s, "-", "-");
-    }
-
-    using ArithmeticIntensity = double (*)(ptrdiff_t, size_t, size_t, size_t);
-
-    void print_generated_rate(const char *const                             name,
-                              const double                                  elapsed,
-                              const ptrdiff_t                               nelements,
-                              const ptrdiff_t                               ndofs,
-                              const int                                     repeat,
-                              const sfem::codegen::KernelDiagnostics *const diagnostics,
-                              const ArithmeticIntensity                     arithmetic_intensity) {
-        const double seconds_per_call = elapsed / repeat;
-        const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
-        const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
-        const double ai               = arithmetic_intensity(nelements, sizeof(real_t), sizeof(real_t), sizeof(real_t));
-        const double gflops_per_s =
-                1e-9 * sfem::codegen::KernelDiagnostics_total_flops(diagnostics, nelements) / seconds_per_call;
-
-        printf("%-18s %12.6e %16.3f %13.3f %10.3f %13.3f\n",
+        printf("%-72s %12.6e %16.3f %13.3f %10s %13s\n",
                name,
                seconds_per_call,
                melements_per_s,
                mdofs_per_s,
-               ai,
-               gflops_per_s);
+               "-",
+               "-");
     }
 
     void compute_hex8_affine_geometry(const std::shared_ptr<sfem::Mesh> &mesh,
@@ -487,47 +469,24 @@ int main(int argc, char *argv[]) {
     printf("#dofs %ld\n", static_cast<long>(ndofs));
     printf("#left_nodes %ld\n", static_cast<long>(boundary.left->size()));
     printf("#right_nodes %ld\n", static_cast<long>(boundary.right->size()));
-    printf("\n%-18s %12s %16s %13s %10s %13s\n",
+    printf("\n%-72s %12s %16s %13s %10s %13s\n",
            "Operation",
            "Time [s]",
            "Rate [MElem/s]",
            "Rate [MDOF/s]",
            "AI",
            "Rate [GFLOP/s]");
-    printf("----------------------------------------------------------------------------------------\n");
+    printf("----------------------------------------------------------------------------------------------------------------------------------------------\n");
     print_rate("gradient", gradient_t1 - gradient_t0, nelements, ndofs, repeat);
     print_rate("hessian_apply", apply_t1 - apply_t0, nelements, ndofs, repeat);
-    const auto *const gradient_diagnostics = generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics();
-    const auto *const apply_diagnostics    = generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics();
-
-    print_generated_rate("gen_affine_grad",
-                         generated_affine_gradient_elapsed,
-                         nelements,
-                         ndofs,
-                         repeat,
-                         gradient_diagnostics,
-                         generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity);
-    print_generated_rate("gen_affine_apply",
-                         generated_affine_apply_elapsed,
-                         nelements,
-                         ndofs,
-                         repeat,
-                         apply_diagnostics,
-                         generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity);
-    print_generated_rate("gen_iso_grad",
-                         generated_iso_gradient_elapsed,
-                         nelements,
-                         ndofs,
-                         repeat,
-                         gradient_diagnostics,
-                         generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity);
-    print_generated_rate("gen_iso_apply",
-                         generated_iso_apply_elapsed,
-                         nelements,
-                         ndofs,
-                         repeat,
-                         apply_diagnostics,
-                         generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity);
+    generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_print_rate(
+            generated_affine_gradient_elapsed, nelements, ndofs, repeat);
+    generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_print_rate(
+            generated_affine_apply_elapsed, nelements, ndofs, repeat);
+    generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_print_rate(
+            generated_iso_gradient_elapsed, nelements, ndofs, repeat);
+    generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_print_rate(
+            generated_iso_apply_elapsed, nelements, ndofs, repeat);
 
     idx_t **const  elements           = mesh->elements(0)->data();
     geom_t **const points             = mesh->points()->data();
