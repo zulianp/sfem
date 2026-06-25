@@ -25,14 +25,22 @@ def weak_form(system):
     current = constitutive.state(water.value, co2.value)
     previous = constitutive.state(water.previous_value, co2.previous_value)
     porosity = constitutive.parameters.porosity
-    water_accumulation = porosity * (
-        current.water_saturation * current.water_density
-        - previous.water_saturation * previous.water_density
-    ) / dt
-    co2_accumulation = porosity * (
-        current.co2_saturation * current.co2_density
-        - previous.co2_saturation * previous.co2_density
-    ) / dt
+    water_accumulation = (
+        porosity
+        * (
+            current.water_saturation * current.water_density
+            - previous.water_saturation * previous.water_density
+        )
+        / dt
+    )
+    co2_accumulation = (
+        porosity
+        * (
+            current.co2_saturation * current.co2_density
+            - previous.co2_saturation * previous.co2_density
+        )
+        / dt
+    )
     water_flux = -(
         current.water_density
         * current.water_mobility
@@ -53,8 +61,7 @@ def weak_form(system):
     )
     system.set_residual(
         co2,
-        co2_accumulation * co2.test_value
-        - co2_flux.dot(sp.Matrix(co2.test_gradient)),
+        co2_accumulation * co2.test_value - co2_flux.dot(sp.Matrix(co2.test_gradient)),
     )
 
 
@@ -64,32 +71,32 @@ material = gen.CoupledResidualMaterial(
     elements=("TRI3", "TET4", "QUAD4", "HEX8"),
     op_name="GeneratedTwoPhaseFlow",
     parameter_defaults=(
-        ("porosity", 0.2),
-        ("S_res", 0.1),
-        ("P_r", 1.0e5),
-        ("m", 2.0),
-        ("rho_w0", 1000.0),
-        ("kappa_T", 1.0e-9),
-        ("p_wr", 1.0e5),
-        ("M_c", 0.044),
-        ("Z", 1.0),
-        ("R", 8.314462618),
-        ("T", 300.0),
-        ("mu_w", 1.0e-3),
-        ("mu_c", 1.5e-5),
-        ("C_kw1", 2.0),
-        ("C_ka1", 2.0),
-        ("C_ka2", 2.0),
+        ("porosity", 0.1),
+        ("S_res", 0.39),
+        ("P_r", 9.5e4 / 1.0e6),
+        ("m", 4.2),
+        ("rho_w0", 1100.0),
+        ("kappa_T", 4.55e-10 * 1.0e6),
+        ("p_wr", 1.0e6 / 1.0e6),
+        ("M_c", 0.04401),
+        ("Z", 0.4252),
+        ("R", 8.314 / 1.0e6),
+        ("T", 333.0),
+        ("mu_w", 5.2),
+        ("mu_c", 1.5),
+        ("C_kw1", 0.52),
+        ("C_ka1", 1.8),
+        ("C_ka2", 0.35),
         ("dt", 1.0),
-        ("K_0", 1.0e-12),
+        ("K_0", 86.40),
         ("K_1", 0.0),
         ("K_2", 0.0),
         ("K_3", 0.0),
-        ("K_4", 1.0e-12),
+        ("K_4", 86.40),
         ("K_5", 0.0),
         ("K_6", 0.0),
         ("K_7", 0.0),
-        ("K_8", 1.0e-12),
+        ("K_8", 86.40),
     ),
 )
 

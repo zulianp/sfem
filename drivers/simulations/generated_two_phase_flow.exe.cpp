@@ -115,6 +115,25 @@ namespace {
         return totals;
     }
 
+    void compute_capillary_and_water_saturation(const real_t *const state,
+                                                const ptrdiff_t     nnodes,
+                                                const real_t        s_res,
+                                                const real_t        p_r,
+                                                const real_t        m,
+                                                real_t *const       suction,
+                                                real_t *const       water_saturation) {
+        const real_t one_minus_s_res = 1.0 - s_res;
+        const real_t exponent        = 1.0 / m - 1.0;
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            const real_t pw        = state[2 * node + 0];
+            const real_t pc        = state[2 * node + 1];
+            const real_t s         = pc - pw;
+            const real_t x         = s / p_r;
+            suction[node]          = s;
+            water_saturation[node] = s_res + one_minus_s_res * std::pow(1.0 + std::pow(x, m), exponent);
+        }
+    }
+
     void write_performance(FILE *const            output,
                            const char *const      sample,
                            const ptrdiff_t        step,
@@ -157,10 +176,10 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Mesh> mesh;
     if (strcmp(argv[1], "GENERATE") == 0) {
-        const ptrdiff_t nx = smesh::Env::read("SFEM_NX", 8);
-        const ptrdiff_t ny = smesh::Env::read("SFEM_NY", 4);
-        const ptrdiff_t nz = smesh::Env::read("SFEM_NZ", 4);
-        mesh               = sfem::Mesh::create_hex8_cube(comm, nx, ny, nz, 0, 0, 0, 1, 0.5, 0.5);
+        const ptrdiff_t nx = smesh::Env::read("SFEM_NX", 400);
+        const ptrdiff_t ny = smesh::Env::read("SFEM_NY", 5);
+        const ptrdiff_t nz = smesh::Env::read("SFEM_NZ", 5);
+        mesh               = sfem::Mesh::create_hex8_cube(comm, nx, ny, nz, 0, 0, 0, 4000, 50, 50);
     } else {
         mesh = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
     }
@@ -186,9 +205,9 @@ int main(int argc, char *argv[]) {
             "sample,step,time,kernel,calls,seconds,elements_per_second,dofs_per_second,"
             "flops_per_second,arithmetic_intensity\n");
 
-    const real_t initial_water_pressure = smesh::Env::read("SFEM_INITIAL_WATER_PRESSURE", 15e6);
-    const real_t initial_co2_pressure   = smesh::Env::read("SFEM_INITIAL_CO2_PRESSURE", 15.1e6);
-    const real_t injection_co2_pressure = smesh::Env::read("SFEM_INJECTION_CO2_PRESSURE", 20e6);
+    const real_t initial_water_pressure = smesh::Env::read("SFEM_INITIAL_WATER_PRESSURE", 15);
+    const real_t initial_co2_pressure   = smesh::Env::read("SFEM_INITIAL_CO2_PRESSURE", 15.1);
+    const real_t injection_co2_pressure = smesh::Env::read("SFEM_INJECTION_CO2_PRESSURE", 20);
     const real_t ramp_duration          = smesh::Env::read("SFEM_RAMP_DURATION", 1.0);
     auto         space                  = sfem::FunctionSpace::create(mesh, 2);
     auto         initial_state          = sfem::create_host_buffer<real_t>(space->n_dofs());
@@ -200,18 +219,22 @@ int main(int argc, char *argv[]) {
     const geom_t xmin               = bounds.first->data()[0];
     const geom_t xmax               = bounds.second->data()[0];
     const geom_t selector_tolerance = std::max<geom_t>(1, std::abs(xmax - xmin)) * 64 * std::numeric_limits<geom_t>::epsilon();
-    auto         left_sidesets      = sfem::Sideset::create_from_selector(
+
+    auto left_sidesets = sfem::Sideset::create_from_selector(
             mesh, [=](const geom_t x, const geom_t, const geom_t) { return std::abs(x - xmin) <= selector_tolerance; });
+
     auto right_sidesets = sfem::Sideset::create_from_selector(
             mesh, [=](const geom_t x, const geom_t, const geom_t) { return std::abs(x - xmax) <= selector_tolerance; });
+
     std::vector<sfem::DirichletConditions::Condition> conditions(4);
-    conditions[0]        = {.sidesets = left_sidesets, .value = initial_water_pressure, .component = 0};
-    conditions[1]        = {.sidesets = left_sidesets, .value = initial_co2_pressure, .component = 1};
-    conditions[2]        = {.sidesets = right_sidesets, .value = initial_water_pressure, .component = 0};
-    conditions[3]        = {.sidesets = right_sidesets, .value = initial_co2_pressure, .component = 1};
-    auto dirichlet       = sfem::DirichletConditions::create(space, conditions);
-    auto left_nodes      = dirichlet->conditions()[0].nodeset;
-    auto right_nodes     = dirichlet->conditions()[2].nodeset;
+    conditions[0]    = {.sidesets = left_sidesets, .value = initial_water_pressure, .component = 0};
+    conditions[1]    = {.sidesets = left_sidesets, .value = initial_co2_pressure, .component = 1};
+    conditions[2]    = {.sidesets = right_sidesets, .value = initial_water_pressure, .component = 0};
+    conditions[3]    = {.sidesets = right_sidesets, .value = initial_co2_pressure, .component = 1};
+    auto dirichlet   = sfem::DirichletConditions::create(space, conditions);
+    auto left_nodes  = dirichlet->conditions()[0].nodeset;
+    auto right_nodes = dirichlet->conditions()[2].nodeset;
+
     auto update_boundary = [=](const real_t time, sfem::DirichletConditions &boundary) {
         const real_t ramp              = ramp_duration > 0 ? std::min<real_t>(1, std::max<real_t>(0, time / ramp_duration)) : 1;
         boundary.conditions()[1].value = initial_co2_pressure + ramp * (injection_co2_pressure - initial_co2_pressure);
@@ -233,19 +256,19 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    const real_t    initial_dt                   = smesh::Env::read("SFEM_DT", 0.1);
+    const real_t    initial_dt                   = smesh::Env::read("SFEM_DT", 1);
     const real_t    minimum_dt                   = smesh::Env::read("SFEM_MIN_DT", initial_dt / 2048);
-    const real_t    end_time                     = smesh::Env::read("SFEM_T_END", 1.0);
+    const real_t    end_time                     = smesh::Env::read("SFEM_T_END", 600);
     const int       nonlinear_max_it             = smesh::Env::read("SFEM_NL_MAX_IT", 20);
-    const real_t    nonlinear_atol               = smesh::Env::read("SFEM_NL_ATOL", 1e-8);
-    const real_t    nonlinear_rtol               = smesh::Env::read("SFEM_NL_RTOL", 1e-8);
+    const real_t    nonlinear_atol               = smesh::Env::read("SFEM_NL_ATOL", 1e-12);
+    const real_t    nonlinear_rtol               = smesh::Env::read("SFEM_NL_RTOL", 1e-10);
     const int       linear_max_it                = smesh::Env::read("SFEM_LS_MAX_IT", 14000);
     const real_t    linear_atol                  = smesh::Env::read("SFEM_LS_ATOL", 1e-12);
-    const real_t    linear_rtol                  = smesh::Env::read("SFEM_LS_RTOL", 1e-4);
+    const real_t    linear_rtol                  = smesh::Env::read("SFEM_LS_RTOL", 1e-8);
     const real_t    armijo                       = smesh::Env::read("SFEM_ARMIJO", 1e-4);
     const real_t    minimum_damping              = smesh::Env::read("SFEM_MIN_DAMPING", 1.0 / 1024);
     const ptrdiff_t checkpoint_frequency         = smesh::Env::read("SFEM_CHECKPOINT_FREQUENCY", 1);
-    const int       benchmark_repeats            = smesh::Env::read("SFEM_BENCHMARK_REPEATS", 100);
+    const int       benchmark_repeats            = smesh::Env::read("SFEM_BENCHMARK_REPEATS", 10);
     const ptrdiff_t performance_report_frequency = smesh::Env::read("SFEM_PERFORMANCE_REPORT_FREQUENCY", 1);
     printf("output nonlinear=%s balance=%s performance=%s\n",
            (output / "nonlinear_history.csv").c_str(),
@@ -255,21 +278,38 @@ int main(int argc, char *argv[]) {
         op->set_value_in_block(entry->name(), "dt", initial_dt);
     }
 
-    auto blas               = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
-    auto residual           = sfem::create_host_buffer<real_t>(space->n_dofs());
-    auto candidate_residual = sfem::create_host_buffer<real_t>(space->n_dofs());
-    auto increment          = sfem::create_host_buffer<real_t>(space->n_dofs());
-    auto candidate          = sfem::create_host_buffer<real_t>(space->n_dofs());
-    auto output_function    = sfem::Function::create(space);
+    auto         blas               = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+    auto         residual           = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto         candidate_residual = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto         increment          = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto         candidate          = sfem::create_host_buffer<real_t>(space->n_dofs());
+    const real_t retention_s_res    = smesh::Env::read("SFEM_S_RES", 0.39);
+    const real_t retention_p_r      = smesh::Env::read("SFEM_P_R", 9.5e4 / 1.0e6);
+    const real_t retention_m        = smesh::Env::read("SFEM_M", 4.2);
+
+    auto scalar_space    = sfem::FunctionSpace::create(mesh, 1);
+    auto output_function = sfem::Function::create(space);
     output_function->output()->set_output_dir(output / "out");
     output_function->output()->enable_AoS_to_SoA(true);
+    auto scalar_output_function = sfem::Function::create(scalar_space);
+    scalar_output_function->output()->set_output_dir(output / "out");
+
+    auto       suction                    = sfem::create_host_buffer<real_t>(mesh->n_nodes());
+    auto       water_saturation           = sfem::create_host_buffer<real_t>(mesh->n_nodes());
+    const auto write_postprocessed_fields = [&](const real_t time, const real_t *const state) {
+        compute_capillary_and_water_saturation(
+                state, mesh->n_nodes(), retention_s_res, retention_p_r, retention_m, suction->data(), water_saturation->data());
+        scalar_output_function->output()->write_time_step("s", time, suction->data());
+        scalar_output_function->output()->write_time_step("S_w", time, water_saturation->data());
+    };
+
     output_function->output()->write_time_step("pressure", time_integration.time(), time_integration.accepted()->data());
+    write_postprocessed_fields(time_integration.time(), time_integration.accepted()->data());
     OpStats    op_stats;
     const auto timed_gradient = [&](const real_t *const state, real_t *const out) {
         const auto begin  = std::chrono::steady_clock::now();
         const int  status = op->gradient(state, out);
-        op_stats.residual_seconds +=
-                std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+        op_stats.residual_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
         ++op_stats.residual_calls;
         return status;
     };
@@ -310,26 +350,25 @@ int main(int argc, char *argv[]) {
                 return SFEM_SUCCESS;
             }
 
-            const ptrdiff_t ndofs = space->n_dofs();
-            auto            linear_op =
-                    sfem::make_op<real_t>(ndofs,
-                                          ndofs,
-                                          [&](const real_t *const direction, real_t *const output) {
-                                              std::fill(output, output + ndofs, static_cast<real_t>(0));
-                                              const auto begin = std::chrono::steady_clock::now();
-                                              const int  err   = op->apply(nullptr, direction, output);
-                                              op_stats.jacobian_seconds += std::chrono::duration<double>(
-                                                                                  std::chrono::steady_clock::now() - begin)
-                                                                                  .count();
-                                              ++op_stats.jacobian_calls;
-                                              if (err != SFEM_SUCCESS) {
-                                                  SFEM_ERROR("GeneratedTwoPhaseFlow Jacobian action failed\n");
-                                              }
-                                              time_integration.constrain_linear(direction, output);
-                                          },
-                                          sfem::EXECUTION_SPACE_HOST);
-            auto bcgs      = sfem::create_bcgs<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
-            bcgs->verbose  = smesh::Env::read("SFEM_VERBOSE", true);
+            const ptrdiff_t ndofs     = space->n_dofs();
+            auto            linear_op = sfem::make_op<real_t>(
+                    ndofs,
+                    ndofs,
+                    [&](const real_t *const direction, real_t *const output) {
+                        std::fill(output, output + ndofs, static_cast<real_t>(0));
+                        const auto begin = std::chrono::steady_clock::now();
+                        const int  err   = op->apply(nullptr, direction, output);
+                        op_stats.jacobian_seconds +=
+                                std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+                        ++op_stats.jacobian_calls;
+                        if (err != SFEM_SUCCESS) {
+                            SFEM_ERROR("GeneratedTwoPhaseFlow Jacobian action failed\n");
+                        }
+                        time_integration.constrain_linear(direction, output);
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+            auto bcgs     = sfem::create_bcgs<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
+            bcgs->verbose = smesh::Env::read("SFEM_VERBOSE", true);
             bcgs->set_max_it(linear_max_it);
             bcgs->set_atol(std::max(linear_atol, linear_rtol * residual_norm));
             blas->zeros(increment->size(), increment->data());
@@ -378,6 +417,10 @@ int main(int argc, char *argv[]) {
             if (!accepted_update) {
                 return SFEM_FAILURE;
             }
+
+            printf("%d) residual norm: %.17g\n", nonlinear_it, static_cast<double>(candidate_norm));
+            printf("%d) merit: %.17g\n", nonlinear_it, static_cast<double>(candidate_merit));
+
             blas->copy(candidate->size(), candidate->data(), trial);
             op->update(previous, trial);
         }
@@ -456,6 +499,7 @@ int main(int argc, char *argv[]) {
         }
         dt = std::min(initial_dt, step_dt * 2);
         output_function->output()->write_time_step("pressure", time_integration.time(), time_integration.accepted()->data());
+        write_postprocessed_fields(time_integration.time(), time_integration.accepted()->data());
         output_function->output()->log_time(time_integration.time());
         if (checkpoint_frequency > 0 && time_integration.step() % checkpoint_frequency == 0) {
             time_integration.save_restart(output / "restart");
@@ -502,18 +546,16 @@ int main(int argc, char *argv[]) {
         OpStats benchmark_stats;
         for (int repeat = 0; repeat < benchmark_repeats; ++repeat) {
             blas->zeros(residual->size(), residual->data());
-            const auto begin  = std::chrono::steady_clock::now();
+            const auto begin = std::chrono::steady_clock::now();
             op->gradient(time_integration.accepted()->data(), residual->data());
-            benchmark_stats.residual_seconds +=
-                    std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+            benchmark_stats.residual_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
             ++benchmark_stats.residual_calls;
         }
         for (int repeat = 0; repeat < benchmark_repeats; ++repeat) {
             blas->zeros(action->size(), action->data());
-            const auto begin  = std::chrono::steady_clock::now();
+            const auto begin = std::chrono::steady_clock::now();
             op->apply(time_integration.accepted()->data(), direction->data(), action->data());
-            benchmark_stats.jacobian_seconds +=
-                    std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+            benchmark_stats.jacobian_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
             ++benchmark_stats.jacobian_calls;
         }
         write_performance(performance_output,
