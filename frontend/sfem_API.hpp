@@ -1199,8 +1199,6 @@ namespace sfem {
                 return sfem::hessian_sdacrs(f, u, es);
             } else if (format == op_type::SELL) {
                 return sfem::hessian_sell(f, u, es);
-            } else if (format == op_type::BSR) {
-                return sfem::hessian_bsr(f, u, es);
             }
 
             if (format != op_type::CRS) {
@@ -1222,6 +1220,8 @@ namespace sfem {
                 default:
                     return crs;
             }
+        } else if (format == op_type::BSR) {
+            return sfem::hessian_bsr(f, u, es);
         }
 
         return sfem::hessian_bcrs_sym(f, u, es);

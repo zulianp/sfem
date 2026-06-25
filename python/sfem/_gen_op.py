@@ -269,38 +269,88 @@ def _residual_op(material, elements):
     declarations = []
     residual_cases = []
     action_cases = []
+    dependencies_by_dim = {}
     for element in elements:
+        dim = _element_dim(element)
+        dependencies = dependencies_by_dim.get(dim)
+        if dependencies is None:
+            from codegen.framework.residual import CoupledResidualSystem
+
+            system = CoupledResidualSystem(dim)
+            material.define(system)
+            dependencies = (
+                system.residual_dependencies(),
+                system.jacobian_action_dependencies(),
+            )
+            dependencies_by_dim[dim] = dependencies
+        residual_dependencies, action_dependencies = dependencies
         stem = "generated_%s_%s" % (material.name, element.lower())
+        residual_pointer_params = []
+        if residual_dependencies.current:
+            residual_pointer_params.append("const real_t *")
+        if residual_dependencies.previous:
+            residual_pointer_params.append("const real_t *")
         declarations.append(
             "int %s_residual_isoparametric_mesh_aos("
             "ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, "
-            "const real_t *, const real_t *, const real_t *, real_t *);"
-            % stem
+            "const real_t *, %sreal_t *);"
+            % (stem, "".join("%s, " % param for param in residual_pointer_params))
         )
+        action_pointer_params = []
+        if action_dependencies.current:
+            action_pointer_params.append("const real_t *")
+        if action_dependencies.previous:
+            action_pointer_params.append("const real_t *")
+        if action_dependencies.direction:
+            action_pointer_params.append("const real_t *")
         declarations.append(
             "int %s_jacobian_action_isoparametric_mesh_aos("
             "ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, "
-            "const real_t *, const real_t *, const real_t *, "
-            "const real_t *, real_t *);" % stem
+            "const real_t *, %sreal_t *);"
+            % (stem, "".join("%s, " % param for param in action_pointer_params))
         )
         common = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), points, parameters"
         )
+        residual_args = [common]
+        if residual_dependencies.current:
+            residual_args.append("state")
+        if residual_dependencies.previous:
+            residual_args.append("previous")
+        residual_args.append("out")
         residual_cases.append(
             _case(
                 element,
                 "%s_residual_isoparametric_mesh_aos" % stem,
-                common + ", state, previous, out",
+                ", ".join(residual_args),
             )
         )
+        action_args = [common]
+        if action_dependencies.current:
+            action_args.append("current")
+        if action_dependencies.previous:
+            action_args.append("previous")
+        if action_dependencies.direction:
+            action_args.append("direction")
+        action_args.append("out")
         action_cases.append(
             _case(
                 element,
                 "%s_jacobian_action_isoparametric_mesh_aos" % stem,
-                common + ", state, previous, direction, out",
+                ", ".join(action_args),
             )
         )
+
+    residual_uses_previous = any(
+        dependencies[0].previous for dependencies in dependencies_by_dim.values()
+    )
+    action_uses_current = any(
+        dependencies[1].current for dependencies in dependencies_by_dim.values()
+    )
+    action_uses_previous = any(
+        dependencies[1].previous for dependencies in dependencies_by_dim.values()
+    )
 
     parameter_names = tuple(str(name) for name, _ in material.parameter_defaults)
     parameter_lines = "\n".join(
@@ -392,10 +442,7 @@ namespace sfem {
     }
 
     int %(op)s::gradient(const real_t *const state, real_t *const out) {
-        if (!impl_->previous) {
-            SFEM_ERROR("%(op)s requires a previous state\\n");
-            return SFEM_FAILURE;
-        }
+%(gradient_previous_check)s
         impl_->current = state;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
@@ -405,7 +452,7 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const parameters = storage;
-            const real_t *const previous = impl_->previous;
+%(gradient_previous_alias)s
             switch (domain.element_type) {
 %(residual_cases)s
                 default:
@@ -420,10 +467,7 @@ namespace sfem {
                       const real_t *const direction,
                       real_t *const out) {
         const real_t *const current = state ? state : impl_->current;
-        if (!current || !impl_->previous) {
-            SFEM_ERROR("%(op)s requires current and previous states\\n");
-            return SFEM_FAILURE;
-        }
+%(apply_state_check)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -432,7 +476,7 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const parameters = storage;
-            const real_t *const previous = impl_->previous;
+%(apply_previous_alias)s
             switch (domain.element_type) {
 %(action_cases)s
                 default:
@@ -479,9 +523,52 @@ namespace sfem {
         "defaults": defaults,
         "parameter_lines": parameter_lines,
         "residual_cases": "\n".join(residual_cases),
-        "action_cases": "\n".join(
-            case.replace(", state, previous, direction, out", ", current, previous, direction, out")
-            for case in action_cases
+        "action_cases": "\n".join(action_cases),
+        "gradient_previous_check": (
+            "        if (!impl_->previous) {\n"
+            '            SFEM_ERROR("%s requires a previous state\\n");\n'
+            "            return SFEM_FAILURE;\n"
+            "        }" % material.op_name
+            if residual_uses_previous
+            else ""
+        ),
+        "gradient_previous_alias": (
+            "            const real_t *const previous = impl_->previous;"
+            if residual_uses_previous
+            else ""
+        ),
+        "apply_state_check": (
+            "        if (%s) {\n"
+            '            SFEM_ERROR("%s requires %s\\n");\n'
+            "            return SFEM_FAILURE;\n"
+            "        }"
+            % (
+                " || ".join(
+                    condition
+                    for condition in (
+                        "!current" if action_uses_current else "",
+                        "!impl_->previous" if action_uses_previous else "",
+                    )
+                    if condition
+                ),
+                material.op_name,
+                (
+                    "current and previous states"
+                    if action_uses_current and action_uses_previous
+                    else (
+                        "a current state"
+                        if action_uses_current
+                        else "a previous state"
+                    )
+                ),
+            )
+            if action_uses_current or action_uses_previous
+            else ""
+        ),
+        "apply_previous_alias": (
+            "            const real_t *const previous = impl_->previous;"
+            if action_uses_previous
+            else ""
         ),
     }
     return _header(material, True), source

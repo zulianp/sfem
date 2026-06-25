@@ -221,6 +221,19 @@ class CoupledResidualSystemTest(unittest.TestCase):
             tuple(sp.simplify(value) for value in action[0].gradient),
             tuple(k_u * value for value in u.direction_gradient),
         )
+        unused = sp.Symbol("unused")
+        system.add_parameters(unused)
+        residual_dependencies = system.residual_dependencies()
+        action_dependencies = system.jacobian_action_dependencies()
+        self.assertTrue(residual_dependencies.current)
+        self.assertTrue(residual_dependencies.previous)
+        self.assertFalse(residual_dependencies.direction)
+        self.assertFalse(action_dependencies.current)
+        self.assertFalse(action_dependencies.previous)
+        self.assertTrue(action_dependencies.direction)
+        self.assertNotIn(unused, residual_dependencies.parameters)
+        self.assertNotIn(unused, action_dependencies.parameters)
+        self.assertNotIn(u.previous_value, system.jacobian_action_data_symbols())
 
         with self.assertRaisesRegex(ValueError, "linear"):
             weak_residual_coefficients(
@@ -400,6 +413,16 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     "block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE]",
                     operator_source,
                 )
+                action_local = local_source.split(
+                    "static SFEM_INLINE void "
+                    "coupled_diffusion_d%d_%s_jacobian_action_block"
+                    % (dim, family),
+                    1,
+                )[1]
+                action_signature = action_local.split(") {", 1)[0]
+                self.assertNotIn(" current[", action_signature)
+                self.assertNotIn(" previous[", action_signature)
+                self.assertIn(" direction[", action_signature)
                 self.assertIn("#pragma omp atomic update", operator_source)
                 self.assertIn(
                     "coupled_diffusion_%s_residual_element_soa_diagnostics"
@@ -765,13 +788,18 @@ class CoupledResidualSystemTest(unittest.TestCase):
             scalar(1.3),
             scalar(0.8),
             scalar(0.25),
-            ctypes.c_long(1),
-            current_storage[0],
-            current_storage[1],
-            ctypes.c_long(1),
-            previous_storage[0],
-            previous_storage[1],
         ]
+        if form == "residual":
+            args.extend(
+                (
+                    ctypes.c_long(1),
+                    current_storage[0],
+                    current_storage[1],
+                    ctypes.c_long(1),
+                    previous_storage[0],
+                    previous_storage[1],
+                )
+            )
         if direction is not None:
             direction_storage = [
                 (scalar * n_shape)(*values) for values in direction
@@ -854,14 +882,19 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 scalar(1.3),
                 scalar(0.8),
                 scalar(0.25),
-                ctypes.c_long(1),
-                current_storage[0],
-                current_storage[1],
-                ctypes.c_long(1),
-                previous_storage[0],
-                previous_storage[1],
             )
         )
+        if form == "residual":
+            args.extend(
+                (
+                    ctypes.c_long(1),
+                    current_storage[0],
+                    current_storage[1],
+                    ctypes.c_long(1),
+                    previous_storage[0],
+                    previous_storage[1],
+                )
+            )
         if direction is not None:
             direction_storage = [
                 (scalar * n_shape)(*values) for values in direction
