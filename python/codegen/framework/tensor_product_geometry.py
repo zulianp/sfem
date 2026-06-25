@@ -1,3 +1,33 @@
+def tensor_product_cartesian_shape_order(dim, n_shape):
+    if dim == 2 and n_shape == 4:
+        return (0, 1, 3, 2)
+    if dim == 3 and n_shape == 8:
+        return (0, 1, 3, 2, 4, 5, 7, 6)
+    if dim == 3 and n_shape == 27:
+        return (
+            0, 8, 1,
+            11, 24, 9,
+            3, 10, 2,
+            16, 20, 17,
+            23, 26, 21,
+            19, 22, 18,
+            4, 12, 5,
+            15, 25, 13,
+            7, 14, 6,
+        )
+    return tuple(range(n_shape))
+
+
+def streams_in_shape_order(streams, n_components, shape_order):
+    if len(streams) != n_components * len(shape_order):
+        raise ValueError("stream count must be component count * number of shapes")
+    return tuple(
+        streams[shape * n_components + component]
+        for shape in shape_order
+        for component in range(n_components)
+    )
+
+
 def isoparametric_adjugate_lines(
     dim,
     indent,

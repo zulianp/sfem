@@ -20,10 +20,10 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
         std::function<void(const T* const, T* const)> right_preconditioner_op;
-        BLAS_Tpl<T> blas;
+        BLAS_Tpl<T>                                   blas;
 
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
-        int iterations_{0};
+        int       iterations_{0};
 
         bool verbose{true};
 
@@ -52,7 +52,7 @@ namespace sfem {
         }
 
         // Solver parameters
-        T tol{1e-10};
+        T   tol{1e-10};
         int max_it{10000};
 
         void set_atol(const T val) { tol = val; }
@@ -84,8 +84,7 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             assert(n_dofs >= 0);
             if (this->n_dofs < 0) {
-                std::cerr
-                        << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                std::cerr << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
                 return 1;
             }
 
@@ -130,7 +129,7 @@ namespace sfem {
 
                 const T ptv = blas.dot(n, r0, v);
 
-                if(ptv == 0) {
+                if (ptv == 0) {
                     info = SFEM_FAILURE;
                     break;
                 }
@@ -155,7 +154,7 @@ namespace sfem {
                 const T tts = blas.dot(n, t, s);
                 const T ttt = blas.dot(n, t, t);
 
-                if(ttt == 0) {
+                if (ttt == 0) {
                     info = SFEM_FAILURE;
                     break;
                 }
@@ -173,9 +172,14 @@ namespace sfem {
                     break;
                 }
 
+                if (std::isnan(omega)) {
+                    info = SFEM_FAILURE;
+                    break;
+                }
+
                 const T rho_new = blas.dot(n, r0, r);
-                const T beta = (rho_new / rho) * (alpha / omega);
-                rho = rho_new;
+                const T beta    = (rho_new / rho) * (alpha / omega);
+                rho             = rho_new;
 
                 blas.axpby(n, 1, r, beta, p);
                 blas.axpby(n, -omega * beta, v, 1, p);
@@ -279,8 +283,8 @@ namespace sfem {
                 }
 
                 const T rho_new = blas.dot(n, r0, r);
-                const T beta = (rho_new / rho) * (alpha / omega);
-                rho = rho_new;
+                const T beta    = (rho_new / rho) * (alpha / omega);
+                rho             = rho_new;
 
                 blas.axpby(n, 1, r, beta, p);
                 blas.axpby(n, -omega * beta, v, 1, p);

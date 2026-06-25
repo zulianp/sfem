@@ -96,7 +96,7 @@ namespace sfem {
                     return generated_neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::HEX8:
                     return generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX27:
+                case smesh::HEX27:
                     return generated_neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 default:
                     SFEM_ERROR("GeneratedNeoHookeanOgden does not support element type %d\n",
@@ -125,7 +125,7 @@ namespace sfem {
                     return generated_neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::HEX8:
                     return generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX27:
+                case smesh::HEX27:
                     return generated_neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 default:
                     SFEM_ERROR("GeneratedNeoHookeanOgden does not support element type %d\n",
@@ -164,7 +164,7 @@ namespace sfem {
                 case smesh::HEX8:
                     status = generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
                     break;
-                case smesh::PROTEUS_HEX27:
+                case smesh::HEX27:
                     status = generated_neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
                     break;
                 default:

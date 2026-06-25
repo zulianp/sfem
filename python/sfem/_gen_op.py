@@ -546,6 +546,4 @@ def _element_dim(element):
 
 
 def _mesh_element_name(element):
-    if element == "HEX27":
-        return "PROTEUS_HEX27"
     return element

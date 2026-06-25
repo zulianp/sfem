@@ -553,6 +553,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             prefix="coupled_diffusion_hex27",
             element_type="HEX27",
         )
+        local_source = files[2].source
         operator_source = files[3].source
         marker = (
             "static SFEM_INLINE int "
@@ -569,6 +570,17 @@ class CoupledResidualSystemTest(unittest.TestCase):
         )
         self.assertIn("static constexpr int N_SHAPE = 27;", section)
         self.assertNotIn("geometry_grad_ref", section)
+        self.assertNotIn("tensor_index", local_source)
+        self.assertIn(
+            "const int s = sx + S * (sy + S * sz);",
+            local_source,
+        )
+        self.assertIn(
+            "block_coordinates[0], block_coordinates[1], block_coordinates[2], "
+            "block_coordinates[24], block_coordinates[25], block_coordinates[26], "
+            "block_coordinates[3], block_coordinates[4], block_coordinates[5]",
+            section,
+        )
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in files:

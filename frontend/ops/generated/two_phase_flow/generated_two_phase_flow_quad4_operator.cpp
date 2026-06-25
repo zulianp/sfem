@@ -802,9 +802,9 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_residual_affine_mesh_soa_i
             block_output[7][lane] = 0;
         }
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[4], block_current[5], block_current[6], block_current[7]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[4], block_previous[5], block_previous[6], block_previous[7]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5]};
+        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5]};
+        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5]};
         const scalar_t *const block_adjugate[4] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin};
 
         generated_two_phase_flow_d2_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, block_output_streams);
@@ -1026,7 +1026,7 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_residual_isoparametric_mes
             block_output[7][lane] = 0;
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[6], block_coordinates[7]};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[6], block_coordinates[7], block_coordinates[4], block_coordinates[5]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
         generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>(
@@ -1048,9 +1048,9 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_residual_isoparametric_mes
             }
         }
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[4], block_current[5], block_current[6], block_current[7]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[4], block_previous[5], block_previous[6], block_previous[7]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5]};
+        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5]};
+        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5]};
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
         generated_two_phase_flow_d2_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, block_output_streams);
@@ -1365,10 +1365,10 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_jacobian_action_affine_mes
             block_output[7][lane] = 0;
         }
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[4], block_current[5], block_current[6], block_current[7]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[4], block_previous[5], block_previous[6], block_previous[7]};
-        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[4], block_direction[5], block_direction[6], block_direction[7]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5]};
+        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5]};
+        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[6], block_direction[7], block_direction[4], block_direction[5]};
+        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5]};
         const scalar_t *const block_adjugate[4] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin};
 
         generated_two_phase_flow_d2_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, block_output_streams);
@@ -1608,7 +1608,7 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_jacobian_action_isoparamet
             block_output[7][lane] = 0;
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[6], block_coordinates[7]};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[6], block_coordinates[7], block_coordinates[4], block_coordinates[5]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
         generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>(
@@ -1630,10 +1630,10 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_jacobian_action_isoparamet
             }
         }
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[4], block_current[5], block_current[6], block_current[7]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[4], block_previous[5], block_previous[6], block_previous[7]};
-        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[4], block_direction[5], block_direction[6], block_direction[7]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5]};
+        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5]};
+        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[6], block_direction[7], block_direction[4], block_direction[5]};
+        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5]};
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
         generated_two_phase_flow_d2_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape_1d, grad_1d, q_weight_1d, block_current_streams, block_previous_streams, block_direction_streams, porosity, S_res, P_r, m, rho_w0, kappa_T, p_wr, M_c, Z, R, T, mu_w, mu_c, C_kw1, C_ka1, C_ka2, dt, K_0, K_1, K_2, K_3, block_output_streams);

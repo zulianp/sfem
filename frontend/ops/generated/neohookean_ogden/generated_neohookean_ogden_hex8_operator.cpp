@@ -266,7 +266,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
             block_value[lane] = value[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
 
         generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
@@ -508,7 +508,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_value[lane] = value[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
 
         const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
 
@@ -736,7 +736,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
             block_value[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
 
         generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
@@ -967,9 +967,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_value[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         generated_neohookean_ogden_d3_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
@@ -1365,8 +1365,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
             block_outz7[lane] = outz7[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
@@ -1723,8 +1723,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_outz7[lane] = outz7[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
 
@@ -2047,8 +2047,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
             block_outz7[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
@@ -2404,10 +2404,10 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_outz7[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         generated_neohookean_ogden_d3_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
@@ -2951,9 +2951,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
             block_outz7[lane] = outz7[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
@@ -3406,9 +3406,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_outz7[lane] = outz7[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
 
@@ -3807,9 +3807,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
             block_outz7[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
         generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
@@ -4225,11 +4225,11 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_outz7[lane] = 0;
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         generated_neohookean_ogden_d3_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,

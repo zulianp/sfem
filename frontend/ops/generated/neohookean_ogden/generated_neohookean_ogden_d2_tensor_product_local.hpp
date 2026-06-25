@@ -43,14 +43,6 @@ static constexpr int sfem_generated_integer_root(const int value, const int expo
 namespace sfem {
 namespace codegen {
 
-template <int N_SHAPE_1D>
-static SFEM_INLINE int generated_neohookean_ogden_d2_tensor_product_tensor_shape_index(
-        const int sx,
-        const int sy) {
-    return N_SHAPE_1D == 2 ? (sy == 0 ? sx : (sx == 0 ? 3 : 2))
-                           : sx + N_SHAPE_1D * sy;
-}
-
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_tensor_gradient(
         const ptrdiff_t nelems,
@@ -69,7 +61,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_tensor_grad
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = 0; scalar_t gx = 0;
                 for (int sx = 0; sx < S; ++sx) {
-                    const int shape = generated_neohookean_ogden_d2_tensor_product_tensor_shape_index<S>(sx, sy);
+                    const int shape = sx + S * sy;
                     const scalar_t u = streams[shape * 2 + component][lane];
                     v += u * shape_1d[qx * S + sx];
                     gx += u * grad_1d[qx * S + sx];
@@ -126,7 +118,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_tensor_test
     }
     for (int sy = 0; sy < S; ++sy) {
         for (int sx = 0; sx < S; ++sx) {
-            const int shape = generated_neohookean_ogden_d2_tensor_product_tensor_shape_index<S>(sx, sy);
+            const int shape = sx + S * sy;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t value = 0;

@@ -1093,6 +1093,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
     def test_generated_tensor_product_shared_local_supports_hex8_and_hex27(self):
         local_prefix = "generated_neohookean_ogden_d3_tensor_product"
         source_by_element = {}
+        operator_by_element = {}
         for element_type in ("HEX8", "HEX27"):
             specialization, generated_files = generated_neohookean_weak_form_files(
                 element_type,
@@ -1116,6 +1117,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
                 operator_source,
             )
+            operator_by_element[element_type] = operator_source
             source_by_element[element_type] = source_by_path["%s_local.hpp" % local_prefix]
 
         self.assertEqual(source_by_element["HEX8"], source_by_element["HEX27"])
@@ -1127,11 +1129,27 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("for (int q = 0; q < N_QP; ++q)", shared_local)
         self.assertIn("%s_tensor_gradient" % local_prefix, shared_local)
         self.assertIn("%s_tensor_test" % local_prefix, shared_local)
+        self.assertIn("const int shape = sx + S * (sy + S * sz);", shared_local)
+        self.assertNotIn("tensor_shape_index", shared_local)
         self.assertNotIn("scalar_t u[N_SHAPE", shared_local)
         self.assertNotIn("scalar_t du[N_SHAPE", shared_local)
         self.assertNotIn("scalar_t element_vector[N_SHAPE", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 8", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 27", shared_local)
+        self.assertIn(
+            "block_ux0, block_uy0, block_uz0, "
+            "block_ux1, block_uy1, block_uz1, "
+            "block_ux3, block_uy3, block_uz3, "
+            "block_ux2, block_uy2, block_uz2",
+            operator_by_element["HEX8"],
+        )
+        self.assertIn(
+            "block_ux0, block_uy0, block_uz0, "
+            "block_ux8, block_uy8, block_uz8, "
+            "block_ux1, block_uy1, block_uz1, "
+            "block_ux11, block_uy11, block_uz11",
+            operator_by_element["HEX27"],
+        )
 
     def test_generated_neohookean_action_matches_python_reference(self):
         compiler = shutil.which("c++")
