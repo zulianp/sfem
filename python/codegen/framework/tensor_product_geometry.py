@@ -165,8 +165,8 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
         return [
             "%sscalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];"
             % evaluator_indent,
-            "%s%s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
-            % (evaluator_indent, local_prefix),
+            "%stensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>("
+            % evaluator_indent,
             "%s        nelems, shape_1d, grad_1d, %s,"
             % (evaluator_indent, streams),
             "%s        coordinate_value, %s);" % (evaluator_indent, gradient),
@@ -204,8 +204,8 @@ def tensor_product_coordinate_gradient_lines(
     for component in range(dim):
         lines.extend(
             [
-                "%s%s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>("
-                % (indent, local_prefix),
+                "%stensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>("
+                % (indent, dim),
                 "%s        nelems, shape_1d, grad_1d, %s, %d,"
                 % (indent, stream_array_name, component),
                 "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"

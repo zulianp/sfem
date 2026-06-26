@@ -405,22 +405,17 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     path = os.path.join(tmpdir, generated.path)
                     with open(path, "w", encoding="utf-8") as stream:
                         stream.write(generated.source)
-                diagnostics_source = files[1].source
-                local_source = files[2].source
-                operator_source = files[3].source
                 family = (
                     "tensor_product"
                     if element in ("QUAD4", "HEX8")
                     else "simplex"
                 )
-                self.assertEqual(
-                    files[2].path,
-                    "coupled_diffusion_d%d_%s_local.hpp" % (dim, family),
-                )
-                self.assertEqual(
-                    files[3].path,
-                    "coupled_diffusion_%s_operator.cpp" % element.lower(),
-                )
+                local_path = "coupled_diffusion_d%d_%s_local.hpp" % (dim, family)
+                operator_path = "coupled_diffusion_%s_operator.cpp" % element.lower()
+                source_by_path = {generated.path: generated.source for generated in files}
+                diagnostics_source = source_by_path["kernel_diagnostics.hpp"]
+                local_source = source_by_path[local_path]
+                operator_source = source_by_path[operator_path]
                 self.assertIn(
                     '#include "coupled_diffusion_d%d_%s_local.hpp"'
                     % (dim, family),
@@ -550,8 +545,8 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     ),
                 )
                 if element in ("QUAD4", "HEX8"):
-                    self.assertIn("_tensor_evaluate", local_source)
-                    self.assertIn("_tensor_integrate", local_source)
+                    self.assertIn("tensor_evaluate", local_source)
+                    self.assertIn("tensor_integrate", local_source)
                     for form in ("residual", "jacobian_action"):
                         marker = (
                             "static SFEM_INLINE int "
@@ -568,7 +563,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                             section,
                         )
                         self.assertIn(
-                            "_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>",
+                            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
                             section,
                         )
                         self.assertNotIn("geometry_grad_ref", section)
@@ -577,9 +572,9 @@ class CoupledResidualSystemTest(unittest.TestCase):
                             section,
                         )
                 else:
-                    self.assertNotIn("_tensor_evaluate", local_source)
+                    self.assertNotIn("tensor_evaluate", local_source)
                 generated_sources.append(
-                    os.path.join(tmpdir, files[3].path)
+                    os.path.join(tmpdir, operator_path)
                 )
 
             for index, source in enumerate(generated_sources):
@@ -643,8 +638,10 @@ class CoupledResidualSystemTest(unittest.TestCase):
             prefix="coupled_diffusion_hex27",
             element_type="HEX27",
         )
-        local_source = files[2].source
-        operator_source = files[3].source
+        source_by_path = {generated.path: generated.source for generated in files}
+        local_source = source_by_path["coupled_diffusion_hex27_d3_tensor_product_local.hpp"]
+        operator_source = source_by_path["coupled_diffusion_hex27_hex27_operator.cpp"]
+        tensor_source = source_by_path["tensor_product_kernels.hpp"]
         marker = (
             "static SFEM_INLINE int "
             "coupled_diffusion_hex27_hex27_residual_isoparametric_mesh_soa_impl"
@@ -655,7 +652,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn(
-            "_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>",
+            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
             section,
         )
         self.assertIn("static constexpr int N_SHAPE = 27;", section)
@@ -663,7 +660,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         self.assertNotIn("tensor_index", local_source)
         self.assertIn(
             "const int s = sx + S * (sy + S * sz);",
-            local_source,
+            tensor_source,
         )
         self.assertIn(
             "block_coordinates[0], block_coordinates[1], block_coordinates[2], "
@@ -688,7 +685,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     "-fopenmp-simd",
                     "-Werror",
                     "-c",
-                    os.path.join(tmpdir, files[3].path),
+                    os.path.join(tmpdir, "coupled_diffusion_hex27_hex27_operator.cpp"),
                     "-I",
                     tmpdir,
                     "-o",
