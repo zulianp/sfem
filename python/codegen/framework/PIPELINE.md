@@ -156,6 +156,9 @@ objects. The same abstraction identifies field value evaluation, field gradient
 evaluation, geometry Jacobian evaluation, and test contractions, so later code
 generation stages can route all tensor-product operations through one shared
 sum-factorization policy instead of separate material-specific branches.
+The tensor-product isoparametric geometry preamble is emitted by shared helpers
+for both residual-style kernels and hyperelastic kernels; only the local
+field-gradient evaluator call differs.
 
 ### 4. Unified Code Generation
 

@@ -36,14 +36,20 @@ try:
         isoparametric_adjugate_lines,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
-        tensor_product_isoparametric_geometry_lines,
+        tensor_product_coordinate_gradient_lines,
+        tensor_product_current_q_isoparametric_geometry_lines,
+        tensor_product_gradient_isoparametric_geometry_lines,
+        tensor_product_ordered_coordinate_streams,
     )
 except ImportError:
     from tensor_product_geometry import (
         isoparametric_adjugate_lines,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
-        tensor_product_isoparametric_geometry_lines,
+        tensor_product_coordinate_gradient_lines,
+        tensor_product_current_q_isoparametric_geometry_lines,
+        tensor_product_gradient_isoparametric_geometry_lines,
+        tensor_product_ordered_coordinate_streams,
     )
 
 try:
@@ -1634,11 +1640,7 @@ def _sfem_soa_local_header(
         "#endif",
         "",
     ]
-    if (
-        quadrature_rule is not None
-        and quadrature_rule.is_tensor_product
-        and any(form.weak_form is not None for form in forms)
-    ):
+    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
         lines.extend(
             [
                 "#ifndef SFEM_GENERATED_INTEGER_ROOT",
@@ -1657,11 +1659,7 @@ def _sfem_soa_local_header(
             ]
         )
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
-    if (
-        quadrature_rule is not None
-        and quadrature_rule.is_tensor_product
-        and any(form.weak_form is not None for form in forms)
-    ):
+    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
         lines.extend(_sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim))
         lines.append("")
 
@@ -3394,6 +3392,7 @@ def _sfem_soa_operator_function(
     lines.extend(
         [
             ") {",
+            "    static constexpr int DIM = %d;" % dim,
             "    static_assert(N_QP == %d, \"N_QP does not match generated geometry streams\");" % n_qp,
             "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");" % n_nodes,
             "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
@@ -3504,7 +3503,7 @@ def _sfem_soa_operator_function(
             )
         )
 
-    if isoparametric_geometry:
+    if isoparametric_geometry and not use_tensor_product_reference:
         lines.append("")
         lines.append(
             "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
@@ -3517,7 +3516,62 @@ def _sfem_soa_operator_function(
             )
         )
 
-    if isoparametric_geometry:
+    if isoparametric_geometry and use_tensor_product_reference:
+        lines.append("")
+        if form.weak_form is not None:
+            lines.extend(
+                tensor_product_gradient_isoparametric_geometry_lines(
+                    dim=dim,
+                    n_shape=n_nodes,
+                    n_qp=quadrature_rule.n_qp,
+                    local_prefix=local_prefix,
+                    coordinate_streams=tensor_product_ordered_coordinate_streams(
+                        dim,
+                        n_nodes,
+                        _coordinate_stream_names(dim, n_nodes),
+                        lambda stream: "block_%s" % stream,
+                    ),
+                    adjugate_target=lambda component, index: (
+                        "block_jacobian_adjugate%d[%s]" % (component, index)
+                    ),
+                    determinant_target=lambda index: (
+                        "block_jacobian_determinant0[%s]" % index
+                    ),
+                )
+            )
+        else:
+            lines.extend(
+                tensor_product_coordinate_gradient_lines(
+                    dim=dim,
+                    local_prefix=local_prefix,
+                    coordinate_streams=tensor_product_ordered_coordinate_streams(
+                        dim,
+                        n_nodes,
+                        _coordinate_stream_names(dim, n_nodes),
+                        lambda stream: "block_%s" % stream,
+                    ),
+                )
+            )
+            lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+            lines.extend(_tensor_product_q_index_lines(dim, "            "))
+            lines.append(
+                "            const scalar_t tensor_q_weight = %s;"
+                % _tensor_product_quadrature_weight_expr(dim)
+            )
+            lines.extend(
+                tensor_product_current_q_isoparametric_geometry_lines(
+                    dim=dim,
+                    indent="            ",
+                    adjugate_target=lambda component, index: (
+                        "block_jacobian_adjugate%d[%s]" % (component, index)
+                    ),
+                    determinant_target=lambda index: (
+                        "block_jacobian_determinant0[%s]" % index
+                    ),
+                    output_index="lane",
+                )
+            )
+    elif isoparametric_geometry:
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
         if use_tensor_product_reference:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
@@ -3945,36 +3999,19 @@ def _sfem_soa_mesh_operator_function(
         and form.weak_form is not None
         and use_tensor_product_reference
     ):
-        def evaluator_lines(streams, gradient, indent):
-            generated = []
-            for component in range(dim):
-                generated.extend(
-                    [
-                        "%s%s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>("
-                        % (indent, local_prefix),
-                        "%s        nelems, shape_1d, grad_1d, %s, %d,"
-                        % (indent, streams, component),
-                        "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"
-                        % (indent, gradient, component),
-                    ]
-                )
-            return generated
-
         lines.append("")
         lines.extend(
-            tensor_product_isoparametric_geometry_lines(
+            tensor_product_gradient_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
-                coordinate_streams=[
-                    "block_%s" % stream
-                    for stream in streams_in_shape_order(
-                        _coordinate_stream_names(dim, n_nodes),
-                        dim,
-                        stream_shape_order,
-                    )
-                ],
-                evaluator_lines=evaluator_lines,
+                local_prefix=local_prefix,
+                coordinate_streams=tensor_product_ordered_coordinate_streams(
+                    dim,
+                    n_nodes,
+                    _coordinate_stream_names(dim, n_nodes),
+                    lambda stream: "block_%s" % stream,
+                ),
                 adjugate_target=lambda component, index: (
                     "block_jacobian_adjugate%d[%s]" % (component, index)
                 ),

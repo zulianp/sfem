@@ -11,6 +11,11 @@ from sfem import gen
 from .materials.neohookean_ogden import material as neohookean_ogden
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
 from .materials.two_phase_flow import material as two_phase_flow
+from .tensor_product_geometry import (
+    tensor_product_evaluated_isoparametric_geometry_lines,
+    tensor_product_gradient_isoparametric_geometry_lines,
+    tensor_product_ordered_coordinate_streams,
+)
 
 
 class GenApiTest(unittest.TestCase):
@@ -672,6 +677,47 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(pressure_basis.n_qp, 3)
         self.assertEqual(pressure_basis.reference_shape_size, 3 * 3)
         self.assertEqual(pressure_basis.reference_gradient_size, 3 * 3 * 2)
+
+    def test_shared_tensor_product_geometry_emitters_cover_residual_and_hyperelastic_paths(self):
+        coordinate_streams = tensor_product_ordered_coordinate_streams(
+            3,
+            8,
+            tuple(range(24)),
+            lambda stream: "block_coordinates[%d]" % stream,
+        )
+        self.assertEqual(coordinate_streams[:6], ("block_coordinates[0]", "block_coordinates[1]", "block_coordinates[2]", "block_coordinates[3]", "block_coordinates[4]", "block_coordinates[5]"))
+        self.assertEqual(coordinate_streams[6:12], ("block_coordinates[9]", "block_coordinates[10]", "block_coordinates[11]", "block_coordinates[6]", "block_coordinates[7]", "block_coordinates[8]"))
+
+        residual_lines = "\n".join(
+            tensor_product_evaluated_isoparametric_geometry_lines(
+                dim=3,
+                n_shape=8,
+                n_qp=8,
+                local_prefix="residual",
+                coordinate_streams=coordinate_streams,
+                adjugate_target=lambda component, index: "adj%d[%s]" % (component, index),
+                determinant_target=lambda index: "det[%s]" % index,
+            )
+        )
+        self.assertIn("residual_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>", residual_lines)
+        self.assertIn("scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];", residual_lines)
+        self.assertIn("adj0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;", residual_lines)
+        self.assertIn("det[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21)", residual_lines)
+
+        hyper_lines = "\n".join(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=3,
+                n_shape=8,
+                n_qp=8,
+                local_prefix="hyper",
+                coordinate_streams=coordinate_streams,
+                adjugate_target=lambda component, index: "adj%d[%s]" % (component, index),
+                determinant_target=lambda index: "det[%s]" % index,
+            )
+        )
+        self.assertIn("hyper_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>", hyper_lines)
+        self.assertIn("coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE", hyper_lines)
+        self.assertNotIn("coordinate_value", hyper_lines)
 
     def test_rejects_equal_order_poro_hyperelastic_element(self):
         with tempfile.TemporaryDirectory() as out_dir:

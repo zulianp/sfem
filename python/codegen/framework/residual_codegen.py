@@ -7,7 +7,8 @@ from .tensor_product_geometry import (
     isoparametric_adjugate_lines,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
-    tensor_product_isoparametric_geometry_lines,
+    tensor_product_evaluated_isoparametric_geometry_lines,
+    tensor_product_ordered_coordinate_streams,
 )
 from .fem import (
     sfem_element_quadrature_rule,
@@ -1878,11 +1879,6 @@ def _isoparametric_mesh_operator_source(
         n_fields,
         shape_order,
     )
-    coordinate_stream_order = streams_in_shape_order(
-        tuple(range(dim * n_shape)),
-        dim,
-        shape_order,
-    )
     impl = "%s_%s_isoparametric_mesh_soa_impl" % (prefix, form)
     block = "%s_%s_block" % (local_prefix, form)
     params = [
@@ -2011,28 +2007,19 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     if rule.is_tensor_product:
-        def evaluator_lines(streams, gradient, indent):
-            return [
-                "%sscalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];"
-                % indent,
-                "%s%s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
-                % (indent, local_prefix),
-                "%s        nelems, shape_1d, grad_1d, %s,"
-                % (indent, streams),
-                "%s        coordinate_value, %s);" % (indent, gradient),
-            ]
-
         lines.append("")
         lines.extend(
-            tensor_product_isoparametric_geometry_lines(
+            tensor_product_evaluated_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
-                coordinate_streams=[
-                    "block_coordinates[%d]" % i
-                    for i in coordinate_stream_order
-                ],
-                evaluator_lines=evaluator_lines,
+                local_prefix=local_prefix,
+                coordinate_streams=tensor_product_ordered_coordinate_streams(
+                    dim,
+                    n_shape,
+                    tuple(range(dim * n_shape)),
+                    lambda stream: "block_coordinates[%d]" % stream,
+                ),
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
                 ),
