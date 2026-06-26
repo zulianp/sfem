@@ -593,17 +593,17 @@ def sfem_taylor_hood_element_types():
         SfemCompatibleElement(
             "TRI6_TRI3",
             "TRI6",
-            (("displacement", "TRI6"), ("pressure", "TRI3")),
+            (("displacement", "TRI6"), ("velocity", "TRI6"), ("pressure", "TRI3")),
         ),
         SfemCompatibleElement(
             "TET10_TET4",
             "TET10",
-            (("displacement", "TET10"), ("pressure", "TET4")),
+            (("displacement", "TET10"), ("velocity", "TET10"), ("pressure", "TET4")),
         ),
         SfemCompatibleElement(
             "HEX27_HEX8",
             "HEX27",
-            (("displacement", "HEX27"), ("pressure", "HEX8")),
+            (("displacement", "HEX27"), ("velocity", "HEX27"), ("pressure", "HEX8")),
         ),
     )
 
@@ -634,7 +634,7 @@ def sfem_detect_taylor_hood_element_types(fields):
 
 
 def _fields_request_taylor_hood(fields):
-    has_displacement = False
+    has_high_order_vector = False
     has_pressure = False
     for field in fields:
         family = getattr(field, "family", "")
@@ -647,13 +647,13 @@ def _fields_request_taylor_hood(fields):
         degree = int(getattr(element, "degree", -1))
         value_shape = tuple(getattr(element, "value_shape", ()))
         components = int(getattr(field, "components", 1))
-        if family == "displacement" and degree == 2 and components > 1:
+        if family in ("displacement", "velocity") and degree == 2 and components > 1:
             if value_shape in (("geometric",), (components,)):
-                has_displacement = True
+                has_high_order_vector = True
         elif family == "pressure" and degree == 1 and components == 1:
             if not value_shape:
                 has_pressure = True
-    return has_displacement and has_pressure
+    return has_high_order_vector and has_pressure
 
 
 def _fields_geometric_dimension(fields):

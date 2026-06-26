@@ -11,6 +11,7 @@ from sfem import gen
 
 from .materials.neohookean_ogden import material as neohookean_ogden
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
+from .materials.stokes import material as stokes
 from .materials.two_phase_flow import material as two_phase_flow
 from .tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
@@ -420,6 +421,7 @@ class GenApiTest(unittest.TestCase):
                 "generated_neohookean_ogden_tri3_operator.cpp",
                 names,
             )
+            self.assertIn("generated_neohookean_ogden_d2_simplex_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIn("sfem_GeneratedNeoHookeanOgden.cpp", names)
             wrapper = os.path.join(
@@ -508,6 +510,18 @@ class GenApiTest(unittest.TestCase):
             ("TET10_TET4", "HEX27_HEX8"),
         )
 
+    def test_stokes_material_uses_taylor_hood_elements(self):
+        names = tuple(element.name for element in stokes.elements)
+        self.assertEqual(names, ("TRI6_TRI3", "TET10_TET4", "HEX27_HEX8"))
+
+        system = stokes.systems.for_dim(2)
+        self.assertEqual(tuple(field.name for field in system.fields), ("u", "p"))
+        self.assertEqual(tuple(field.components for field in system.fields), (2, 1))
+        self.assertEqual(tuple(field.family for field in system.fields), ("velocity", "pressure"))
+        forms = system.form_collection("")
+        self.assertEqual(len(forms.blocks_for(gen.FormOrder.ONE)), 3)
+        self.assertEqual(len(forms.blocks_for(gen.FormOrder.TWO)), 9)
+
     def test_fem_policy_describes_basis_quadrature_and_field_compatibility(self):
         element = poro_hyperelasticity.elements[2]
         policy = gen.sfem_fem_policy(element)
@@ -520,6 +534,7 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(policy.basis.degree, 2)
         self.assertEqual(policy.quadrature_rule.n_qp, 27)
         self.assertEqual(policy.element_for_family("displacement"), "HEX27")
+        self.assertEqual(policy.element_for_family("velocity"), "HEX27")
         self.assertEqual(policy.element_for_family("pressure"), "HEX8")
         self.assertTrue(policy.is_mixed_order)
 
@@ -959,6 +974,30 @@ class GenApiTest(unittest.TestCase):
                 ),
             )).validate_for_context(context)
 
+    def test_local_kernel_plan_names_by_dimension_and_family(self):
+        simplex = gen.LocalKernelPlan("generated_material", 2, "simplex")
+        tensor_product = gen.LocalKernelPlan("generated_material", 3, "tensor_product")
+        mixed = gen.LocalKernelPlan("generated_material", 3, "tensor_product", "_mixed")
+
+        self.assertEqual(simplex.name, "generated_material_d2_simplex")
+        self.assertEqual(simplex.header, "generated_material_d2_simplex_local.hpp")
+        self.assertEqual(tensor_product.name, "generated_material_d3_tensor_product")
+        self.assertEqual(mixed.name, "generated_material_d3_tensor_product_mixed")
+        self.assertEqual(mixed.header, "generated_material_d3_tensor_product_mixed_local.hpp")
+        with self.assertRaisesRegex(ValueError, "unsupported local kernel family"):
+            gen.LocalKernelPlan("generated_material", 2, "hex8")
+
+    def test_mesh_kernel_plan_names_by_element_or_compatible_element(self):
+        tri3 = gen.MeshKernelPlan("generated_material", "TRI3")
+        taylor_hood = gen.MeshKernelPlan("generated_material", "TRI6_TRI3")
+
+        self.assertEqual(tri3.name, "generated_material_tri3")
+        self.assertEqual(tri3.source, "generated_material_tri3_operator.cpp")
+        self.assertEqual(taylor_hood.name, "generated_material_tri6_tri3")
+        self.assertEqual(taylor_hood.source, "generated_material_tri6_tri3_operator.cpp")
+        with self.assertRaisesRegex(ValueError, "element label"):
+            gen.MeshKernelPlan("generated_material", "tri6-tri3")
+
     def test_generation_plan_dumps_json_for_inspection(self):
         residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         residual_plan = gen.SpecializedFormManipulationStage(
@@ -1020,6 +1059,51 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "generated_poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
                 names,
+            )
+
+    def test_generates_taylor_hood_stokes_material(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(
+                stokes,
+                out_dir,
+                elements=("TRI6_TRI3",),
+            )
+            names = {os.path.basename(path) for path in result.sources}
+            self.assertIn("generated_stokes_tri6_tri3_operator.cpp", names)
+            self.assertIn("kernel_diagnostics.hpp", names)
+            self.assertIsInstance(result.plan, gen.GenerationPlan)
+            self.assertEqual(result.plan.units[0].name, "stokes")
+            self.assertEqual(len(result.plan.units[0].blocks), 12)
+
+    def test_compiles_taylor_hood_stokes_operator(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                stokes,
+                out_dir,
+                elements=("TRI6_TRI3",),
+            )
+            source = os.path.join(
+                out_dir,
+                "generated_stokes_tri6_tri3_operator.cpp",
+            )
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    source,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "stokes.o"),
+                ],
+                check=True,
             )
 
     def test_compiles_taylor_hood_poro_residual_operator(self):

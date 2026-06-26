@@ -30,5 +30,5 @@ PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
 
 `poro_hyperelasticity` is a mixed formulation and defaults to Taylor-Hood
 compatible element pairs: `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`.
-The current generator rejects those pairs until residual code generation
-supports per-field interpolation orders.
+`stokes` is a minimal residual-only Taylor-Hood example that uses the same
+compatible element pairs to exercise mixed velocity-pressure kernel generation.
