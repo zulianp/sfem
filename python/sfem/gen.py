@@ -12,13 +12,17 @@ from codegen.framework import (
     CoupledResidualSystem,
     KernelExpressions,
     TwoPhaseFlowConstitutiveModel,
+    FormOrder,
+    energy_form_pipeline,
     generate_coupled_residual_sfem_files,
     generate_sfem_soa_cpp_files_for_element,
     matrix_inner,
-    sfem_supported_element_types,
-    sfem_soa_element_specialization,
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
+)
+from codegen.framework.fem import (
+    sfem_supported_element_types,
+    sfem_soa_element_specialization,
 )
 
 
@@ -63,6 +67,47 @@ class CoupledResidualMaterial:
 class GenerationResult:
     sources: tuple
     objects: tuple = ()
+
+
+@dataclass(frozen=True)
+class ElementGenerationContext:
+    material_name: str
+    element_type: str
+    specialization: object
+
+    @classmethod
+    def create(cls, material_name, element_type, vector_size, quadrature_order):
+        return cls(
+            material_name,
+            str(element_type).upper(),
+            sfem_soa_element_specialization(
+                element_type,
+                vector_size,
+                quadrature_order,
+            ),
+        )
+
+    @property
+    def generated_prefix(self):
+        return "generated_%s" % self.material_name
+
+    @property
+    def element_prefix(self):
+        return "%s_%s" % (self.generated_prefix, self.element_type.lower())
+
+    @property
+    def local_prefix(self):
+        return "%s_d%d_%s" % (
+            self.generated_prefix,
+            self.specialization.dim,
+            self.family,
+        )
+
+    @property
+    def family(self):
+        if self.specialization.quadrature_rule.is_tensor_product:
+            return "tensor_product"
+        return "simplex"
 
 
 def generate(
@@ -159,21 +204,25 @@ def run(material, default_out_dir, argv=None):
 
 def _generate_hyperelastic(material, elements, vector_size, quadrature_order):
     outputs = {}
-    prefix = "generated_%s" % material.name
     for element in elements:
-        specialization = sfem_soa_element_specialization(
+        context = ElementGenerationContext.create(
+            material.name,
             element,
             vector_size,
             quadrature_order,
         )
-        dim = specialization.dim
+        dim = context.specialization.dim
         deformation_gradient = sp.Matrix(
             dim,
             dim,
             tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
         )
-        weak_form = sfem_soa_weak_form(
+        energy_pipeline = energy_form_pipeline(
             material.energy(deformation_gradient),
+            tuple(deformation_gradient),
+        )
+        weak_form = sfem_soa_weak_form(
+            energy_pipeline.form(FormOrder.ZERO).expression,
             deformation_gradient,
         )
         forms = tuple(
@@ -185,16 +234,11 @@ def _generate_hyperelastic(material, elements, vector_size, quadrature_order):
             )
             for kernel in material.kernels
         )
-        family = (
-            "tensor_product"
-            if specialization.quadrature_rule.is_tensor_product
-            else "simplex"
-        )
         generated = generate_sfem_soa_cpp_files_for_element(
             forms,
-            prefix="%s_%s" % (prefix, element.lower()),
-            local_prefix="%s_d%d_%s" % (prefix, dim, family),
-            specialization=specialization,
+            prefix=context.element_prefix,
+            local_prefix=context.local_prefix,
+            specialization=context.specialization,
         )
         _merge_files(outputs, generated)
         if material.diagnostics:
@@ -213,7 +257,7 @@ def _generate_hyperelastic(material, elements, vector_size, quadrature_order):
             outputs["%s_summary.md" % report_prefix] = _summary(
                 material.name,
                 graph,
-                specialization,
+                context.specialization,
             )
             outputs["%s_reduced_outputs.txt" % report_prefix] = (
                 "\n\n".join(str(output) for output in graph.reduced_outputs) + "\n"
@@ -229,23 +273,23 @@ def _generate_coupled_residual(
 ):
     outputs = {}
     systems = {}
-    prefix = "generated_%s" % material.name
     for element in elements:
-        specialization = sfem_soa_element_specialization(
+        context = ElementGenerationContext.create(
+            material.name,
             element,
             vector_size,
             quadrature_order,
         )
-        system = systems.get(specialization.dim)
+        system = systems.get(context.specialization.dim)
         if system is None:
-            system = CoupledResidualSystem(specialization.dim)
+            system = CoupledResidualSystem(context.specialization.dim)
             material.define(system)
-            systems[specialization.dim] = system
+            systems[context.specialization.dim] = system
         _merge_files(
             outputs,
             generate_coupled_residual_sfem_files(
                 system,
-                prefix=prefix,
+                prefix=context.generated_prefix,
                 element_type=element,
                 vector_size=vector_size,
                 quadrature_order=quadrature_order,

@@ -48,9 +48,65 @@ from symbolic import (
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
+from forms import FormKind, FormOrder, energy_form_pipeline, residual_form_pipeline
+from targets import CUDATarget, OpenMPTarget, TargetLanguage
 
 
 class SymbolicFrameworkTest(unittest.TestCase):
+    def test_unified_energy_and_residual_form_pipelines(self):
+        u0, u1, du0, du1 = sp.symbols("u0 u1 du0 du1")
+        energy = u0 * u0 + u0 * u1
+        residual = sp.Matrix([u0 + u1, u0 - u1])
+
+        energy_forms = energy_form_pipeline(
+            energy,
+            (u0, u1),
+            (du0, du1),
+        ).forms()
+        residual_forms = residual_form_pipeline(
+            residual,
+            (u0, u1),
+            (du0, du1),
+        ).forms()
+
+        self.assertEqual(
+            [(form.kind, form.order, form.role, form.name) for form in energy_forms],
+            [
+                (FormKind.ENERGY, FormOrder.ZERO, ExpressionRole.ENERGY, "energy"),
+                (FormKind.ENERGY, FormOrder.ONE, ExpressionRole.GRADIENT, "gradient"),
+                (
+                    FormKind.ENERGY,
+                    FormOrder.TWO,
+                    ExpressionRole.HESSIAN_ACTION,
+                    "hessian_action",
+                ),
+            ],
+        )
+        self.assertEqual(
+            [(form.kind, form.order, form.role, form.name) for form in residual_forms],
+            [
+                (FormKind.RESIDUAL, FormOrder.ZERO, ExpressionRole.MERIT, "merit"),
+                (FormKind.RESIDUAL, FormOrder.ONE, ExpressionRole.RESIDUAL, "residual"),
+                (
+                    FormKind.RESIDUAL,
+                    FormOrder.TWO,
+                    ExpressionRole.JACOBIAN_ACTION,
+                    "jacobian_action",
+                ),
+            ],
+        )
+        self.assertEqual(energy_forms[1].expression, sp.Matrix([2 * u0 + u1, u0]))
+        self.assertEqual(residual_forms[0].expression, u0**2 + u1**2)
+
+    def test_target_platform_classes(self):
+        openmp = OpenMPTarget()
+        cuda = CUDATarget()
+
+        self.assertEqual(openmp.generated_language, "c++")
+        self.assertEqual(openmp.parallel_for_pragma(), "#pragma omp parallel for")
+        self.assertEqual(cuda.language, TargetLanguage.CUDA)
+        self.assertEqual(cuda.function_qualifier(), "__device__ __forceinline__")
+
     def test_accepts_all_m1_expression_roles(self):
         x, y, z = sp.symbols("x y z")
         out = sp.symbols("out[0]")

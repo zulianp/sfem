@@ -9,6 +9,7 @@ from .tensor_product_geometry import (
     tensor_product_cartesian_shape_order,
     tensor_product_isoparametric_geometry_lines,
 )
+from .fem import sfem_soa_element_specialization
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -17,7 +18,6 @@ from .symbolic import (
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_math_header_source,
-    sfem_soa_element_specialization,
 )
 
 
