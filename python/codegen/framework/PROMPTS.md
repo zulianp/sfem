@@ -18,11 +18,37 @@ Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.
 @materials Create the material for The Holzapfel-Gasser-Ogden (HGO) strain energy function workflow (see neoohokean_ogden.py for reference)
 
 
+The code gen framework is too fragmented and there are too many redundancies. The design should be revisited as follows:
+- Symbolic Layer: 
+    - Expressions and abstractions should have classes and fully compatible with  SymPy
+    - The asthetic style should follow UFL (see paper Unified Form Language: A Domain-Specific Language for Weak Formulations of Partial Differential Equations), although we can inject extra qualifiers (e.g., for hyperelasticity to inform the code generator)
+    - The user can create systems of equations starting from merit/energy, residual/gradient (wording different but implementation is exactly the same in the layer below)
+    - Input: user UFL-style spec
+    - Output: EquationSystem complete with 0-, 1-, 2- forms (automated)
+- Form Manipulation Layer
+    - Forms are manipulated based on automated policies: 
+        - Mesh-level kernel
+            1. Jacobian computation (for iso-parametric use sum-factorisation) or routing (for affine Jacobin adjugate and determinant are passed as input, 1 per element)
+        - Local kernel
+            1. Values, Gradients, ... are computed (reference). Use (for iso-parametric use sum-factorisation)
+            2. Transformations using the Adjugate are performed
+            3. Material computations using energy/merit, gradient/residual, hessian/jacobian, the style is the left-operand style (already in-place)
+            4. If requied apply test-based contactions (for iso-parametric use sum-factorisation)
+    - Input: Equation system with Standardized form collection (with qualifiers)
+    - Ouput: Generation plan according to steps
+- Code generation Layer (input unified system of equations expression graphs)
+    - The code generation is general and works for any combination of equations with a specific plan
+    - In case of block-systems (multphyiscs) the code generated is both monolithic and the separate blocks
+    - Input: plan + platforms (OpenMP, CUDA, etc..)
+    - Output: generated code kernels and OOP wrappers
+
+    
+Lets create classes for each of the following 
+
+
 The Jacobian computed from the points per quadrature point for tensor-product elements must use sum factorization
 
 <!-- RESIDUAL BASED MATERIALS -->
-
-The residual code generator injects depencies in kernels that are not actually needed (e.g., see the hessian action passing the old/previous timestep quantities). The symbolic framework must make sure that no unneeded quantities are passed to the kernels.
 
 <!-- BOTH  -->
 
