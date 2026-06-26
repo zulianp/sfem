@@ -14,11 +14,11 @@
 namespace sfem {
 namespace codegen {
 
-static const double generated_two_phase_flow_tri3_tri3_shape_f64[3] = {double(0.33333333333333331), double(0.33333333333333331), double(0.33333333333333331)};
+static const double generated_two_phase_flow_tri3_tri3_shape_f64[3] = {double(0.33333333333333343), double(0.33333333333333331), double(0.33333333333333331)};
 static const double generated_two_phase_flow_tri3_tri3_grad_ref_x_f64[3] = {double(-1), double(1), double(0)};
 static const double generated_two_phase_flow_tri3_tri3_grad_ref_y_f64[3] = {double(-1), double(0), double(1)};
 static const double generated_two_phase_flow_tri3_tri3_q_weight_f64[1] = {double(0.5)};
-static const float generated_two_phase_flow_tri3_tri3_shape_f32[3] = {float(0.33333333333333331), float(0.33333333333333331), float(0.33333333333333331)};
+static const float generated_two_phase_flow_tri3_tri3_shape_f32[3] = {float(0.33333333333333343), float(0.33333333333333331), float(0.33333333333333331)};
 static const float generated_two_phase_flow_tri3_tri3_grad_ref_x_f32[3] = {float(-1), float(1), float(0)};
 static const float generated_two_phase_flow_tri3_tri3_grad_ref_y_f32[3] = {float(-1), float(0), float(1)};
 static const float generated_two_phase_flow_tri3_tri3_q_weight_f32[1] = {float(0.5)};
@@ -756,7 +756,7 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_residual_affine_mesh_soa_im
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333331), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
     static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
     static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
     static const scalar_t q_weight[1] = {scalar_t(0.5)};
@@ -959,7 +959,7 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_residual_isoparametric_mesh
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333331), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
     static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
     static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
     static const scalar_t q_weight[1] = {scalar_t(0.5)};
@@ -1276,7 +1276,7 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_jacobian_action_affine_mesh
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333331), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
     static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
     static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
     static const scalar_t q_weight[1] = {scalar_t(0.5)};
@@ -1479,7 +1479,7 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_jacobian_action_isoparametr
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333331), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
     static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
     static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
     static const scalar_t q_weight[1] = {scalar_t(0.5)};

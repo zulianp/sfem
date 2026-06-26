@@ -10,6 +10,7 @@
 #endif
 #endif
 #include "kernel_math.hpp"
+#include "tensor_product_kernels.hpp"
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
@@ -26,144 +27,6 @@ typedef double geom_t;
 
 namespace sfem {
 namespace codegen {
-
-static constexpr int generated_two_phase_flow_d2_tensor_product_ipow(const int b, const int e) {
-    return e == 0 ? 1 : b * generated_two_phase_flow_d2_tensor_product_ipow(b, e - 1);
-}
-static constexpr int generated_two_phase_flow_d2_tensor_product_integer_root_search(const int v, const int e, const int c) {
-    return generated_two_phase_flow_d2_tensor_product_ipow(c, e) >= v ? c : generated_two_phase_flow_d2_tensor_product_integer_root_search(v, e, c + 1);
-}
-static constexpr int generated_two_phase_flow_d2_tensor_product_integer_root(const int v, const int e) {
-    return generated_two_phase_flow_d2_tensor_product_integer_root_search(v, e, 1);
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>
-static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_tensor_evaluate(
-        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,
-        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value, scalar_t *const gradient) {
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, 2);
-    static constexpr int S = generated_two_phase_flow_d2_tensor_product_integer_root(N_SHAPE, 2);
-    scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
-    scalar_t gx[N_FIELDS * Q * S * VECTOR_SIZE];
-    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t v = scalar_t(0), g = scalar_t(0);
-            for (int sx = 0; sx < S; ++sx) {
-                const int s = sx + S * sy;
-                const scalar_t u = streams[s * N_FIELDS + f][lane];
-                v += u * shape_1d[qx * S + sx]; g += u * grad_1d[qx * S + sx];
-            }
-            const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
-            vx[i] = v; gx[i] = g;
-        }
-    }
-    for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
-        const int q = qx + Q * qy;
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t v = scalar_t(0), g0 = scalar_t(0), g1 = scalar_t(0);
-            for (int sy = 0; sy < S; ++sy) {
-                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
-                v += vx[i] * shape_1d[qy * S + sy];
-                g0 += gx[i] * shape_1d[qy * S + sy];
-                g1 += vx[i] * grad_1d[qy * S + sy];
-            }
-            value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
-            gradient[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] = g0;
-            gradient[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = g1;
-        }
-    }
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>
-static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_tensor_evaluate_value(
-        const ptrdiff_t nelems, const scalar_t *const shape_1d,
-        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value) {
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, 2);
-    static constexpr int S = generated_two_phase_flow_d2_tensor_product_integer_root(N_SHAPE, 2);
-    scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
-    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t v = scalar_t(0);
-            for (int sx = 0; sx < S; ++sx) {
-                const int s = sx + S * sy;
-                v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];
-            }
-            vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = v;
-        }
-    }
-    for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
-        const int q = qx + Q * qy;
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t v = scalar_t(0);
-            for (int sy = 0; sy < S; ++sy) {
-                v += vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
-            }
-            value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
-        }
-    }
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>
-static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_tensor_integrate(
-        const ptrdiff_t nelems, const scalar_t *const shape_1d, const scalar_t *const grad_1d,
-        const scalar_t *const value_coeff, const scalar_t *const grad_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, 2), S = generated_two_phase_flow_d2_tensor_product_integer_root(N_SHAPE, 2);
-    scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE], sg[N_FIELDS * Q * S * VECTOR_SIZE];
-    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t a = scalar_t(0), b = scalar_t(0);
-            for (int qy = 0; qy < Q; ++qy) { const int q = qx + Q * qy;
-                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy]
-                   + grad_coeff[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];
-                b += grad_coeff[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy]; }
-            const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane; sv[i] = a; sg[i] = b;
-        }
-    }
-    for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
-        const int s = sx + S * sy;
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = scalar_t(0);
-            for (int qx = 0; qx < Q; ++qx) { const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
-                v += sv[i] * shape_1d[qx * S + sx] + sg[i] * grad_1d[qx * S + sx]; }
-            output[s * N_FIELDS + f][lane] += v;
-        }
-    }
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>
-static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_tensor_integrate_value(
-        const ptrdiff_t nelems, const scalar_t *const shape_1d,
-        const scalar_t *const value_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, 2), S = generated_two_phase_flow_d2_tensor_product_integer_root(N_SHAPE, 2);
-    scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
-    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t a = scalar_t(0);
-            for (int qy = 0; qy < Q; ++qy) {
-                const int q = qx + Q * qy;
-                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
-            }
-            sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = a;
-        }
-    }
-    for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
-        const int s = sx + S * sy;
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            scalar_t v = scalar_t(0);
-            for (int qx = 0; qx < Q; ++qx) {
-                v += sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];
-            }
-            output[s * N_FIELDS + f][lane] += v;
-        }
-    }
-}
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_residual_block(
@@ -203,14 +66,14 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_residual_bloc
     static constexpr int N_FIELDS = 2;
     scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
     scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    generated_two_phase_flow_d2_tensor_product_tensor_evaluate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_evaluate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, previous, previous_value);
     scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, DIM);
+    static constexpr int Q = integer_root(N_QP, DIM);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % Q;
         const int qy = q / Q;
@@ -264,7 +127,7 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_residual_bloc
             grad_coeff_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
         }
     }
-    generated_two_phase_flow_d2_tensor_product_tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
@@ -306,15 +169,15 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
     static constexpr int N_FIELDS = 2;
     scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
     scalar_t direction_value[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t direction_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    generated_two_phase_flow_d2_tensor_product_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
     scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];
     scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    static constexpr int Q = generated_two_phase_flow_d2_tensor_product_integer_root(N_QP, DIM);
+    static constexpr int Q = integer_root(N_QP, DIM);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % Q;
         const int qy = q / Q;
@@ -428,7 +291,7 @@ static SFEM_INLINE void generated_two_phase_flow_d2_tensor_product_jacobian_acti
             grad_coeff_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
         }
     }
-    generated_two_phase_flow_d2_tensor_product_tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>(
+    tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
             nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
