@@ -24,6 +24,20 @@ The residual code generator injects depencies in kernels that are not actually n
 
 <!-- BOTH  -->
 
+Unify abstraction for energy and residual based code generation, note that the pipelines ar paralleled as follows
+
+User input | energy   | residual (variational)
+0-Form     | energy   | merit function
+1-Form     | gradient | residual
+2-From     | hessian  | jacobian
+
+- Remove code duplication in code generator, organize stateful parts into proper classes
+- Create separate files form FEM specifics (fem.py) where basis functions, gradients, are specified
+- Create dedicated classes in separate files for the target platform (e.g., OpenMP and CUDA)
+
+
+
+
 For the affine geometry: when the kernel allows it try to move geometry related computations to preprocessing, for instance see FFF in SFEM laplace operators. This uses the properties of dot products, tensor contractions, etc... to perform operand rearrangement
 
 Create a script that I can run to generate and (re-)install all the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
