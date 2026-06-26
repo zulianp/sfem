@@ -280,6 +280,47 @@ class CoupledResidualSystemTest(unittest.TestCase):
             tuple(k * value for value in u.direction_gradient),
         )
 
+    def test_prunes_unused_value_only_residual_dependencies(self):
+        system = CoupledResidualSystem(2)
+        u = system.add_field("u")
+        unused = sp.Symbol("unused")
+        system.add_parameters(unused)
+        system.add_residual(u, u.value * u.test_value)
+
+        for element, family in (("TRI3", "simplex"), ("QUAD4", "tensor_product")):
+            files = generate_coupled_residual_sfem_files(
+                system,
+                prefix="value_only",
+                element_type=element,
+            )
+            local = next(source.source for source in files if source.path.endswith("_local.hpp"))
+            operator = next(source.source for source in files if source.path.endswith("_operator.cpp"))
+            local_name = "value_only_d2_%s_residual_block" % family
+            action_name = "value_only_d2_%s_jacobian_action_block" % family
+            residual_body = local.split(local_name, 1)[1].split(action_name, 1)[0]
+            residual_signature = residual_body.split(") {", 1)[0]
+
+            self.assertNotIn("adjugate", residual_signature)
+            self.assertNotIn("grad_ref", residual_signature)
+            self.assertNotIn("unused", residual_signature)
+            self.assertNotIn("previous", residual_signature)
+            self.assertNotIn("direction", residual_signature)
+            self.assertNotIn("grad_coeff_ref", residual_body)
+            self.assertNotIn("test_grad", residual_body)
+
+            function = "value_only_%s_residual_element_soa" % element.lower()
+            element_signature = operator.split('extern "C" int %s(' % function, 1)[1].split(") {", 1)[0]
+            self.assertNotIn("adjugate", element_signature)
+            self.assertNotIn("unused", element_signature)
+            self.assertNotIn("previous", element_signature)
+            self.assertNotIn("direction", element_signature)
+
+            if family == "tensor_product":
+                self.assertNotIn("if (gradient)", local)
+                self.assertIn("tensor_evaluate_value", residual_body)
+                self.assertIn("tensor_integrate_value", residual_body)
+                self.assertNotIn("grad_1d", residual_signature)
+
     def test_preserves_residual_and_block_identity(self):
         system, _, _ = two_field_diffusion_system()
         residual_graph = system.build_residual_graph()

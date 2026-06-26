@@ -116,30 +116,36 @@ def _codegen_dependencies(system, coefficients, dependencies):
         free_symbols.update(sp.sympify(coefficient.value).free_symbols)
         for expression in coefficient.gradient:
             free_symbols.update(sp.sympify(expression).free_symbols)
+    current_value = any(field.value in free_symbols for field in system.fields)
+    current_gradient = any(
+        free_symbols.intersection(field.gradient) for field in system.fields
+    )
+    previous_value = any(
+        field.previous_value is not None and field.previous_value in free_symbols
+        for field in system.fields
+    )
+    previous_gradient = any(
+        free_symbols.intersection(field.previous_gradient) for field in system.fields
+    )
+    direction_value = any(
+        field.direction_value in free_symbols for field in system.fields
+    )
+    direction_gradient = any(
+        free_symbols.intersection(field.direction_gradient) for field in system.fields
+    )
     return ResidualCodegenDependencies(
-        current=dependencies.current,
-        previous=dependencies.previous,
-        direction=dependencies.direction,
-        parameters=tuple(dependencies.parameters),
-        current_value=any(field.value in free_symbols for field in system.fields),
-        current_gradient=any(
-            free_symbols.intersection(field.gradient) for field in system.fields
+        current=current_value or current_gradient,
+        previous=previous_value or previous_gradient,
+        direction=direction_value or direction_gradient,
+        parameters=tuple(
+            parameter for parameter in dependencies.parameters if parameter in free_symbols
         ),
-        previous_value=any(
-            field.previous_value is not None and field.previous_value in free_symbols
-            for field in system.fields
-        ),
-        previous_gradient=any(
-            free_symbols.intersection(field.previous_gradient)
-            for field in system.fields
-        ),
-        direction_value=any(
-            field.direction_value in free_symbols for field in system.fields
-        ),
-        direction_gradient=any(
-            free_symbols.intersection(field.direction_gradient)
-            for field in system.fields
-        ),
+        current_value=current_value,
+        current_gradient=current_gradient,
+        previous_value=previous_value,
+        previous_gradient=previous_gradient,
+        direction_value=direction_value,
+        direction_gradient=direction_gradient,
         value_coefficients=tuple(
             not _is_zero(coefficient.value) for coefficient in coefficients
         ),
@@ -151,7 +157,8 @@ def _codegen_dependencies(system, coefficients, dependencies):
 
 
 def _is_zero(expression):
-    return sp.simplify(expression) == 0
+    expression = sp.sympify(expression)
+    return expression == 0 or expression.is_zero is True
 
 
 def generate_coupled_residual_sfem_files(
@@ -276,8 +283,16 @@ def generate_mixed_residual_sfem_files(
 
 def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs):
     rule = specialization.quadrature_rule
-    residual_dependencies = system.residual_dependencies()
-    action_dependencies = system.jacobian_action_dependencies()
+    residual_dependencies = _codegen_dependencies(
+        system,
+        residual_coeffs,
+        system.residual_dependencies(),
+    )
+    action_dependencies = _codegen_dependencies(
+        system,
+        action_coeffs,
+        system.jacobian_action_dependencies(),
+    )
     guard = ("%s_LOCAL_HPP" % local_prefix).upper()
     lines = [
         "#ifndef %s" % guard,
@@ -354,24 +369,25 @@ def _local_function(
     params = [
         "const ptrdiff_t nelems",
         "const ptrdiff_t geometry_stride",
-        "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim),
         "const scalar_t *const SFEM_RESTRICT determinant",
     ]
-    if rule.is_tensor_product:
-        params.extend(
-            (
-                "const scalar_t *const SFEM_RESTRICT shape_1d",
-                "const scalar_t *const SFEM_RESTRICT grad_1d",
-                "const scalar_t *const SFEM_RESTRICT q_weight_1d",
-            )
+    if dependencies.uses_adjugate:
+        params.append(
+            "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
+    if rule.is_tensor_product:
+        params.append("const scalar_t *const SFEM_RESTRICT shape_1d")
+        if dependencies.uses_reference_gradients:
+            params.append("const scalar_t *const SFEM_RESTRICT grad_1d")
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
     else:
         params.append("const scalar_t *const SFEM_RESTRICT shape")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s"
-            % _simplex_grad_ref_name("grad_ref", d)
-            for d in range(dim)
-        )
+        if dependencies.uses_reference_gradients:
+            params.extend(
+                "const scalar_t *const SFEM_RESTRICT %s"
+                % _simplex_grad_ref_name("grad_ref", d)
+                for d in range(dim)
+            )
         params.append("const scalar_t *const SFEM_RESTRICT q_weight")
     if dependencies.current:
         params.append(
@@ -431,11 +447,12 @@ def _simplex_local_body(system, coefficients, dependencies):
         "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
         "            const scalar_t det = determinant[geometry_offset];",
     ]
-    for i in range(dim * dim):
-        lines.append(
-            "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-            % (i, i)
-        )
+    if dependencies.uses_adjugate:
+        for i in range(dim * dim):
+            lines.append(
+                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
+                % (i, i)
+            )
     lines.extend(_field_evaluation_lines(system, dependencies, "            ", False))
     lines.extend(
         _coefficient_evaluation_lines(
@@ -443,6 +460,7 @@ def _simplex_local_body(system, coefficients, dependencies):
             coefficients,
             "            ",
             "q_weight[q]",
+            dependencies,
         )
     )
     lines.extend(
@@ -452,6 +470,8 @@ def _simplex_local_body(system, coefficients, dependencies):
         ]
     )
     for d in range(dim):
+        if not any(row[d] for row in dependencies.gradient_coefficients):
+            continue
         terms = [
             "%s[q * N_SHAPE + test] * adj%d"
             % (_simplex_grad_ref_name("grad_ref", k), k * dim + d)
@@ -462,14 +482,19 @@ def _simplex_local_body(system, coefficients, dependencies):
             % (d, " + ".join(terms))
         )
     for row in range(len(system.fields)):
-        terms = ["value_coeff%d * test_value" % row] + [
+        terms = []
+        if dependencies.value_coefficients[row]:
+            terms.append("value_coeff%d * test_value" % row)
+        terms.extend(
             "grad_coeff%d_%d * test_grad%d" % (row, d, d)
             for d in range(dim)
-        ]
-        lines.append(
-            "                output[test * N_FIELDS + %d][lane] += q_weight[q] * det * (%s);"
-            % (row, " + ".join(terms))
+            if dependencies.gradient_coefficients[row][d]
         )
+        if terms:
+            lines.append(
+                "                output[test * N_FIELDS + %d][lane] += q_weight[q] * det * (%s);"
+                % (row, " + ".join(terms))
+            )
     lines.extend(["            }", "        }", "    }"])
     return lines
 
@@ -485,21 +510,39 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
     ):
         if not enabled:
             continue
+        uses_gradient = getattr(dependencies, "%s_gradient" % group)
         lines.extend(
             [
                 "    scalar_t %s_value[N_FIELDS * N_QP * VECTOR_SIZE];" % group,
-                "    scalar_t %s_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];"
-                % group,
-                "    %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
-                % prefix,
-                "            nelems, shape_1d, grad_1d, %s, %s_value, %s_grad_ref);"
-                % (group, group, group),
             ]
         )
+        if uses_gradient:
+            lines.append(
+                "    scalar_t %s_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];"
+                % group
+            )
+        if uses_gradient:
+            lines.extend(
+                [
+                    "    %s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
+                    % prefix,
+                    "            nelems, shape_1d, grad_1d, %s, %s_value, %s_grad_ref);"
+                    % (group, group, group),
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "    %s_tensor_evaluate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
+                    % prefix,
+                    "            nelems, shape_1d, %s, %s_value);" % (group, group),
+                ]
+            )
+    lines.append("    scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];")
+    if dependencies.uses_test_gradients:
+        lines.append("    scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];")
     lines.extend(
         [
-            "    scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];",
-            "    scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];",
             "    static constexpr int Q = %s_integer_root(N_QP, DIM);" % prefix,
             "    for (int q = 0; q < N_QP; ++q) {",
         ]
@@ -529,36 +572,52 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
             "            const scalar_t det = determinant[geometry_offset];",
         ]
     )
-    for i in range(dim * dim):
-        lines.append(
-            "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-            % (i, i)
-        )
-    lines.extend(_tensor_field_alias_lines(system, dependencies))
-    lines.extend(_coefficient_evaluation_lines(system, coefficients, "            ", "qw"))
-    for row in range(n_fields):
-        lines.append(
-            "            value_coeff[(%d * N_QP + q) * VECTOR_SIZE + lane] = qw * det * value_coeff%d;"
-            % (row, row)
-        )
-        for k in range(dim):
-            terms = [
-                "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
-                for d in range(dim)
-            ]
+    if dependencies.uses_adjugate:
+        for i in range(dim * dim):
             lines.append(
-                "            grad_coeff_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane] = qw * (%s);"
-                % (row, k, " + ".join(terms))
+                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
+                % (i, i)
             )
-    lines.extend(
-        [
-            "        }",
-            "    }",
-            "    %s_tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
-            % prefix,
-            "            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);",
-        ]
-    )
+    lines.extend(_tensor_field_alias_lines(system, dependencies))
+    lines.extend(_coefficient_evaluation_lines(system, coefficients, "            ", "qw", dependencies))
+    for row in range(n_fields):
+        if dependencies.value_coefficients[row]:
+            value = "qw * det * value_coeff%d" % row
+        else:
+            value = "scalar_t(0)"
+        lines.append(
+            "            value_coeff[(%d * N_QP + q) * VECTOR_SIZE + lane] = %s;"
+            % (row, value)
+        )
+        if dependencies.uses_test_gradients:
+            for k in range(dim):
+                terms = [
+                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                    for d in range(dim)
+                    if dependencies.gradient_coefficients[row][d]
+                ]
+                value = "qw * (%s)" % " + ".join(terms) if terms else "scalar_t(0)"
+                lines.append(
+                    "            grad_coeff_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane] = %s;"
+                    % (row, k, value)
+                )
+    lines.extend(["        }", "    }"])
+    if dependencies.uses_test_gradients:
+        lines.extend(
+            [
+                "    %s_tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
+                % prefix,
+                "            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "    %s_tensor_integrate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, N_FIELDS>("
+                % prefix,
+                "            nelems, shape_1d, value_coeff, output);",
+            ]
+        )
     return lines
 
 
@@ -570,70 +629,94 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
     for field_index, field in enumerate(system.fields):
         groups = []
         if dependencies.current:
-            groups.append(("", "current"))
-        if dependencies.previous:
-            groups.append(("_old", "previous"))
-        for stem, stream in groups:
-            lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, stem))
-            for d in range(dim):
-                lines.append(
-                    "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
-                    % (indent, field.name, stem, d)
+            groups.append(
+                (
+                    "",
+                    "current",
+                    dependencies.current_value,
+                    dependencies.current_gradient,
                 )
+            )
+        if dependencies.previous:
+            groups.append(
+                (
+                    "_old",
+                    "previous",
+                    dependencies.previous_value,
+                    dependencies.previous_gradient,
+                )
+            )
+        for stem, stream, uses_value, uses_gradient in groups:
+            if uses_value:
+                lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, stem))
+            if uses_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
+                        % (indent, field.name, stem, d)
+                    )
             lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
             lines.append(
                 "%s    const scalar_t coeff = %s[trial * N_FIELDS + %d][lane];"
                 % (indent, stream, field_index)
             )
-            lines.append(
-                "%s    %s%s += coeff * shape[q * N_SHAPE + trial];"
-                % (indent, field.name, stem)
-            )
-            for d in range(dim):
+            if uses_value:
                 lines.append(
-                    "%s    %s%s_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
-                    % (
-                        indent,
-                        field.name,
-                        stem,
-                        d,
-                        _simplex_grad_ref_name("grad_ref", d),
+                    "%s    %s%s += coeff * shape[q * N_SHAPE + trial];"
+                    % (indent, field.name, stem)
+                )
+            if uses_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "%s    %s%s_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
+                        % (
+                            indent,
+                            field.name,
+                            stem,
+                            d,
+                            _simplex_grad_ref_name("grad_ref", d),
+                        )
                     )
-                )
             lines.append("%s}" % indent)
-            lines.extend(
-                _physical_gradient_lines(field.name + stem, dim, indent)
-            )
-        if dependencies.direction:
-            lines.append("%sscalar_t %s_direction = scalar_t(0);" % (indent, field.name))
-            for d in range(dim):
-                lines.append(
-                    "%sscalar_t %s_direction_grad_%d_ref = scalar_t(0);"
-                    % (indent, field.name, d)
+            if uses_gradient:
+                lines.extend(
+                    _physical_gradient_lines(field.name + stem, dim, indent)
                 )
+        if dependencies.direction:
+            if dependencies.direction_value:
+                lines.append("%sscalar_t %s_direction = scalar_t(0);" % (indent, field.name))
+            if dependencies.direction_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "%sscalar_t %s_direction_grad_%d_ref = scalar_t(0);"
+                        % (indent, field.name, d)
+                    )
             lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
             lines.append(
                 "%s    const scalar_t coeff = direction[trial * N_FIELDS + %d][lane];"
                 % (indent, field_index)
             )
-            lines.append(
-                "%s    %s_direction += coeff * shape[q * N_SHAPE + trial];"
-                % (indent, field.name)
-            )
-            for d in range(dim):
+            if dependencies.direction_value:
                 lines.append(
-                    "%s    %s_direction_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
-                    % (
-                        indent,
-                        field.name,
-                        d,
-                        _simplex_grad_ref_name("grad_ref", d),
-                    )
+                    "%s    %s_direction += coeff * shape[q * N_SHAPE + trial];"
+                    % (indent, field.name)
                 )
+            if dependencies.direction_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "%s    %s_direction_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
+                        % (
+                            indent,
+                            field.name,
+                            d,
+                            _simplex_grad_ref_name("grad_ref", d),
+                        )
+                    )
             lines.append("%s}" % indent)
-            lines.extend(
-                _physical_gradient_lines(field.name + "_direction", dim, indent)
-            )
+            if dependencies.direction_gradient:
+                lines.extend(
+                    _physical_gradient_lines(field.name + "_direction", dim, indent)
+                )
     return lines
 
 
@@ -657,49 +740,71 @@ def _tensor_field_alias_lines(system, dependencies):
     for field_index, field in enumerate(system.fields):
         groups = []
         if dependencies.current:
-            groups.append(("", "current"))
+            groups.append(
+                (
+                    "",
+                    "current",
+                    dependencies.current_value,
+                    dependencies.current_gradient,
+                )
+            )
         if dependencies.previous:
-            groups.append(("_old", "previous"))
-        for stem, array in groups:
-            lines.append(
-                "            const scalar_t %s%s = %s_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
-                % (field.name, stem, array, field_index)
-            )
-            for k in range(dim):
-                lines.append(
-                    "            const scalar_t %s%s_grad_%d_ref = %s_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                    % (field.name, stem, k, array, field_index, k)
+            groups.append(
+                (
+                    "_old",
+                    "previous",
+                    dependencies.previous_value,
+                    dependencies.previous_gradient,
                 )
-            lines.extend(
-                _physical_gradient_lines(field.name + stem, dim, "            ")
             )
+        for stem, array, uses_value, uses_gradient in groups:
+            if uses_value:
+                lines.append(
+                    "            const scalar_t %s%s = %s_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
+                    % (field.name, stem, array, field_index)
+                )
+            if uses_gradient:
+                for k in range(dim):
+                    lines.append(
+                        "            const scalar_t %s%s_grad_%d_ref = %s_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
+                        % (field.name, stem, k, array, field_index, k)
+                    )
+                lines.extend(
+                    _physical_gradient_lines(field.name + stem, dim, "            ")
+                )
         if dependencies.direction:
-            lines.append(
-                "            const scalar_t %s_direction = direction_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
-                % (field.name, field_index)
-            )
-            for k in range(dim):
+            if dependencies.direction_value:
                 lines.append(
-                    "            const scalar_t %s_direction_grad_%d_ref = direction_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                    % (field.name, k, field_index, k)
+                    "            const scalar_t %s_direction = direction_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
+                    % (field.name, field_index)
                 )
-            lines.extend(
-                _physical_gradient_lines(
-                    field.name + "_direction", dim, "            "
+            if dependencies.direction_gradient:
+                for k in range(dim):
+                    lines.append(
+                        "            const scalar_t %s_direction_grad_%d_ref = direction_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
+                        % (field.name, k, field_index, k)
+                    )
+                lines.extend(
+                    _physical_gradient_lines(
+                        field.name + "_direction", dim, "            "
+                    )
                 )
-            )
     return lines
 
 
-def _coefficient_evaluation_lines(system, coefficients, indent, weight):
+def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependencies=None):
     expressions = []
     targets = []
     for row, coefficient in enumerate(coefficients):
-        expressions.append(coefficient.value)
-        targets.append("value_coeff%d" % row)
+        if dependencies is None or dependencies.value_coefficients[row]:
+            expressions.append(coefficient.value)
+            targets.append("value_coeff%d" % row)
         for d, expression in enumerate(coefficient.gradient):
-            expressions.append(expression)
-            targets.append("grad_coeff%d_%d" % (row, d))
+            if dependencies is None or dependencies.gradient_coefficients[row][d]:
+                expressions.append(expression)
+                targets.append("grad_coeff%d_%d" % (row, d))
+    if not expressions:
+        return []
     temporaries, reduced = sp.cse(
         expressions,
         symbols=sp.numbered_symbols("residual_tmp"),
@@ -747,8 +852,16 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
     lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
     lines.append("")
     form_dependencies = {
-        "residual": system.residual_dependencies(),
-        "jacobian_action": system.jacobian_action_dependencies(),
+        "residual": _codegen_dependencies(
+            system,
+            coupled_residual_weak_coefficients(system, False),
+            system.residual_dependencies(),
+        ),
+        "jacobian_action": _codegen_dependencies(
+            system,
+            coupled_residual_weak_coefficients(system, True),
+            system.jacobian_action_dependencies(),
+        ),
     }
     for form in ("residual", "jacobian_action"):
         dependencies = form_dependencies[form]
@@ -759,10 +872,13 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
             params = [
                 "const ptrdiff_t nelems",
                 "const ptrdiff_t geometry_stride",
-                "const %s *const SFEM_RESTRICT adjugate[%d]"
-                % (scalar_type, dim * dim),
                 "const %s *const SFEM_RESTRICT determinant" % scalar_type,
             ]
+            if dependencies.uses_adjugate:
+                params.append(
+                    "const %s *const SFEM_RESTRICT adjugate[%d]"
+                    % (scalar_type, dim * dim)
+                )
             if dependencies.current:
                 params.append(
                     "const %s *const SFEM_RESTRICT current[%d]"
@@ -792,33 +908,39 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                     "        %s%s"
                     % (param, "," if index + 1 < len(params) else "")
                 )
-            call_args = ["nelems", "geometry_stride", "adjugate", "determinant"]
+            call_args = ["nelems", "geometry_stride", "determinant"]
+            if dependencies.uses_adjugate:
+                call_args.append("adjugate")
             if rule.is_tensor_product:
-                call_args.extend(
-                    (
-                        "sfem::codegen::%s_%s_shape_1d_%s"
-                        % (prefix, element, reference_suffix),
+                call_args.append(
+                    "sfem::codegen::%s_%s_shape_1d_%s"
+                    % (prefix, element, reference_suffix)
+                )
+                if dependencies.uses_reference_gradients:
+                    call_args.append(
                         "sfem::codegen::%s_%s_grad_1d_%s"
-                        % (prefix, element, reference_suffix),
-                        "sfem::codegen::%s_%s_q_weight_1d_%s"
-                        % (prefix, element, reference_suffix),
+                        % (prefix, element, reference_suffix)
                     )
+                call_args.append(
+                    "sfem::codegen::%s_%s_q_weight_1d_%s"
+                    % (prefix, element, reference_suffix)
                 )
             else:
                 call_args.append(
                     "sfem::codegen::%s_%s_shape_%s"
                     % (prefix, element, reference_suffix)
                 )
-                call_args.extend(
-                    "sfem::codegen::%s_%s_%s_%s"
-                    % (
-                        prefix,
-                        element,
-                        _simplex_grad_ref_name("grad_ref", d),
-                        reference_suffix,
+                if dependencies.uses_reference_gradients:
+                    call_args.extend(
+                        "sfem::codegen::%s_%s_%s_%s"
+                        % (
+                            prefix,
+                            element,
+                            _simplex_grad_ref_name("grad_ref", d),
+                            reference_suffix,
+                        )
+                        for d in range(dim)
                     )
-                    for d in range(dim)
-                )
                 call_args.append(
                     "sfem::codegen::%s_%s_q_weight_%s"
                     % (prefix, element, reference_suffix)
@@ -1644,10 +1766,11 @@ def _mesh_operator_source(
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
     ]
-    params.extend(
-        "const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
-        for i in range(dim * dim)
-    )
+    if dependencies.uses_adjugate:
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+            for i in range(dim * dim)
+        )
     params.append(
         "const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0"
     )
@@ -1767,12 +1890,12 @@ def _mesh_operator_source(
                 for i in field_stream_order
             )
         )
-    lines.extend(
-        [
-            "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_output[%d]" % i for i in field_stream_order
-            ),
+    lines.append(
+        "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
+        % ", ".join("block_output[%d]" % i for i in field_stream_order)
+    )
+    if dependencies.uses_adjugate:
+        lines.append(
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
                 dim * dim,
@@ -1780,22 +1903,26 @@ def _mesh_operator_source(
                     "g_jacobian_adjugate%d + evbegin" % i
                     for i in range(dim * dim)
                 ),
-            ),
-        ]
-    )
+            )
+        )
     call_args = [
         "nelems",
         "0",
-        "block_adjugate",
         "g_jacobian_determinant0 + evbegin",
     ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
     if rule.is_tensor_product:
-        call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
+        call_args.append("shape_1d")
+        if dependencies.uses_reference_gradients:
+            call_args.append("grad_1d")
+        call_args.append("q_weight_1d")
     else:
         call_args.append("shape")
-        call_args.extend(
-            _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
-        )
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+            )
         call_args.append("q_weight")
     if dependencies.current:
         call_args.append("block_current_streams")
@@ -1849,9 +1976,10 @@ def _mesh_operator_source(
                 % (param, "," if index + 1 < len(typed_params) else "")
             )
         call_args = ["nelements", "nnodes", "elements"]
-        call_args.extend(
-            "g_jacobian_adjugate%d" % i for i in range(dim * dim)
-        )
+        if dependencies.uses_adjugate:
+            call_args.extend(
+                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
+            )
         call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
         if dependencies.current:
@@ -2188,34 +2316,38 @@ def _isoparametric_mesh_operator_source(
                 for i in field_stream_order
             )
         )
-    lines.extend(
-        [
-            "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_output[%d]" % i for i in field_stream_order
-            ),
+    lines.append(
+        "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
+        % ", ".join("block_output[%d]" % i for i in field_stream_order)
+    )
+    if dependencies.uses_adjugate:
+        lines.append(
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
                 dim * dim,
                 ", ".join(
                     "block_adjugate_data[%d]" % i for i in range(dim * dim)
                 ),
-            ),
-        ]
-    )
+            )
+        )
     call_args = [
         "nelems",
         "VECTOR_SIZE",
-        "block_adjugate",
         "block_determinant",
     ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
     if rule.is_tensor_product:
-        call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
+        call_args.append("shape_1d")
+        if dependencies.uses_reference_gradients:
+            call_args.append("grad_1d")
+        call_args.append("q_weight_1d")
     else:
         call_args.append("shape")
-        call_args.extend(
-            _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
-        )
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+            )
         call_args.append("q_weight")
     if dependencies.current:
         call_args.append("block_current_streams")
@@ -2415,7 +2547,11 @@ def _tensor_helpers(prefix, dim):
     lines.append("")
     lines.extend(_tensor_evaluate_helper(prefix, dim))
     lines.append("")
+    lines.extend(_tensor_value_evaluate_helper(prefix, dim))
+    lines.append("")
     lines.extend(_tensor_integrate_helper(prefix, dim))
+    lines.append("")
+    lines.extend(_tensor_value_integrate_helper(prefix, dim))
     return lines
 
 
@@ -2423,6 +2559,12 @@ def _tensor_evaluate_helper(prefix, dim):
     if dim == 2:
         return _tensor_evaluate_2d(prefix)
     return _tensor_evaluate_3d(prefix)
+
+
+def _tensor_value_evaluate_helper(prefix, dim):
+    if dim == 2:
+        return _tensor_value_evaluate_2d(prefix)
+    return _tensor_value_evaluate_3d(prefix)
 
 
 def _tensor_evaluate_2d(prefix):
@@ -2462,6 +2604,41 @@ def _tensor_evaluate_2d(prefix):
         "            value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;",
         "            gradient[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] = g0;",
         "            gradient[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = g1;",
+        "        }",
+        "    }",
+        "}",
+    ]
+
+
+def _tensor_value_evaluate_2d(prefix):
+    return [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
+        "static SFEM_INLINE void %s_tensor_evaluate_value(" % prefix,
+        "        const ptrdiff_t nelems, const scalar_t *const shape_1d,",
+        "        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value) {",
+        "    static constexpr int Q = %s_integer_root(N_QP, 2);" % prefix,
+        "    static constexpr int S = %s_integer_root(N_SHAPE, 2);" % prefix,
+        "    scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int sx = 0; sx < S; ++sx) {",
+        "                const int s = sx + S * sy;",
+        "                v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];",
+        "            }",
+        "            vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = v;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {",
+        "        const int q = qx + Q * qy;",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int sy = 0; sy < S; ++sy) {",
+        "                v += vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
+        "            }",
+        "            value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;",
         "        }",
         "    }",
         "}",
@@ -2523,10 +2700,62 @@ def _tensor_evaluate_3d(prefix):
     ]
 
 
+def _tensor_value_evaluate_3d(prefix):
+    return [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
+        "static SFEM_INLINE void %s_tensor_evaluate_value(" % prefix,
+        "        const ptrdiff_t nelems, const scalar_t *const shape_1d,",
+        "        const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE], scalar_t *const value) {",
+        "    static constexpr int Q = %s_integer_root(N_QP, 3);" % prefix,
+        "    static constexpr int S = %s_integer_root(N_SHAPE, 3);" % prefix,
+        "    scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE];",
+        "    scalar_t vxy[N_FIELDS * Q * Q * S * VECTOR_SIZE];",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int sx = 0; sx < S; ++sx) {",
+        "                const int s = sx + S * (sy + S * sz);",
+        "                v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];",
+        "            }",
+        "            vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = v;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int sy = 0; sy < S; ++sy) {",
+        "                v += vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
+        "            }",
+        "            vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = v;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {",
+        "        const int q = qx + Q * (qy + Q * qz);",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int sz = 0; sz < S; ++sz) {",
+        "                v += vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
+        "            }",
+        "            value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;",
+        "        }",
+        "    }",
+        "}",
+    ]
+
+
 def _tensor_integrate_helper(prefix, dim):
     if dim == 2:
         return _tensor_integrate_2d(prefix)
     return _tensor_integrate_3d(prefix)
+
+
+def _tensor_value_integrate_helper(prefix, dim):
+    if dim == 2:
+        return _tensor_value_integrate_2d(prefix)
+    return _tensor_value_integrate_3d(prefix)
 
 
 def _tensor_integrate_2d(prefix):
@@ -2555,6 +2784,41 @@ def _tensor_integrate_2d(prefix):
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = scalar_t(0);",
         "            for (int qx = 0; qx < Q; ++qx) { const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;",
         "                v += sv[i] * shape_1d[qx * S + sx] + sg[i] * grad_1d[qx * S + sx]; }",
+        "            output[s * N_FIELDS + f][lane] += v;",
+        "        }",
+        "    }",
+        "}",
+    ]
+
+
+def _tensor_value_integrate_2d(prefix):
+    return [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
+        "static SFEM_INLINE void %s_tensor_integrate_value(" % prefix,
+        "        const ptrdiff_t nelems, const scalar_t *const shape_1d,",
+        "        const scalar_t *const value_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {",
+        "    static constexpr int Q = %s_integer_root(N_QP, 2), S = %s_integer_root(N_SHAPE, 2);"
+        % (prefix, prefix),
+        "    scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t a = scalar_t(0);",
+        "            for (int qy = 0; qy < Q; ++qy) {",
+        "                const int q = qx + Q * qy;",
+        "                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
+        "            }",
+        "            sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = a;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
+        "        const int s = sx + S * sy;",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int qx = 0; qx < Q; ++qx) {",
+        "                v += sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];",
+        "            }",
         "            output[s * N_FIELDS + f][lane] += v;",
         "        }",
         "    }",
@@ -2598,6 +2862,52 @@ def _tensor_integrate_3d(prefix):
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = scalar_t(0);",
         "            for (int qx = 0; qx < Q; ++qx) { const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;",
         "                v += yz0[j] * shape_1d[qx * S + sx] + yz1[j] * grad_1d[qx * S + sx]; }",
+        "            output[s * N_FIELDS + f][lane] += v;",
+        "        }",
+        "    }",
+        "}",
+    ]
+
+
+def _tensor_value_integrate_3d(prefix):
+    return [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int N_FIELDS>",
+        "static SFEM_INLINE void %s_tensor_integrate_value(" % prefix,
+        "        const ptrdiff_t nelems, const scalar_t *const shape_1d,",
+        "        const scalar_t *const value_coeff, scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {",
+        "    static constexpr int Q = %s_integer_root(N_QP, 3), S = %s_integer_root(N_SHAPE, 3);"
+        % (prefix, prefix),
+        "    scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];",
+        "    scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t a = scalar_t(0);",
+        "            for (int qz = 0; qz < Q; ++qz) {",
+        "                const int q = qx + Q * (qy + Q * qz);",
+        "                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
+        "            }",
+        "            z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = a;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t a = scalar_t(0);",
+        "            for (int qy = 0; qy < Q; ++qy) {",
+        "                a += z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
+        "            }",
+        "            yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = a;",
+        "        }",
+        "    }",
+        "    for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
+        "        const int s = sx + S * (sy + S * sz);",
+        "#pragma omp simd",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        "            scalar_t v = scalar_t(0);",
+        "            for (int qx = 0; qx < Q; ++qx) {",
+        "                v += yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];",
+        "            }",
         "            output[s * N_FIELDS + f][lane] += v;",
         "        }",
         "    }",

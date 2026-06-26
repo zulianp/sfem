@@ -31,8 +31,8 @@ template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void generated_two_phase_flow_d3_simplex_residual_block(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT adjugate[9],
         const scalar_t *const SFEM_RESTRICT determinant,
+        const scalar_t *const SFEM_RESTRICT adjugate[9],
         const scalar_t *const SFEM_RESTRICT shape,
         const scalar_t *const SFEM_RESTRICT grad_ref_x,
         const scalar_t *const SFEM_RESTRICT grad_ref_y,
@@ -99,19 +99,10 @@ static SFEM_INLINE void generated_two_phase_flow_d3_simplex_residual_block(
             const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
             const scalar_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
             scalar_t p_w_old = scalar_t(0);
-            scalar_t p_w_old_grad_0_ref = scalar_t(0);
-            scalar_t p_w_old_grad_1_ref = scalar_t(0);
-            scalar_t p_w_old_grad_2_ref = scalar_t(0);
             for (int trial = 0; trial < N_SHAPE; ++trial) {
                 const scalar_t coeff = previous[trial * N_FIELDS + 0][lane];
                 p_w_old += coeff * shape[q * N_SHAPE + trial];
-                p_w_old_grad_0_ref += coeff * grad_ref_x[q * N_SHAPE + trial];
-                p_w_old_grad_1_ref += coeff * grad_ref_y[q * N_SHAPE + trial];
-                p_w_old_grad_2_ref += coeff * grad_ref_z[q * N_SHAPE + trial];
             }
-            const scalar_t p_w_old_grad_0 = (p_w_old_grad_0_ref * adj0 + p_w_old_grad_1_ref * adj3 + p_w_old_grad_2_ref * adj6) / det;
-            const scalar_t p_w_old_grad_1 = (p_w_old_grad_0_ref * adj1 + p_w_old_grad_1_ref * adj4 + p_w_old_grad_2_ref * adj7) / det;
-            const scalar_t p_w_old_grad_2 = (p_w_old_grad_0_ref * adj2 + p_w_old_grad_1_ref * adj5 + p_w_old_grad_2_ref * adj8) / det;
             scalar_t p_c = scalar_t(0);
             scalar_t p_c_grad_0_ref = scalar_t(0);
             scalar_t p_c_grad_1_ref = scalar_t(0);
@@ -127,19 +118,10 @@ static SFEM_INLINE void generated_two_phase_flow_d3_simplex_residual_block(
             const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
             const scalar_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
             scalar_t p_c_old = scalar_t(0);
-            scalar_t p_c_old_grad_0_ref = scalar_t(0);
-            scalar_t p_c_old_grad_1_ref = scalar_t(0);
-            scalar_t p_c_old_grad_2_ref = scalar_t(0);
             for (int trial = 0; trial < N_SHAPE; ++trial) {
                 const scalar_t coeff = previous[trial * N_FIELDS + 1][lane];
                 p_c_old += coeff * shape[q * N_SHAPE + trial];
-                p_c_old_grad_0_ref += coeff * grad_ref_x[q * N_SHAPE + trial];
-                p_c_old_grad_1_ref += coeff * grad_ref_y[q * N_SHAPE + trial];
-                p_c_old_grad_2_ref += coeff * grad_ref_z[q * N_SHAPE + trial];
             }
-            const scalar_t p_c_old_grad_0 = (p_c_old_grad_0_ref * adj0 + p_c_old_grad_1_ref * adj3 + p_c_old_grad_2_ref * adj6) / det;
-            const scalar_t p_c_old_grad_1 = (p_c_old_grad_0_ref * adj1 + p_c_old_grad_1_ref * adj4 + p_c_old_grad_2_ref * adj7) / det;
-            const scalar_t p_c_old_grad_2 = (p_c_old_grad_0_ref * adj2 + p_c_old_grad_1_ref * adj5 + p_c_old_grad_2_ref * adj8) / det;
             const scalar_t residual_tmp0 = -p_wr;
             const scalar_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
             const scalar_t residual_tmp2 = S_res + scalar_t(-1);
@@ -179,8 +161,8 @@ template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void generated_two_phase_flow_d3_simplex_jacobian_action_block(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT adjugate[9],
         const scalar_t *const SFEM_RESTRICT determinant,
+        const scalar_t *const SFEM_RESTRICT adjugate[9],
         const scalar_t *const SFEM_RESTRICT shape,
         const scalar_t *const SFEM_RESTRICT grad_ref_x,
         const scalar_t *const SFEM_RESTRICT grad_ref_y,

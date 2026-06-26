@@ -643,8 +643,8 @@ extern "C" void generated_two_phase_flow_tet4_jacobian_action_isoparametric_mesh
 extern "C" int generated_two_phase_flow_tet4_residual_element_soa(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT adjugate[9],
         const double *const SFEM_RESTRICT determinant,
+        const double *const SFEM_RESTRICT adjugate[9],
         const double *const SFEM_RESTRICT current[8],
         const double *const SFEM_RESTRICT previous[8],
         const double C_ka1,
@@ -675,15 +675,15 @@ extern "C" int generated_two_phase_flow_tet4_residual_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_simplex_residual_block<double, 1, 4, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_simplex_residual_block<double, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
 extern "C" int generated_two_phase_flow_tet4_residual_element_soa_float(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT adjugate[9],
         const float *const SFEM_RESTRICT determinant,
+        const float *const SFEM_RESTRICT adjugate[9],
         const float *const SFEM_RESTRICT current[8],
         const float *const SFEM_RESTRICT previous[8],
         const float C_ka1,
@@ -714,7 +714,7 @@ extern "C" int generated_two_phase_flow_tet4_residual_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_simplex_residual_block<float, 1, 4, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_simplex_residual_block<float, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -833,7 +833,7 @@ static SFEM_INLINE int generated_two_phase_flow_tet4_residual_affine_mesh_soa_im
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
         const scalar_t *const block_adjugate[9] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin};
 
-        generated_two_phase_flow_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_previous_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        generated_two_phase_flow_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_previous_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1113,7 +1113,7 @@ static SFEM_INLINE int generated_two_phase_flow_tet4_residual_isoparametric_mesh
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        generated_two_phase_flow_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_previous_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        generated_two_phase_flow_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_previous_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1258,8 +1258,8 @@ extern "C" int generated_two_phase_flow_tet4_residual_isoparametric_mesh_aos_flo
 extern "C" int generated_two_phase_flow_tet4_jacobian_action_element_soa(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT adjugate[9],
         const double *const SFEM_RESTRICT determinant,
+        const double *const SFEM_RESTRICT adjugate[9],
         const double *const SFEM_RESTRICT current[8],
         const double *const SFEM_RESTRICT direction[8],
         const double C_ka1,
@@ -1290,15 +1290,15 @@ extern "C" int generated_two_phase_flow_tet4_jacobian_action_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_simplex_jacobian_action_block<double, 1, 4, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_simplex_jacobian_action_block<double, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f64, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
 extern "C" int generated_two_phase_flow_tet4_jacobian_action_element_soa_float(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT adjugate[9],
         const float *const SFEM_RESTRICT determinant,
+        const float *const SFEM_RESTRICT adjugate[9],
         const float *const SFEM_RESTRICT current[8],
         const float *const SFEM_RESTRICT direction[8],
         const float C_ka1,
@@ -1329,7 +1329,7 @@ extern "C" int generated_two_phase_flow_tet4_jacobian_action_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_simplex_jacobian_action_block<float, 1, 4, 16>(nelems, geometry_stride, adjugate, determinant, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_simplex_jacobian_action_block<float, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tet4_tet4_shape_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_grad_ref_z_f32, sfem::codegen::generated_two_phase_flow_tet4_tet4_q_weight_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1448,7 +1448,7 @@ static SFEM_INLINE int generated_two_phase_flow_tet4_jacobian_action_affine_mesh
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
         const scalar_t *const block_adjugate[9] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin};
 
-        generated_two_phase_flow_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_adjugate, g_jacobian_determinant0 + evbegin, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_direction_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        generated_two_phase_flow_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_direction_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1728,7 +1728,7 @@ static SFEM_INLINE int generated_two_phase_flow_tet4_jacobian_action_isoparametr
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        generated_two_phase_flow_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_adjugate, block_determinant, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_direction_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        generated_two_phase_flow_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, shape, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, block_current_streams, block_direction_streams, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
