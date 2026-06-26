@@ -47,6 +47,10 @@ namespace sfem {
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
                                 real_t value) override;
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif  // SFEM_ENABLE_RYAML
 
     private:
         class Impl;
@@ -179,6 +183,14 @@ namespace sfem {
         void seed_parameters(Parameters &parameters) {
 %(defaults)s
         }
+
+        void seed_material(MultiDomainOp &domains) {
+            for (auto &entry : domains.domains()) {
+                seed_parameters(*entry.second.parameters);
+            }
+        }
+
+%(yaml_helpers)s
 
         smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
                                                const smesh::Mesh::Block &block) {
@@ -369,11 +381,64 @@ namespace sfem {
                                     const real_t value) {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                 const ryml::ConstNodeRef             &node) {
+        auto ret = std::make_shared<%(op)s>(space);
+
+        std::vector<std::string> block_names;
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (block.has_child("name")) {
+                    block_names.push_back(yaml_read_string(block["name"]));
+                }
+            }
+        }
+
+        if (ret->initialize(block_names) != SFEM_SUCCESS) {
+            return nullptr;
+        }
+
+        real_t defaults[N_MATERIAL_PARAMETERS];
+        material_defaults(defaults);
+        real_t top_values[N_MATERIAL_PARAMETERS];
+        copy_material_parameters(defaults, top_values);
+        if (material_from_yaml(node, defaults, top_values)) {
+            set_material(*ret->impl_->domains, top_values);
+        }
+
+        read_affine_options(node,
+                            ret->impl_->objective_uses_affine,
+                            ret->impl_->gradient_uses_affine,
+                            ret->impl_->apply_uses_affine);
+
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (!block.has_child("name")) {
+                    continue;
+                }
+
+                real_t block_values[N_MATERIAL_PARAMETERS];
+                copy_material_parameters(top_values, block_values);
+                if (!material_from_yaml(block, top_values, block_values)) {
+                    continue;
+                }
+
+                const std::string block_name = yaml_read_string(block["name"]);
+                set_material_in_block(*ret->impl_->domains, block_name, block_values);
+            }
+        }
+
+        return ret;
+    }
+#endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """ % {
         "op": material.op_name,
         "declarations": "\n".join(declarations),
         "defaults": defaults,
+        "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "gradient_cases": "\n".join(gradient_cases),
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
@@ -497,6 +562,14 @@ namespace sfem {
 %(defaults)s
         }
 
+        void seed_material(MultiDomainOp &domains) {
+            for (auto &entry : domains.domains()) {
+                seed_parameters(*entry.second.parameters);
+            }
+        }
+
+%(yaml_helpers)s
+
         void parameter_array(const Parameters &parameters,
                              const int dim,
                              real_t *const values) {
@@ -539,9 +612,7 @@ namespace sfem {
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        for (auto &entry : impl_->domains->domains()) {
-            seed_parameters(*entry.second.parameters);
-        }
+        seed_material(*impl_->domains);
         return SFEM_SUCCESS;
     }
 
@@ -623,6 +694,53 @@ namespace sfem {
 
     void %(op)s::set_option(const std::string &, const bool) {}
 
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                 const ryml::ConstNodeRef             &node) {
+        auto ret = std::make_shared<%(op)s>(space);
+
+        std::vector<std::string> block_names;
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (block.has_child("name")) {
+                    block_names.push_back(yaml_read_string(block["name"]));
+                }
+            }
+        }
+
+        if (ret->initialize(block_names) != SFEM_SUCCESS) {
+            return nullptr;
+        }
+
+        real_t defaults[N_MATERIAL_PARAMETERS];
+        material_defaults(defaults);
+        real_t top_values[N_MATERIAL_PARAMETERS];
+        copy_material_parameters(defaults, top_values);
+        if (material_from_yaml(node, defaults, top_values)) {
+            set_material(*ret->impl_->domains, top_values);
+        }
+
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (!block.has_child("name")) {
+                    continue;
+                }
+
+                real_t block_values[N_MATERIAL_PARAMETERS];
+                copy_material_parameters(top_values, block_values);
+                if (!material_from_yaml(block, top_values, block_values)) {
+                    continue;
+                }
+
+                const std::string block_name = yaml_read_string(block["name"]);
+                set_material_in_block(*ret->impl_->domains, block_name, block_values);
+            }
+        }
+
+        return ret;
+    }
+#endif  // SFEM_ENABLE_RYAML
+
     int %(op)s::hessian_crs(const real_t *const,
                             const count_t *const,
                             const idx_t *const,
@@ -640,6 +758,7 @@ namespace sfem {
         "declarations": "\n".join(declarations),
         "max_parameters": max_parameters,
         "defaults": defaults,
+        "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
@@ -762,6 +881,136 @@ def _seed_lines(defaults):
         '            parameters.set_value("%s", %.17g);' % (name, value)
         for name, value in defaults
     )
+
+
+def _yaml_helpers(defaults):
+    nparameters = len(defaults)
+    storage_size = max(1, nparameters)
+    names = ", ".join('"%s"' % name for name, _ in defaults) or "nullptr"
+    default_lines = []
+    for i, (_, value) in enumerate(defaults):
+        default_lines.append("            values[%d] = %.17g;" % (i, value))
+    if not default_lines:
+        default_lines.append("            values[0] = 0;")
+    return """#ifdef SFEM_ENABLE_RYAML
+        constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
+        constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
+        static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
+
+        bool yaml_read_real(const ryml::ConstNodeRef &node,
+                            const char *const key,
+                            real_t &value) {
+            if (!node.has_child(key)) {
+                return false;
+            }
+            node[key] >> value;
+            return true;
+        }
+
+        bool yaml_read_parameter(const ryml::ConstNodeRef &node,
+                                 const char *const key,
+                                 real_t &value) {
+            if (yaml_read_real(node, key, value)) {
+                return true;
+            }
+            if (node.has_child("parameters") &&
+                yaml_read_real(node["parameters"], key, value)) {
+                return true;
+            }
+            if (node.has_child("material") &&
+                yaml_read_real(node["material"], key, value)) {
+                return true;
+            }
+            return false;
+        }
+
+        std::string yaml_read_string(const ryml::ConstNodeRef &node) {
+            const auto value = node.val();
+            return std::string(value.str, value.len);
+        }
+
+        void material_defaults(real_t *const values) {
+%(default_lines)s
+        }
+
+        void copy_material_parameters(const real_t *const src,
+                                      real_t *const dst) {
+            for (int i = 0; i < N_MATERIAL_PARAMETERS; ++i) {
+                dst[i] = src[i];
+            }
+        }
+
+        bool material_from_yaml(const ryml::ConstNodeRef &node,
+                                const real_t *const base,
+                                real_t *const values) {
+            copy_material_parameters(base, values);
+            bool changed = false;
+            for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+                changed |= yaml_read_parameter(node,
+                                               MATERIAL_PARAMETER_NAMES[i],
+                                               values[i]);
+            }
+            return changed;
+        }
+
+        void set_material(MultiDomainOp &domains,
+                          const real_t *const values) {
+            for (auto &entry : domains.domains()) {
+                for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+                    entry.second.parameters->set_value(MATERIAL_PARAMETER_NAMES[i],
+                                                       values[i]);
+                }
+            }
+        }
+
+        void set_material_in_block(MultiDomainOp &domains,
+                                   const std::string &block_name,
+                                   const real_t *const values) {
+            for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+                domains.set_value_in_block(block_name,
+                                           MATERIAL_PARAMETER_NAMES[i],
+                                           values[i]);
+            }
+        }
+
+        bool yaml_read_bool(const ryml::ConstNodeRef &node,
+                            const char *const key,
+                            bool &value) {
+            if (!node.has_child(key)) {
+                return false;
+            }
+            int raw = value ? 1 : 0;
+            node[key] >> raw;
+            value = raw != 0;
+            return true;
+        }
+
+        void read_affine_options(const ryml::ConstNodeRef &node,
+                                 bool &objective,
+                                 bool &gradient,
+                                 bool &hessian_action) {
+            bool all = objective && gradient && hessian_action;
+            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
+                yaml_read_bool(node, "assume_affine", all)) {
+                objective = all;
+                gradient = all;
+                hessian_action = all;
+            }
+            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
+            yaml_read_bool(node, "objective_assume_affine", objective);
+            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
+            yaml_read_bool(node, "gradient_assume_affine", gradient);
+            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
+            yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
+            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
+            yaml_read_bool(node, "apply_assume_affine", hessian_action);
+        }
+#endif  // SFEM_ENABLE_RYAML""" % {
+        "nparameters": nparameters,
+        "storage_size": storage_size,
+        "names": names,
+        "default_lines": "\n".join(default_lines),
+    }
 
 
 def _parameter_args(parameters):

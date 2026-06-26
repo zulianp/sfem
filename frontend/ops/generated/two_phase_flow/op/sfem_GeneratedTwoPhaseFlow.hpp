@@ -30,9 +30,14 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
+        void set_option(const std::string &name, bool val) override;
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
                                 real_t value) override;
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif  // SFEM_ENABLE_RYAML
 
     private:
         class Impl;
