@@ -85,18 +85,24 @@ def generate_coupled_residual_sfem_files(
     element_type,
     vector_size=16,
     quadrature_order=None,
+    specialization=None,
+    residual_coeffs=None,
+    action_coeffs=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
-    specialization = sfem_soa_element_specialization(
-        element_type,
-        vector_size,
-        quadrature_order,
-    )
+    if specialization is None:
+        specialization = sfem_soa_element_specialization(
+            element_type,
+            vector_size,
+            quadrature_order,
+        )
     if system.dim != specialization.dim:
         raise ValueError("residual system dimension does not match element dimension")
-    residual_coeffs = coupled_residual_weak_coefficients(system, False)
-    action_coeffs = coupled_residual_weak_coefficients(system, True)
+    if residual_coeffs is None:
+        residual_coeffs = coupled_residual_weak_coefficients(system, False)
+    if action_coeffs is None:
+        action_coeffs = coupled_residual_weak_coefficients(system, True)
     family = (
         "tensor_product"
         if specialization.quadrature_rule.is_tensor_product

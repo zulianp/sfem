@@ -34,6 +34,13 @@ class FormOrder(Enum):
     TWO = 2
 
 
+class PipelineStage(Enum):
+    USER_INPUT = "user_input"
+    FORM_EVALUATION = "form_evaluation"
+    SPECIALIZED_FORM_MANIPULATION = "specialized_form_manipulation"
+    CODE_GENERATION = "code_generation"
+
+
 @dataclass(frozen=True)
 class UnifiedForm:
     kind: FormKind
@@ -44,6 +51,29 @@ class UnifiedForm:
 
     def add_to(self, expressions):
         return expressions.add(self.role, self.expression, self.name)
+
+
+@dataclass(frozen=True)
+class FormEvaluation:
+    kind: FormKind
+    forms: tuple
+
+    @property
+    def stage(self):
+        return PipelineStage.FORM_EVALUATION
+
+    def form(self, order):
+        order = FormOrder(order)
+        for form in self.forms:
+            if form.order is order:
+                return form
+        raise ValueError("form order %s was not evaluated" % order.name)
+
+    def expressions(self):
+        expressions = KernelExpressions()
+        for form in self.forms:
+            form.add_to(expressions)
+        return expressions
 
 
 class FormPipeline:
@@ -69,13 +99,16 @@ class FormPipeline:
         return self._residual_form(order)
 
     def forms(self, orders=(FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)):
-        return tuple(self.form(order) for order in orders)
+        return self.evaluate(orders).forms
+
+    def evaluate(self, orders=(FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)):
+        return FormEvaluation(
+            self.kind,
+            tuple(self.form(order) for order in orders),
+        )
 
     def expressions(self, orders=(FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)):
-        expressions = KernelExpressions()
-        for form in self.forms(orders):
-            form.add_to(expressions)
-        return expressions
+        return self.evaluate(orders).expressions()
 
     def _energy_form(self, order):
         if order is FormOrder.ZERO:

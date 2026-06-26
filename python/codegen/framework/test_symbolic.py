@@ -48,7 +48,13 @@ from symbolic import (
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
-from forms import FormKind, FormOrder, energy_form_pipeline, residual_form_pipeline
+from forms import (
+    FormKind,
+    FormOrder,
+    PipelineStage,
+    energy_form_pipeline,
+    residual_form_pipeline,
+)
 from targets import CUDATarget, OpenMPTarget, TargetLanguage
 
 
@@ -58,16 +64,21 @@ class SymbolicFrameworkTest(unittest.TestCase):
         energy = u0 * u0 + u0 * u1
         residual = sp.Matrix([u0 + u1, u0 - u1])
 
-        energy_forms = energy_form_pipeline(
+        energy_evaluation = energy_form_pipeline(
             energy,
             (u0, u1),
             (du0, du1),
-        ).forms()
-        residual_forms = residual_form_pipeline(
+        ).evaluate()
+        residual_evaluation = residual_form_pipeline(
             residual,
             (u0, u1),
             (du0, du1),
-        ).forms()
+        ).evaluate()
+        energy_forms = energy_evaluation.forms
+        residual_forms = residual_evaluation.forms
+
+        self.assertEqual(energy_evaluation.stage, PipelineStage.FORM_EVALUATION)
+        self.assertEqual(residual_evaluation.stage, PipelineStage.FORM_EVALUATION)
 
         self.assertEqual(
             [(form.kind, form.order, form.role, form.name) for form in energy_forms],

@@ -74,9 +74,11 @@ from .fem import (
     sfem_supported_element_types,
 )
 from .forms import (
+    FormEvaluation,
     FormKind,
     FormOrder,
     FormPipeline,
+    PipelineStage,
     UnifiedForm,
     energy_form_pipeline,
     residual_form_pipeline,
@@ -149,7 +151,9 @@ __all__ = [
     "TransformedFirstPiola",
     "FormKind",
     "FormOrder",
+    "FormEvaluation",
     "FormPipeline",
+    "PipelineStage",
     "UnifiedForm",
     "CUDATarget",
     "OpenMPTarget",
