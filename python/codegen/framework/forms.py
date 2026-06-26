@@ -34,6 +34,21 @@ class FormOrder(Enum):
     TWO = 2
 
 
+class StandardFormName(Enum):
+    ZERO = "form_0"
+    ONE = "form_1"
+    TWO = "form_2"
+
+    @classmethod
+    def from_order(cls, order):
+        order = FormOrder(order)
+        if order is FormOrder.ZERO:
+            return cls.ZERO
+        if order is FormOrder.ONE:
+            return cls.ONE
+        return cls.TWO
+
+
 class PipelineStage(Enum):
     USER_INPUT = "user_input"
     FORM_EVALUATION = "form_evaluation"
@@ -48,6 +63,14 @@ class UnifiedForm:
     role: ExpressionRole
     name: str
     expression: object
+
+    @property
+    def standard_name(self):
+        return StandardFormName.from_order(self.order).value
+
+    @property
+    def standard_form(self):
+        return StandardFormName.from_order(self.order)
 
     def add_to(self, expressions):
         return expressions.add(self.role, self.expression, self.name)
@@ -68,6 +91,16 @@ class FormEvaluation:
             if form.order is order:
                 return form
         raise ValueError("form order %s was not evaluated" % order.name)
+
+    def standard_form(self, name):
+        name = StandardFormName(name)
+        for form in self.forms:
+            if form.standard_form is name:
+                return form
+        raise ValueError("standard form %s was not evaluated" % name.value)
+
+    def standard_forms(self):
+        return {form.standard_name: form for form in self.forms}
 
     def expressions(self):
         expressions = KernelExpressions()

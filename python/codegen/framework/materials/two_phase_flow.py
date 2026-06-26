@@ -6,9 +6,12 @@ import sympy as sp
 from sfem import gen
 
 
-def weak_form(system):
-    water = system.add_field("p_w")
-    co2 = system.add_field("p_c")
+def define(system):
+    water = system.Coefficient("p_w")
+    co2 = system.Coefficient("p_c")
+    q_w = gen.TestFunction(water)
+    q_c = gen.TestFunction(co2)
+
     constitutive = gen.TwoPhaseFlowConstitutiveModel.symbolic()
     dt = sp.Symbol("dt")
     permeability = sp.Matrix(
@@ -16,14 +19,9 @@ def weak_form(system):
         system.dim,
         sp.symbols("K_0:%d" % (system.dim * system.dim)),
     )
-    system.add_parameters(
-        *constitutive.parameters.as_tuple(),
-        dt,
-        *tuple(permeability),
-    )
 
-    current = constitutive.state(water.value, co2.value)
-    previous = constitutive.state(water.previous_value, co2.previous_value)
+    current = constitutive.state(water, co2)
+    previous = constitutive.state(gen.old(water), gen.old(co2))
     porosity = constitutive.parameters.porosity
     water_accumulation = (
         porosity
@@ -45,29 +43,27 @@ def weak_form(system):
         current.water_density
         * current.water_mobility
         * permeability
-        * sp.Matrix(water.gradient)
+        * gen.grad(water)
     )
     co2_flux = -(
         current.co2_density
         * current.co2_mobility
         * permeability
-        * sp.Matrix(co2.gradient)
+        * gen.grad(co2)
     )
 
-    system.set_residual(
-        water,
-        water_accumulation * water.test_value
-        - water_flux.dot(sp.Matrix(water.test_gradient)),
+    form = (
+        water_accumulation * q_w
+        - water_flux.dot(gen.grad(q_w))
+        + co2_accumulation * q_c
+        - co2_flux.dot(gen.grad(q_c))
     )
-    system.set_residual(
-        co2,
-        co2_accumulation * co2.test_value - co2_flux.dot(sp.Matrix(co2.test_gradient)),
-    )
+    system.residual("", form, fields=(water, co2))
 
 
-material = gen.CoupledResidualMaterial(
+material = gen.UnifiedMaterial(
     "two_phase_flow",
-    weak_form,
+    define,
     elements=("TRI3", "TET4", "QUAD4", "HEX8"),
     op_name="GeneratedTwoPhaseFlow",
     parameter_defaults=(

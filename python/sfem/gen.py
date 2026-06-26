@@ -10,15 +10,37 @@ import sympy as sp
 
 from ._gen_op import generate_op_files
 from codegen.framework import (
+    CodegenQualifier,
+    Coefficient,
     CoupledResidualSystem,
+    DEFORMATION_GRADIENT,
     EquationForm,
     EquationSystem,
+    EquationSystemBuilder,
     GeneratedKernelFile,
+    Identity,
+    HyperelasticQualifier,
     KernelExpressions,
+    MATERIAL_PARAMETER,
+    MaterialParameter,
+    MaterialParameterQualifier,
+    PREVIOUS_ARGUMENT,
+    PreviousFunction,
+    QualifiedExpression,
+    ScalarField,
+    SymbolicArgument,
+    SymbolicField,
+    TEST_ARGUMENT,
+    TensorField,
+    TestFunction,
+    TRIAL_ARGUMENT,
+    TrialFunction,
     TwoPhaseFlowConstitutiveModel,
     FormEvaluation,
     FormOrder,
     PipelineStage,
+    StandardFormName,
+    VectorField,
     coupled_residual_weak_coefficients,
     energy_form_pipeline,
     generate_coupled_residual_sfem_files,
@@ -28,6 +50,26 @@ from codegen.framework import (
     residual_form_pipeline,
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
+    scalar_field,
+    tensor_field,
+    test_function,
+    trial_function,
+    vector_field,
+    adjugate,
+    det,
+    deformation_gradient,
+    derivative,
+    div,
+    grad,
+    inner,
+    inv,
+    material_parameter,
+    old,
+    previous_function,
+    qualifiers,
+    qualify,
+    variable,
+    value,
 )
 from codegen.framework.fem import (
     SfemCompatibleElement,
@@ -95,6 +137,22 @@ class UnifiedMaterial:
 class GenerationResult:
     sources: tuple
     objects: tuple = ()
+
+
+@dataclass(frozen=True)
+class _HyperelasticOpMaterialAdapter:
+    name: str
+    energy: object
+    op_name: str
+    parameter_defaults: tuple
+
+
+@dataclass(frozen=True)
+class _ResidualOpMaterialAdapter:
+    name: str
+    define: object
+    op_name: str
+    parameter_defaults: tuple
 
 
 @dataclass(frozen=True)
@@ -315,12 +373,7 @@ def generate(
     files = CodeGenerationStage(user_input, codegen_plan).run()
 
     if material.op_name:
-        if isinstance(material, UnifiedMaterial):
-            raise ValueError(
-                "generated Op wrappers are only available for legacy single-form "
-                "HyperelasticMaterial and CoupledResidualMaterial inputs"
-            )
-        files.update(generate_op_files(material, selected))
+        files.update(_generate_op_wrapper_files(material, selected, user_input))
 
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
@@ -547,22 +600,57 @@ def _emit_residual_soa(unit, context):
 
 
 def _material_equations(material, dim):
-    system = EquationSystem(dim)
+    builder = EquationSystemBuilder(dim)
     if isinstance(material, HyperelasticMaterial):
-        system.energy(
+        builder.energy(
             "",
             material.energy,
             kernels=material.kernels,
             diagnostics=material.diagnostics,
         )
-        return system.equations
+        return builder.equations
     if isinstance(material, CoupledResidualMaterial):
-        system.residual("", material.define)
-        return system.equations
+        builder.residual("", material.define)
+        return builder.equations
     if isinstance(material, UnifiedMaterial):
-        material.define(system)
-        return system.equations
+        material.define(builder)
+        return builder.equations
     raise TypeError("unsupported material type %s" % type(material).__name__)
+
+
+def _generate_op_wrapper_files(material, selected, user_input):
+    if not isinstance(material, UnifiedMaterial):
+        return generate_op_files(material, selected)
+    if not user_input.element_contexts:
+        raise ValueError("generated Op wrapper requires at least one element context")
+    representative_dim = user_input.element_contexts[0].specialization.dim
+    equations = _material_equations(material, representative_dim)
+    if len(equations) != 1 or equations[0].name:
+        raise ValueError(
+            "generated Op wrappers for UnifiedMaterial require exactly one unnamed equation"
+        )
+    equation = equations[0]
+    if equation.is_energy:
+        return generate_op_files(
+            _HyperelasticOpMaterialAdapter(
+                material.name,
+                equation.define,
+                material.op_name,
+                material.parameter_defaults,
+            ),
+            selected,
+        )
+    if equation.is_residual:
+        return generate_op_files(
+            _ResidualOpMaterialAdapter(
+                material.name,
+                equation.define,
+                material.op_name,
+                material.parameter_defaults,
+            ),
+            selected,
+        )
+    raise TypeError("unsupported unified equation form %s" % equation.form)
 
 
 def _evaluate_equation(dim, equation):
@@ -828,15 +916,59 @@ def _validate_op(op_name, parameter_defaults):
 __all__ = [
     "CoupledResidualMaterial",
     "CoupledResidualSystem",
+    "CodegenQualifier",
+    "Coefficient",
     "DEFAULT_VECTOR_SIZE",
+    "DEFORMATION_GRADIENT",
     "EquationForm",
     "EquationSystem",
+    "EquationSystemBuilder",
     "GenerationResult",
     "HyperelasticMaterial",
+    "HyperelasticQualifier",
+    "Identity",
+    "MATERIAL_PARAMETER",
+    "MaterialParameter",
+    "MaterialParameterQualifier",
+    "PREVIOUS_ARGUMENT",
+    "PreviousFunction",
+    "QualifiedExpression",
+    "ScalarField",
+    "StandardFormName",
+    "SymbolicArgument",
+    "SymbolicField",
+    "TEST_ARGUMENT",
+    "TensorField",
+    "TensorCoefficient",
+    "TestFunction",
+    "TRIAL_ARGUMENT",
+    "TrialFunction",
     "TwoPhaseFlowConstitutiveModel",
     "UnifiedMaterial",
+    "VectorField",
+    "VectorCoefficient",
+    "adjugate",
+    "det",
+    "deformation_gradient",
+    "derivative",
+    "div",
     "generate",
+    "grad",
+    "inner",
+    "inv",
+    "material_parameter",
     "matrix_inner",
+    "old",
+    "previous_function",
+    "qualifiers",
+    "qualify",
     "run",
+    "scalar_field",
     "sfem_taylor_hood_element_types",
+    "tensor_field",
+    "test_function",
+    "trial_function",
+    "vector_field",
+    "variable",
+    "value",
 ]
