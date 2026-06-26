@@ -411,6 +411,14 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
             self.assertIn("sfem_GeneratedTwoPhaseFlow.cpp", names)
+            wrapper = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow.cpp")
+            with open(wrapper, encoding="utf-8") as stream:
+                source = stream.read()
+            self.assertLess(
+                source.index('parameters.require_real_value("C_ka1")'),
+                source.index('parameters.require_real_value("porosity")'),
+            )
+            self.assertNotIn('parameters.require_real_value("K_" + std::to_string(i))', source)
 
     def test_poro_hyperelastic_material_uses_taylor_hood_elements(self):
         names = tuple(element.name for element in poro_hyperelasticity.elements)
