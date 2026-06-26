@@ -24,10 +24,11 @@ The residual code generator injects depencies in kernels that are not actually n
 
 <!-- BOTH  -->
 
+For the affine geometry: when the kernel allows it try to move geometry related computations to preprocessing, for instance see FFF in SFEM laplace operators. This uses the properties of dot products, tensor contractions, etc... to perform operand rearrangement
+
 Create a script that I can run to generate and (re-)install all the materials from python/codegen/framework/materials  including their C++ wrapper in frontend/ops/generated/ 
 
 In framework create folder tests (where all the test should be moved)
-
 
 Lets revisit naming convetions (if incomplete stop and let me know what is missing)
 
@@ -44,6 +45,7 @@ naming conversion for micro-kernels (local)
 dim := 1|2|3
 family := simplex|tensor_product
 
+add generation for PROTEUS discretization (smesh element types)
 
 <!-- SMESH -->
 
