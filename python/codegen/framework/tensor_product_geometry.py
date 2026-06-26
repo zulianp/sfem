@@ -128,3 +128,178 @@ def tensor_product_isoparametric_geometry_lines(
     )
     lines.extend(["%s    }" % indent, "%s}" % indent])
     return lines
+
+
+def tensor_product_ordered_streams(streams, n_components, dim, n_shape):
+    shape_order = tensor_product_cartesian_shape_order(dim, n_shape)
+    return streams_in_shape_order(tuple(streams), n_components, shape_order)
+
+
+def tensor_product_ordered_coordinate_streams(dim, n_shape, coordinate_streams, wrapper=None):
+    wrapper = (lambda stream: stream) if wrapper is None else wrapper
+    return tuple(
+        wrapper(stream)
+        for stream in tensor_product_ordered_streams(
+            coordinate_streams,
+            dim,
+            dim,
+            n_shape,
+        )
+    )
+
+
+def tensor_product_evaluated_isoparametric_geometry_lines(
+    *,
+    dim,
+    n_shape,
+    n_qp,
+    local_prefix,
+    coordinate_streams,
+    indent="        ",
+    gradient_name="coordinate_grad_ref",
+    stream_array_name="block_coordinate_streams",
+    adjugate_target,
+    determinant_target,
+):
+    def evaluator_lines(streams, gradient, evaluator_indent):
+        return [
+            "%sscalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];"
+            % evaluator_indent,
+            "%s%s_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>("
+            % (evaluator_indent, local_prefix),
+            "%s        nelems, shape_1d, grad_1d, %s,"
+            % (evaluator_indent, streams),
+            "%s        coordinate_value, %s);" % (evaluator_indent, gradient),
+        ]
+
+    return tensor_product_isoparametric_geometry_lines(
+        dim=dim,
+        n_shape=n_shape,
+        n_qp=n_qp,
+        coordinate_streams=coordinate_streams,
+        evaluator_lines=evaluator_lines,
+        gradient_name=gradient_name,
+        stream_array_name=stream_array_name,
+        indent=indent,
+        adjugate_target=adjugate_target,
+        determinant_target=determinant_target,
+    )
+
+
+def tensor_product_coordinate_gradient_lines(
+    *,
+    dim,
+    local_prefix,
+    coordinate_streams,
+    indent="        ",
+    gradient_name="coordinate_grad_ref",
+    stream_array_name="block_coordinate_streams",
+):
+    lines = [
+        "%sconst scalar_t *const %s[DIM * N_SHAPE] = {%s};"
+        % (indent, stream_array_name, ", ".join(coordinate_streams)),
+        "%sscalar_t %s[DIM * N_QP * DIM * VECTOR_SIZE];"
+        % (indent, gradient_name),
+    ]
+    for component in range(dim):
+        lines.extend(
+            [
+                "%s%s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>("
+                % (indent, local_prefix),
+                "%s        nelems, shape_1d, grad_1d, %s, %d,"
+                % (indent, stream_array_name, component),
+                "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"
+                % (indent, gradient_name, component),
+            ]
+        )
+    return lines
+
+
+def tensor_product_current_q_isoparametric_geometry_lines(
+    *,
+    dim,
+    gradient_name="coordinate_grad_ref",
+    indent="        ",
+    adjugate_target,
+    determinant_target,
+    output_index="lane",
+):
+    lines = [
+        "#pragma omp simd",
+        "%sfor (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
+    ]
+    body_indent = indent + "    "
+    for row in range(dim):
+        for col in range(dim):
+            lines.append(
+                "%sconst scalar_t J%d%d = %s[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
+                % (body_indent, row, col, gradient_name, row, col)
+            )
+    lines.extend(
+        isoparametric_adjugate_lines(
+            dim,
+            body_indent,
+            output_index,
+            adjugate_target,
+            determinant_target,
+        )
+    )
+    lines.append("%s}" % indent)
+    return lines
+
+
+def tensor_product_gradient_isoparametric_geometry_lines(
+    *,
+    dim,
+    n_shape,
+    n_qp,
+    local_prefix,
+    coordinate_streams,
+    indent="        ",
+    gradient_name="coordinate_grad_ref",
+    stream_array_name="block_coordinate_streams",
+    adjugate_target,
+    determinant_target,
+):
+    n_shape_1d = round(n_shape ** (1.0 / dim))
+    if n_shape_1d ** dim != n_shape:
+        raise ValueError("tensor-product geometry n_shape must be a perfect tensor power")
+    n_qp_1d = round(n_qp ** (1.0 / dim))
+    if n_qp_1d ** dim != n_qp:
+        raise ValueError("tensor-product geometry n_qp must be a perfect tensor power")
+    sum_factorization = tensor_product_geometry_jacobian_plan_from_sizes(
+        dim,
+        n_shape,
+        n_qp,
+        n_shape_1d,
+        n_qp_1d,
+    )
+    if not sum_factorization.evaluates_geometry_jacobian:
+        raise ValueError("tensor-product geometry requires a Jacobian sum-factorization plan")
+
+    lines = tensor_product_coordinate_gradient_lines(
+        dim=dim,
+        local_prefix=local_prefix,
+        coordinate_streams=coordinate_streams,
+        indent=indent,
+        gradient_name=gradient_name,
+        stream_array_name=stream_array_name,
+    )
+    lines.extend(
+        [
+            "",
+            "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
+        ]
+    )
+    lines.extend(
+        tensor_product_current_q_isoparametric_geometry_lines(
+            dim=dim,
+            gradient_name=gradient_name,
+            indent=indent + "    ",
+            adjugate_target=adjugate_target,
+            determinant_target=determinant_target,
+            output_index="q * VECTOR_SIZE + lane",
+        )
+    )
+    lines.append("%s}" % indent)
+    return lines

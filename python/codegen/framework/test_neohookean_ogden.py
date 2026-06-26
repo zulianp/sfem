@@ -1011,6 +1011,55 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 minimum_matches=3,
             )
 
+    def test_tensor_product_isoparametric_objective_geometry_uses_sum_factorization(self):
+        specialization = sfem_soa_element_specialization("QUAD4", vector_size=8)
+        dim = specialization.dim
+        F = sp.Matrix(
+            dim,
+            dim,
+            tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
+        )
+        weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
+
+        generated_files = generate_sfem_soa_cpp_files_for_element(
+            (
+                sfem_soa_kernel_form(
+                    "objective",
+                    weak_form=weak_form,
+                    output_mode="accumulate",
+                ),
+            ),
+            prefix="generated_quad4_iso_objective",
+            specialization=specialization,
+        )
+
+        operator_source = {
+            generated.path: generated.source for generated in generated_files
+        }["generated_quad4_iso_objective_operator.cpp"]
+        for marker, terminator in (
+            (
+                "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_soa_impl",
+                'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_soa',
+            ),
+            (
+                "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa_impl",
+                'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa',
+            ),
+        ):
+            section = operator_source.split(marker, 1)[1].split(terminator, 1)[0]
+            self.assertIn(
+                "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+                section,
+            )
+            self.assertIn(
+                "generated_quad4_iso_objective_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
+                section,
+            )
+            self.assertNotIn(
+                "for (int shape = 0; shape < N_SHAPE; ++shape)",
+                section,
+            )
+
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
         compiler = shutil.which("c++")
         if compiler is None:
@@ -1271,7 +1320,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("const real_t *const SFEM_RESTRICT x0", operator_source)
-        self.assertIn("block_coordinate_streams[N_SHAPE * 3]", operator_source)
+        self.assertIn("block_coordinate_streams[DIM * N_SHAPE]", operator_source)
         self.assertIn(
             "block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22",
             operator_source,

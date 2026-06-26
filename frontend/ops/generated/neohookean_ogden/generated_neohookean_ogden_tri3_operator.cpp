@@ -179,6 +179,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_objective_soa_impl(
         const real_t *const SFEM_RESTRICT uy2,
         real_t *const SFEM_RESTRICT value
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -266,6 +267,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_objective_isoparamet
         const real_t *const SFEM_RESTRICT uy2,
         real_t *const SFEM_RESTRICT value
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -796,6 +798,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_gradient_soa_impl(
         real_t *const SFEM_RESTRICT outx2,
         real_t *const SFEM_RESTRICT outy2
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -909,6 +912,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_gradient_isoparametr
         real_t *const SFEM_RESTRICT outx2,
         real_t *const SFEM_RESTRICT outy2
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -1532,6 +1536,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_apply_soa_impl(
         real_t *const SFEM_RESTRICT outx2,
         real_t *const SFEM_RESTRICT outy2
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -1670,6 +1675,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri3_tri3_apply_isoparametric_
         real_t *const SFEM_RESTRICT outx2,
         real_t *const SFEM_RESTRICT outy2
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");

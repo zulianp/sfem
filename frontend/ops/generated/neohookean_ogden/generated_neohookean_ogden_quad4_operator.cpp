@@ -181,6 +181,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_soa_impl
         const real_t *const SFEM_RESTRICT uy3,
         real_t *const SFEM_RESTRICT value
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -280,6 +281,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
         const real_t *const SFEM_RESTRICT uy3,
         real_t *const SFEM_RESTRICT value
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -335,27 +337,22 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
 
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2, block_x3, block_y3};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
         for (int q = 0; q < N_QP; ++q) {
-            const int qx = q % N_QP_1D;
-            const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const int sx = ((shape + 1) >> 1) & 1;
-                    const int sy = shape >> 1;
-                    const scalar_t g0 = grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy];
-                    const scalar_t g1 = shape_1d[qx * N_SHAPE_1D + sx] * grad_1d[qy * N_SHAPE_1D + sy];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
+                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
+                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
@@ -849,6 +846,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_soa_impl(
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -984,6 +982,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -1054,27 +1053,22 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2, block_x3, block_y3};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
         for (int q = 0; q < N_QP; ++q) {
-            const int qx = q % N_QP_1D;
-            const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const int sx = ((shape + 1) >> 1) & 1;
-                    const int sy = shape >> 1;
-                    const scalar_t g0 = grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy];
-                    const scalar_t g1 = shape_1d[qx * N_SHAPE_1D + sx] * grad_1d[qy * N_SHAPE_1D + sy];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
+                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
+                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
@@ -1676,6 +1670,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_soa_impl(
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -1844,6 +1839,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
+    static constexpr int DIM = 2;
     static_assert(N_QP == 4, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 4, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
@@ -1931,27 +1927,22 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
         const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx3, block_hy3, block_hx2, block_hy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2, block_x3, block_y3};
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
         for (int q = 0; q < N_QP; ++q) {
-            const int qx = q % N_QP_1D;
-            const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const int sx = ((shape + 1) >> 1) & 1;
-                    const int sy = shape >> 1;
-                    const scalar_t g0 = grad_1d[qx * N_SHAPE_1D + sx] * shape_1d[qy * N_SHAPE_1D + sy];
-                    const scalar_t g1 = shape_1d[qx * N_SHAPE_1D + sx] * grad_1d[qy * N_SHAPE_1D + sy];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
+                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
+                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
+                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;

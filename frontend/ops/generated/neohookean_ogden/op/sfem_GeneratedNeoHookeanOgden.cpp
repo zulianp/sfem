@@ -167,14 +167,19 @@ namespace sfem {
                                  bool &gradient,
                                  bool &hessian_action) {
             bool all = objective && gradient && hessian_action;
-            if (yaml_read_bool(node, "assume_affine", all)) {
+            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
+                yaml_read_bool(node, "assume_affine", all)) {
                 objective = all;
                 gradient = all;
                 hessian_action = all;
             }
+            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
             yaml_read_bool(node, "objective_assume_affine", objective);
+            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
             yaml_read_bool(node, "gradient_assume_affine", gradient);
+            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
             yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
+            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
             yaml_read_bool(node, "apply_assume_affine", hessian_action);
         }
 #endif  // SFEM_ENABLE_RYAML
