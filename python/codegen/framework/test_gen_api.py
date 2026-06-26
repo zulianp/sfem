@@ -240,6 +240,54 @@ class GenApiTest(unittest.TestCase):
             sp.Matrix([2 * sp.Symbol("p_trial")]),
         )
 
+    def test_equation_system_owns_standard_form_collections(self):
+        builder = gen.EquationSystemBuilder(1)
+        p = builder.scalar_field("p", family="pressure")
+        q = gen.test_function(p)
+
+        energy = builder.add_energy("stored", p * p, fields=(p,), variables=(p,))
+        residual = builder.add_residual("flow", p * q, fields=(p,))
+        system = builder.build()
+
+        energy_forms = system.form_collection(energy)
+        residual_forms = system.form_collection("flow")
+
+        self.assertIsInstance(energy_forms, gen.FormCollection)
+        self.assertIsInstance(residual_forms, gen.FormCollection)
+        self.assertEqual(energy_forms.equation_name, "stored")
+        self.assertEqual(residual_forms.equation_name, "flow")
+        self.assertEqual(tuple(energy_forms.standard_forms()), ("form_0", "form_1", "form_2"))
+        self.assertEqual(tuple(residual_forms.standard_forms()), ("form_0", "form_1", "form_2"))
+        self.assertEqual(energy_forms.form(gen.FormOrder.ONE).expression, sp.Matrix([2 * p.value]))
+        self.assertEqual(
+            residual_forms.form(gen.FormOrder.ONE).expression,
+            sp.Matrix([p.value * q.value]),
+        )
+        self.assertEqual(
+            residual_forms.source.residual_expression(residual_forms.source.fields[0]),
+            p.value * q.value,
+        )
+        residual_metadata = residual_forms.form_metadata(gen.FormOrder.ONE)
+        action_metadata = residual_forms.form_metadata(gen.FormOrder.TWO)
+        self.assertIsInstance(residual_metadata, gen.FormMetadata)
+        self.assertEqual(residual_metadata.coefficients[0].row_field, "p")
+        self.assertEqual(residual_metadata.coefficients[0].value, p.value)
+        self.assertTrue(residual_metadata.dependencies.current)
+        self.assertFalse(residual_metadata.dependencies.direction)
+        self.assertIn(gen.FormQualifier("p", "field_family", "pressure"), energy_forms.qualifiers)
+        self.assertIn(gen.FormQualifier("p", "field_family", "pressure"), residual_forms.qualifiers)
+        self.assertEqual(
+            energy_forms.form_metadata(gen.FormOrder.ONE).dependencies,
+            (p.value,),
+        )
+        self.assertEqual(action_metadata.coefficients[0].value, sp.Symbol("p_direction"))
+        self.assertTrue(action_metadata.dependencies.direction)
+        self.assertFalse(action_metadata.dependencies.previous)
+        self.assertTrue(residual_forms.blocks)
+        self.assertEqual(residual_forms.blocks, action_metadata.blocks)
+        self.assertIs(system.form_collection(energy), energy_forms)
+        self.assertEqual(system.form_collections(), (energy_forms, residual_forms))
+
     def test_hyperelastic_energy_records_deformation_gradient_explicitly(self):
         builder = gen.EquationSystemBuilder(2)
         u = builder.vector_field("u", family="displacement")

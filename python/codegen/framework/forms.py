@@ -109,6 +109,111 @@ class FormEvaluation:
         return expressions
 
 
+@dataclass(frozen=True)
+class FormCollection:
+    equation_name: str
+    kind: FormKind
+    fields: tuple
+    forms: tuple
+    variables: tuple = ()
+    directions: tuple = ()
+    coefficients: tuple = ()
+    qualifiers: tuple = ()
+    dependencies: object = None
+    blocks: tuple = ()
+    source: object = None
+    metadata: tuple = ()
+
+    @property
+    def stage(self):
+        return PipelineStage.FORM_EVALUATION
+
+    def form(self, order):
+        order = FormOrder(order)
+        for form in self.forms:
+            if form.order is order:
+                return form
+        raise ValueError("form order %s was not evaluated" % order.name)
+
+    def standard_form(self, name):
+        name = StandardFormName(name)
+        for form in self.forms:
+            if form.standard_form is name:
+                return form
+        raise ValueError("standard form %s was not evaluated" % name.value)
+
+    def standard_forms(self):
+        return {form.standard_name: form for form in self.forms}
+
+    def expressions(self):
+        expressions = KernelExpressions()
+        for form in self.forms:
+            form.add_to(expressions)
+        return expressions
+
+    def form_metadata(self, order):
+        order = FormOrder(order)
+        for metadata in self.metadata:
+            if metadata.order is order:
+                return metadata
+        raise ValueError("metadata for form order %s is not available" % order.name)
+
+    @classmethod
+    def from_evaluation(
+        cls,
+        equation_name,
+        evaluation,
+        *,
+        fields=(),
+        variables=(),
+        directions=(),
+        coefficients=(),
+        qualifiers=(),
+        dependencies=None,
+        blocks=(),
+        source=None,
+        metadata=(),
+    ):
+        return cls(
+            str(equation_name),
+            evaluation.kind,
+            tuple(fields),
+            tuple(evaluation.forms),
+            tuple(variables),
+            tuple(directions),
+            tuple(coefficients),
+            tuple(qualifiers),
+            dependencies,
+            tuple(blocks),
+            source,
+            tuple(metadata),
+        )
+
+
+@dataclass(frozen=True)
+class FormQualifier:
+    target: str
+    name: str
+    value: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "target", str(self.target))
+        object.__setattr__(self, "name", str(self.name))
+
+
+@dataclass(frozen=True)
+class FormMetadata:
+    order: FormOrder
+    coefficients: tuple = ()
+    dependencies: object = None
+    blocks: tuple = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "order", FormOrder(self.order))
+        object.__setattr__(self, "coefficients", tuple(self.coefficients))
+        object.__setattr__(self, "blocks", tuple(self.blocks))
+
+
 class FormPipeline:
     def __init__(self, kind, zero_form, variables, directions=None, *, merit=None):
         self.kind = FormKind(kind)
