@@ -52,6 +52,7 @@ from forms import (
     FormKind,
     FormOrder,
     PipelineStage,
+    StandardFormName,
     energy_form_pipeline,
     residual_form_pipeline,
 )
@@ -108,6 +109,26 @@ class SymbolicFrameworkTest(unittest.TestCase):
         )
         self.assertEqual(energy_forms[1].expression, sp.Matrix([2 * u0 + u1, u0]))
         self.assertEqual(residual_forms[0].expression, u0**2 + u1**2)
+        self.assertEqual(
+            tuple(form.standard_name for form in energy_forms),
+            ("form_0", "form_1", "form_2"),
+        )
+        self.assertEqual(
+            tuple(form.standard_name for form in residual_forms),
+            ("form_0", "form_1", "form_2"),
+        )
+        self.assertIs(
+            energy_evaluation.standard_form(StandardFormName.ONE),
+            energy_forms[1],
+        )
+        self.assertIs(
+            residual_evaluation.standard_form("form_1"),
+            residual_forms[1],
+        )
+        self.assertEqual(
+            tuple(energy_evaluation.standard_forms()),
+            ("form_0", "form_1", "form_2"),
+        )
 
     def test_target_platform_classes(self):
         openmp = OpenMPTarget()

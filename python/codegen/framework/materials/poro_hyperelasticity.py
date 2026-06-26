@@ -6,54 +6,44 @@ import sympy as sp
 from sfem import gen
 
 
-mu, lmbda, alpha, storage, dt, hydraulic_conductivity = sp.symbols(
-    "mu lmbda alpha storage dt hydraulic_conductivity"
-)
-
-
-def strain_energy(F):
-    dim = F.rows
-    log_j = sp.log(F.det())
-    return (
-        mu * (gen.matrix_inner(F, F) - dim) / 2
-        - mu * log_j
-        + lmbda * log_j**2 / 2
-    )
-
-
-def pressure_residual(system):
-    displacement = tuple(
-        system.add_field("u%d" % d)
-        for d in range(system.dim)
-    )
-    pressure = system.add_field("p")
-    system.add_parameters(alpha, storage, dt, hydraulic_conductivity)
-
-    div_u = sum(displacement[d].gradient[d] for d in range(system.dim))
-    div_u_old = sum(displacement[d].previous_gradient[d] for d in range(system.dim))
-
-    for d, field in enumerate(displacement):
-        system.set_residual(
-            field,
-            -alpha * pressure.value * field.test_gradient[d],
-        )
-
-    diffusion = hydraulic_conductivity * sum(
-        pressure.gradient[d] * pressure.test_gradient[d]
-        for d in range(system.dim)
-    )
-    accumulation = (
-        storage * (pressure.value - pressure.previous_value)
-        + alpha * (div_u - div_u_old)
-    ) * pressure.test_value / dt
-    system.set_residual(pressure, accumulation + diffusion)
+mu = gen.material_parameter("mu")
+lmbda = gen.material_parameter("lmbda")
+alpha = gen.material_parameter("alpha")
+storage = gen.material_parameter("storage")
+dt = gen.material_parameter("dt")
+hydraulic_conductivity = gen.material_parameter("hydraulic_conductivity")
 
 
 def define(system):
-    displacement = system.vector_field("u", family="displacement")
-    pressure = system.scalar_field("p", family="pressure")
-    system.hyperelastic("solid", strain_energy, fields=(displacement,))
-    system.residual("poro", pressure_residual, fields=(displacement, pressure))
+    u = system.VectorCoefficient("u", family="displacement")
+    p = system.Coefficient("p", family="pressure")
+    v = gen.TestFunction(u)
+    q = gen.TestFunction(p)
+
+    F = gen.variable(
+        gen.Identity(system.dim) + gen.grad(u),
+        name="F",
+        qualifier=gen.DEFORMATION_GRADIENT,
+    )
+    J = gen.det(F)
+    psi = (
+        mu * (gen.inner(F, F) - system.dim) / 2
+        - mu * sp.log(J)
+        + lmbda * sp.log(J) ** 2 / 2
+    )
+    system.energy("solid", psi, fields=(u,))
+
+    form = (
+        -alpha * p * gen.div(v)
+        + (
+            storage * (p - gen.old(p))
+            + alpha * (gen.div(u) - gen.div(gen.old(u)))
+        )
+        * q
+        / dt
+        + hydraulic_conductivity * gen.inner(gen.grad(p), gen.grad(q))
+    )
+    system.residual("poro", form, fields=(u, p))
 
 
 material = gen.UnifiedMaterial(

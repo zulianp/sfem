@@ -31,7 +31,7 @@ The symbolic layer is the user-facing mathematical API.
 
 Responsibilities:
 
-- Provide UFL-style classes and operators that remain fully compatible with
+- Provide UFL-conforming classes and operators that remain fully compatible with
   SymPy.
 - Represent fields, test functions, trial functions, gradients, deformation
   gradients, geometric quantities, coefficients, and qualifiers as symbolic
@@ -47,7 +47,7 @@ Responsibilities:
 
 Input:
 
-- User UFL-style specification.
+- User UFL-conforming specification.
 
 Output:
 
@@ -139,7 +139,7 @@ Output:
 
 ### M1. Symbolic Layer Unification
 
-Goal: replace ad hoc symbolic entry points with a UFL-style symbolic API that
+Goal: replace ad hoc symbolic entry points with a UFL-conforming symbolic API that
 produces a complete `EquationSystem`.
 
 Tasks:
@@ -147,7 +147,7 @@ Tasks:
 1. Define symbolic field classes for scalar, vector, and tensor fields with
    SymPy-compatible behavior.
 2. Define symbolic test and trial objects for each field.
-3. Define UFL-style operators for value, gradient, divergence, deformation
+3. Define UFL-conforming operators for value, gradient, divergence, deformation
    gradient, inner product, determinant, inverse, adjugate, and common tensor
    operations.
 4. Add qualifier classes for codegen-relevant semantics, such as

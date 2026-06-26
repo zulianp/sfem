@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unittest
 
+import sympy as sp
+
 from sfem import gen
 
 from .materials.neohookean_ogden import material as neohookean_ogden
@@ -12,6 +14,110 @@ from .materials.two_phase_flow import material as two_phase_flow
 
 
 class GenApiTest(unittest.TestCase):
+    def test_symbolic_scalar_field_is_sympy_compatible(self):
+        p = gen.scalar_field("p", family="pressure")
+        expression = p * p + 2 * p + 1
+
+        self.assertIsInstance(p, gen.ScalarField)
+        self.assertEqual(p.value, sp.Symbol("p"))
+        self.assertEqual(sp.sympify(p), sp.Symbol("p"))
+        self.assertEqual(sp.diff(expression, p.symbol), 2 * p.symbol + 2)
+        self.assertEqual(p.family, "pressure")
+
+    def test_symbolic_vector_and_tensor_fields_expose_sympy_values(self):
+        u = gen.vector_field("u", 3, family="displacement")
+        F = gen.tensor_field("F", (3, 3), metadata={"qualifier": "deformation"})
+
+        self.assertIsInstance(u, gen.VectorField)
+        self.assertEqual(u.shape, (3,))
+        self.assertEqual(tuple(u), tuple(sp.Symbol("u[%d]" % i) for i in range(3)))
+        self.assertEqual(u.as_matrix().shape, (3, 1))
+        self.assertEqual(u[2], sp.Symbol("u[2]"))
+
+        self.assertIsInstance(F, gen.TensorField)
+        self.assertEqual(F.shape, (3, 3))
+        self.assertEqual(F.as_matrix().shape, (3, 3))
+        self.assertEqual(F[1, 2], sp.Symbol("F[5]"))
+        self.assertEqual(F.metadata["qualifier"], "deformation")
+
+    def test_symbolic_field_validation(self):
+        with self.assertRaisesRegex(ValueError, "valid identifier"):
+            gen.scalar_field("not valid")
+        with self.assertRaisesRegex(ValueError, "positive"):
+            gen.vector_field("u", 0)
+        with self.assertRaisesRegex(ValueError, "rank at least 2"):
+            gen.tensor_field("T", (3,))
+
+    def test_symbolic_test_and_trial_functions_follow_field_shape(self):
+        p = gen.scalar_field("p", family="pressure")
+        q = gen.test_function(p)
+        dp = gen.trial_function(p)
+        expression = q * (p + dp)
+
+        self.assertIsInstance(q, gen.TestFunction)
+        self.assertIsInstance(dp, gen.TrialFunction)
+        self.assertEqual(q.field, p)
+        self.assertEqual(dp.field, p)
+        self.assertEqual(q.role, gen.TEST_ARGUMENT)
+        self.assertEqual(dp.role, gen.TRIAL_ARGUMENT)
+        self.assertEqual(q.value, sp.Symbol("p_test"))
+        self.assertEqual(dp.value, sp.Symbol("p_trial"))
+        self.assertEqual(
+            sp.diff(expression, dp.value),
+            sp.Symbol("p_test"),
+        )
+
+    def test_symbolic_vector_test_function_exposes_matrix(self):
+        u = gen.vector_field("u", 2, family="displacement")
+        v = gen.test_function(u, name="v")
+        du = gen.trial_function(u, name="du")
+
+        self.assertEqual(v.shape, (2,))
+        self.assertEqual(v.family, "displacement")
+        self.assertEqual(tuple(v), (sp.Symbol("v[0]"), sp.Symbol("v[1]")))
+        self.assertEqual(v.as_matrix().shape, (2, 1))
+        self.assertEqual(du.as_matrix()[1, 0], sp.Symbol("du[1]"))
+
+    def test_ufl_style_operators_return_sympy_expressions(self):
+        p = gen.scalar_field("p")
+        u = gen.vector_field("u", 2)
+        F = gen.tensor_field("F", (2, 2))
+
+        grad_p = gen.grad(p, dim=2)
+        grad_u = gen.grad(u)
+        deformation = gen.deformation_gradient(u)
+
+        self.assertEqual(gen.value(p), sp.Symbol("p"))
+        self.assertEqual(grad_p, sp.Matrix([sp.Symbol("p_grad[0]"), sp.Symbol("p_grad[1]")]))
+        self.assertEqual(grad_u.shape, (2, 2))
+        self.assertEqual(gen.div(u), sp.Symbol("u_grad[0]") + sp.Symbol("u_grad[3]"))
+        self.assertEqual(deformation, sp.eye(2) + grad_u)
+        self.assertEqual(gen.inner(u.value, u.value), sp.Symbol("u[0]")**2 + sp.Symbol("u[1]")**2)
+        self.assertEqual(gen.det(F), F.as_matrix().det())
+        self.assertEqual(gen.inv(F), F.as_matrix().inv())
+        self.assertEqual(gen.adjugate(F), F.as_matrix().adjugate())
+
+    def test_codegen_qualifiers_and_material_parameters(self):
+        mu = gen.material_parameter("mu", default=2.0)
+        p = gen.scalar_field("p")
+        u = gen.vector_field("u", 2)
+
+        expression = mu * p * p
+        F = gen.qualify(
+            gen.deformation_gradient(u),
+            gen.DEFORMATION_GRADIENT,
+        )
+
+        self.assertIsInstance(mu, gen.MaterialParameter)
+        self.assertEqual(mu.value, sp.Symbol("mu"))
+        self.assertEqual(mu.default, 2.0)
+        self.assertIn(gen.MATERIAL_PARAMETER, mu.qualifiers)
+        self.assertEqual(sp.diff(expression, mu.symbol), p.value**2)
+
+        self.assertIsInstance(F, gen.QualifiedExpression)
+        self.assertEqual(F.value, gen.deformation_gradient(u))
+        self.assertEqual(gen.qualifiers(F), (gen.DEFORMATION_GRADIENT,))
+
     def test_equation_system_accepts_vector_scalar_energy_and_residual_equations(self):
         system = gen.EquationSystem(3)
         displacement = system.vector_field("u", family="displacement")
@@ -33,6 +139,82 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(energy.form, gen.EquationForm.ENERGY)
         self.assertEqual(residual.form, gen.EquationForm.RESIDUAL)
         self.assertEqual(system.equations, (energy, residual))
+
+    def test_equation_system_builder_maps_symbolic_fields_to_equations(self):
+        builder = gen.EquationSystemBuilder(3)
+        displacement = builder.vector_field("u", family="displacement")
+        pressure = builder.scalar_field("p", family="pressure")
+
+        builder.hyperelastic("solid", lambda F: F[0, 0], fields=(displacement,))
+        builder.residual("flow", lambda residual_system: None, fields=(displacement, pressure))
+
+        system = builder.build()
+        self.assertIsInstance(displacement, gen.VectorField)
+        self.assertIsInstance(pressure, gen.ScalarField)
+        self.assertEqual(tuple(field.name for field in system.fields), ("u", "p"))
+        self.assertEqual(tuple(field.components for field in system.fields), (3, 1))
+        self.assertEqual(
+            tuple(field.family for field in system.equations[1].fields),
+            ("displacement", "pressure"),
+        )
+
+    def test_equation_system_builder_derives_energy_and_merit_forms(self):
+        builder = gen.EquationSystemBuilder(1)
+        p = builder.scalar_field("p")
+
+        energy = builder.derive_energy_forms(p * p, fields=(p,))
+        merit = builder.derive_merit_forms(p * p + p, fields=(p,))
+
+        self.assertEqual(tuple(energy.standard_forms()), ("form_0", "form_1", "form_2"))
+        self.assertIs(energy.standard_form(gen.StandardFormName.TWO), energy.forms[2])
+        self.assertEqual(energy.forms[0].expression, p.value**2)
+        self.assertEqual(energy.forms[1].expression, sp.Matrix([2 * p.value]))
+        self.assertEqual(
+            energy.forms[2].expression,
+            sp.Matrix([2 * sp.Symbol("p_trial")]),
+        )
+        self.assertEqual(merit.forms[1].expression, sp.Matrix([2 * p.value + 1]))
+
+    def test_equation_system_builder_derives_residual_and_jacobian_action_forms(self):
+        builder = gen.EquationSystemBuilder(2)
+        u = builder.vector_field("u", 2)
+        residual = sp.Matrix([u[0] + u[1], u[0] - u[1]])
+
+        forms = builder.derive_residual_forms(residual, fields=(u,))
+
+        self.assertEqual(tuple(forms.standard_forms()), ("form_0", "form_1", "form_2"))
+        self.assertIs(forms.standard_form("form_1"), forms.forms[1])
+        self.assertEqual(forms.forms[0].expression, u[0] ** 2 + u[1] ** 2)
+        self.assertEqual(forms.forms[1].expression, residual)
+        self.assertEqual(
+            forms.forms[2].expression,
+            sp.Matrix([
+                sp.Symbol("u_trial[0]") + sp.Symbol("u_trial[1]"),
+                sp.Symbol("u_trial[0]") - sp.Symbol("u_trial[1]"),
+            ]),
+        )
+
+    def test_equation_system_builder_handles_mixed_scalar_vector_forms(self):
+        builder = gen.EquationSystemBuilder(2)
+        u = builder.vector_field("u", family="displacement")
+        p = builder.scalar_field("p", family="pressure")
+        residual = sp.Matrix([u[0] + p.value, u[1] - p.value, p.value + u[0] - u[1]])
+
+        forms = builder.derive_residual_forms(residual, fields=(u, p))
+
+        self.assertEqual(forms.forms[1].expression, residual)
+        self.assertEqual(
+            forms.forms[2].expression,
+            sp.Matrix([
+                sp.Symbol("u_trial[0]") + sp.Symbol("p_trial"),
+                sp.Symbol("u_trial[1]") - sp.Symbol("p_trial"),
+                sp.Symbol("p_trial") + sp.Symbol("u_trial[0]") - sp.Symbol("u_trial[1]"),
+            ]),
+        )
+        self.assertEqual(
+            tuple(field.family for field in builder.build().fields),
+            ("displacement", "pressure"),
+        )
 
     def test_generates_hyperelastic_material(self):
         with tempfile.TemporaryDirectory() as out_dir:
