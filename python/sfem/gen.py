@@ -22,6 +22,7 @@ from codegen.framework import (
     FieldQualifier,
     Function,
     FunctionSpace,
+    FormCollection,
     GeneratedKernelFile,
     Identity,
     HyperelasticQualifier,
@@ -44,7 +45,9 @@ from codegen.framework import (
     TrialFunction,
     TwoPhaseFlowConstitutiveModel,
     FormEvaluation,
+    FormMetadata,
     FormOrder,
+    FormQualifier,
     PipelineStage,
     StandardFormName,
     VectorField,
@@ -52,7 +55,6 @@ from codegen.framework import (
     VectorFunctionSpace,
     VectorFunction,
     TensorFunction,
-    coupled_residual_weak_coefficients,
     current_geometric_dimension,
     energy_form_pipeline,
     generate_coupled_residual_sfem_files,
@@ -413,9 +415,17 @@ def _evaluate_forms(user_input):
         dim = context.specialization.dim
         if dim in by_dim:
             continue
+        material_system = user_input.material.systems.for_dim(dim)
         units = tuple(
-            _evaluate_equation(dim, equation)
-            for equation in _material_equations(user_input.material, dim)
+            _evaluate_equation(
+                dim,
+                equation,
+                material_system.form_collection(
+                    equation,
+                    orders=_equation_form_orders(equation),
+                ),
+            )
+            for equation in material_system.equations
         )
         if not units:
             raise ValueError("material '%s' did not define any equations" % user_input.material.name)
@@ -504,8 +514,8 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         dim,
         ResidualCodeGenerationPayload(
             evaluated.system,
-            coupled_residual_weak_coefficients(evaluated.system, False),
-            coupled_residual_weak_coefficients(evaluated.system, True),
+            evaluated.form_evaluation.form_metadata(FormOrder.ONE).coefficients,
+            evaluated.form_evaluation.form_metadata(FormOrder.TWO).coefficients,
             evaluated.fields,
         ),
     )
@@ -626,31 +636,42 @@ def _generate_op_wrapper_files(material, selected, user_input):
     raise TypeError("unsupported unified equation form %s" % equation.form)
 
 
-def _evaluate_equation(dim, equation):
+def _evaluate_equation(dim, equation, form_collection=None):
     if equation.is_energy:
-        return _evaluate_energy_equation(dim, equation)
+        return _evaluate_energy_equation(dim, equation, form_collection)
     if equation.is_residual:
-        return _evaluate_residual_equation(dim, equation)
+        return _evaluate_residual_equation(dim, equation, form_collection)
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
-def _evaluate_energy_equation(dim, equation):
+def _equation_form_orders(equation):
+    if equation.is_energy:
+        return _energy_form_orders(equation.kernels)
+    if equation.is_residual:
+        return (FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)
+    raise TypeError("unsupported equation form %s" % equation.form)
+
+
+def _evaluate_energy_equation(dim, equation, form_collection=None):
     orders = _energy_form_orders(equation.kernels)
     variables = tuple(equation.variables)
     if not variables:
         raise ValueError("energy equation '%s' requires explicit variables" % equation.name)
     data_symbols = _energy_data_symbols(dim, variables)
-    directions = None
-    if FormOrder.TWO in orders:
-        directions = tuple(equation.directions) or _default_energy_directions(variables)
-    energy_pipeline = energy_form_pipeline(
-        equation.define,
-        variables,
-        directions,
-    )
+    if form_collection is None:
+        directions = None
+        if FormOrder.TWO in orders:
+            directions = tuple(equation.directions) or _default_energy_directions(variables)
+        form_evaluation = energy_form_pipeline(
+            equation.define,
+            variables,
+            directions,
+        ).evaluate(orders)
+    else:
+        form_evaluation = form_collection
     return EnergyDimensionEvaluation(
         equation.name,
-        energy_pipeline.evaluate(orders),
+        form_evaluation,
         data_symbols,
         variables,
         equation.kernels,
@@ -677,30 +698,35 @@ def _default_energy_directions(variables):
     return tuple(directions)
 
 
-def _evaluate_residual_equation(dim, equation):
-    system = CoupledResidualSystem(dim)
-    equation.define(system)
-    residual_vector = sp.Matrix(
-        [system.residual_expression(field) for field in system.fields]
-    )
-    variables = tuple(
-        symbol
-        for field in system.fields
-        for symbol in field.variables
-    )
-    directions = tuple(
-        symbol
-        for field in system.fields
-        for symbol in field.directions
-    )
-    return ResidualDimensionEvaluation(
-        equation.name,
-        system,
-        residual_form_pipeline(
+def _evaluate_residual_equation(dim, equation, form_collection=None):
+    if form_collection is None:
+        system = CoupledResidualSystem(dim)
+        equation.define(system)
+        residual_vector = sp.Matrix(
+            [system.residual_expression(field) for field in system.fields]
+        )
+        variables = tuple(
+            symbol
+            for field in system.fields
+            for symbol in field.variables
+        )
+        directions = tuple(
+            symbol
+            for field in system.fields
+            for symbol in field.directions
+        )
+        form_evaluation = residual_form_pipeline(
             residual_vector,
             variables,
             directions,
-        ).evaluate((FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)),
+        ).evaluate((FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO))
+    else:
+        system = form_collection.source
+        form_evaluation = form_collection
+    return ResidualDimensionEvaluation(
+        equation.name,
+        system,
+        form_evaluation,
         equation.fields,
     )
 
@@ -927,6 +953,11 @@ __all__ = [
     "FieldQualifier",
     "Function",
     "FunctionSpace",
+    "FormCollection",
+    "FormEvaluation",
+    "FormMetadata",
+    "FormOrder",
+    "FormQualifier",
     "GenerationResult",
     "current_geometric_dimension",
     "geometric_dimension_context",

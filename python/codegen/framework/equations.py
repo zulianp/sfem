@@ -4,8 +4,16 @@ import math
 
 import sympy as sp
 
-from .forms import energy_form_pipeline, residual_form_pipeline
+from .forms import (
+    FormCollection,
+    FormMetadata,
+    FormOrder,
+    FormQualifier,
+    energy_form_pipeline,
+    residual_form_pipeline,
+)
 from .residual import CoupledResidualSystem
+from .residual_codegen import coupled_residual_weak_coefficients
 from .symbolic_fields import (
     ScalarField,
     SymbolicField,
@@ -112,6 +120,7 @@ class EquationSystem:
             raise ValueError("equation system dimension must be positive")
         self._fields = []
         self._equations = []
+        self._form_collections = {}
 
     @property
     def fields(self):
@@ -120,6 +129,26 @@ class EquationSystem:
     @property
     def equations(self):
         return tuple(self._equations)
+
+    def form_collection(self, equation_or_name, orders=None):
+        equation = self._resolve_equation(equation_or_name)
+        normalized_orders = (
+            (FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)
+            if orders is None
+            else tuple(FormOrder(order) for order in orders)
+        )
+        key = (id(equation), normalized_orders)
+        collection = self._form_collections.get(key)
+        if collection is None:
+            collection = _build_form_collection(self, equation, normalized_orders)
+            self._form_collections[key] = collection
+        return collection
+
+    def form_collections(self, orders=None):
+        return tuple(
+            self.form_collection(equation, orders=orders)
+            for equation in self._equations
+        )
 
     def field(self, name, components=1, family=""):
         field = EquationField(name, components, family)
@@ -191,6 +220,19 @@ class EquationSystem:
             define,
             fields=fields,
         )
+
+    def _resolve_equation(self, equation_or_name):
+        if isinstance(equation_or_name, Equation):
+            if any(equation is equation_or_name for equation in self._equations):
+                return equation_or_name
+            raise ValueError("equation is not registered in this system")
+        name = str(equation_or_name)
+        matches = tuple(equation for equation in self._equations if equation.name == name)
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError("unknown equation '%s'" % name)
+        raise ValueError("equation name '%s' is ambiguous" % name)
 
 
 class EquationSystems:
@@ -480,6 +522,129 @@ def _symbols_from_fields(fields):
         else:
             symbols.append(sp.sympify(field))
     return tuple(symbols)
+
+
+def _build_form_collection(system, equation, orders):
+    if equation.is_energy:
+        variables = tuple(equation.variables)
+        directions = tuple(equation.directions)
+        if FormOrder.TWO in orders and not directions:
+            directions = _default_direction_symbols(variables)
+        evaluation = energy_form_pipeline(
+            equation.define,
+            variables,
+            directions or None,
+        ).evaluate(orders)
+        metadata = _evaluation_metadata(evaluation)
+        return FormCollection.from_evaluation(
+            equation.name,
+            evaluation,
+            fields=equation.fields,
+            variables=variables,
+            directions=directions,
+            qualifiers=_equation_qualifiers(equation),
+            dependencies=tuple(entry.dependencies for entry in metadata),
+            metadata=metadata,
+        )
+    if equation.is_residual:
+        residual_system = CoupledResidualSystem(system.dim)
+        equation.define(residual_system)
+        residual_vector = sp.Matrix(
+            [
+                residual_system.residual_expression(field)
+                for field in residual_system.fields
+            ]
+        )
+        variables = tuple(
+            symbol
+            for field in residual_system.fields
+            for symbol in field.variables
+        )
+        directions = tuple(
+            symbol
+            for field in residual_system.fields
+            for symbol in field.directions
+        )
+        evaluation = residual_form_pipeline(
+            residual_vector,
+            variables,
+            directions,
+        ).evaluate(orders)
+        residual_metadata = []
+        if FormOrder.ZERO in orders:
+            residual_metadata.append(FormMetadata(FormOrder.ZERO))
+        if FormOrder.ONE in orders:
+            residual_metadata.append(
+                FormMetadata(
+                    FormOrder.ONE,
+                    coefficients=coupled_residual_weak_coefficients(
+                        residual_system,
+                        False,
+                    ),
+                    dependencies=residual_system.residual_dependencies(),
+                )
+            )
+        if FormOrder.TWO in orders:
+            blocks = residual_system.jacobian_blocks()
+            residual_metadata.append(
+                FormMetadata(
+                    FormOrder.TWO,
+                    coefficients=coupled_residual_weak_coefficients(
+                        residual_system,
+                        True,
+                    ),
+                    dependencies=residual_system.jacobian_action_dependencies(),
+                    blocks=blocks,
+                )
+            )
+        return FormCollection.from_evaluation(
+            equation.name,
+            evaluation,
+            fields=equation.fields,
+            variables=variables,
+            directions=directions,
+            coefficients=tuple(
+                metadata.coefficients
+                for metadata in residual_metadata
+                if metadata.coefficients
+            ),
+            dependencies=residual_system.residual_dependencies()
+            if FormOrder.ONE in orders
+            else None,
+            blocks=residual_system.jacobian_blocks() if FormOrder.TWO in orders else (),
+            qualifiers=_equation_qualifiers(equation),
+            source=residual_system,
+            metadata=tuple(residual_metadata),
+        )
+    raise TypeError("unsupported equation form %s" % equation.form)
+
+
+def _equation_qualifiers(equation):
+    ret = []
+    for field in equation.fields:
+        if field.family:
+            ret.append(FormQualifier(field.name, "field_family", field.family))
+        ret.append(FormQualifier(field.name, "field_components", field.components))
+    return tuple(ret)
+
+
+def _evaluation_metadata(evaluation):
+    return tuple(
+        FormMetadata(
+            form.order,
+            dependencies=_free_symbols(form.expression),
+        )
+        for form in evaluation.forms
+    )
+
+
+def _free_symbols(expression):
+    if isinstance(expression, sp.MatrixBase):
+        symbols = set()
+        for entry in expression:
+            symbols.update(sp.sympify(entry).free_symbols)
+        return tuple(sorted(symbols, key=str))
+    return tuple(sorted(sp.sympify(expression).free_symbols, key=str))
 
 
 def _validate_energy_variable_groups(fields, variables):
