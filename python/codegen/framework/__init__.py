@@ -63,6 +63,7 @@ from .symbolic import (
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
 from .fem import (
+    SfemCompatibleElement,
     SfemElementQuadratureRule,
     SfemSoAArrayInput,
     SfemSoAElementSpecialization,
@@ -72,6 +73,7 @@ from .fem import (
     sfem_soa_element_specializations,
     sfem_soa_reference_input,
     sfem_supported_element_types,
+    sfem_taylor_hood_element_types,
 )
 from .forms import (
     FormEvaluation,
@@ -82,6 +84,12 @@ from .forms import (
     UnifiedForm,
     energy_form_pipeline,
     residual_form_pipeline,
+)
+from .equations import (
+    Equation,
+    EquationField,
+    EquationForm,
+    EquationSystem,
 )
 from .targets import (
     CUDATarget,
@@ -110,6 +118,7 @@ from .residual_codegen import (
     WeakResidualCoefficients,
     coupled_residual_weak_coefficients,
     generate_coupled_residual_sfem_files,
+    generate_mixed_residual_sfem_files,
     weak_residual_coefficients,
 )
 
@@ -144,6 +153,7 @@ __all__ = [
     "ScopeKind",
     "SfemSoAArrayInput",
     "SfemSoAElementSpecialization",
+    "SfemCompatibleElement",
     "SfemElementQuadratureRule",
     "SfemSoAKernelForm",
     "SfemSoAWeakForm",
@@ -155,6 +165,10 @@ __all__ = [
     "FormPipeline",
     "PipelineStage",
     "UnifiedForm",
+    "Equation",
+    "EquationField",
+    "EquationForm",
+    "EquationSystem",
     "CUDATarget",
     "OpenMPTarget",
     "TargetLanguage",
@@ -184,6 +198,7 @@ __all__ = [
     "residual_from_energy",
     "residual_form_pipeline",
     "sfem_supported_element_types",
+    "sfem_taylor_hood_element_types",
     "sfem_soa_adjugate_geometry_inputs",
     "sfem_soa_array_input",
     "sfem_element_quadrature_rule",
@@ -211,5 +226,6 @@ __all__ = [
     "WeakResidualCoefficients",
     "coupled_residual_weak_coefficients",
     "generate_coupled_residual_sfem_files",
+    "generate_mixed_residual_sfem_files",
     "weak_residual_coefficients",
 ]
