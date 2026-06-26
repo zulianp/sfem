@@ -5,6 +5,7 @@ import math
 import sympy as sp
 
 from .forms import (
+    FormBlock,
     FormCollection,
     FormMetadata,
     FormOrder,
@@ -13,7 +14,10 @@ from .forms import (
     residual_form_pipeline,
 )
 from .residual import CoupledResidualSystem
-from .residual_codegen import coupled_residual_weak_coefficients
+from .residual_codegen import (
+    coupled_residual_weak_coefficients,
+    weak_residual_coefficients,
+)
 from .symbolic_fields import (
     ScalarField,
     SymbolicField,
@@ -574,6 +578,7 @@ def _build_form_collection(system, equation, orders):
         if FormOrder.ZERO in orders:
             residual_metadata.append(FormMetadata(FormOrder.ZERO))
         if FormOrder.ONE in orders:
+            blocks = _residual_row_blocks(residual_system)
             residual_metadata.append(
                 FormMetadata(
                     FormOrder.ONE,
@@ -582,10 +587,11 @@ def _build_form_collection(system, equation, orders):
                         False,
                     ),
                     dependencies=residual_system.residual_dependencies(),
+                    blocks=blocks,
                 )
             )
         if FormOrder.TWO in orders:
-            blocks = residual_system.jacobian_blocks()
+            blocks = _residual_jacobian_blocks(residual_system)
             residual_metadata.append(
                 FormMetadata(
                     FormOrder.TWO,
@@ -597,6 +603,11 @@ def _build_form_collection(system, equation, orders):
                     blocks=blocks,
                 )
             )
+        blocks = tuple(
+            block
+            for metadata in residual_metadata
+            for block in metadata.blocks
+        )
         return FormCollection.from_evaluation(
             equation.name,
             evaluation,
@@ -611,12 +622,55 @@ def _build_form_collection(system, equation, orders):
             dependencies=residual_system.residual_dependencies()
             if FormOrder.ONE in orders
             else None,
-            blocks=residual_system.jacobian_blocks() if FormOrder.TWO in orders else (),
+            blocks=blocks,
             qualifiers=_equation_qualifiers(equation),
             source=residual_system,
             metadata=tuple(residual_metadata),
         )
     raise TypeError("unsupported equation form %s" % equation.form)
+
+
+def _residual_row_blocks(residual_system):
+    return tuple(
+        FormBlock(
+            FormOrder.ONE,
+            row_field=field.name,
+            expression=residual_system.residual_expression(field),
+            coefficients=(
+                weak_residual_coefficients(
+                    residual_system,
+                    residual_system.residual_expression(field),
+                    field.name,
+                ),
+            ),
+            dependencies=residual_system.dependencies_for_expressions(
+                (residual_system.residual_expression(field),)
+            ),
+        )
+        for field in residual_system.fields
+    )
+
+
+def _residual_jacobian_blocks(residual_system):
+    return tuple(
+        FormBlock(
+            FormOrder.TWO,
+            row_field=block.row_field,
+            column_field=block.column_field,
+            expression=block.expression,
+            coefficients=(
+                weak_residual_coefficients(
+                    residual_system,
+                    block.expression,
+                    block.row_field,
+                ),
+            ),
+            dependencies=residual_system.dependencies_for_expressions(
+                (block.expression,)
+            ),
+        )
+        for block in residual_system.jacobian_blocks()
+    )
 
 
 def _equation_qualifiers(equation):

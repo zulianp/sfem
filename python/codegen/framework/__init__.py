@@ -76,6 +76,7 @@ from .fem import (
     sfem_taylor_hood_element_types,
 )
 from .forms import (
+    FormBlock,
     FormEvaluation,
     FormCollection,
     FormKind,
@@ -227,6 +228,7 @@ __all__ = [
     "SymbolicObject",
     "TransformedFirstPiola",
     "FormKind",
+    "FormBlock",
     "FormMetadata",
     "FormOrder",
     "FormEvaluation",

@@ -186,7 +186,7 @@ Tasks:
    the same information.
 4. Add dependency analysis that removes unused current, previous, direction,
    parameter, geometry, and coefficient inputs.
-5. Represent block structure explicitly for coupled systems.
+5. Represent block structure explicitly for coupled systems with the goal to allow subproblems code gen (as well as mixed terms).
 6. Add tests that verify unused quantities are not passed to generated kernels.
 7. Update `PIPELINE.md` to describe the standardized form collection.
 
