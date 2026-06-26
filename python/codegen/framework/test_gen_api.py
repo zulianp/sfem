@@ -171,7 +171,7 @@ class GenApiTest(unittest.TestCase):
             fields=(displacement,),
             variables=(variables,),
         )
-        residual = system.residual(
+        residual = system.add_residual(
             "flow",
             lambda residual_system: None,
             fields=(displacement, pressure),
@@ -194,7 +194,7 @@ class GenApiTest(unittest.TestCase):
         )
 
         builder.add_energy("solid", F.value[0, 0], fields=(displacement,), variables=(F,))
-        builder.residual("flow", lambda residual_system: None, fields=(displacement, pressure))
+        builder.add_residual("flow", lambda residual_system: None, fields=(displacement, pressure))
 
         system = builder.build()
         self.assertIsInstance(displacement, gen.VectorField)

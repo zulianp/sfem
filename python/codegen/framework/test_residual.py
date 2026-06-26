@@ -23,13 +23,13 @@ def two_field_diffusion_system(dim=2):
     v = system.add_field("v")
     dt, k_u, k_v, coupling = sp.symbols("dt k_u k_v coupling")
     system.add_parameters(dt, k_u, k_v, coupling)
-    system.set_residual(
+    system.add_residual(
         u,
         (u.value - u.previous_value) * u.test_value / dt
         + k_u * sum(u.gradient[d] * u.test_gradient[d] for d in range(dim))
         + coupling * (u.value - v.value) * u.test_value,
     )
-    system.set_residual(
+    system.add_residual(
         v,
         (v.value - v.previous_value) * v.test_value / dt
         + k_v * sum(v.gradient[d] * v.test_gradient[d] for d in range(dim))
@@ -253,6 +253,32 @@ class CoupledResidualSystemTest(unittest.TestCase):
         self.assertEqual(len(field.direction_gradient), 3)
         self.assertEqual(field.variables, (field.value,) + field.gradient)
         self.assertEqual(field.directions, (field.direction_value,) + field.direction_gradient)
+
+    def test_add_residual_accumulates_multiple_contributions(self):
+        system = CoupledResidualSystem(2)
+        u = system.add_field("u")
+        k = sp.Symbol("k")
+        system.add_parameters(k)
+
+        system.add_residual(u, u.value * u.test_value)
+        system.add_residual(
+            u,
+            k * sum(u.gradient[d] * u.test_gradient[d] for d in range(system.dim)),
+        )
+
+        residual = coupled_residual_weak_coefficients(system)
+        action = coupled_residual_weak_coefficients(system, jacobian_action=True)
+
+        self.assertEqual(sp.simplify(residual[0].value - u.value), 0)
+        self.assertEqual(
+            tuple(sp.simplify(value) for value in residual[0].gradient),
+            tuple(k * value for value in u.gradient),
+        )
+        self.assertEqual(sp.simplify(action[0].value - u.direction_value), 0)
+        self.assertEqual(
+            tuple(sp.simplify(value) for value in action[0].gradient),
+            tuple(k * value for value in u.direction_gradient),
+        )
 
     def test_preserves_residual_and_block_identity(self):
         system, _, _ = two_field_diffusion_system()
@@ -930,10 +956,10 @@ class CoupledResidualSystemTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown residual field"):
             system.field("v")
         with self.assertRaisesRegex(ValueError, "must be scalar"):
-            system.set_residual(u, sp.Matrix([u.value, u.value]))
+            system.add_residual(u, sp.Matrix([u.value, u.value]))
         unknown = sp.Symbol("unknown")
         with self.assertRaisesRegex(ValueError, "unregistered symbols"):
-            system.set_residual(u, u.value + unknown)
+            system.add_residual(u, u.value + unknown)
         with self.assertRaisesRegex(ValueError, "missing residual equations"):
             system.build_residual_graph()
 

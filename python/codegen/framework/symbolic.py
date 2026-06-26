@@ -2192,8 +2192,7 @@ def _sfem_soa_block_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_reference_gradient_vectors = (
-        form.weak_form is not None
-        and not use_tensor_product_reference
+        not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
     )
@@ -2410,6 +2409,20 @@ def _sfem_soa_block_function(
             reference_inputs[0].name,
             quadrature_rule,
         )
+    elif use_reference_gradient_vectors:
+        array_input = reference_inputs[0]
+        for shape in range(array_input.n_shape):
+            for component in range(array_input.components):
+                local_idx = shape * array_input.components + component
+                lines.append(
+                    "        %s[%d] = %s[q * N_SHAPE + %d];"
+                    % (
+                        array_input.name,
+                        local_idx,
+                        _sfem_reference_gradient_vector_name(component),
+                        shape,
+                    )
+                )
     else:
         for array_input in reference_inputs:
             source = _sfem_soa_reference_param_name(array_input)
@@ -3302,8 +3315,7 @@ def _sfem_soa_operator_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_reference_gradient_vectors = (
-        form.weak_form is not None
-        and not use_tensor_product_reference
+        not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
     )
@@ -3692,8 +3704,7 @@ def _sfem_soa_mesh_operator_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_reference_gradient_vectors = (
-        form.weak_form is not None
-        and not use_tensor_product_reference
+        not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
     )
@@ -4489,15 +4500,8 @@ def _sfem_soa_quadrature_rule_lines(prefix, quadrature_rule):
                 _cpp_scalar_initializer_list(quadrature_rule.tensor_product_weights_1d),
             ),
         ]
-    grad_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "grad_ref")
     weight_name = _sfem_soa_quadrature_array_name(prefix, quadrature_rule, "q_weight")
     lines = [
-        "static const real_t %s[%d] = {%s};"
-        % (
-            grad_name,
-            len(quadrature_rule.reference_gradients),
-            _cpp_scalar_initializer_list(quadrature_rule.reference_gradients),
-        ),
         "static const real_t %s[%d] = {%s};"
         % (
             weight_name,

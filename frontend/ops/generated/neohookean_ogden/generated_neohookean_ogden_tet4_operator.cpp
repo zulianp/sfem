@@ -16,7 +16,6 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_tet4_tet4_grad_ref[12] = {real_t(-1), real_t(-1), real_t(-1), real_t(1), real_t(0), real_t(0), real_t(0), real_t(1), real_t(0), real_t(0), real_t(0), real_t(1)};
 static const real_t generated_neohookean_ogden_tet4_tet4_q_weight[1] = {real_t(0.16666666666666666)};
 static const real_t generated_neohookean_ogden_tet4_tet4_grad_ref_x[4] = {real_t(-1), real_t(1), real_t(0), real_t(0)};
 static const real_t generated_neohookean_ogden_tet4_tet4_grad_ref_y[4] = {real_t(-1), real_t(0), real_t(1), real_t(0)};

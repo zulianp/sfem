@@ -58,7 +58,7 @@ def _build_system(dim):
             / dt
             + hydraulic_conductivity * gen.inner(gen.grad(p), gen.grad(q))
         )
-        system.residual("poro", form, fields=(u, p))
+        system.add_residual("poro", form, fields=(u, p))
     return system.build()
 
 

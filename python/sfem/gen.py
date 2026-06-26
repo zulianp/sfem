@@ -681,7 +681,7 @@ def _evaluate_residual_equation(dim, equation):
     system = CoupledResidualSystem(dim)
     equation.define(system)
     residual_vector = sp.Matrix(
-        [system.residual(field) for field in system.fields]
+        [system.residual_expression(field) for field in system.fields]
     )
     variables = tuple(
         symbol

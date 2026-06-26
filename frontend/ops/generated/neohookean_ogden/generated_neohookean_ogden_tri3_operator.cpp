@@ -16,7 +16,6 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_tri3_tri3_grad_ref[6] = {real_t(-1), real_t(-1), real_t(1), real_t(0), real_t(0), real_t(1)};
 static const real_t generated_neohookean_ogden_tri3_tri3_q_weight[1] = {real_t(0.5)};
 static const real_t generated_neohookean_ogden_tri3_tri3_grad_ref_x[3] = {real_t(-1), real_t(1), real_t(0)};
 static const real_t generated_neohookean_ogden_tri3_tri3_grad_ref_y[3] = {real_t(-1), real_t(0), real_t(1)};
