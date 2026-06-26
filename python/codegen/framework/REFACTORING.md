@@ -215,8 +215,7 @@ Tasks:
    - test contractions
 5. Replace duplicated tensor-product geometry code in residual and
    hyperelastic generators.
-6. Add Taylor-Hood policies for `TRI6_TRI3`, `TET10_TET4`, and
-   `HEX27_HEX8`.
+6. Add Taylor-Hood policies by detecting mixed-FE forms
 7. Add tests for affine and isoparametric geometry plans on simplex and
    tensor-product elements.
 
@@ -243,7 +242,7 @@ Tasks:
 3. Express local-kernel evaluation order as plan nodes:
    - evaluate trial quantities
    - transform reference quantities
-   - evaluate material terms
+   - evaluate material terms (left-operand style)
    - contract with tests
 4. Add plan validation for unsupported element/form/target combinations.
 5. Generate both monolithic and block plans for coupled systems.

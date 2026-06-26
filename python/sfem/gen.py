@@ -89,9 +89,22 @@ from codegen.framework import (
 )
 from codegen.framework.fem import (
     SfemCompatibleElement,
+    SfemElementBasisPolicy,
+    SfemFEMPolicy,
+    SfemFieldFamilyCompatibilityPolicy,
+    SfemReferenceData,
+    sfem_cell_rule_points,
+    sfem_element_quadrature_rule,
+    sfem_field_n_shape,
+    sfem_fem_policy,
+    sfem_mesh_reference_data,
+    sfem_mixed_reference_data,
+    sfem_reference_data,
+    sfem_shape_data_for_element_at_cell_rule,
+    sfem_simplex_grad_ref_name,
     sfem_supported_element_types,
-    sfem_soa_element_specialization,
     sfem_taylor_hood_element_types,
+    sfem_tensor_hex_shape_index,
 )
 
 
@@ -147,23 +160,19 @@ class ElementGenerationContext:
     element_type: str
     label: str
     specialization: object
+    fem_policy: object
     compatible_element: object = None
 
     @classmethod
     def create(cls, material_name, element, vector_size, quadrature_order):
-        compatible = element if isinstance(element, SfemCompatibleElement) else None
-        element_type = compatible.cell_element_type if compatible else str(element).upper()
-        label = compatible.name.lower() if compatible else element_type.lower()
+        policy = sfem_fem_policy(element, vector_size, quadrature_order)
         return cls(
             material_name,
-            element_type,
-            label,
-            sfem_soa_element_specialization(
-                element_type,
-                vector_size,
-                quadrature_order,
-            ),
-            compatible,
+            policy.cell_element_type,
+            policy.label,
+            policy.specialization,
+            policy,
+            policy.compatible_element,
         )
 
     @property
@@ -184,13 +193,11 @@ class ElementGenerationContext:
 
     @property
     def family(self):
-        if self.specialization.quadrature_rule.is_tensor_product:
-            return "tensor_product"
-        return "simplex"
+        return self.fem_policy.family
 
     @property
     def is_mixed_order(self):
-        return bool(self.compatible_element and self.compatible_element.is_mixed_order)
+        return self.fem_policy.is_mixed_order
 
 
 @dataclass(frozen=True)
@@ -734,9 +741,7 @@ def _evaluate_residual_equation(dim, equation, form_collection=None):
 
 def _field_element_types_for_context(equation_fields, context):
     ret = {}
-    for field in equation_fields:
-        family = field.family or field.name
-        element_type = context.compatible_element.element_for_field(family)
+    for field, element_type in context.fem_policy.field_element_types_for(equation_fields):
         if field.components == 1:
             ret[field.name] = element_type
         else:
@@ -974,6 +979,10 @@ __all__ = [
     "PreviousFunction",
     "QualifiedExpression",
     "ScalarField",
+    "SfemElementBasisPolicy",
+    "SfemFEMPolicy",
+    "SfemFieldFamilyCompatibilityPolicy",
+    "SfemReferenceData",
     "StandardFormName",
     "SymbolicArgument",
     "SymbolicField",
@@ -1006,7 +1015,18 @@ __all__ = [
     "qualify",
     "run",
     "scalar_field",
+    "sfem_cell_rule_points",
+    "sfem_element_quadrature_rule",
+    "sfem_field_n_shape",
+    "sfem_fem_policy",
+    "sfem_mesh_reference_data",
+    "sfem_mixed_reference_data",
+    "sfem_reference_data",
+    "sfem_shape_data_for_element_at_cell_rule",
+    "sfem_simplex_grad_ref_name",
+    "sfem_supported_element_types",
     "sfem_taylor_hood_element_types",
+    "sfem_tensor_hex_shape_index",
     "tensor_field",
     "test_function",
     "trial_function",

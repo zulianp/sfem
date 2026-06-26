@@ -9,7 +9,15 @@ from .tensor_product_geometry import (
     tensor_product_cartesian_shape_order,
     tensor_product_isoparametric_geometry_lines,
 )
-from .fem import sfem_element_quadrature_rule, sfem_soa_element_specialization
+from .fem import (
+    sfem_element_quadrature_rule,
+    sfem_field_n_shape,
+    sfem_mesh_reference_data,
+    sfem_mixed_reference_data,
+    sfem_reference_data,
+    sfem_simplex_grad_ref_name,
+    sfem_soa_element_specialization,
+)
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -385,7 +393,7 @@ def _local_function(
         if dependencies.uses_reference_gradients:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s"
-                % _simplex_grad_ref_name("grad_ref", d)
+                % sfem_simplex_grad_ref_name("grad_ref", d)
                 for d in range(dim)
             )
         params.append("const scalar_t *const SFEM_RESTRICT q_weight")
@@ -474,7 +482,7 @@ def _simplex_local_body(system, coefficients, dependencies):
             continue
         terms = [
             "%s[q * N_SHAPE + test] * adj%d"
-            % (_simplex_grad_ref_name("grad_ref", k), k * dim + d)
+            % (sfem_simplex_grad_ref_name("grad_ref", k), k * dim + d)
             for k in range(dim)
         ]
         lines.append(
@@ -674,7 +682,7 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                             field.name,
                             stem,
                             d,
-                            _simplex_grad_ref_name("grad_ref", d),
+                            sfem_simplex_grad_ref_name("grad_ref", d),
                         )
                     )
             lines.append("%s}" % indent)
@@ -709,7 +717,7 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                             indent,
                             field.name,
                             d,
-                            _simplex_grad_ref_name("grad_ref", d),
+                            sfem_simplex_grad_ref_name("grad_ref", d),
                         )
                     )
             lines.append("%s}" % indent)
@@ -936,7 +944,7 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                         % (
                             prefix,
                             element,
-                            _simplex_grad_ref_name("grad_ref", d),
+                            sfem_simplex_grad_ref_name("grad_ref", d),
                             reference_suffix,
                         )
                         for d in range(dim)
@@ -1058,33 +1066,19 @@ def _mixed_operator_source(
 
 
 def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
-    data = list(_simplex_reference_gradient_data("cell_grad_ref", cell_rule))
-    data.append(("q_weight", cell_rule.weights))
-    for field in system.fields:
-        element_type = field_element_types.get(field.name, cell_rule.element_type)
-        shape, grad = _shape_data_for_element_at_cell_rule(element_type, cell_rule)
-        data.append(("%s_shape" % field.name, shape))
-        data.extend(
-            _split_reference_gradient_data(
-                "%s_grad_ref" % field.name,
-                grad,
-                cell_rule.n_qp,
-                len(shape) // cell_rule.n_qp,
-                cell_rule.dim,
-            )
-        )
+    data = sfem_mixed_reference_data(cell_rule, system.fields, field_element_types)
     lines = []
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        for name, values in data:
+        for reference in data:
             lines.append(
                 "static const %s %s_%s_%s[%d] = {%s};"
                 % (
                     scalar_type,
                     prefix,
-                    name,
+                    reference.name,
                     suffix,
-                    len(values),
-                    _cpp_scalar_initializer_list(values, scalar_type),
+                    len(reference.values),
+                    _cpp_scalar_initializer_list(reference.values, scalar_type),
                 )
             )
     return lines
@@ -1168,7 +1162,7 @@ def _mixed_isoparametric_function(
                 % (
                     prefix,
                     field.name,
-                    _simplex_grad_ref_name("grad_ref", k),
+                    sfem_simplex_grad_ref_name("grad_ref", k),
                     n_shape,
                     k * dim + d,
                 )
@@ -1243,7 +1237,7 @@ def _mixed_geometry_lines(prefix, cell_rule, dim):
                     i,
                     shape,
                     prefix,
-                    _simplex_grad_ref_name("cell_grad_ref", j),
+                    sfem_simplex_grad_ref_name("cell_grad_ref", j),
                     shape,
                 )
                 for shape in range(cell_rule.n_shape)
@@ -1314,7 +1308,7 @@ def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, depe
                         stride,
                         prefix,
                         field.name,
-                        _simplex_grad_ref_name("grad_ref", k),
+                        sfem_simplex_grad_ref_name("grad_ref", k),
                         n_shape,
                         s,
                     )
@@ -1332,235 +1326,10 @@ def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, depe
 
 def _field_n_shape(field, cell_rule, field_element_types):
     element_type = field_element_types[field.name]
-    return sfem_element_quadrature_rule(
+    return sfem_field_n_shape(
         element_type,
         cell_rule.order if element_type in ("QUAD4", "HEX8") else None,
-    ).n_shape
-
-
-def _shape_data_for_element_at_cell_rule(element_type, cell_rule):
-    element_type = str(element_type).upper()
-    points = _cell_rule_points(cell_rule)
-    if element_type == "TRI3":
-        shape = []
-        grad = []
-        for x, y in points:
-            shape.extend((1.0 - x - y, x, y))
-            grad.extend((-1.0, -1.0, 1.0, 0.0, 0.0, 1.0))
-        return tuple(shape), tuple(grad)
-    if element_type == "TRI6":
-        shape = []
-        grad = []
-        for x, y in points:
-            l0 = 1.0 - x - y
-            shape.extend(
-                (
-                    l0 * (2.0 * l0 - 1.0),
-                    x * (2.0 * x - 1.0),
-                    y * (2.0 * y - 1.0),
-                    4.0 * x * l0,
-                    4.0 * x * y,
-                    4.0 * y * l0,
-                )
-            )
-            grad.extend(_tri6_gradients_at(x, y))
-        return tuple(shape), tuple(grad)
-    if element_type == "TET4":
-        shape = []
-        grad = []
-        for x, y, z in points:
-            shape.extend((1.0 - x - y - z, x, y, z))
-            grad.extend(
-                (
-                    -1.0, -1.0, -1.0,
-                    1.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0,
-                    0.0, 0.0, 1.0,
-                )
-            )
-        return tuple(shape), tuple(grad)
-    if element_type == "TET10":
-        shape = []
-        grad = []
-        for x, y, z in points:
-            l0 = 1.0 - x - y - z
-            shape.extend(
-                (
-                    l0 * (2.0 * l0 - 1.0),
-                    x * (2.0 * x - 1.0),
-                    y * (2.0 * y - 1.0),
-                    z * (2.0 * z - 1.0),
-                    4.0 * x * l0,
-                    4.0 * x * y,
-                    4.0 * y * l0,
-                    4.0 * z * l0,
-                    4.0 * x * z,
-                    4.0 * y * z,
-                )
-            )
-            grad.extend(_tet10_gradients_at(x, y, z))
-        return tuple(shape), tuple(grad)
-    if element_type in ("HEX8", "HEX27"):
-        order = 1 if element_type == "HEX8" else 2
-        return _hex_lagrange_shape_gradients(points, order)
-    raise ValueError("unsupported mixed residual field element '%s'" % element_type)
-
-
-def _cell_rule_points(rule):
-    if rule.element_type in ("TRI3",):
-        return ((1.0 / 3.0, 1.0 / 3.0),)
-    if rule.element_type == "TRI6":
-        return (
-            (1.0 / 6.0, 1.0 / 6.0),
-            (2.0 / 3.0, 1.0 / 6.0),
-            (1.0 / 6.0, 2.0 / 3.0),
-        )
-    if rule.element_type == "TET4":
-        return ((0.25, 0.25, 0.25),)
-    if rule.element_type == "TET10":
-        a = 0.5854101966249685
-        b = 0.1381966011250105
-        return ((b, b, b), (a, b, b), (b, a, b), (b, b, a))
-    if rule.element_type in ("HEX8", "HEX27"):
-        pts_1d = _unit_interval_gauss_points(rule.order)
-        return tuple((x, y, z) for z in pts_1d for y in pts_1d for x in pts_1d)
-    raise ValueError("unsupported cell rule '%s'" % rule.element_type)
-
-
-def _unit_interval_gauss_points(order):
-    if order == 1:
-        return (0.5,)
-    if order == 2:
-        offset = 0.5 / 3.0 ** 0.5
-        return (0.5 - offset, 0.5 + offset)
-    if order == 3:
-        offset = 0.5 * (3.0 / 5.0) ** 0.5
-        return (0.5 - offset, 0.5, 0.5 + offset)
-    raise ValueError("unsupported tensor-product order %d" % order)
-
-
-def _tri6_gradients_at(x, y):
-    return (
-        -3.0 + 4.0 * x + 4.0 * y,
-        -3.0 + 4.0 * x + 4.0 * y,
-        4.0 * x - 1.0,
-        0.0,
-        0.0,
-        4.0 * y - 1.0,
-        4.0 - 8.0 * x - 4.0 * y,
-        -4.0 * x,
-        4.0 * y,
-        4.0 * x,
-        -4.0 * y,
-        4.0 - 4.0 * x - 8.0 * y,
     )
-
-
-def _tet10_gradients_at(x, y, z):
-    dx = (
-        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
-        4.0 * x - 1.0,
-        0.0,
-        0.0,
-        -8.0 * x - 4.0 * y - 4.0 * z + 4.0,
-        4.0 * y,
-        -4.0 * y,
-        -4.0 * z,
-        4.0 * z,
-        0.0,
-    )
-    dy = (
-        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
-        0.0,
-        4.0 * y - 1.0,
-        0.0,
-        -4.0 * x,
-        4.0 * x,
-        -8.0 * y - 4.0 * x - 4.0 * z + 4.0,
-        -4.0 * z,
-        0.0,
-        4.0 * z,
-    )
-    dz = (
-        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
-        0.0,
-        0.0,
-        4.0 * z - 1.0,
-        -4.0 * x,
-        0.0,
-        -4.0 * y,
-        -8.0 * z - 4.0 * x - 4.0 * y + 4.0,
-        4.0 * x,
-        4.0 * y,
-    )
-    gradients = []
-    for i in range(10):
-        gradients.extend((dx[i], dy[i], dz[i]))
-    return tuple(gradients)
-
-
-def _hex_lagrange_shape_gradients(points, order):
-    n = order + 1
-    shape = []
-    grad = []
-    for x, y, z in points:
-        values_x, grads_x = _lagrange_1d_at(x, order)
-        values_y, grads_y = _lagrange_1d_at(y, order)
-        values_z, grads_z = _lagrange_1d_at(z, order)
-        shape_q = [None] * (n * n * n)
-        grad_q = [None] * (n * n * n)
-        for sz in range(n):
-            for sy in range(n):
-                for sx in range(n):
-                    idx = _tensor_hex_shape_index(n, sx, sy, sz)
-                    vx = values_x[sx]
-                    vy = values_y[sy]
-                    vz = values_z[sz]
-                    shape_q[idx] = vx * vy * vz
-                    grad_q[idx] = (
-                        grads_x[sx] * vy * vz,
-                        vx * grads_y[sy] * vz,
-                        vx * vy * grads_z[sz],
-                    )
-        shape.extend(shape_q)
-        for item in grad_q:
-            grad.extend(item)
-    return tuple(shape), tuple(grad)
-
-
-def _lagrange_1d_at(x, order):
-    if order == 1:
-        return (1.0 - x, x), (-1.0, 1.0)
-    if order == 2:
-        return (
-            2.0 * x * x - 3.0 * x + 1.0,
-            4.0 * x - 4.0 * x * x,
-            2.0 * x * x - x,
-        ), (
-            4.0 * x - 3.0,
-            4.0 - 8.0 * x,
-            4.0 * x - 1.0,
-        )
-    raise ValueError("unsupported 1D Lagrange order %d" % order)
-
-
-def _tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
-    if n_shape_1d == 2:
-        return (sx if sy == 0 else (3 if sx == 0 else 2)) + 4 * sz
-    if n_shape_1d == 3:
-        cartesian_to_hex27 = (
-            0, 8, 1,
-            11, 24, 9,
-            3, 10, 2,
-            16, 20, 17,
-            23, 26, 21,
-            19, 22, 18,
-            4, 12, 5,
-            15, 25, 13,
-            7, 14, 6,
-        )
-        return cartesian_to_hex27[sx + 3 * (sy + 3 * sz)]
-    raise ValueError("unsupported tensor-product hex order")
 
 
 def _residual_diagnostics_lines(system, prefix, specialization):
@@ -1625,17 +1394,17 @@ def _kernel_diagnostics_lines(
     n_fields = len(system.fields)
     field_streams = n_fields * rule.n_shape
     geometry_streams = system.dim * system.dim + 1
-    if rule.is_tensor_product:
-        reference_scalars = (
-            len(rule.tensor_product_shape_values_1d)
-            + len(rule.tensor_product_shape_gradients_1d)
-        )
-        quadrature_weight_scalars = len(rule.tensor_product_weights_1d)
-    else:
-        reference_scalars = (
-            len(_simplex_shape_values(rule)) + len(rule.reference_gradients)
-        )
-        quadrature_weight_scalars = len(rule.weights)
+    reference_data = sfem_reference_data(rule)
+    reference_scalars = sum(
+        len(reference.values)
+        for reference in reference_data
+        if not reference.name.startswith("q_weight")
+    )
+    quadrature_weight_scalars = sum(
+        len(reference.values)
+        for reference in reference_data
+        if reference.name.startswith("q_weight")
+    )
     variable_name = "%s_diagnostics_data" % public_name
     lines = [
         "namespace sfem {",
@@ -1921,7 +1690,7 @@ def _mesh_operator_source(
         call_args.append("shape")
         if dependencies.uses_reference_gradients:
             call_args.extend(
-                _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+                sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim)
             )
         call_args.append("q_weight")
     if dependencies.current:
@@ -2286,7 +2055,7 @@ def _isoparametric_mesh_operator_source(
                     "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
                     % (
                         shape * dim + i,
-                        _simplex_grad_ref_name("grad_ref", j),
+                        sfem_simplex_grad_ref_name("grad_ref", j),
                         shape,
                     )
                     for shape in range(n_shape)
@@ -2346,7 +2115,7 @@ def _isoparametric_mesh_operator_source(
         call_args.append("shape")
         if dependencies.uses_reference_gradients:
             call_args.extend(
-                _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+                sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim)
             )
         call_args.append("q_weight")
     if dependencies.current:
@@ -2440,93 +2209,35 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
 
 
 def _mesh_reference_data_lines(rule):
-    if rule.is_tensor_product:
-        data = (
-            ("shape_1d", rule.tensor_product_shape_values_1d),
-            ("grad_1d", rule.tensor_product_shape_gradients_1d),
-            ("q_weight_1d", rule.tensor_product_weights_1d),
-        )
-    else:
-        data = (
-            (("shape", _simplex_shape_values(rule)),)
-            + _simplex_reference_gradient_data("grad_ref", rule)
-            + (("q_weight", rule.weights),)
-        )
     return [
         "    static const scalar_t %s[%d] = {%s};"
-        % (name, len(values), _cpp_scalar_initializer_list(values, "scalar_t"))
-        for name, values in data
+        % (
+            reference.name,
+            len(reference.values),
+            _cpp_scalar_initializer_list(reference.values, "scalar_t"),
+        )
+        for reference in sfem_mesh_reference_data(rule)
     ]
 
 
 def _reference_data_lines(prefix, rule):
     element = rule.element_type.lower()
-    if rule.is_tensor_product:
-        data = (
-            ("shape_1d", rule.tensor_product_shape_values_1d),
-            ("grad_1d", rule.tensor_product_shape_gradients_1d),
-            ("q_weight_1d", rule.tensor_product_weights_1d),
-        )
-    else:
-        data = (
-            (("shape", _simplex_shape_values(rule)),)
-            + _simplex_reference_gradient_data("grad_ref", rule)
-            + (("q_weight", rule.weights),)
-        )
     lines = []
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        for name, values in data:
+        for reference in sfem_reference_data(rule):
             lines.append(
                 "static const %s %s_%s_%s_%s[%d] = {%s};"
                 % (
                     scalar_type,
                     prefix,
                     element,
-                    name,
+                    reference.name,
                     suffix,
-                    len(values),
-                    _cpp_scalar_initializer_list(values, scalar_type),
+                    len(reference.values),
+                    _cpp_scalar_initializer_list(reference.values, scalar_type),
                 )
             )
     return lines
-
-
-def _simplex_shape_values(rule):
-    if rule.element_type == "TRI3":
-        return (1.0 / 3.0,) * 3
-    if rule.element_type == "TET4":
-        return (0.25,) * 4
-    raise ValueError(
-        "simplex residual lowering currently supports TRI3 and TET4"
-    )
-
-
-def _simplex_grad_ref_name(prefix, component):
-    names = ("x", "y", "z")
-    if component < 0 or component >= len(names):
-        raise ValueError("unsupported simplex gradient component %d" % component)
-    return "%s_%s" % (prefix, names[component])
-
-
-def _split_reference_gradient_data(prefix, gradients, n_qp, n_shape, dim):
-    components = []
-    for d in range(dim):
-        values = []
-        for q in range(n_qp):
-            for shape in range(n_shape):
-                values.append(gradients[(q * n_shape + shape) * dim + d])
-        components.append((_simplex_grad_ref_name(prefix, d), tuple(values)))
-    return tuple(components)
-
-
-def _simplex_reference_gradient_data(prefix, rule):
-    return _split_reference_gradient_data(
-        prefix,
-        rule.reference_gradients,
-        rule.n_qp,
-        rule.n_shape,
-        rule.dim,
-    )
 
 
 def _tensor_helpers(prefix, dim):
