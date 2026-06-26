@@ -1854,7 +1854,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn('#include "kernel_math.hpp"', local_source)
         self.assertIn("static SFEM_INLINE T pow_2", math_source)
         self.assertIn("static SFEM_INLINE T pow_m2", math_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref", operator_source)
+        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_x", operator_source)
+        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_y", operator_source)
         self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
         self.assertIn('#include "kernel_diagnostics.hpp"', operator_source)
         self.assertNotIn("struct SfemKernelDiagnostics", operator_source)
@@ -1909,7 +1910,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("accumulator_t", operator_source)
         self.assertNotIn("accumulator_t", local_source)
         self.assertNotIn("typedef double scalar_t;", local_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref", operator_source)
+        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_x", operator_source)
+        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_y", operator_source)
         self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
         self.assertIn("static_assert(N_QP == 1", operator_source)
         self.assertIn("static_assert(N_SHAPE == 3", operator_source)
@@ -1936,18 +1938,21 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", local_source)
         self.assertIn("generated_neohookean_ogden_apply_block", local_source)
         self.assertIn("const int q", local_source)
-        self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_data", local_source)
+        self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", local_source)
+        self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", local_source)
+        self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_data", local_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
         self.assertIn("scalar_t grad_ref[N_SHAPE * 2];", local_source)
         self.assertIn("scalar_t u[N_SHAPE * 2];", local_source)
         self.assertIn(
-            "grad_ref[0] = grad_ref_data[(q * N_SHAPE + 0) * 2 + 0];",
+            "grad_ref[0] = grad_ref_x[q * N_SHAPE + 0];",
             local_source,
         )
         self.assertIn(
-            "grad_ref[5] = grad_ref_data[(q * N_SHAPE + 2) * 2 + 1];",
+            "grad_ref[5] = grad_ref_y[q * N_SHAPE + 2];",
             local_source,
         )
+        self.assertNotIn("grad_ref_data[(q * N_SHAPE", local_source)
         self.assertIn("jacobian_adjugate[0]", local_source)
         self.assertIn("jacobian_determinant[0]", local_source)
 

@@ -64,7 +64,7 @@ def _build_system(dim):
             + co2_accumulation * q_c
             - co2_flux.dot(gen.grad(q_c))
         )
-        system.residual("", form, fields=(water, co2))
+        system.add_residual("", form, fields=(water, co2))
     return system.build()
 
 

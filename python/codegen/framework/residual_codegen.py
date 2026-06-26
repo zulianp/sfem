@@ -71,7 +71,7 @@ def coupled_residual_weak_coefficients(system, jacobian_action=False):
             coefficients.append(
                 weak_residual_coefficients(
                     system,
-                    system.residual(row),
+                    system.residual_expression(row),
                     row.name,
                 )
             )
@@ -290,13 +290,13 @@ def _local_function(
             )
         )
     else:
+        params.append("const scalar_t *const SFEM_RESTRICT shape")
         params.extend(
-            (
-                "const scalar_t *const SFEM_RESTRICT shape",
-                "const scalar_t *const SFEM_RESTRICT grad_ref",
-                "const scalar_t *const SFEM_RESTRICT q_weight",
-            )
+            "const scalar_t *const SFEM_RESTRICT %s"
+            % _simplex_grad_ref_name("grad_ref", d)
+            for d in range(dim)
         )
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
     if dependencies.current:
         params.append(
             "const scalar_t *const SFEM_RESTRICT current[%d * N_SHAPE]"
@@ -377,8 +377,8 @@ def _simplex_local_body(system, coefficients, dependencies):
     )
     for d in range(dim):
         terms = [
-            "grad_ref[(q * N_SHAPE + test) * DIM + %d] * adj%d"
-            % (k, k * dim + d)
+            "%s[q * N_SHAPE + test] * adj%d"
+            % (_simplex_grad_ref_name("grad_ref", k), k * dim + d)
             for k in range(dim)
         ]
         lines.append(
@@ -515,8 +515,14 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
             )
             for d in range(dim):
                 lines.append(
-                    "%s    %s%s_grad_%d_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + %d];"
-                    % (indent, field.name, stem, d, d)
+                    "%s    %s%s_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
+                    % (
+                        indent,
+                        field.name,
+                        stem,
+                        d,
+                        _simplex_grad_ref_name("grad_ref", d),
+                    )
                 )
             lines.append("%s}" % indent)
             lines.extend(
@@ -540,8 +546,13 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
             )
             for d in range(dim):
                 lines.append(
-                    "%s    %s_direction_grad_%d_ref += coeff * grad_ref[(q * N_SHAPE + trial) * DIM + %d];"
-                    % (indent, field.name, d, d)
+                    "%s    %s_direction_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
+                    % (
+                        indent,
+                        field.name,
+                        d,
+                        _simplex_grad_ref_name("grad_ref", d),
+                    )
                 )
             lines.append("%s}" % indent)
             lines.extend(
@@ -718,15 +729,23 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                     )
                 )
             else:
+                call_args.append(
+                    "sfem::codegen::%s_%s_shape_%s"
+                    % (prefix, element, reference_suffix)
+                )
                 call_args.extend(
-                    (
-                        "sfem::codegen::%s_%s_shape_%s"
-                        % (prefix, element, reference_suffix),
-                        "sfem::codegen::%s_%s_grad_ref_%s"
-                        % (prefix, element, reference_suffix),
-                        "sfem::codegen::%s_%s_q_weight_%s"
-                        % (prefix, element, reference_suffix),
+                    "sfem::codegen::%s_%s_%s_%s"
+                    % (
+                        prefix,
+                        element,
+                        _simplex_grad_ref_name("grad_ref", d),
+                        reference_suffix,
                     )
+                    for d in range(dim)
+                )
+                call_args.append(
+                    "sfem::codegen::%s_%s_q_weight_%s"
+                    % (prefix, element, reference_suffix)
                 )
             if dependencies.current:
                 call_args.append("current")
@@ -841,15 +860,21 @@ def _mixed_operator_source(
 
 
 def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
-    data = [
-        ("cell_grad_ref", cell_rule.reference_gradients),
-        ("q_weight", cell_rule.weights),
-    ]
+    data = list(_simplex_reference_gradient_data("cell_grad_ref", cell_rule))
+    data.append(("q_weight", cell_rule.weights))
     for field in system.fields:
         element_type = field_element_types.get(field.name, cell_rule.element_type)
         shape, grad = _shape_data_for_element_at_cell_rule(element_type, cell_rule)
         data.append(("%s_shape" % field.name, shape))
-        data.append(("%s_grad_ref" % field.name, grad))
+        data.extend(
+            _split_reference_gradient_data(
+                "%s_grad_ref" % field.name,
+                grad,
+                cell_rule.n_qp,
+                len(shape) // cell_rule.n_qp,
+                cell_rule.dim,
+            )
+        )
     lines = []
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
         for name, values in data:
@@ -941,8 +966,14 @@ def _mixed_isoparametric_function(
         )
         for d in range(dim):
             terms = [
-                "%s_%s_grad_ref_f64[(q * %d + test) * DIM + %d] * adj%d"
-                % (prefix, field.name, n_shape, k, k * dim + d)
+                "%s_%s_%s_f64[q * %d + test] * adj%d"
+                % (
+                    prefix,
+                    field.name,
+                    _simplex_grad_ref_name("grad_ref", k),
+                    n_shape,
+                    k * dim + d,
+                )
                 for k in range(dim)
             ]
             lines.append(
@@ -1009,8 +1040,14 @@ def _mixed_geometry_lines(prefix, cell_rule, dim):
     for i in range(dim):
         for j in range(dim):
             terms = [
-                "points[%d][ev[%d]] * %s_cell_grad_ref_f64[(q * CELL_N_SHAPE + %d) * DIM + %d]"
-                % (i, shape, prefix, shape, j)
+                "points[%d][ev[%d]] * %s_%s_f64[q * CELL_N_SHAPE + %d]"
+                % (
+                    i,
+                    shape,
+                    prefix,
+                    _simplex_grad_ref_name("cell_grad_ref", j),
+                    shape,
+                )
                 for shape in range(cell_rule.n_shape)
             ]
             lines.append(
@@ -1071,7 +1108,7 @@ def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, depe
             )
             for k in range(dim):
                 grad_terms = [
-                    "%s%s[ev[%d] * %s] * %s_%s_grad_ref_f64[(q * %d + %d) * DIM + %d]"
+                    "%s%s[ev[%d] * %s] * %s_%s_%s_f64[q * %d + %d]"
                     % (
                         field.name,
                         pointer_suffix,
@@ -1079,9 +1116,9 @@ def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, depe
                         stride,
                         prefix,
                         field.name,
+                        _simplex_grad_ref_name("grad_ref", k),
                         n_shape,
                         s,
-                        k,
                     )
                     for s in range(n_shape)
                 ]
@@ -1679,7 +1716,11 @@ def _mesh_operator_source(
     if rule.is_tensor_product:
         call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
     else:
-        call_args.extend(("shape", "grad_ref", "q_weight"))
+        call_args.append("shape")
+        call_args.extend(
+            _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+        )
+        call_args.append("q_weight")
     if dependencies.current:
         call_args.append("block_current_streams")
     if dependencies.previous:
@@ -1926,14 +1967,6 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     lines.extend(_mesh_reference_data_lines(rule))
-    if not rule.is_tensor_product:
-        lines.append(
-            "    static const scalar_t geometry_grad_ref[%d] = {%s};"
-            % (
-                len(rule.reference_gradients),
-                _cpp_scalar_initializer_list(rule.reference_gradients, "scalar_t"),
-            )
-        )
     lines.extend(
         [
             "",
@@ -2046,8 +2079,12 @@ def _isoparametric_mesh_operator_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * geometry_grad_ref[(q * N_SHAPE + %d) * %d + %d]"
-                    % (shape * dim + i, shape, dim, j)
+                    "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        _simplex_grad_ref_name("grad_ref", j),
+                        shape,
+                    )
                     for shape in range(n_shape)
                 ]
                 lines.append(
@@ -2099,7 +2136,11 @@ def _isoparametric_mesh_operator_source(
     if rule.is_tensor_product:
         call_args.extend(("shape_1d", "grad_1d", "q_weight_1d"))
     else:
-        call_args.extend(("shape", "grad_ref", "q_weight"))
+        call_args.append("shape")
+        call_args.extend(
+            _simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+        )
+        call_args.append("q_weight")
     if dependencies.current:
         call_args.append("block_current_streams")
     if dependencies.previous:
@@ -2199,9 +2240,9 @@ def _mesh_reference_data_lines(rule):
         )
     else:
         data = (
-            ("shape", _simplex_shape_values(rule)),
-            ("grad_ref", rule.reference_gradients),
-            ("q_weight", rule.weights),
+            (("shape", _simplex_shape_values(rule)),)
+            + _simplex_reference_gradient_data("grad_ref", rule)
+            + (("q_weight", rule.weights),)
         )
     return [
         "    static const scalar_t %s[%d] = {%s};"
@@ -2220,9 +2261,9 @@ def _reference_data_lines(prefix, rule):
         )
     else:
         data = (
-            ("shape", _simplex_shape_values(rule)),
-            ("grad_ref", rule.reference_gradients),
-            ("q_weight", rule.weights),
+            (("shape", _simplex_shape_values(rule)),)
+            + _simplex_reference_gradient_data("grad_ref", rule)
+            + (("q_weight", rule.weights),)
         )
     lines = []
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
@@ -2249,6 +2290,34 @@ def _simplex_shape_values(rule):
         return (0.25,) * 4
     raise ValueError(
         "simplex residual lowering currently supports TRI3 and TET4"
+    )
+
+
+def _simplex_grad_ref_name(prefix, component):
+    names = ("x", "y", "z")
+    if component < 0 or component >= len(names):
+        raise ValueError("unsupported simplex gradient component %d" % component)
+    return "%s_%s" % (prefix, names[component])
+
+
+def _split_reference_gradient_data(prefix, gradients, n_qp, n_shape, dim):
+    components = []
+    for d in range(dim):
+        values = []
+        for q in range(n_qp):
+            for shape in range(n_shape):
+                values.append(gradients[(q * n_shape + shape) * dim + d])
+        components.append((_simplex_grad_ref_name(prefix, d), tuple(values)))
+    return tuple(components)
+
+
+def _simplex_reference_gradient_data(prefix, rule):
+    return _split_reference_gradient_data(
+        prefix,
+        rule.reference_gradients,
+        rule.n_qp,
+        rule.n_shape,
+        rule.dim,
     )
 
 

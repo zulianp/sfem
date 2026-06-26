@@ -135,7 +135,7 @@ class CoupledResidualSystem:
             self._parameters.append(parameter)
         return self
 
-    def set_residual(self, field, expression):
+    def add_residual(self, field, expression):
         field = self.field(field.name if isinstance(field, ResidualField) else field)
         expression = sp.sympify(expression)
         if isinstance(expression, sp.MatrixBase):
@@ -146,10 +146,15 @@ class CoupledResidualSystem:
                 "residual equation for field '%s' contains unregistered symbols: %s"
                 % (field.name, ", ".join(sorted(map(str, unknown))))
             )
-        self._residuals[field.name] = expression
+        self._residuals[field.name] = self._residuals.get(field.name, sp.S.Zero) + expression
         return self
 
-    def residual(self, field):
+    def set_residual(self, field, expression):
+        field = self.field(field.name if isinstance(field, ResidualField) else field)
+        self._residuals.pop(field.name, None)
+        return self.add_residual(field, expression)
+
+    def residual_expression(self, field):
         field = self.field(field.name if isinstance(field, ResidualField) else field)
         if field.name not in self._residuals:
             raise ValueError("residual equation for field '%s' is not registered" % field.name)

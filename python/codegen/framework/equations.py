@@ -184,7 +184,7 @@ class EquationSystem:
             diagnostics=diagnostics,
         )
 
-    def residual(self, name, define, *, fields=()):
+    def add_residual(self, name, define, *, fields=()):
         return self.equation(
             name,
             EquationForm.RESIDUAL,
@@ -357,9 +357,9 @@ class EquationSystemBuilder:
             diagnostics=diagnostics,
         )
 
-    def residual(self, name, define, *, fields=()):
+    def add_residual(self, name, define, *, fields=()):
         symbolic_fields = tuple(fields)
-        return self._system.residual(
+        return self._system.add_residual(
             name,
             _residual_define(define, symbolic_fields, self.dim),
             fields=self._resolve_fields(fields),
@@ -561,7 +561,7 @@ def _residual_define(define, fields, dim):
             system.add_parameters(*parameters)
         for residual_field in residual_fields:
             row_expression = _extract_row_weak_form(lowered, residual_field)
-            system.set_residual(residual_field, row_expression)
+            system.add_residual(residual_field, row_expression)
 
     return evaluate
 
