@@ -470,6 +470,20 @@ class GenApiTest(unittest.TestCase):
         names = tuple(element.name for element in poro_hyperelasticity.elements)
         self.assertEqual(names, ("TRI6_TRI3", "TET10_TET4", "HEX27_HEX8"))
 
+    def test_taylor_hood_elements_are_detected_from_mixed_function_spaces(self):
+        system = poro_hyperelasticity.systems.for_dim(3)
+        names = tuple(
+            element.name
+            for element in gen.sfem_detect_taylor_hood_element_types(system.fields)
+        )
+        self.assertEqual(names, ("TET10_TET4", "HEX27_HEX8"))
+
+        material = gen.CodeGenerator("auto_taylor_hood", gen.EquationSystems(system))
+        self.assertEqual(
+            tuple(element.name for element in material.elements),
+            ("TET10_TET4", "HEX27_HEX8"),
+        )
+
     def test_fem_policy_describes_basis_quadrature_and_field_compatibility(self):
         element = poro_hyperelasticity.elements[2]
         policy = gen.sfem_fem_policy(element)
@@ -733,7 +747,7 @@ class GenApiTest(unittest.TestCase):
             result = gen.generate(
                 poro_hyperelasticity,
                 out_dir,
-                elements=("TRI6_TRI3",),
+                elements=("TRI6",),
             )
             names = {os.path.basename(path) for path in result.sources}
             self.assertIn(

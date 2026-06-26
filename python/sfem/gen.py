@@ -120,6 +120,8 @@ from codegen.framework.fem import (
     SfemFieldFamilyCompatibilityPolicy,
     SfemReferenceData,
     sfem_cell_rule_points,
+    sfem_detect_compatible_element_types,
+    sfem_detect_taylor_hood_element_types,
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
     sfem_fem_policy,
@@ -141,7 +143,7 @@ DEFAULT_VECTOR_SIZE = 16
 class CodeGenerator:
     name: str
     systems: object
-    elements: tuple
+    elements: tuple = None
     op_name: str = None
     parameter_defaults: tuple = ()
 
@@ -152,8 +154,10 @@ class CodeGenerator:
         object.__setattr__(self, "systems", _as_equation_systems(self.systems))
         if not self.systems:
             raise ValueError("code generators require at least one equation system")
-        if not self.elements:
+        elements = tuple(self.elements) if self.elements else _default_elements_for_systems(self.systems)
+        if not elements:
             raise ValueError("code generators require supported elements")
+        object.__setattr__(self, "elements", elements)
         _validate_op(self.op_name, self.parameter_defaults)
 
 
@@ -899,11 +903,12 @@ def _summary(name, graph, specialization):
 
 def _parse_elements(values, defaults):
     default_entries = tuple(defaults)
-    default_by_name = {_element_selection_name(element): element for element in default_entries}
+    default_by_name = _element_selection_map(default_entries)
     supported = set(sfem_supported_element_types())
     supported.update(default_by_name)
-    defaults = tuple(default_by_name)
+    defaults = tuple(_element_selection_name(element) for element in default_entries)
     enabled = set(defaults)
+    enabled.update(default_by_name)
     if not values:
         selected_names = defaults
     else:
@@ -932,6 +937,27 @@ def _parse_elements(values, defaults):
             % (", ".join(disabled), ", ".join(defaults))
         )
     return tuple(default_by_name.get(name, name) for name in selected_names)
+
+
+def _default_elements_for_systems(systems):
+    detected = []
+    for system in systems:
+        for element in sfem_detect_compatible_element_types(system.fields):
+            name = _element_selection_name(element)
+            if name not in {_element_selection_name(existing) for existing in detected}:
+                detected.append(element)
+    if detected:
+        return tuple(detected)
+    return sfem_supported_element_types()
+
+
+def _element_selection_map(elements):
+    by_name = {}
+    for element in elements:
+        by_name[_element_selection_name(element)] = element
+        if isinstance(element, SfemCompatibleElement):
+            by_name[element.cell_element_type] = element
+    return by_name
 
 
 def _element_selection_name(element):
@@ -978,6 +1004,7 @@ def _clean_outputs(out_dir, name):
         "%s_*_reduced_outputs.txt" % name,
         "kernel_math.hpp",
         "kernel_diagnostics.hpp",
+        "tensor_product_kernels.hpp",
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):
@@ -1123,6 +1150,8 @@ __all__ = [
     "run",
     "scalar_field",
     "sfem_cell_rule_points",
+    "sfem_detect_compatible_element_types",
+    "sfem_detect_taylor_hood_element_types",
     "sfem_element_quadrature_rule",
     "sfem_field_n_shape",
     "sfem_fem_policy",
