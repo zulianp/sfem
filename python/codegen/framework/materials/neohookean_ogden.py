@@ -8,29 +8,42 @@ from sfem import gen
 
 mu = gen.material_parameter("mu")
 lmbda = gen.material_parameter("lmbda")
+element = gen.VectorElement(
+    "Lagrange",
+    degree=1,
+)
+V = gen.FunctionSpace(element)
 
 
-def define(system):
-    u = system.VectorCoefficient("u", family="displacement")
+def _build_system(dim):
+    system = gen.EquationSystemBuilder(dim)
+    with gen.geometric_dimension_context(dim):
+        u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
 
-    F = gen.variable(
-        gen.Identity(system.dim) + gen.grad(u),
-        name="F",
-        qualifier=gen.DEFORMATION_GRADIENT,
-    )
-    J = gen.det(F)
-    psi = (
-        mu * (gen.inner(F, F) - system.dim) / 2
-        - mu * sp.log(J)
-        + lmbda * sp.log(J) ** 2 / 2
-    )
+        F = gen.variable(
+            gen.Identity(dim) + gen.grad(u),
+            name="F",
+            qualifier=gen.DEFORMATION_GRADIENT,
+        )
+        J = gen.det(F)
+        psi = (
+            mu * (gen.inner(F, F) - dim) / 2
+            - mu * sp.log(J)
+            + lmbda * sp.log(J) ** 2 / 2
+        )
 
-    system.energy("", psi, fields=(u,))
+        system.add_energy("", psi, fields=(u,), variables=(F,))
+    return system.build()
 
 
-material = gen.UnifiedMaterial(
+systems = gen.EquationSystems()
+for dim in (2, 3):
+    systems.add(_build_system(dim))
+
+
+material = gen.CodeGenerator(
     "neohookean_ogden",
-    define,
+    systems,
     elements=gen.sfem_supported_element_types(),
     op_name="GeneratedNeoHookeanOgden",
     parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),

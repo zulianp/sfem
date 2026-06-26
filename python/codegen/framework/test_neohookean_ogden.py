@@ -903,23 +903,23 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_weak_neohookean_tri3_grad_ref_x", operator_source)
         self.assertIn("generated_weak_neohookean_tri3_grad_ref_y", operator_source)
         self.assertIn(
-            "grad_u_ref[0] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_u_ref0 += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
         self.assertIn(
-            "grad_h_ref[0] += weak_h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_h_ref0 += weak_h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
-        self.assertIn("scalar_t trial_grad[4];", local_source)
-        self.assertIn("scalar_t material[4];", local_source)
-        self.assertIn("scalar_t loperand[4];", local_source)
+        self.assertIn("const scalar_t trial_grad0", local_source)
+        self.assertIn("const scalar_t material0", local_source)
+        self.assertIn("const scalar_t loperand0", local_source)
         self.assertNotIn("scalar_t F[4];", local_source)
         self.assertNotIn("F[0] = 1.0 + grad_u[0];", local_source)
         self.assertNotIn("scalar_t u[N_SHAPE", local_source)
         self.assertNotIn("scalar_t du[N_SHAPE", local_source)
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
         self.assertIn(
-            "weak_out_streams[shape * 2 + 0][lane] += loperand[0] * grad_ref_x[q * N_SHAPE + shape]",
+            "weak_out_streams[shape * 2 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape]",
             local_source,
         )
         self.assertIn("generated_weak_neohookean_tri3_apply_soa_impl<real_t, 1, 3, 8>", operator_source)

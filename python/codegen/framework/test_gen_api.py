@@ -78,6 +78,47 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(v.as_matrix().shape, (2, 1))
         self.assertEqual(du.as_matrix()[1, 0], sp.Symbol("du[1]"))
 
+    def test_ufl_style_function_spaces_and_arguments(self):
+        V = gen.FunctionSpace(
+            gen.VectorElement("Lagrange", degree=2),
+            dim=3,
+        )
+        Q = gen.FunctionSpace(
+            gen.FiniteElement("Lagrange", degree=1),
+            dim=3,
+        )
+        W = gen.MixedFunctionSpace(V, Q)
+
+        u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+        p = gen.Function(Q, "p", qualifier=gen.PRESSURE)
+        v = gen.TestFunction(V, name="v")
+        du = gen.TrialFunction(V, name="du")
+
+        self.assertEqual(len(W), 2)
+        self.assertEqual(u.shape, (3,))
+        self.assertEqual(u.family, "displacement")
+        self.assertEqual(p.shape, ())
+        self.assertEqual(p.family, "pressure")
+        self.assertEqual(v.shape, (3,))
+        self.assertEqual(tuple(v), tuple(sp.Symbol("v[%d]" % i) for i in range(3)))
+        self.assertEqual(du[2], sp.Symbol("du[2]"))
+
+    def test_geometric_vector_space_uses_generation_dimension_context(self):
+        V = gen.FunctionSpace(
+            gen.VectorElement("Lagrange", degree=2)
+        )
+
+        with gen.geometric_dimension_context(2):
+            u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+            v = gen.TestFunction(V, name="v")
+            du = gen.TrialFunction(V, name="du")
+
+        self.assertEqual(u.shape, (2,))
+        self.assertEqual(u.metadata["dim"], 2)
+        self.assertEqual(v.shape, (2,))
+        self.assertEqual(du.shape, (2,))
+        self.assertEqual(tuple(v), (sp.Symbol("v[0]"), sp.Symbol("v[1]")))
+
     def test_ufl_style_operators_return_sympy_expressions(self):
         p = gen.scalar_field("p")
         u = gen.vector_field("u", 2)
@@ -122,11 +163,13 @@ class GenApiTest(unittest.TestCase):
         system = gen.EquationSystem(3)
         displacement = system.vector_field("u", family="displacement")
         pressure = system.scalar_field("p", family="pressure")
+        variables = sp.symbols("F[0:9]")
 
-        energy = system.energy(
+        energy = system.add_energy(
             "solid",
-            lambda F: F[0, 0],
+            variables[0],
             fields=(displacement,),
+            variables=(variables,),
         )
         residual = system.residual(
             "flow",
@@ -144,8 +187,13 @@ class GenApiTest(unittest.TestCase):
         builder = gen.EquationSystemBuilder(3)
         displacement = builder.vector_field("u", family="displacement")
         pressure = builder.scalar_field("p", family="pressure")
+        F = gen.variable(
+            gen.Identity(3) + gen.grad(displacement),
+            name="F",
+            qualifier=gen.DEFORMATION_GRADIENT,
+        )
 
-        builder.hyperelastic("solid", lambda F: F[0, 0], fields=(displacement,))
+        builder.add_energy("solid", F.value[0, 0], fields=(displacement,), variables=(F,))
         builder.residual("flow", lambda residual_system: None, fields=(displacement, pressure))
 
         system = builder.build()
@@ -162,8 +210,8 @@ class GenApiTest(unittest.TestCase):
         builder = gen.EquationSystemBuilder(1)
         p = builder.scalar_field("p")
 
-        energy = builder.derive_energy_forms(p * p, fields=(p,))
-        merit = builder.derive_merit_forms(p * p + p, fields=(p,))
+        energy = builder.derive_energy_forms(p * p, variables=p)
+        merit = builder.derive_merit_forms(p * p + p, variables=p)
 
         self.assertEqual(tuple(energy.standard_forms()), ("form_0", "form_1", "form_2"))
         self.assertIs(energy.standard_form(gen.StandardFormName.TWO), energy.forms[2])
@@ -174,6 +222,48 @@ class GenApiTest(unittest.TestCase):
             sp.Matrix([2 * sp.Symbol("p_trial")]),
         )
         self.assertEqual(merit.forms[1].expression, sp.Matrix([2 * p.value + 1]))
+
+    def test_energy_equation_uses_explicit_differentiation_variables(self):
+        builder = gen.EquationSystemBuilder(1)
+        p = builder.scalar_field("p")
+
+        equation = builder.add_energy("stored", p * p, fields=(p,), variables=(p,))
+        evaluated = gen._evaluate_equation(1, equation)
+
+        self.assertEqual(equation.variables, (p.value,))
+        self.assertEqual(
+            evaluated.form_evaluation.form(gen.FormOrder.ONE).expression,
+            sp.Matrix([2 * p.value]),
+        )
+        self.assertEqual(
+            evaluated.form_evaluation.form(gen.FormOrder.TWO).expression,
+            sp.Matrix([2 * sp.Symbol("p_trial")]),
+        )
+
+    def test_hyperelastic_energy_records_deformation_gradient_explicitly(self):
+        builder = gen.EquationSystemBuilder(2)
+        u = builder.vector_field("u", family="displacement")
+        F = gen.variable(
+            gen.Identity(2) + gen.grad(u),
+            name="F",
+            qualifier=gen.DEFORMATION_GRADIENT,
+        )
+
+        equation = builder.add_energy("solid", gen.inner(F, F), fields=(u,), variables=(F,))
+
+        self.assertEqual(equation.variables, tuple(F.value))
+
+    def test_code_generator_requires_explicit_equation_systems(self):
+        builder = gen.EquationSystemBuilder(2)
+        p = builder.scalar_field("p")
+        builder.add_energy("", p * p, fields=(p,), variables=(p,))
+        systems = gen.EquationSystems(builder.build())
+
+        material = gen.CodeGenerator("explicit_system", systems, elements=("TRI3",))
+
+        self.assertEqual(material.systems.dims, (2,))
+        with self.assertRaisesRegex(TypeError, "not a callback"):
+            gen.CodeGenerator("callback_system", lambda system: None, elements=("TRI3",))
 
     def test_equation_system_builder_derives_residual_and_jacobian_action_forms(self):
         builder = gen.EquationSystemBuilder(2)

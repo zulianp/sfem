@@ -11,12 +11,17 @@ import sympy as sp
 from ._gen_op import generate_op_files
 from codegen.framework import (
     CodegenQualifier,
-    Coefficient,
     CoupledResidualSystem,
     DEFORMATION_GRADIENT,
+    DISPLACEMENT,
     EquationForm,
     EquationSystem,
     EquationSystemBuilder,
+    EquationSystems,
+    FiniteElement,
+    FieldQualifier,
+    Function,
+    FunctionSpace,
     GeneratedKernelFile,
     Identity,
     HyperelasticQualifier,
@@ -24,6 +29,8 @@ from codegen.framework import (
     MATERIAL_PARAMETER,
     MaterialParameter,
     MaterialParameterQualifier,
+    MixedFunctionSpace,
+    PRESSURE,
     PREVIOUS_ARGUMENT,
     PreviousFunction,
     QualifiedExpression,
@@ -41,11 +48,17 @@ from codegen.framework import (
     PipelineStage,
     StandardFormName,
     VectorField,
+    VectorElement,
+    VectorFunctionSpace,
+    VectorFunction,
+    TensorFunction,
     coupled_residual_weak_coefficients,
+    current_geometric_dimension,
     energy_form_pipeline,
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
     generate_sfem_soa_cpp_files_for_element,
+    geometric_dimension_context,
     matrix_inner,
     residual_form_pipeline,
     sfem_soa_kernel_form,
@@ -83,53 +96,22 @@ DEFAULT_VECTOR_SIZE = 16
 
 
 @dataclass(frozen=True)
-class HyperelasticMaterial:
+class CodeGenerator:
     name: str
-    energy: object
-    elements: tuple = ()
-    kernels: tuple = ("objective", "gradient", "apply")
-    diagnostics: bool = True
-    op_name: str = None
-    parameter_defaults: tuple = ()
-
-    def __post_init__(self):
-        _validate_name(self.name)
-        if not callable(self.energy):
-            raise TypeError("energy must be callable")
-        _validate_op(self.op_name, self.parameter_defaults)
-
-
-@dataclass(frozen=True)
-class CoupledResidualMaterial:
-    name: str
-    define: object
+    systems: object
     elements: tuple
     op_name: str = None
     parameter_defaults: tuple = ()
 
     def __post_init__(self):
         _validate_name(self.name)
-        if not callable(self.define):
-            raise TypeError("define must be callable")
+        if callable(self.systems):
+            raise TypeError("CodeGenerator requires equation systems, not a callback")
+        object.__setattr__(self, "systems", _as_equation_systems(self.systems))
+        if not self.systems:
+            raise ValueError("code generators require at least one equation system")
         if not self.elements:
-            raise ValueError("coupled residual materials require supported elements")
-        _validate_op(self.op_name, self.parameter_defaults)
-
-
-@dataclass(frozen=True)
-class UnifiedMaterial:
-    name: str
-    define: object
-    elements: tuple
-    op_name: str = None
-    parameter_defaults: tuple = ()
-
-    def __post_init__(self):
-        _validate_name(self.name)
-        if not callable(self.define):
-            raise TypeError("define must be callable")
-        if not self.elements:
-            raise ValueError("unified materials require supported elements")
+            raise ValueError("code generators require supported elements")
         _validate_op(self.op_name, self.parameter_defaults)
 
 
@@ -140,11 +122,11 @@ class GenerationResult:
 
 
 @dataclass(frozen=True)
-class _HyperelasticOpMaterialAdapter:
+class _EnergyOpMaterialAdapter:
     name: str
-    energy: object
     op_name: str
     parameter_defaults: tuple
+    energy: bool = True
 
 
 @dataclass(frozen=True)
@@ -234,10 +216,11 @@ class UserInputStage:
 
 
 @dataclass(frozen=True)
-class HyperelasticDimensionEvaluation:
+class EnergyDimensionEvaluation:
     name: str
     form_evaluation: FormEvaluation
     deformation_gradient: object
+    variables: tuple
     kernels: tuple
     diagnostics: bool
 
@@ -267,7 +250,7 @@ class UnifiedFormEvaluation:
 
 
 class CodeGenerationKind(Enum):
-    HYPERELASTIC_SOA = "hyperelastic_soa"
+    ENERGY_SOA = "energy_soa"
     RESIDUAL_SOA = "residual_soa"
 
 
@@ -284,7 +267,7 @@ class CodeGenerationUnit:
 
 
 @dataclass(frozen=True)
-class HyperelasticCodeGenerationPayload:
+class EnergyCodeGenerationPayload:
     kernel_forms: tuple
     diagnostic_graph: object
     diagnostics: bool
@@ -444,9 +427,9 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
     units = []
     for dim_eval in form_evaluation.by_dim.values():
         for evaluated in dim_eval.units:
-            if isinstance(evaluated, HyperelasticDimensionEvaluation):
+            if isinstance(evaluated, EnergyDimensionEvaluation):
                 units.append(
-                    _hyperelastic_codegen_unit(
+                    _energy_codegen_unit(
                         form_evaluation.material.name,
                         dim_eval.dim,
                         evaluated,
@@ -467,7 +450,13 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
     return CodeGenerationPlan(tuple(units))
 
 
-def _hyperelastic_codegen_unit(material_name, dim, evaluated):
+def _energy_codegen_unit(material_name, dim, evaluated):
+    if evaluated.deformation_gradient.shape != (dim, dim):
+        raise ValueError(
+            "energy code generation currently requires %d x %d explicit variables; "
+            "got %d variables for energy unit '%s'"
+            % (dim, dim, len(evaluated.variables), evaluated.name or material_name)
+        )
     weak_form = sfem_soa_weak_form(
         evaluated.form_evaluation.form(FormOrder.ZERO).expression,
         evaluated.deformation_gradient,
@@ -495,11 +484,11 @@ def _hyperelastic_codegen_unit(material_name, dim, evaluated):
             )
         )
     return CodeGenerationUnit(
-        CodeGenerationKind.HYPERELASTIC_SOA,
+        CodeGenerationKind.ENERGY_SOA,
         material_name,
         evaluated.name,
         dim,
-        HyperelasticCodeGenerationPayload(
+        EnergyCodeGenerationPayload(
             kernel_forms,
             diagnostic_graph,
             evaluated.diagnostics,
@@ -523,14 +512,14 @@ def _residual_codegen_unit(material_name, dim, evaluated):
 
 
 def _emit_codegen_unit(unit, context):
-    if unit.kind is CodeGenerationKind.HYPERELASTIC_SOA:
-        return _emit_hyperelastic_soa(unit, context)
+    if unit.kind is CodeGenerationKind.ENERGY_SOA:
+        return _emit_energy_soa(unit, context)
     if unit.kind is CodeGenerationKind.RESIDUAL_SOA:
         return _emit_residual_soa(unit, context)
     raise ValueError("unsupported code generation unit kind %s" % unit.kind)
 
 
-def _emit_hyperelastic_soa(unit, context):
+def _emit_energy_soa(unit, context):
     payload = unit.payload
     generated_prefix = _unit_generated_prefix(unit)
     files = list(
@@ -600,41 +589,25 @@ def _emit_residual_soa(unit, context):
 
 
 def _material_equations(material, dim):
-    builder = EquationSystemBuilder(dim)
-    if isinstance(material, HyperelasticMaterial):
-        builder.energy(
-            "",
-            material.energy,
-            kernels=material.kernels,
-            diagnostics=material.diagnostics,
-        )
-        return builder.equations
-    if isinstance(material, CoupledResidualMaterial):
-        builder.residual("", material.define)
-        return builder.equations
-    if isinstance(material, UnifiedMaterial):
-        material.define(builder)
-        return builder.equations
-    raise TypeError("unsupported material type %s" % type(material).__name__)
+    if not isinstance(material, CodeGenerator):
+        raise TypeError("generation requires CodeGenerator")
+    return material.systems.for_dim(dim).equations
 
 
 def _generate_op_wrapper_files(material, selected, user_input):
-    if not isinstance(material, UnifiedMaterial):
-        return generate_op_files(material, selected)
     if not user_input.element_contexts:
         raise ValueError("generated Op wrapper requires at least one element context")
     representative_dim = user_input.element_contexts[0].specialization.dim
     equations = _material_equations(material, representative_dim)
     if len(equations) != 1 or equations[0].name:
         raise ValueError(
-            "generated Op wrappers for UnifiedMaterial require exactly one unnamed equation"
+            "generated Op wrappers for CodeGenerator require exactly one unnamed equation"
         )
     equation = equations[0]
     if equation.is_energy:
         return generate_op_files(
-            _HyperelasticOpMaterialAdapter(
+            _EnergyOpMaterialAdapter(
                 material.name,
-                equation.define,
                 material.op_name,
                 material.parameter_defaults,
             ),
@@ -662,29 +635,46 @@ def _evaluate_equation(dim, equation):
 
 
 def _evaluate_energy_equation(dim, equation):
-    orders = _hyperelastic_form_orders(equation.kernels)
-    deformation_gradient = sp.Matrix(
-        dim,
-        dim,
-        tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
-    )
-    directions = (
-        tuple(sp.symbols("dF[%d]" % i) for i in range(dim * dim))
-        if FormOrder.TWO in orders
-        else None
-    )
+    orders = _energy_form_orders(equation.kernels)
+    variables = tuple(equation.variables)
+    if not variables:
+        raise ValueError("energy equation '%s' requires explicit variables" % equation.name)
+    data_symbols = _energy_data_symbols(dim, variables)
+    directions = None
+    if FormOrder.TWO in orders:
+        directions = tuple(equation.directions) or _default_energy_directions(variables)
     energy_pipeline = energy_form_pipeline(
-        equation.define(deformation_gradient),
-        tuple(deformation_gradient),
+        equation.define,
+        variables,
         directions,
     )
-    return HyperelasticDimensionEvaluation(
+    return EnergyDimensionEvaluation(
         equation.name,
         energy_pipeline.evaluate(orders),
-        deformation_gradient,
+        data_symbols,
+        variables,
         equation.kernels,
         equation.diagnostics,
     )
+
+
+def _energy_data_symbols(dim, variables):
+    if len(variables) == dim * dim:
+        return sp.Matrix(dim, dim, variables)
+    return sp.Matrix(len(variables), 1, variables)
+
+
+def _default_energy_directions(variables):
+    directions = []
+    for variable in variables:
+        name = str(variable)
+        if name.startswith("F["):
+            directions.append(sp.Symbol("d%s" % name))
+        elif "[" in name:
+            directions.append(sp.Symbol("d_%s" % name))
+        else:
+            directions.append(sp.Symbol("%s_trial" % name))
+    return tuple(directions)
 
 
 def _evaluate_residual_equation(dim, equation):
@@ -743,7 +733,7 @@ def _unit_report_name(unit):
     return _unit_output_name(unit)
 
 
-def _hyperelastic_form_orders(kernels):
+def _energy_form_orders(kernels):
     order_by_kernel = {
         "objective": FormOrder.ZERO,
         "gradient": FormOrder.ONE,
@@ -830,6 +820,16 @@ def _element_selection_name(element):
     return str(element).upper()
 
 
+def _as_equation_systems(systems):
+    if isinstance(systems, EquationSystems):
+        return systems
+    if isinstance(systems, EquationSystem):
+        return EquationSystems(systems)
+    if isinstance(systems, (tuple, list)):
+        return EquationSystems(*systems)
+    raise TypeError("CodeGenerator requires EquationSystem or EquationSystems")
+
+
 def _merge_files(outputs, files):
     for generated in files:
         existing = outputs.get(generated.path)
@@ -914,22 +914,29 @@ def _validate_op(op_name, parameter_defaults):
 
 
 __all__ = [
-    "CoupledResidualMaterial",
     "CoupledResidualSystem",
     "CodegenQualifier",
-    "Coefficient",
     "DEFAULT_VECTOR_SIZE",
     "DEFORMATION_GRADIENT",
+    "DISPLACEMENT",
     "EquationForm",
     "EquationSystem",
     "EquationSystemBuilder",
+    "EquationSystems",
+    "FiniteElement",
+    "FieldQualifier",
+    "Function",
+    "FunctionSpace",
     "GenerationResult",
-    "HyperelasticMaterial",
+    "current_geometric_dimension",
+    "geometric_dimension_context",
     "HyperelasticQualifier",
     "Identity",
     "MATERIAL_PARAMETER",
     "MaterialParameter",
     "MaterialParameterQualifier",
+    "MixedFunctionSpace",
+    "PRESSURE",
     "PREVIOUS_ARGUMENT",
     "PreviousFunction",
     "QualifiedExpression",
@@ -939,14 +946,16 @@ __all__ = [
     "SymbolicField",
     "TEST_ARGUMENT",
     "TensorField",
-    "TensorCoefficient",
+    "TensorFunction",
     "TestFunction",
     "TRIAL_ARGUMENT",
     "TrialFunction",
     "TwoPhaseFlowConstitutiveModel",
-    "UnifiedMaterial",
+    "CodeGenerator",
     "VectorField",
-    "VectorCoefficient",
+    "VectorFunction",
+    "VectorElement",
+    "VectorFunctionSpace",
     "adjugate",
     "det",
     "deformation_gradient",
