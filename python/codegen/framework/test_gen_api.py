@@ -541,49 +541,53 @@ class GenApiTest(unittest.TestCase):
         self.assertTrue(context.is_mixed_order)
 
     def test_geometry_policy_nodes_describe_affine_and_isoparametric_paths(self):
-        tri_context = gen.ElementGenerationContext.create(
-            "test_material",
-            "TRI3",
-            16,
-            None,
-        )
-        tri_affine = tri_context.geometry_plan(gen.GeometryMode.AFFINE)
-        tri_iso = tri_context.geometry_plan(gen.GeometryMode.ISOPARAMETRIC)
+        for element, expected_dim, tensor_product in (
+            ("TRI3", 2, False),
+            ("TET4", 3, False),
+            ("QUAD4", 2, True),
+            ("HEX8", 3, True),
+        ):
+            context = gen.ElementGenerationContext.create(
+                "test_material",
+                element,
+                16,
+                None,
+            )
+            affine = context.geometry_plan(gen.GeometryMode.AFFINE)
+            iso = context.geometry_plan(gen.GeometryMode.ISOPARAMETRIC)
 
-        self.assertTrue(tri_affine.is_affine)
-        self.assertEqual(tri_affine.input_layout, gen.GeometryInputLayout.ADJUGATE_DETERMINANT_SOA)
-        self.assertEqual(tri_affine.evaluation, gen.GeometryEvaluation.ROUTE_PRECOMPUTED_AFFINE)
-        self.assertEqual(tri_affine.jacobian_scope, "element")
-        self.assertEqual(tri_affine.geometry_points_per_element, 1)
-        self.assertEqual(tri_affine.geometry_stream_count, 2 * 2 + 1)
-        self.assertTrue(tri_affine.requires_adjugate_determinant_streams)
-        self.assertFalse(tri_affine.uses_sum_factorization)
+            self.assertTrue(affine.is_affine)
+            self.assertEqual(affine.element_type, element)
+            self.assertEqual(affine.dim, expected_dim)
+            self.assertEqual(affine.input_layout, gen.GeometryInputLayout.ADJUGATE_DETERMINANT_SOA)
+            self.assertEqual(affine.evaluation, gen.GeometryEvaluation.ROUTE_PRECOMPUTED_AFFINE)
+            self.assertEqual(affine.jacobian_scope, "element")
+            self.assertEqual(affine.geometry_points_per_element, 1)
+            self.assertEqual(affine.geometry_stream_count, expected_dim * expected_dim + 1)
+            self.assertTrue(affine.requires_adjugate_determinant_streams)
+            self.assertFalse(affine.uses_sum_factorization)
 
-        self.assertTrue(tri_iso.is_isoparametric)
-        self.assertEqual(tri_iso.input_layout, gen.GeometryInputLayout.COORDINATE_AOS)
-        self.assertEqual(tri_iso.evaluation, gen.GeometryEvaluation.SIMPLEX_REFERENCE)
-        self.assertEqual(tri_iso.jacobian_scope, "quadrature_point")
-        self.assertEqual(tri_iso.geometry_points_per_element, tri_context.specialization.n_qp)
-        self.assertTrue(tri_iso.requires_coordinates)
-        self.assertFalse(tri_iso.uses_sum_factorization)
-
-        hex_context = gen.ElementGenerationContext.create(
-            "test_material",
-            "HEX8",
-            16,
-            None,
-        )
-        hex_iso = hex_context.geometry_plan("isoparametric")
-        self.assertEqual(hex_iso.element_type, "HEX8")
-        self.assertEqual(hex_iso.evaluation, gen.GeometryEvaluation.TENSOR_PRODUCT_SUM_FACTOR)
-        self.assertEqual(hex_iso.geometry_points_per_element, hex_context.specialization.n_qp)
-        self.assertTrue(hex_iso.uses_sum_factorization)
-        self.assertIsInstance(hex_iso.sum_factorization_plan, gen.TensorProductSumFactorizationPlan)
-        self.assertTrue(hex_iso.sum_factorization_plan.evaluates_geometry_jacobian)
-        self.assertEqual(
-            hex_iso.sum_factorization_plan.operations,
-            (gen.TensorProductOperation.GEOMETRY_JACOBIAN,),
-        )
+            self.assertTrue(iso.is_isoparametric)
+            self.assertEqual(iso.element_type, element)
+            self.assertEqual(iso.dim, expected_dim)
+            self.assertEqual(iso.input_layout, gen.GeometryInputLayout.COORDINATE_AOS)
+            self.assertEqual(iso.jacobian_scope, "quadrature_point")
+            self.assertEqual(iso.geometry_points_per_element, context.specialization.n_qp)
+            self.assertEqual(iso.geometry_stream_count, expected_dim * expected_dim + 1)
+            self.assertTrue(iso.requires_coordinates)
+            if tensor_product:
+                self.assertEqual(iso.evaluation, gen.GeometryEvaluation.TENSOR_PRODUCT_SUM_FACTOR)
+                self.assertTrue(iso.uses_sum_factorization)
+                self.assertIsInstance(iso.sum_factorization_plan, gen.TensorProductSumFactorizationPlan)
+                self.assertTrue(iso.sum_factorization_plan.evaluates_geometry_jacobian)
+                self.assertEqual(
+                    iso.sum_factorization_plan.operations,
+                    (gen.TensorProductOperation.GEOMETRY_JACOBIAN,),
+                )
+            else:
+                self.assertEqual(iso.evaluation, gen.GeometryEvaluation.SIMPLEX_REFERENCE)
+                self.assertFalse(iso.uses_sum_factorization)
+                self.assertIsNone(iso.sum_factorization_plan)
 
         mixed_context = gen.ElementGenerationContext.create(
             "test_material",
@@ -732,6 +736,86 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>", hyper_lines)
         self.assertIn("coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE", hyper_lines)
         self.assertNotIn("coordinate_value", hyper_lines)
+
+    def test_generation_plan_schema_validates_kernel_blocks_and_streams(self):
+        context = gen.ElementGenerationContext.create("test_material", "TRI3", 16, None)
+        user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
+        form_evaluation = gen._evaluate_forms(user_input)
+        form_collection = form_evaluation.by_dim[2].units[0].form_evaluation
+        stream = gen.DataStreamPlan(
+            "u",
+            gen.DataStreamRole.FIELD,
+            gen.DataStreamLayout.SOA,
+            components=2,
+            n_items=context.basis_plan().n_shape,
+        )
+        geometry = gen.GeometryPlan(context.geometry_plan("affine"), (stream,))
+        block = gen.BlockPlan(
+            "u_u",
+            "u",
+            "u",
+            gen.FormOrder.TWO,
+            (
+                gen.LocalPhase.EVALUATE_TRIAL,
+                gen.LocalPhase.EVALUATE_MATERIAL,
+                gen.LocalPhase.CONTRACT_TEST,
+            ),
+            (stream,),
+            (context.basis_plan(),),
+        )
+        kernel = gen.KernelPlan(
+            "test_material_solid",
+            "energy",
+            form_collection,
+            2,
+            (
+                gen.MeshPhase.GEOMETRY,
+                gen.MeshPhase.LOCAL_CALL,
+                gen.MeshPhase.SCATTER,
+            ),
+            geometry,
+            (block,),
+            (stream,),
+        )
+        plan = gen.GenerationPlan((kernel,))
+
+        self.assertEqual(plan.stage, gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION)
+        self.assertEqual(plan.units_for_context(context), (kernel,))
+        self.assertTrue(block.is_diagonal)
+        self.assertEqual(geometry.mode, gen.GeometryMode.AFFINE)
+
+    def test_specialized_form_manipulation_returns_generation_plan(self):
+        energy_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
+        energy_plan = gen.SpecializedFormManipulationStage(
+            energy_input,
+            gen._evaluate_forms(energy_input),
+        ).run()
+        self.assertIsInstance(energy_plan, gen.GenerationPlan)
+        self.assertTrue(all(isinstance(unit, gen.KernelPlan) for unit in energy_plan.units))
+        self.assertEqual(
+            energy_plan.units[0].mesh_phases,
+            (
+                gen.MeshPhase.GEOMETRY,
+                gen.MeshPhase.LOCAL_CALL,
+                gen.MeshPhase.SCATTER,
+            ),
+        )
+
+        residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        residual_plan = gen.SpecializedFormManipulationStage(
+            residual_input,
+            gen._evaluate_forms(residual_input),
+        ).run()
+        self.assertIsInstance(residual_plan, gen.GenerationPlan)
+        self.assertEqual(
+            residual_plan.units[0].mesh_phases,
+            (
+                gen.MeshPhase.GATHER,
+                gen.MeshPhase.GEOMETRY,
+                gen.MeshPhase.LOCAL_CALL,
+                gen.MeshPhase.SCATTER,
+            ),
+        )
 
     def test_rejects_equal_order_poro_hyperelastic_element(self):
         with tempfile.TemporaryDirectory() as out_dir:
