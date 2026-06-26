@@ -18,6 +18,8 @@ Generate the cpp OOP wrapper inheriting from sfem::Op, see sfem_NeoHookeanOgden.
 @materials Create the material for The Holzapfel-Gasser-Ogden (HGO) strain energy function workflow (see neoohokean_ogden.py for reference)
 
 
+The Jacobian computed from the points per quadrature point for tensor-product elements must use sum factorization
+
 <!-- RESIDUAL BASED MATERIALS -->
 
 The residual code generator injects depencies in kernels that are not actually needed (e.g., see the hessian action passing the old/previous timestep quantities). The symbolic framework must make sure that no unneeded quantities are passed to the kernels.
