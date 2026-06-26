@@ -141,6 +141,16 @@ Each `ElementGenerationContext` also carries explicit geometry plan nodes:
 This keeps geometry policy at the form-manipulation boundary instead of hiding
 it inside material-specific code generators.
 
+The same context carries basis plan nodes:
+
+- simplex basis evaluation uses direct quadrature-point shape and gradient
+  arrays;
+- tensor-product basis evaluation uses 1D shape/gradient data and marks values,
+  gradients, and later test contractions as sum-factorized;
+- mixed-order fields can ask the context for field-specific basis plans, so
+  field shape counts and scatter sizes come from field-family compatibility
+  metadata while still being evaluated on the cell quadrature rule.
+
 ### 4. Unified Code Generation
 
 `CodeGenerationStage` is the only stage that emits generated source files.

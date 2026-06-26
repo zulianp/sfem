@@ -14,6 +14,10 @@ from codegen.framework import (
     CoupledResidualSystem,
     DEFORMATION_GRADIENT,
     DISPLACEMENT,
+    BasisDataLayout,
+    BasisEvaluation,
+    BasisFamily,
+    BasisPlanNode,
     EquationForm,
     EquationSystem,
     EquationSystemBuilder,
@@ -78,10 +82,15 @@ from codegen.framework import (
     vector_field,
     adjugate,
     affine_geometry_plan,
+    basis_plan_for_element_at_cell_rule,
+    basis_plan_for_quadrature_rule,
+    basis_plans_for_fem_policy,
     det,
     deformation_gradient,
     derivative,
     div,
+    field_basis_plan_for_fem_policy,
+    field_basis_plans_for_fem_policy,
     grad,
     inner,
     inv,
@@ -169,10 +178,12 @@ class ElementGenerationContext:
     specialization: object
     fem_policy: object
     geometry_plans: tuple
+    basis_plans: tuple
     compatible_element: object = None
 
     def __post_init__(self):
         object.__setattr__(self, "geometry_plans", tuple(self.geometry_plans))
+        object.__setattr__(self, "basis_plans", tuple(self.basis_plans))
         seen = set()
         for plan in self.geometry_plans:
             if not isinstance(plan, GeometryPlanNode):
@@ -190,6 +201,23 @@ class ElementGenerationContext:
             if plan.mode in seen:
                 raise ValueError("duplicate geometry plan mode '%s'" % plan.mode.value)
             seen.add(plan.mode)
+        seen = set()
+        for plan in self.basis_plans:
+            if not isinstance(plan, BasisPlanNode):
+                raise TypeError("basis_plans must contain BasisPlanNode objects")
+            if plan.cell_element_type != self.element_type:
+                raise ValueError(
+                    "basis plan cell element '%s' does not match context element '%s'"
+                    % (plan.cell_element_type, self.element_type)
+                )
+            if plan.dim != self.specialization.dim:
+                raise ValueError(
+                    "basis plan dimension %d does not match context dimension %d"
+                    % (plan.dim, self.specialization.dim)
+                )
+            if plan.role in seen:
+                raise ValueError("duplicate basis plan role '%s'" % plan.role)
+            seen.add(plan.role)
 
     @classmethod
     def create(cls, material_name, element, vector_size, quadrature_order):
@@ -201,6 +229,7 @@ class ElementGenerationContext:
             policy.specialization,
             policy,
             geometry_plans_for_fem_policy(policy),
+            basis_plans_for_fem_policy(policy),
             policy.compatible_element,
         )
 
@@ -234,6 +263,19 @@ class ElementGenerationContext:
             if plan.mode is mode:
                 return plan
         raise ValueError("geometry mode '%s' is not available" % mode.value)
+
+    def basis_plan(self, role="cell"):
+        role = str(role)
+        for plan in self.basis_plans:
+            if plan.role == role:
+                return plan
+        raise ValueError("basis plan role '%s' is not available" % role)
+
+    def field_basis_plan(self, field):
+        return field_basis_plan_for_fem_policy(self.fem_policy, field)
+
+    def field_basis_plans(self, fields):
+        return field_basis_plans_for_fem_policy(self.fem_policy, fields)
 
 
 @dataclass(frozen=True)
@@ -1002,6 +1044,10 @@ __all__ = [
     "FormBlock",
     "FormQualifier",
     "GenerationResult",
+    "BasisDataLayout",
+    "BasisEvaluation",
+    "BasisFamily",
+    "BasisPlanNode",
     "GeometryEvaluation",
     "GeometryInputLayout",
     "GeometryMode",
@@ -1040,10 +1086,15 @@ __all__ = [
     "VectorFunctionSpace",
     "adjugate",
     "affine_geometry_plan",
+    "basis_plan_for_element_at_cell_rule",
+    "basis_plan_for_quadrature_rule",
+    "basis_plans_for_fem_policy",
     "det",
     "deformation_gradient",
     "derivative",
     "div",
+    "field_basis_plan_for_fem_policy",
+    "field_basis_plans_for_fem_policy",
     "generate",
     "geometry_plans_for_fem_policy",
     "grad",

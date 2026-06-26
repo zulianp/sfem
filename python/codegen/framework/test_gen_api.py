@@ -571,6 +571,83 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(mixed_iso.n_shape, 27)
         self.assertTrue(mixed_iso.uses_sum_factorization)
 
+    def test_basis_policy_nodes_describe_simplex_tensor_and_mixed_fields(self):
+        tri_context = gen.ElementGenerationContext.create(
+            "test_material",
+            "TRI3",
+            16,
+            None,
+        )
+        tri_basis = tri_context.basis_plan()
+        self.assertIsInstance(tri_basis, gen.BasisPlanNode)
+        self.assertEqual(tri_basis.family, gen.BasisFamily.SIMPLEX)
+        self.assertEqual(tri_basis.evaluation, gen.BasisEvaluation.DIRECT_REFERENCE)
+        self.assertEqual(tri_basis.data_layout, gen.BasisDataLayout.QP_SHAPE)
+        self.assertEqual(tri_basis.n_shape, 3)
+        self.assertEqual(tri_basis.n_qp, 1)
+        self.assertEqual(tri_basis.reference_shape_size, 3)
+        self.assertEqual(tri_basis.reference_gradient_size, 1 * 3 * 2)
+        self.assertEqual(tri_basis.scatter_n_shape, 3)
+        self.assertFalse(tri_basis.uses_sum_factorization)
+
+        hex_context = gen.ElementGenerationContext.create(
+            "test_material",
+            "HEX27",
+            16,
+            None,
+        )
+        hex_basis = hex_context.basis_plan("cell")
+        self.assertEqual(hex_basis.family, gen.BasisFamily.TENSOR_PRODUCT)
+        self.assertEqual(hex_basis.evaluation, gen.BasisEvaluation.TENSOR_PRODUCT_SUM_FACTOR)
+        self.assertEqual(hex_basis.data_layout, gen.BasisDataLayout.TENSOR_PRODUCT_1D)
+        self.assertEqual(hex_basis.n_shape, 27)
+        self.assertEqual(hex_basis.n_qp, 27)
+        self.assertEqual(hex_basis.n_shape_1d, 3)
+        self.assertEqual(hex_basis.n_qp_1d, 3)
+        self.assertEqual(hex_basis.reference_shape_size, 9)
+        self.assertEqual(hex_basis.reference_gradient_size, 9)
+        self.assertTrue(hex_basis.uses_sum_factorization)
+
+        mixed_context = gen.ElementGenerationContext.create(
+            "test_material",
+            poro_hyperelasticity.elements[2],
+            16,
+            None,
+        )
+        builder = gen.EquationSystemBuilder(3)
+        u = builder.vector_field("u", family="displacement")
+        p = builder.scalar_field("p", family="pressure")
+        displacement_basis, pressure_basis = mixed_context.field_basis_plans((u, p))
+        self.assertEqual(displacement_basis.role, "field:u")
+        self.assertEqual(displacement_basis.element_type, "HEX27")
+        self.assertEqual(displacement_basis.cell_element_type, "HEX27")
+        self.assertEqual(displacement_basis.n_shape, 27)
+        self.assertTrue(displacement_basis.uses_sum_factorization)
+        self.assertEqual(pressure_basis.role, "field:p")
+        self.assertEqual(pressure_basis.element_type, "HEX8")
+        self.assertEqual(pressure_basis.cell_element_type, "HEX27")
+        self.assertEqual(pressure_basis.n_shape, 8)
+        self.assertEqual(pressure_basis.n_qp, 27)
+        self.assertEqual(pressure_basis.n_shape_1d, 2)
+        self.assertEqual(pressure_basis.n_qp_1d, 3)
+        self.assertEqual(pressure_basis.scatter_n_shape, 8)
+        self.assertTrue(pressure_basis.uses_sum_factorization)
+
+        simplex_mixed_context = gen.ElementGenerationContext.create(
+            "test_material",
+            poro_hyperelasticity.elements[0],
+            16,
+            None,
+        )
+        pressure_basis = simplex_mixed_context.field_basis_plan(p)
+        self.assertEqual(pressure_basis.element_type, "TRI3")
+        self.assertEqual(pressure_basis.cell_element_type, "TRI6")
+        self.assertEqual(pressure_basis.family, gen.BasisFamily.SIMPLEX)
+        self.assertEqual(pressure_basis.n_shape, 3)
+        self.assertEqual(pressure_basis.n_qp, 3)
+        self.assertEqual(pressure_basis.reference_shape_size, 3 * 3)
+        self.assertEqual(pressure_basis.reference_gradient_size, 3 * 3 * 2)
+
     def test_rejects_equal_order_poro_hyperelastic_element(self):
         with tempfile.TemporaryDirectory() as out_dir:
             with self.assertRaisesRegex(ValueError, "not enabled"):
