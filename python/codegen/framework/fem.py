@@ -164,6 +164,18 @@ class SfemElementQuadratureRule:
 
 
 @dataclass(frozen=True)
+class SfemReferenceData:
+    name: str
+    values: Tuple[float, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, "name", str(self.name))
+        object.__setattr__(self, "values", tuple(float(value) for value in self.values))
+        if not self.name:
+            raise ValueError("reference data requires a name")
+
+
+@dataclass(frozen=True)
 class SfemSoAElementSpecialization:
     quadrature_rule: SfemElementQuadratureRule
     vector_size: int = 16
@@ -239,6 +251,158 @@ class SfemCompatibleElement:
             if field == field_name:
                 return element
         return self.cell_element_type
+
+
+@dataclass(frozen=True)
+class SfemElementBasisPolicy:
+    element_type: str
+    dim: int
+    n_shape: int
+    family: str
+    degree: int
+    cell: str
+    is_tensor_product: bool
+
+    def __post_init__(self):
+        element_type = str(self.element_type).upper()
+        dim = int(self.dim)
+        n_shape = int(self.n_shape)
+        family = str(self.family)
+        degree = int(self.degree)
+        cell = str(self.cell)
+        is_tensor_product = bool(self.is_tensor_product)
+        object.__setattr__(self, "element_type", element_type)
+        object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "n_shape", n_shape)
+        object.__setattr__(self, "family", family)
+        object.__setattr__(self, "degree", degree)
+        object.__setattr__(self, "cell", cell)
+        object.__setattr__(self, "is_tensor_product", is_tensor_product)
+        if family not in ("simplex", "tensor_product"):
+            raise ValueError("basis family must be 'simplex' or 'tensor_product'")
+        if dim <= 0 or n_shape <= 0 or degree <= 0:
+            raise ValueError("basis policy dim, n_shape, and degree must be positive")
+
+
+@dataclass(frozen=True)
+class SfemFieldFamilyCompatibilityPolicy:
+    cell_element_type: str
+    field_element_types: tuple = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "cell_element_type", str(self.cell_element_type).upper())
+        object.__setattr__(
+            self,
+            "field_element_types",
+            tuple(
+                (str(family), str(element).upper())
+                for family, element in self.field_element_types
+            ),
+        )
+
+    @classmethod
+    def from_element(cls, element):
+        if isinstance(element, SfemCompatibleElement):
+            return cls(element.cell_element_type, element.field_element_types)
+        return cls(str(element).upper(), ())
+
+    @property
+    def is_mixed_order(self):
+        return any(
+            element != self.cell_element_type
+            for _, element in self.field_element_types
+        )
+
+    def element_for_family(self, family):
+        family = str(family)
+        for field_family, element in self.field_element_types:
+            if field_family == family:
+                return element
+        return self.cell_element_type
+
+    def element_for_field(self, field):
+        family = getattr(field, "family", "") or getattr(field, "name", "")
+        return self.element_for_family(family)
+
+    def field_element_types_for(self, fields):
+        return tuple((field, self.element_for_field(field)) for field in fields)
+
+
+@dataclass(frozen=True)
+class SfemFEMPolicy:
+    element: object
+    label: str
+    cell_element_type: str
+    basis: SfemElementBasisPolicy
+    quadrature_rule: SfemElementQuadratureRule
+    specialization: SfemSoAElementSpecialization
+    compatibility: SfemFieldFamilyCompatibilityPolicy
+    compatible_element: object = None
+
+    @property
+    def family(self):
+        return self.basis.family
+
+    @property
+    def dim(self):
+        return self.basis.dim
+
+    @property
+    def is_mixed_order(self):
+        return self.compatibility.is_mixed_order
+
+    def element_for_family(self, family):
+        return self.compatibility.element_for_family(family)
+
+    def element_for_field(self, field):
+        return self.compatibility.element_for_field(field)
+
+    def field_element_types_for(self, fields):
+        return self.compatibility.field_element_types_for(fields)
+
+
+def sfem_fem_policy(element, vector_size=16, quadrature_order=None):
+    compatible = element if isinstance(element, SfemCompatibleElement) else None
+    cell_element_type = compatible.cell_element_type if compatible else str(element).upper()
+    quadrature_rule = sfem_element_quadrature_rule(cell_element_type, quadrature_order)
+    specialization = SfemSoAElementSpecialization(quadrature_rule, vector_size)
+    return SfemFEMPolicy(
+        element,
+        compatible.name.lower() if compatible else cell_element_type.lower(),
+        cell_element_type,
+        _sfem_basis_policy(quadrature_rule),
+        quadrature_rule,
+        specialization,
+        SfemFieldFamilyCompatibilityPolicy.from_element(element),
+        compatible,
+    )
+
+
+def _sfem_basis_policy(quadrature_rule):
+    element_type = quadrature_rule.element_type
+    degree = 2 if element_type in ("TRI6", "TET10", "HEX27") else 1
+    return SfemElementBasisPolicy(
+        element_type,
+        quadrature_rule.dim,
+        quadrature_rule.n_shape,
+        "tensor_product" if quadrature_rule.is_tensor_product else "simplex",
+        degree,
+        _sfem_cell_name(element_type),
+        quadrature_rule.is_tensor_product,
+    )
+
+
+def _sfem_cell_name(element_type):
+    element_type = str(element_type).upper()
+    if element_type in ("TRI3", "TRI6"):
+        return "triangle"
+    if element_type in ("TET4", "TET10"):
+        return "tetrahedron"
+    if element_type == "QUAD4":
+        return "quadrilateral"
+    if element_type in ("HEX8", "HEX27"):
+        return "hexahedron"
+    raise ValueError("unsupported element type '%s'" % element_type)
 
 
 def sfem_element_quadrature_rule(element_type, order=None):
@@ -459,6 +623,179 @@ def sfem_soa_element_specialization(element_type, vector_size=16, quadrature_ord
     )
 
 
+def sfem_simplex_grad_ref_name(prefix, component):
+    names = ("x", "y", "z")
+    component = int(component)
+    if component < 0 or component >= len(names):
+        raise ValueError("unsupported simplex gradient component %d" % component)
+    return "%s_%s" % (prefix, names[component])
+
+
+def sfem_split_reference_gradient_data(prefix, gradients, n_qp, n_shape, dim):
+    components = []
+    for d in range(dim):
+        values = []
+        for q in range(n_qp):
+            for shape in range(n_shape):
+                values.append(gradients[(q * n_shape + shape) * dim + d])
+        components.append(SfemReferenceData(sfem_simplex_grad_ref_name(prefix, d), values))
+    return tuple(components)
+
+
+def sfem_reference_data(rule):
+    if rule.is_tensor_product:
+        return (
+            SfemReferenceData("shape_1d", rule.tensor_product_shape_values_1d),
+            SfemReferenceData("grad_1d", rule.tensor_product_shape_gradients_1d),
+            SfemReferenceData("q_weight_1d", rule.tensor_product_weights_1d),
+        )
+    shape, gradients = sfem_shape_data_for_element_at_cell_rule(rule.element_type, rule)
+    return (
+        (SfemReferenceData("shape", shape),)
+        + sfem_split_reference_gradient_data(
+            "grad_ref",
+            gradients,
+            rule.n_qp,
+            rule.n_shape,
+            rule.dim,
+        )
+        + (SfemReferenceData("q_weight", rule.weights),)
+    )
+
+
+def sfem_mesh_reference_data(rule):
+    return sfem_reference_data(rule)
+
+
+def sfem_mixed_reference_data(cell_rule, fields, field_element_types):
+    data = (
+        sfem_split_reference_gradient_data(
+            "cell_grad_ref",
+            cell_rule.reference_gradients,
+            cell_rule.n_qp,
+            cell_rule.n_shape,
+            cell_rule.dim,
+        )
+        + (SfemReferenceData("q_weight", cell_rule.weights),)
+    )
+    for field in fields:
+        element_type = field_element_types.get(field.name, cell_rule.element_type)
+        shape, gradients = sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule)
+        n_shape = len(shape) // cell_rule.n_qp
+        data += (
+            (SfemReferenceData("%s_shape" % field.name, shape),)
+            + sfem_split_reference_gradient_data(
+                "%s_grad_ref" % field.name,
+                gradients,
+                cell_rule.n_qp,
+                n_shape,
+                cell_rule.dim,
+            )
+        )
+    return data
+
+
+def sfem_field_n_shape(element_type, quadrature_order=None):
+    return sfem_element_quadrature_rule(element_type, quadrature_order).n_shape
+
+
+def sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule):
+    element_type = str(element_type).upper()
+    points = sfem_cell_rule_points(cell_rule)
+    if element_type == "TRI3":
+        shape = []
+        gradients = []
+        for x, y in points:
+            shape.extend((1.0 - x - y, x, y))
+            gradients.extend((-1.0, -1.0, 1.0, 0.0, 0.0, 1.0))
+        return tuple(shape), tuple(gradients)
+    if element_type == "TRI6":
+        shape = []
+        gradients = []
+        for x, y in points:
+            l0 = 1.0 - x - y
+            shape.extend(
+                (
+                    l0 * (2.0 * l0 - 1.0),
+                    x * (2.0 * x - 1.0),
+                    y * (2.0 * y - 1.0),
+                    4.0 * x * l0,
+                    4.0 * x * y,
+                    4.0 * y * l0,
+                )
+            )
+            gradients.extend(_tri6_reference_gradients(x, y))
+        return tuple(shape), tuple(gradients)
+    if element_type == "TET4":
+        shape = []
+        gradients = []
+        for x, y, z in points:
+            shape.extend((1.0 - x - y - z, x, y, z))
+            gradients.extend(
+                (
+                    -1.0,
+                    -1.0,
+                    -1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                )
+            )
+        return tuple(shape), tuple(gradients)
+    if element_type == "TET10":
+        shape = []
+        gradients = []
+        for x, y, z in points:
+            l0 = 1.0 - x - y - z
+            shape.extend(
+                (
+                    l0 * (2.0 * l0 - 1.0),
+                    x * (2.0 * x - 1.0),
+                    y * (2.0 * y - 1.0),
+                    z * (2.0 * z - 1.0),
+                    4.0 * x * l0,
+                    4.0 * x * y,
+                    4.0 * y * l0,
+                    4.0 * z * l0,
+                    4.0 * x * z,
+                    4.0 * y * z,
+                )
+            )
+            gradients.extend(_tet10_reference_gradients(x, y, z))
+        return tuple(shape), tuple(gradients)
+    if element_type in ("HEX8", "HEX27"):
+        order = 1 if element_type == "HEX8" else 2
+        return _sfem_hex_lagrange_shape_gradients(points, order)
+    raise ValueError("unsupported residual field element '%s'" % element_type)
+
+
+def sfem_cell_rule_points(rule):
+    if rule.element_type == "TRI3":
+        return ((1.0 / 3.0, 1.0 / 3.0),)
+    if rule.element_type == "TRI6":
+        return (
+            (1.0 / 6.0, 1.0 / 6.0),
+            (2.0 / 3.0, 1.0 / 6.0),
+            (1.0 / 6.0, 2.0 / 3.0),
+        )
+    if rule.element_type == "TET4":
+        return ((0.25, 0.25, 0.25),)
+    if rule.element_type == "TET10":
+        a = 0.5854101966249685
+        b = 0.1381966011250105
+        return ((b, b, b), (a, b, b), (b, a, b), (b, b, a))
+    if rule.element_type in ("HEX8", "HEX27"):
+        points, _ = _sfem_unit_interval_gauss_rule(rule.order)
+        return tuple((x, y, z) for z in points for y in points for x in points)
+    raise ValueError("unsupported cell rule '%s'" % rule.element_type)
+
+
 def _tri6_reference_gradients(x, y):
     return (
         -3.0 + 4.0 * x + 4.0 * y,
@@ -555,6 +892,51 @@ def _sfem_lagrange_q2_1d_shapes(points):
     return tuple(shape_values), tuple(shape_gradients)
 
 
+def _sfem_lagrange_1d_at(x, order):
+    if order == 1:
+        return (1.0 - x, x), (-1.0, 1.0)
+    if order == 2:
+        return (
+            2.0 * x * x - 3.0 * x + 1.0,
+            4.0 * x - 4.0 * x * x,
+            2.0 * x * x - x,
+        ), (
+            4.0 * x - 3.0,
+            4.0 - 8.0 * x,
+            4.0 * x - 1.0,
+        )
+    raise ValueError("unsupported 1D Lagrange order %d" % order)
+
+
+def _sfem_hex_lagrange_shape_gradients(points, order):
+    n = order + 1
+    shape = []
+    gradients = []
+    for x, y, z in points:
+        values_x, grads_x = _sfem_lagrange_1d_at(x, order)
+        values_y, grads_y = _sfem_lagrange_1d_at(y, order)
+        values_z, grads_z = _sfem_lagrange_1d_at(z, order)
+        shape_q = [None] * (n * n * n)
+        gradients_q = [None] * (n * n * n)
+        for sz in range(n):
+            for sy in range(n):
+                for sx in range(n):
+                    idx = sfem_tensor_hex_shape_index(n, sx, sy, sz)
+                    vx = values_x[sx]
+                    vy = values_y[sy]
+                    vz = values_z[sz]
+                    shape_q[idx] = vx * vy * vz
+                    gradients_q[idx] = (
+                        grads_x[sx] * vy * vz,
+                        vx * grads_y[sy] * vz,
+                        vx * vy * grads_z[sz],
+                    )
+        shape.extend(shape_q)
+        for item in gradients_q:
+            gradients.extend(item)
+    return tuple(shape), tuple(gradients)
+
+
 def _sfem_tensor_product_hex_gradients_and_weights(
     shape_values_1d,
     shape_gradients_1d,
@@ -578,7 +960,7 @@ def _sfem_tensor_product_hex_gradients_and_weights(
                             dx = shape_gradients_1d[qx * n_shape_1d + sx] * syv * szv
                             dy = sxv * shape_gradients_1d[qy * n_shape_1d + sy] * szv
                             dz = sxv * syv * shape_gradients_1d[qz * n_shape_1d + sz]
-                            shape = _sfem_tensor_hex_shape_index(
+                            shape = sfem_tensor_hex_shape_index(
                                 n_shape_1d,
                                 sx,
                                 sy,
@@ -590,7 +972,7 @@ def _sfem_tensor_product_hex_gradients_and_weights(
     return tuple(gradients), tuple(weights)
 
 
-def _sfem_tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
+def sfem_tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
     if n_shape_1d == 2:
         return (sx if sy == 0 else (3 if sx == 0 else 2)) + 4 * sz
     if n_shape_1d == 3:

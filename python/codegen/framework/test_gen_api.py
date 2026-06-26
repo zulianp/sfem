@@ -465,6 +465,62 @@ class GenApiTest(unittest.TestCase):
         names = tuple(element.name for element in poro_hyperelasticity.elements)
         self.assertEqual(names, ("TRI6_TRI3", "TET10_TET4", "HEX27_HEX8"))
 
+    def test_fem_policy_describes_basis_quadrature_and_field_compatibility(self):
+        element = poro_hyperelasticity.elements[2]
+        policy = gen.sfem_fem_policy(element)
+
+        self.assertIsInstance(policy, gen.SfemFEMPolicy)
+        self.assertEqual(policy.label, "hex27_hex8")
+        self.assertEqual(policy.cell_element_type, "HEX27")
+        self.assertEqual(policy.family, "tensor_product")
+        self.assertEqual(policy.basis.cell, "hexahedron")
+        self.assertEqual(policy.basis.degree, 2)
+        self.assertEqual(policy.quadrature_rule.n_qp, 27)
+        self.assertEqual(policy.element_for_family("displacement"), "HEX27")
+        self.assertEqual(policy.element_for_family("pressure"), "HEX8")
+        self.assertTrue(policy.is_mixed_order)
+
+        builder = gen.EquationSystemBuilder(3)
+        u = builder.vector_field("u", family="displacement")
+        p = builder.scalar_field("p", family="pressure")
+        mapping = {
+            field.name: element
+            for field, element in policy.field_element_types_for(builder.build().fields)
+        }
+        self.assertEqual(mapping, {"u": "HEX27", "p": "HEX8"})
+
+        reference_data = {item.name: item.values for item in gen.sfem_reference_data(policy.quadrature_rule)}
+        self.assertEqual(set(reference_data), {"shape_1d", "grad_1d", "q_weight_1d"})
+        self.assertEqual(len(reference_data["shape_1d"]), 9)
+        self.assertEqual(len(reference_data["grad_1d"]), 9)
+        self.assertEqual(len(reference_data["q_weight_1d"]), 3)
+
+        mixed_data = {
+            item.name: item.values
+            for item in gen.sfem_mixed_reference_data(
+                policy.quadrature_rule,
+                builder.build().fields,
+                mapping,
+            )
+        }
+        self.assertIn("cell_grad_ref_x", mixed_data)
+        self.assertIn("u_shape", mixed_data)
+        self.assertIn("u_grad_ref_x", mixed_data)
+        self.assertIn("p_shape", mixed_data)
+        self.assertIn("p_grad_ref_x", mixed_data)
+        self.assertEqual(len(mixed_data["u_shape"]), 27 * 27)
+        self.assertEqual(len(mixed_data["p_shape"]), 27 * 8)
+
+        context = gen.ElementGenerationContext.create(
+            "poro_hyperelasticity",
+            element,
+            16,
+            None,
+        )
+        self.assertIs(context.fem_policy.compatible_element, element)
+        self.assertEqual(context.family, "tensor_product")
+        self.assertTrue(context.is_mixed_order)
+
     def test_rejects_equal_order_poro_hyperelastic_element(self):
         with tempfile.TemporaryDirectory() as out_dir:
             with self.assertRaisesRegex(ValueError, "not enabled"):
