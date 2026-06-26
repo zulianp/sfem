@@ -211,6 +211,36 @@ class SfemSoAElementSpecialization:
         )
 
 
+@dataclass(frozen=True)
+class SfemCompatibleElement:
+    name: str
+    cell_element_type: str
+    field_element_types: tuple
+
+    def __post_init__(self):
+        name = str(self.name).upper()
+        cell_element_type = str(self.cell_element_type).upper()
+        fields = tuple((str(field), str(element).upper()) for field, element in self.field_element_types)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "cell_element_type", cell_element_type)
+        object.__setattr__(self, "field_element_types", fields)
+        if not name or not cell_element_type:
+            raise ValueError("compatible element requires a name and cell element")
+        if not fields:
+            raise ValueError("compatible element requires at least one field family")
+
+    @property
+    def is_mixed_order(self):
+        return any(element != self.cell_element_type for _, element in self.field_element_types)
+
+    def element_for_field(self, field_name):
+        field_name = str(field_name)
+        for field, element in self.field_element_types:
+            if field == field_name:
+                return element
+        return self.cell_element_type
+
+
 def sfem_element_quadrature_rule(element_type, order=None):
     element_type = str(element_type).upper()
     if order is None:
@@ -392,6 +422,26 @@ def sfem_element_quadrature_rule(element_type, order=None):
 
 def sfem_supported_element_types():
     return ("TRI3", "TRI6", "QUAD4", "TET4", "TET10", "HEX8", "HEX27")
+
+
+def sfem_taylor_hood_element_types():
+    return (
+        SfemCompatibleElement(
+            "TRI6_TRI3",
+            "TRI6",
+            (("displacement", "TRI6"), ("pressure", "TRI3")),
+        ),
+        SfemCompatibleElement(
+            "TET10_TET4",
+            "TET10",
+            (("displacement", "TET10"), ("pressure", "TET4")),
+        ),
+        SfemCompatibleElement(
+            "HEX27_HEX8",
+            "HEX27",
+            (("displacement", "HEX27"), ("pressure", "HEX8")),
+        ),
+    )
 
 
 def sfem_soa_element_specializations(element_types=None, vector_size=16, quadrature_order=None):

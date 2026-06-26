@@ -9,7 +9,7 @@ from .tensor_product_geometry import (
     tensor_product_cartesian_shape_order,
     tensor_product_isoparametric_geometry_lines,
 )
-from .fem import sfem_soa_element_specialization
+from .fem import sfem_element_quadrature_rule, sfem_soa_element_specialization
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -134,6 +134,66 @@ def generate_coupled_residual_sfem_files(
             "\n".join(_sfem_soa_diagnostics_header()),
         ),
         GeneratedKernelFile(local_name, local_source),
+        GeneratedKernelFile(operator_name, operator_source),
+    )
+
+
+def generate_mixed_residual_sfem_files(
+    system,
+    *,
+    prefix,
+    compatible_element,
+    vector_size=16,
+    quadrature_order=None,
+    residual_coeffs=None,
+    action_coeffs=None,
+    field_element_types=None,
+):
+    if not isinstance(system, CoupledResidualSystem):
+        raise TypeError("system must be CoupledResidualSystem")
+    cell_specialization = sfem_soa_element_specialization(
+        compatible_element.cell_element_type,
+        vector_size,
+        quadrature_order,
+    )
+    if system.dim != cell_specialization.dim:
+        raise ValueError("residual system dimension does not match element dimension")
+    field_element_types = dict(field_element_types or ())
+    missing_fields = tuple(
+        field.name for field in system.fields if field.name not in field_element_types
+    )
+    if missing_fields:
+        raise ValueError(
+            "mixed residual code generation requires element types for field(s): %s"
+            % ", ".join(missing_fields)
+        )
+    if residual_coeffs is None:
+        residual_coeffs = coupled_residual_weak_coefficients(system, False)
+    if action_coeffs is None:
+        action_coeffs = coupled_residual_weak_coefficients(system, True)
+    family = (
+        "tensor_product"
+        if cell_specialization.quadrature_rule.is_tensor_product
+        else "simplex"
+    )
+    local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family)
+    operator_name = "%s_%s_operator.cpp" % (prefix, compatible_element.name.lower())
+    operator_source = _mixed_operator_source(
+        system,
+        prefix,
+        local_prefix,
+        cell_specialization,
+        compatible_element,
+        field_element_types,
+        residual_coeffs,
+        action_coeffs,
+    )
+    return (
+        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile(
+            "kernel_diagnostics.hpp",
+            "\n".join(_sfem_soa_diagnostics_header()),
+        ),
         GeneratedKernelFile(operator_name, operator_source),
     )
 
@@ -714,6 +774,560 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
     return "\n".join(lines)
 
 
+def _mixed_operator_source(
+    system,
+    prefix,
+    local_prefix,
+    cell_specialization,
+    compatible_element,
+    field_element_types,
+    residual_coeffs,
+    action_coeffs,
+):
+    rule = cell_specialization.quadrature_rule
+    element = compatible_element.name.lower()
+    lines = [
+        "#include <math.h>",
+        "#include <stddef.h>",
+        '#include "kernel_math.hpp"',
+        '#include "kernel_diagnostics.hpp"',
+        "",
+        "#ifndef SFEM_SUCCESS",
+        "#define SFEM_SUCCESS 0",
+        "#endif",
+        "#ifndef MIN",
+        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
+        "#endif",
+        "#ifndef SFEM_RESTRICT",
+        "#define SFEM_RESTRICT",
+        "#endif",
+        "#ifndef SFEM_INLINE",
+        "#define SFEM_INLINE inline",
+        "#endif",
+        "#ifndef SFEM_GENERATED_SCALAR_T",
+        "#define SFEM_GENERATED_SCALAR_T",
+        "typedef double real_t;",
+        "typedef ptrdiff_t idx_t;",
+        "typedef double geom_t;",
+        "#endif",
+        "#ifdef _OPENMP",
+        "#include <omp.h>",
+        "#endif",
+        "",
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    lines.extend(_mixed_reference_data_lines(prefix, rule, system, field_element_types))
+    lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
+    form_data = (
+        ("residual", residual_coeffs, system.residual_dependencies()),
+        ("jacobian_action", action_coeffs, system.jacobian_action_dependencies()),
+    )
+    for form, coefficients, dependencies in form_data:
+        lines.extend(
+            _mixed_isoparametric_function(
+                system,
+                prefix,
+                element,
+                rule,
+                field_element_types,
+                form,
+                coefficients,
+                dependencies,
+            )
+        )
+    return "\n".join(lines)
+
+
+def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
+    data = [
+        ("cell_grad_ref", cell_rule.reference_gradients),
+        ("q_weight", cell_rule.weights),
+    ]
+    for field in system.fields:
+        element_type = field_element_types.get(field.name, cell_rule.element_type)
+        shape, grad = _shape_data_for_element_at_cell_rule(element_type, cell_rule)
+        data.append(("%s_shape" % field.name, shape))
+        data.append(("%s_grad_ref" % field.name, grad))
+    lines = []
+    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
+        for name, values in data:
+            lines.append(
+                "static const %s %s_%s_%s[%d] = {%s};"
+                % (
+                    scalar_type,
+                    prefix,
+                    name,
+                    suffix,
+                    len(values),
+                    _cpp_scalar_initializer_list(values),
+                )
+            )
+    return lines
+
+
+def _mixed_isoparametric_function(
+    system,
+    prefix,
+    element,
+    cell_rule,
+    field_element_types,
+    form,
+    coefficients,
+    dependencies,
+):
+    dim = system.dim
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const geom_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
+    if dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend("const scalar_t *const SFEM_RESTRICT %s_data" % field.name for field in system.fields)
+    if dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend("const scalar_t *const SFEM_RESTRICT %s_old_data" % field.name for field in system.fields)
+    if dependencies.direction:
+        params.append("const ptrdiff_t direction_stride")
+        params.extend("const scalar_t *const SFEM_RESTRICT %s_direction_data" % field.name for field in system.fields)
+    params.append("const ptrdiff_t out_stride")
+    params.extend("scalar_t *const SFEM_RESTRICT %s_out" % field.name for field in system.fields)
+    impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s(" % impl,
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % cell_rule.n_qp,
+            "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
+            "    (void)nnodes;",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t e = 0; e < nelements; ++e) {",
+            "        idx_t ev[CELL_N_SHAPE];",
+            "        for (int s = 0; s < CELL_N_SHAPE; ++s) ev[s] = elements[s][e];",
+            "        for (int q = 0; q < N_QP; ++q) {",
+        ]
+    )
+    lines.extend(_mixed_geometry_lines(prefix, cell_rule, dim))
+    lines.extend(
+        _mixed_field_eval_lines(
+            prefix,
+            system,
+            cell_rule,
+            field_element_types,
+            dependencies,
+        )
+    )
+    lines.extend(_coefficient_evaluation_lines(system, coefficients, "            ", "1"))
+    lines.append("            const scalar_t qw_det = %s_q_weight_f64[q] * det;" % prefix)
+    for row, field in enumerate(system.fields):
+        n_shape = _field_n_shape(field, cell_rule, field_element_types)
+        lines.append("            for (int test = 0; test < %d; ++test) {" % n_shape)
+        lines.append(
+            "                const scalar_t test_value = %s_%s_shape_f64[q * %d + test];"
+            % (prefix, field.name, n_shape)
+        )
+        for d in range(dim):
+            terms = [
+                "%s_%s_grad_ref_f64[(q * %d + test) * DIM + %d] * adj%d"
+                % (prefix, field.name, n_shape, k, k * dim + d)
+                for k in range(dim)
+            ]
+            lines.append(
+                "                const scalar_t test_grad%d = (%s) / det;"
+                % (d, " + ".join(terms))
+            )
+        terms = ["value_coeff%d * test_value" % row] + [
+            "grad_coeff%d_%d * test_grad%d" % (row, d, d)
+            for d in range(dim)
+        ]
+        lines.extend(
+            [
+                "#pragma omp atomic update",
+                "                %s_out[ev[test] * out_stride] += qw_det * (%s);"
+                % (field.name, " + ".join(terms)),
+                "            }",
+            ]
+        )
+    lines.extend(
+        [
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    function = "%s_%s_%s_isoparametric_mesh_soa" % (prefix, element, form)
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [param.replace("scalar_t", scalar_type) for param in params]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend("%s_data" % field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old_data" % field.name for field in system.fields)
+        if dependencies.direction:
+            call_args.append("direction_stride")
+            call_args.extend("%s_direction_data" % field.name for field in system.fields)
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _mixed_geometry_lines(prefix, cell_rule, dim):
+    lines = []
+    for i in range(dim):
+        for j in range(dim):
+            terms = [
+                "points[%d][ev[%d]] * %s_cell_grad_ref_f64[(q * CELL_N_SHAPE + %d) * DIM + %d]"
+                % (i, shape, prefix, shape, j)
+                for shape in range(cell_rule.n_shape)
+            ]
+            lines.append(
+                "            const scalar_t J%d%d = %s;"
+                % (i, j, " + ".join(terms))
+            )
+    if dim == 2:
+        lines.extend(
+            [
+                "            const scalar_t det = J00 * J11 - J01 * J10;",
+                "            const scalar_t adj0 = J11;",
+                "            const scalar_t adj1 = -J01;",
+                "            const scalar_t adj2 = -J10;",
+                "            const scalar_t adj3 = J00;",
+            ]
+        )
+    elif dim == 3:
+        lines.extend(
+            [
+                "            const scalar_t adj0 = J11 * J22 - J12 * J21;",
+                "            const scalar_t adj1 = J02 * J21 - J01 * J22;",
+                "            const scalar_t adj2 = J01 * J12 - J02 * J11;",
+                "            const scalar_t adj3 = J12 * J20 - J10 * J22;",
+                "            const scalar_t adj4 = J00 * J22 - J02 * J20;",
+                "            const scalar_t adj5 = J02 * J10 - J00 * J12;",
+                "            const scalar_t adj6 = J10 * J21 - J11 * J20;",
+                "            const scalar_t adj7 = J01 * J20 - J00 * J21;",
+                "            const scalar_t adj8 = J00 * J11 - J01 * J10;",
+                "            const scalar_t det = J00 * adj0 + J01 * adj3 + J02 * adj6;",
+            ]
+        )
+    else:
+        raise ValueError("mixed residual codegen supports dimensions 2 and 3")
+    return lines
+
+
+def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, dependencies):
+    dim = system.dim
+    lines = []
+    groups = []
+    if dependencies.current:
+        groups.append(("", "_data", "current_stride"))
+    if dependencies.previous:
+        groups.append(("_old", "_old_data", "previous_stride"))
+    if dependencies.direction:
+        groups.append(("_direction", "_direction_data", "direction_stride"))
+    for field in system.fields:
+        n_shape = _field_n_shape(field, cell_rule, field_element_types)
+        for suffix, pointer_suffix, stride in groups:
+            value_terms = [
+                "%s%s[ev[%d] * %s] * %s_%s_shape_f64[q * %d + %d]"
+                % (field.name, pointer_suffix, s, stride, prefix, field.name, n_shape, s)
+                for s in range(n_shape)
+            ]
+            lines.append(
+                "            const scalar_t %s%s = %s;"
+                % (field.name, suffix, " + ".join(value_terms))
+            )
+            for k in range(dim):
+                grad_terms = [
+                    "%s%s[ev[%d] * %s] * %s_%s_grad_ref_f64[(q * %d + %d) * DIM + %d]"
+                    % (
+                        field.name,
+                        pointer_suffix,
+                        s,
+                        stride,
+                        prefix,
+                        field.name,
+                        n_shape,
+                        s,
+                        k,
+                    )
+                    for s in range(n_shape)
+                ]
+                lines.append(
+                    "            const scalar_t %s%s_grad_%d_ref = %s;"
+                    % (field.name, suffix, k, " + ".join(grad_terms))
+                )
+            lines.extend(
+                _physical_gradient_lines(field.name + suffix, dim, "            ")
+            )
+    return lines
+
+
+def _field_n_shape(field, cell_rule, field_element_types):
+    element_type = field_element_types[field.name]
+    return sfem_element_quadrature_rule(
+        element_type,
+        cell_rule.order if element_type in ("QUAD4", "HEX8") else None,
+    ).n_shape
+
+
+def _shape_data_for_element_at_cell_rule(element_type, cell_rule):
+    element_type = str(element_type).upper()
+    points = _cell_rule_points(cell_rule)
+    if element_type == "TRI3":
+        shape = []
+        grad = []
+        for x, y in points:
+            shape.extend((1.0 - x - y, x, y))
+            grad.extend((-1.0, -1.0, 1.0, 0.0, 0.0, 1.0))
+        return tuple(shape), tuple(grad)
+    if element_type == "TRI6":
+        shape = []
+        grad = []
+        for x, y in points:
+            l0 = 1.0 - x - y
+            shape.extend(
+                (
+                    l0 * (2.0 * l0 - 1.0),
+                    x * (2.0 * x - 1.0),
+                    y * (2.0 * y - 1.0),
+                    4.0 * x * l0,
+                    4.0 * x * y,
+                    4.0 * y * l0,
+                )
+            )
+            grad.extend(_tri6_gradients_at(x, y))
+        return tuple(shape), tuple(grad)
+    if element_type == "TET4":
+        shape = []
+        grad = []
+        for x, y, z in points:
+            shape.extend((1.0 - x - y - z, x, y, z))
+            grad.extend(
+                (
+                    -1.0, -1.0, -1.0,
+                    1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0,
+                )
+            )
+        return tuple(shape), tuple(grad)
+    if element_type == "TET10":
+        shape = []
+        grad = []
+        for x, y, z in points:
+            l0 = 1.0 - x - y - z
+            shape.extend(
+                (
+                    l0 * (2.0 * l0 - 1.0),
+                    x * (2.0 * x - 1.0),
+                    y * (2.0 * y - 1.0),
+                    z * (2.0 * z - 1.0),
+                    4.0 * x * l0,
+                    4.0 * x * y,
+                    4.0 * y * l0,
+                    4.0 * z * l0,
+                    4.0 * x * z,
+                    4.0 * y * z,
+                )
+            )
+            grad.extend(_tet10_gradients_at(x, y, z))
+        return tuple(shape), tuple(grad)
+    if element_type in ("HEX8", "HEX27"):
+        order = 1 if element_type == "HEX8" else 2
+        return _hex_lagrange_shape_gradients(points, order)
+    raise ValueError("unsupported mixed residual field element '%s'" % element_type)
+
+
+def _cell_rule_points(rule):
+    if rule.element_type in ("TRI3",):
+        return ((1.0 / 3.0, 1.0 / 3.0),)
+    if rule.element_type == "TRI6":
+        return (
+            (1.0 / 6.0, 1.0 / 6.0),
+            (2.0 / 3.0, 1.0 / 6.0),
+            (1.0 / 6.0, 2.0 / 3.0),
+        )
+    if rule.element_type == "TET4":
+        return ((0.25, 0.25, 0.25),)
+    if rule.element_type == "TET10":
+        a = 0.5854101966249685
+        b = 0.1381966011250105
+        return ((b, b, b), (a, b, b), (b, a, b), (b, b, a))
+    if rule.element_type in ("HEX8", "HEX27"):
+        pts_1d = _unit_interval_gauss_points(rule.order)
+        return tuple((x, y, z) for z in pts_1d for y in pts_1d for x in pts_1d)
+    raise ValueError("unsupported cell rule '%s'" % rule.element_type)
+
+
+def _unit_interval_gauss_points(order):
+    if order == 1:
+        return (0.5,)
+    if order == 2:
+        offset = 0.5 / 3.0 ** 0.5
+        return (0.5 - offset, 0.5 + offset)
+    if order == 3:
+        offset = 0.5 * (3.0 / 5.0) ** 0.5
+        return (0.5 - offset, 0.5, 0.5 + offset)
+    raise ValueError("unsupported tensor-product order %d" % order)
+
+
+def _tri6_gradients_at(x, y):
+    return (
+        -3.0 + 4.0 * x + 4.0 * y,
+        -3.0 + 4.0 * x + 4.0 * y,
+        4.0 * x - 1.0,
+        0.0,
+        0.0,
+        4.0 * y - 1.0,
+        4.0 - 8.0 * x - 4.0 * y,
+        -4.0 * x,
+        4.0 * y,
+        4.0 * x,
+        -4.0 * y,
+        4.0 - 4.0 * x - 8.0 * y,
+    )
+
+
+def _tet10_gradients_at(x, y, z):
+    dx = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        4.0 * x - 1.0,
+        0.0,
+        0.0,
+        -8.0 * x - 4.0 * y - 4.0 * z + 4.0,
+        4.0 * y,
+        -4.0 * y,
+        -4.0 * z,
+        4.0 * z,
+        0.0,
+    )
+    dy = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        0.0,
+        4.0 * y - 1.0,
+        0.0,
+        -4.0 * x,
+        4.0 * x,
+        -8.0 * y - 4.0 * x - 4.0 * z + 4.0,
+        -4.0 * z,
+        0.0,
+        4.0 * z,
+    )
+    dz = (
+        4.0 * x + 4.0 * y + 4.0 * z - 3.0,
+        0.0,
+        0.0,
+        4.0 * z - 1.0,
+        -4.0 * x,
+        0.0,
+        -4.0 * y,
+        -8.0 * z - 4.0 * x - 4.0 * y + 4.0,
+        4.0 * x,
+        4.0 * y,
+    )
+    gradients = []
+    for i in range(10):
+        gradients.extend((dx[i], dy[i], dz[i]))
+    return tuple(gradients)
+
+
+def _hex_lagrange_shape_gradients(points, order):
+    n = order + 1
+    shape = []
+    grad = []
+    for x, y, z in points:
+        values_x, grads_x = _lagrange_1d_at(x, order)
+        values_y, grads_y = _lagrange_1d_at(y, order)
+        values_z, grads_z = _lagrange_1d_at(z, order)
+        shape_q = [None] * (n * n * n)
+        grad_q = [None] * (n * n * n)
+        for sz in range(n):
+            for sy in range(n):
+                for sx in range(n):
+                    idx = _tensor_hex_shape_index(n, sx, sy, sz)
+                    vx = values_x[sx]
+                    vy = values_y[sy]
+                    vz = values_z[sz]
+                    shape_q[idx] = vx * vy * vz
+                    grad_q[idx] = (
+                        grads_x[sx] * vy * vz,
+                        vx * grads_y[sy] * vz,
+                        vx * vy * grads_z[sz],
+                    )
+        shape.extend(shape_q)
+        for item in grad_q:
+            grad.extend(item)
+    return tuple(shape), tuple(grad)
+
+
+def _lagrange_1d_at(x, order):
+    if order == 1:
+        return (1.0 - x, x), (-1.0, 1.0)
+    if order == 2:
+        return (
+            2.0 * x * x - 3.0 * x + 1.0,
+            4.0 * x - 4.0 * x * x,
+            2.0 * x * x - x,
+        ), (
+            4.0 * x - 3.0,
+            4.0 - 8.0 * x,
+            4.0 * x - 1.0,
+        )
+    raise ValueError("unsupported 1D Lagrange order %d" % order)
+
+
+def _tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
+    if n_shape_1d == 2:
+        return (sx if sy == 0 else (3 if sx == 0 else 2)) + 4 * sz
+    if n_shape_1d == 3:
+        cartesian_to_hex27 = (
+            0, 8, 1,
+            11, 24, 9,
+            3, 10, 2,
+            16, 20, 17,
+            23, 26, 21,
+            19, 22, 18,
+            4, 12, 5,
+            15, 25, 13,
+            7, 14, 6,
+        )
+        return cartesian_to_hex27[sx + 3 * (sy + 3 * sz)]
+    raise ValueError("unsupported tensor-product hex order")
+
+
 def _residual_diagnostics_lines(system, prefix, specialization):
     rule = specialization.quadrature_rule
     diagnostics = [
@@ -1161,6 +1775,7 @@ def _mesh_operator_source(
 def _aos_dispatch_source(system, prefix, form, dependencies):
     target = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
     function = "%s_%s_isoparametric_mesh_aos" % (prefix, form)
+    n_fields = len(system.fields)
     lines = []
     for scalar_type, suffix in (("double", ""), ("float", "_float")):
         params = [
@@ -1191,14 +1806,28 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
             if parameter in dependencies.parameters
         )
         if dependencies.current:
-            call_args.extend(("2", "current + 0", "current + 1"))
-        if dependencies.previous:
-            call_args.extend(("2", "previous + 0", "previous + 1"))
-        if dependencies.direction:
+            call_args.append(str(n_fields))
             call_args.extend(
-                ("2", "direction + 0", "direction + 1")
+                "current + %d" % index
+                for index in range(n_fields)
             )
-        call_args.extend(("2", "output + 0", "output + 1"))
+        if dependencies.previous:
+            call_args.append(str(n_fields))
+            call_args.extend(
+                "previous + %d" % index
+                for index in range(n_fields)
+            )
+        if dependencies.direction:
+            call_args.append(str(n_fields))
+            call_args.extend(
+                "direction + %d" % index
+                for index in range(n_fields)
+            )
+        call_args.append(str(n_fields))
+        call_args.extend(
+            "output + %d" % index
+            for index in range(n_fields)
+        )
         lines.extend(
             [
                 ") {",

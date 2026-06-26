@@ -27,3 +27,8 @@ PYTHONPATH=python python -m codegen.framework.materials.neohookean_ogden \
 PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
     --out-dir /tmp/two_phase_flow --element HEX8 --compile
 ```
+
+`poro_hyperelasticity` is a mixed formulation and defaults to Taylor-Hood
+compatible element pairs: `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`.
+The current generator rejects those pairs until residual code generation
+supports per-field interpolation orders.

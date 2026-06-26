@@ -11,6 +11,8 @@ import sympy as sp
 from ._gen_op import generate_op_files
 from codegen.framework import (
     CoupledResidualSystem,
+    EquationForm,
+    EquationSystem,
     GeneratedKernelFile,
     KernelExpressions,
     TwoPhaseFlowConstitutiveModel,
@@ -20,6 +22,7 @@ from codegen.framework import (
     coupled_residual_weak_coefficients,
     energy_form_pipeline,
     generate_coupled_residual_sfem_files,
+    generate_mixed_residual_sfem_files,
     generate_sfem_soa_cpp_files_for_element,
     matrix_inner,
     residual_form_pipeline,
@@ -27,8 +30,10 @@ from codegen.framework import (
     sfem_soa_weak_form,
 )
 from codegen.framework.fem import (
+    SfemCompatibleElement,
     sfem_supported_element_types,
     sfem_soa_element_specialization,
+    sfem_taylor_hood_element_types,
 )
 
 
@@ -70,6 +75,23 @@ class CoupledResidualMaterial:
 
 
 @dataclass(frozen=True)
+class UnifiedMaterial:
+    name: str
+    define: object
+    elements: tuple
+    op_name: str = None
+    parameter_defaults: tuple = ()
+
+    def __post_init__(self):
+        _validate_name(self.name)
+        if not callable(self.define):
+            raise TypeError("define must be callable")
+        if not self.elements:
+            raise ValueError("unified materials require supported elements")
+        _validate_op(self.op_name, self.parameter_defaults)
+
+
+@dataclass(frozen=True)
 class GenerationResult:
     sources: tuple
     objects: tuple = ()
@@ -79,18 +101,25 @@ class GenerationResult:
 class ElementGenerationContext:
     material_name: str
     element_type: str
+    label: str
     specialization: object
+    compatible_element: object = None
 
     @classmethod
-    def create(cls, material_name, element_type, vector_size, quadrature_order):
+    def create(cls, material_name, element, vector_size, quadrature_order):
+        compatible = element if isinstance(element, SfemCompatibleElement) else None
+        element_type = compatible.cell_element_type if compatible else str(element).upper()
+        label = compatible.name.lower() if compatible else element_type.lower()
         return cls(
             material_name,
-            str(element_type).upper(),
+            element_type,
+            label,
             sfem_soa_element_specialization(
                 element_type,
                 vector_size,
                 quadrature_order,
             ),
+            compatible,
         )
 
     @property
@@ -99,7 +128,7 @@ class ElementGenerationContext:
 
     @property
     def element_prefix(self):
-        return "%s_%s" % (self.generated_prefix, self.element_type.lower())
+        return "%s_%s" % (self.generated_prefix, self.label)
 
     @property
     def local_prefix(self):
@@ -114,6 +143,10 @@ class ElementGenerationContext:
         if self.specialization.quadrature_rule.is_tensor_product:
             return "tensor_product"
         return "simplex"
+
+    @property
+    def is_mixed_order(self):
+        return bool(self.compatible_element and self.compatible_element.is_mixed_order)
 
 
 @dataclass(frozen=True)
@@ -144,33 +177,30 @@ class UserInputStage:
 
 @dataclass(frozen=True)
 class HyperelasticDimensionEvaluation:
+    name: str
     form_evaluation: FormEvaluation
-    weak_form: object
-    kernel_forms: tuple
-    diagnostic_graph: object
-
-
-@dataclass(frozen=True)
-class HyperelasticFormEvaluation:
-    material: HyperelasticMaterial
-    by_dim: dict
-
-    @property
-    def stage(self):
-        return PipelineStage.FORM_EVALUATION
+    deformation_gradient: object
+    kernels: tuple
+    diagnostics: bool
 
 
 @dataclass(frozen=True)
 class ResidualDimensionEvaluation:
+    name: str
     system: CoupledResidualSystem
     form_evaluation: FormEvaluation
-    residual_coeffs: tuple
-    action_coeffs: tuple
+    fields: tuple
 
 
 @dataclass(frozen=True)
-class CoupledResidualFormEvaluation:
-    material: CoupledResidualMaterial
+class DimensionFormEvaluation:
+    dim: int
+    units: tuple
+
+
+@dataclass(frozen=True)
+class UnifiedFormEvaluation:
+    material: object
     by_dim: dict
 
     @property
@@ -187,6 +217,7 @@ class CodeGenerationKind(Enum):
 class CodeGenerationUnit:
     kind: CodeGenerationKind
     material_name: str
+    unit_name: str
     dim: int
     payload: object
 
@@ -206,6 +237,7 @@ class ResidualCodeGenerationPayload:
     system: CoupledResidualSystem
     residual_coeffs: tuple
     action_coeffs: tuple
+    equation_fields: tuple
 
 
 @dataclass(frozen=True)
@@ -226,14 +258,7 @@ class SpecializedFormManipulationStage:
         return PipelineStage.SPECIALIZED_FORM_MANIPULATION
 
     def run(self):
-        if isinstance(self.form_evaluation, HyperelasticFormEvaluation):
-            return _hyperelastic_codegen_plan(self.form_evaluation)
-        if isinstance(self.form_evaluation, CoupledResidualFormEvaluation):
-            return _coupled_residual_codegen_plan(self.form_evaluation)
-        raise TypeError(
-            "unsupported form evaluation type %s"
-            % type(self.form_evaluation).__name__
-        )
+        return _codegen_plan_from_form_evaluation(self.form_evaluation)
 
 
 @dataclass(frozen=True)
@@ -290,6 +315,11 @@ def generate(
     files = CodeGenerationStage(user_input, codegen_plan).run()
 
     if material.op_name:
+        if isinstance(material, UnifiedMaterial):
+            raise ValueError(
+                "generated Op wrappers are only available for legacy single-form "
+                "HyperelasticMaterial and CoupledResidualMaterial inputs"
+            )
         files.update(generate_op_files(material, selected))
 
     source_paths = _write_files(out_dir, files)
@@ -342,48 +372,101 @@ def run(material, default_out_dir, argv=None):
 
 
 def _evaluate_forms(user_input):
-    material = user_input.material
-    if isinstance(material, HyperelasticMaterial):
-        return _evaluate_hyperelastic_forms(user_input)
-    if isinstance(material, CoupledResidualMaterial):
-        return _evaluate_coupled_residual_forms(user_input)
-    raise TypeError("unsupported material type %s" % type(material).__name__)
-
-
-def _hyperelastic_codegen_plan(form_evaluation):
-    units = []
-    for dim, evaluated in form_evaluation.by_dim.items():
-        units.append(
-            CodeGenerationUnit(
-                CodeGenerationKind.HYPERELASTIC_SOA,
-                form_evaluation.material.name,
-                dim,
-                HyperelasticCodeGenerationPayload(
-                    evaluated.kernel_forms,
-                    evaluated.diagnostic_graph,
-                    form_evaluation.material.diagnostics,
-                ),
-            )
+    by_dim = {}
+    for context in user_input.element_contexts:
+        dim = context.specialization.dim
+        if dim in by_dim:
+            continue
+        units = tuple(
+            _evaluate_equation(dim, equation)
+            for equation in _material_equations(user_input.material, dim)
         )
+        if not units:
+            raise ValueError("material '%s' did not define any equations" % user_input.material.name)
+        by_dim[dim] = DimensionFormEvaluation(dim, units)
+    return UnifiedFormEvaluation(user_input.material, by_dim)
+
+
+def _codegen_plan_from_form_evaluation(form_evaluation):
+    units = []
+    for dim_eval in form_evaluation.by_dim.values():
+        for evaluated in dim_eval.units:
+            if isinstance(evaluated, HyperelasticDimensionEvaluation):
+                units.append(
+                    _hyperelastic_codegen_unit(
+                        form_evaluation.material.name,
+                        dim_eval.dim,
+                        evaluated,
+                    )
+                )
+            elif isinstance(evaluated, ResidualDimensionEvaluation):
+                units.append(
+                    _residual_codegen_unit(
+                        form_evaluation.material.name,
+                        dim_eval.dim,
+                        evaluated,
+                    )
+                )
+            else:
+                raise TypeError(
+                    "unsupported evaluated form unit %s" % type(evaluated).__name__
+                )
     return CodeGenerationPlan(tuple(units))
 
 
-def _coupled_residual_codegen_plan(form_evaluation):
-    units = []
-    for dim, evaluated in form_evaluation.by_dim.items():
-        units.append(
-            CodeGenerationUnit(
-                CodeGenerationKind.RESIDUAL_SOA,
-                form_evaluation.material.name,
-                dim,
-                ResidualCodeGenerationPayload(
-                    evaluated.system,
-                    evaluated.residual_coeffs,
-                    evaluated.action_coeffs,
-                ),
+def _hyperelastic_codegen_unit(material_name, dim, evaluated):
+    weak_form = sfem_soa_weak_form(
+        evaluated.form_evaluation.form(FormOrder.ZERO).expression,
+        evaluated.deformation_gradient,
+    )
+    kernel_forms = tuple(
+        sfem_soa_kernel_form(
+            kernel,
+            weak_form=weak_form,
+            has_direction=kernel == "apply",
+            output_mode="accumulate",
+        )
+        for kernel in evaluated.kernels
+    )
+    diagnostic_graph = None
+    if evaluated.diagnostics:
+        diagnostic_graph = (
+            KernelExpressions()
+            .add(
+                "operator_evaluation",
+                weak_form.diagnostic_expressions(has_direction=True),
+            )
+            .build_graph(
+                data_symbols=weak_form.deformation_gradient,
+                temporary_prefix="%s_inspect_tmp" % material_name,
             )
         )
-    return CodeGenerationPlan(tuple(units))
+    return CodeGenerationUnit(
+        CodeGenerationKind.HYPERELASTIC_SOA,
+        material_name,
+        evaluated.name,
+        dim,
+        HyperelasticCodeGenerationPayload(
+            kernel_forms,
+            diagnostic_graph,
+            evaluated.diagnostics,
+        ),
+    )
+
+
+def _residual_codegen_unit(material_name, dim, evaluated):
+    return CodeGenerationUnit(
+        CodeGenerationKind.RESIDUAL_SOA,
+        material_name,
+        evaluated.name,
+        dim,
+        ResidualCodeGenerationPayload(
+            evaluated.system,
+            coupled_residual_weak_coefficients(evaluated.system, False),
+            coupled_residual_weak_coefficients(evaluated.system, True),
+            evaluated.fields,
+        ),
+    )
 
 
 def _emit_codegen_unit(unit, context):
@@ -396,17 +479,19 @@ def _emit_codegen_unit(unit, context):
 
 def _emit_hyperelastic_soa(unit, context):
     payload = unit.payload
+    generated_prefix = _unit_generated_prefix(unit)
     files = list(
         generate_sfem_soa_cpp_files_for_element(
             payload.kernel_forms,
-            prefix=context.element_prefix,
-            local_prefix=context.local_prefix,
+            prefix="%s_%s" % (generated_prefix, context.element_type.lower()),
+            local_prefix="%s_d%d_%s"
+            % (generated_prefix, context.specialization.dim, context.family),
             specialization=context.specialization,
         )
     )
     if payload.diagnostics:
         report_prefix = "%s_%s" % (
-            unit.material_name,
+            _unit_report_name(unit),
             context.element_type.lower(),
         )
         files.append(
@@ -433,10 +518,25 @@ def _emit_hyperelastic_soa(unit, context):
 
 
 def _emit_residual_soa(unit, context):
+    if context.is_mixed_order:
+        payload = unit.payload
+        return generate_mixed_residual_sfem_files(
+            payload.system,
+            prefix=_unit_generated_prefix(unit),
+            compatible_element=context.compatible_element,
+            vector_size=context.specialization.vector_size,
+            quadrature_order=context.specialization.quadrature_rule.order,
+            residual_coeffs=payload.residual_coeffs,
+            action_coeffs=payload.action_coeffs,
+            field_element_types=_field_element_types_for_context(
+                payload.equation_fields,
+                context,
+            ),
+        )
     payload = unit.payload
     return generate_coupled_residual_sfem_files(
         payload.system,
-        prefix=context.generated_prefix,
+        prefix=_unit_generated_prefix(unit),
         element_type=context.element_type,
         vector_size=context.specialization.vector_size,
         quadrature_order=context.specialization.quadrature_rule.order,
@@ -446,99 +546,113 @@ def _emit_residual_soa(unit, context):
     )
 
 
-def _evaluate_hyperelastic_forms(user_input):
-    material = user_input.material
-    by_dim = {}
-    orders = _hyperelastic_form_orders(material.kernels)
-    for context in user_input.element_contexts:
-        dim = context.specialization.dim
-        if dim in by_dim:
-            continue
-        deformation_gradient = sp.Matrix(
-            dim,
-            dim,
-            tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
+def _material_equations(material, dim):
+    system = EquationSystem(dim)
+    if isinstance(material, HyperelasticMaterial):
+        system.energy(
+            "",
+            material.energy,
+            kernels=material.kernels,
+            diagnostics=material.diagnostics,
         )
-        directions = (
-            tuple(sp.symbols("dF[%d]" % i) for i in range(dim * dim))
-            if FormOrder.TWO in orders
-            else None
-        )
-        energy_pipeline = energy_form_pipeline(
-            material.energy(deformation_gradient),
-            tuple(deformation_gradient),
-            directions,
-        )
-        form_evaluation = energy_pipeline.evaluate(orders)
-        weak_form = sfem_soa_weak_form(
-            form_evaluation.form(FormOrder.ZERO).expression,
-            deformation_gradient,
-        )
-        kernel_forms = tuple(
-            sfem_soa_kernel_form(
-                kernel,
-                weak_form=weak_form,
-                has_direction=kernel == "apply",
-                output_mode="accumulate",
-            )
-            for kernel in material.kernels
-        )
-        diagnostic_graph = None
-        if material.diagnostics:
-            diagnostic_graph = (
-                KernelExpressions()
-                .add(
-                    "operator_evaluation",
-                    weak_form.diagnostic_expressions(has_direction=True),
-                )
-                .build_graph(
-                    data_symbols=weak_form.deformation_gradient,
-                    temporary_prefix="%s_inspect_tmp" % material.name,
-                )
-            )
-        by_dim[dim] = HyperelasticDimensionEvaluation(
-            form_evaluation,
-            weak_form,
-            kernel_forms,
-            diagnostic_graph,
-        )
-    return HyperelasticFormEvaluation(material, by_dim)
-
-
-def _evaluate_coupled_residual_forms(user_input):
-    material = user_input.material
-    by_dim = {}
-    for context in user_input.element_contexts:
-        dim = context.specialization.dim
-        if dim in by_dim:
-            continue
-        system = CoupledResidualSystem(dim)
+        return system.equations
+    if isinstance(material, CoupledResidualMaterial):
+        system.residual("", material.define)
+        return system.equations
+    if isinstance(material, UnifiedMaterial):
         material.define(system)
-        residual_vector = sp.Matrix(
-            [system.residual(field) for field in system.fields]
-        )
-        variables = tuple(
-            symbol
-            for field in system.fields
-            for symbol in field.variables
-        )
-        directions = tuple(
-            symbol
-            for field in system.fields
-            for symbol in field.directions
-        )
-        form_evaluation = residual_form_pipeline(
+        return system.equations
+    raise TypeError("unsupported material type %s" % type(material).__name__)
+
+
+def _evaluate_equation(dim, equation):
+    if equation.is_energy:
+        return _evaluate_energy_equation(dim, equation)
+    if equation.is_residual:
+        return _evaluate_residual_equation(dim, equation)
+    raise TypeError("unsupported equation form %s" % equation.form)
+
+
+def _evaluate_energy_equation(dim, equation):
+    orders = _hyperelastic_form_orders(equation.kernels)
+    deformation_gradient = sp.Matrix(
+        dim,
+        dim,
+        tuple(sp.symbols("F[%d]" % i) for i in range(dim * dim)),
+    )
+    directions = (
+        tuple(sp.symbols("dF[%d]" % i) for i in range(dim * dim))
+        if FormOrder.TWO in orders
+        else None
+    )
+    energy_pipeline = energy_form_pipeline(
+        equation.define(deformation_gradient),
+        tuple(deformation_gradient),
+        directions,
+    )
+    return HyperelasticDimensionEvaluation(
+        equation.name,
+        energy_pipeline.evaluate(orders),
+        deformation_gradient,
+        equation.kernels,
+        equation.diagnostics,
+    )
+
+
+def _evaluate_residual_equation(dim, equation):
+    system = CoupledResidualSystem(dim)
+    equation.define(system)
+    residual_vector = sp.Matrix(
+        [system.residual(field) for field in system.fields]
+    )
+    variables = tuple(
+        symbol
+        for field in system.fields
+        for symbol in field.variables
+    )
+    directions = tuple(
+        symbol
+        for field in system.fields
+        for symbol in field.directions
+    )
+    return ResidualDimensionEvaluation(
+        equation.name,
+        system,
+        residual_form_pipeline(
             residual_vector,
             variables,
             directions,
-        ).evaluate((FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO))
-        by_dim[dim] = ResidualDimensionEvaluation(
-            system,
-            form_evaluation,
-            coupled_residual_weak_coefficients(system, False),
-            coupled_residual_weak_coefficients(system, True),
-        )
-    return CoupledResidualFormEvaluation(material, by_dim)
+        ).evaluate((FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)),
+        equation.fields,
+    )
+
+
+def _field_element_types_for_context(equation_fields, context):
+    ret = {}
+    for field in equation_fields:
+        family = field.family or field.name
+        element_type = context.compatible_element.element_for_field(family)
+        if field.components == 1:
+            ret[field.name] = element_type
+        else:
+            for component in range(field.components):
+                ret["%s%d" % (field.name, component)] = element_type
+    return ret
+
+
+def _unit_generated_prefix(unit):
+    name = _unit_output_name(unit)
+    return "generated_%s" % name
+
+
+def _unit_output_name(unit):
+    if unit.unit_name:
+        return "%s_%s" % (unit.material_name, unit.unit_name)
+    return unit.material_name
+
+
+def _unit_report_name(unit):
+    return _unit_output_name(unit)
 
 
 def _hyperelastic_form_orders(kernels):
@@ -586,37 +700,46 @@ def _summary(name, graph, specialization):
 
 
 def _parse_elements(values, defaults):
+    default_entries = tuple(defaults)
+    default_by_name = {_element_selection_name(element): element for element in default_entries}
     supported = set(sfem_supported_element_types())
-    defaults = tuple(str(element).upper() for element in defaults)
+    supported.update(default_by_name)
+    defaults = tuple(default_by_name)
     enabled = set(defaults)
     if not values:
-        selected = defaults
+        selected_names = defaults
     else:
-        selected = []
+        selected_names = []
         for value in values:
             for item in str(value).split(","):
-                element = item.strip().upper()
-                if not element:
+                name = item.strip().upper()
+                if not name:
                     continue
-                if element == "ALL":
-                    selected = list(defaults)
+                if name == "ALL":
+                    selected_names = list(defaults)
                     break
-                selected.append(element)
-        selected = tuple(dict.fromkeys(selected))
+                selected_names.append(name)
+        selected_names = tuple(dict.fromkeys(selected_names))
 
-    invalid = tuple(element for element in selected if element not in supported)
+    invalid = tuple(element for element in selected_names if element not in supported)
     if invalid:
         raise ValueError(
             "unsupported element %s; expected one of %s"
             % (", ".join(invalid), ", ".join(sorted(supported)))
         )
-    disabled = tuple(element for element in selected if element not in enabled)
+    disabled = tuple(element for element in selected_names if element not in enabled)
     if disabled:
         raise ValueError(
             "element %s is not enabled for this material; expected one of %s"
             % (", ".join(disabled), ", ".join(defaults))
         )
-    return tuple(selected)
+    return tuple(default_by_name.get(name, name) for name in selected_names)
+
+
+def _element_selection_name(element):
+    if isinstance(element, SfemCompatibleElement):
+        return element.name
+    return str(element).upper()
 
 
 def _merge_files(outputs, files):
@@ -706,10 +829,14 @@ __all__ = [
     "CoupledResidualMaterial",
     "CoupledResidualSystem",
     "DEFAULT_VECTOR_SIZE",
+    "EquationForm",
+    "EquationSystem",
     "GenerationResult",
     "HyperelasticMaterial",
     "TwoPhaseFlowConstitutiveModel",
+    "UnifiedMaterial",
     "generate",
     "matrix_inner",
     "run",
+    "sfem_taylor_hood_element_types",
 ]
