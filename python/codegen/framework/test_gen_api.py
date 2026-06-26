@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -440,6 +441,29 @@ class GenApiTest(unittest.TestCase):
                 source,
             )
 
+    def test_material_runner_writes_generation_plan_dump(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            plan_path = os.path.join(out_dir, "inspect", "neo_plan.json")
+            result = gen.run(
+                neohookean_ogden,
+                out_dir,
+                argv=(
+                    "--element",
+                    "TRI3",
+                    "--plan-out",
+                    plan_path,
+                ),
+            )
+            self.assertIsInstance(result.plan, gen.GenerationPlan)
+            self.assertEqual(result.plan_dump, plan_path)
+            self.assertTrue(os.path.exists(plan_path))
+            with open(plan_path, encoding="utf-8") as stream:
+                dump = json.load(stream)
+            self.assertEqual(dump["stage"], gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION.value)
+            self.assertEqual(dump["n_monolithic_kernels"], 1)
+            self.assertEqual(dump["kernels"][0]["name"], "neohookean_ogden")
+            self.assertEqual(dump["kernels"][0]["mesh_phases"], ["geometry", "local_call", "scatter"])
+
     def test_generates_coupled_residual_material(self):
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(
@@ -781,8 +805,33 @@ class GenApiTest(unittest.TestCase):
 
         self.assertEqual(plan.stage, gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION)
         self.assertEqual(plan.units_for_context(context), (kernel,))
+        self.assertEqual(plan.monolithic_kernels, (kernel,))
+        self.assertEqual(plan.block_kernels, ())
         self.assertTrue(block.is_diagonal)
         self.assertEqual(geometry.mode, gen.GeometryMode.AFFINE)
+        self.assertTrue(all(isinstance(phase, gen.MeshPhasePlan) for phase in kernel.mesh_phase_plans))
+        self.assertEqual(
+            tuple(phase.phase for phase in kernel.mesh_phase_plans),
+            (
+                gen.MeshPhase.GEOMETRY,
+                gen.MeshPhase.LOCAL_CALL,
+                gen.MeshPhase.SCATTER,
+            ),
+        )
+        self.assertIs(kernel.mesh_phase_plans[0].geometry, geometry)
+        self.assertEqual(kernel.mesh_phase_plans[1].blocks, (block,))
+        self.assertEqual(kernel.mesh_phase_plans[2].streams, (stream,))
+        self.assertTrue(all(isinstance(phase, gen.LocalPhasePlan) for phase in block.local_phase_plans))
+        self.assertEqual(
+            tuple(phase.phase for phase in block.local_phase_plans),
+            (
+                gen.LocalPhase.EVALUATE_TRIAL,
+                gen.LocalPhase.EVALUATE_MATERIAL,
+                gen.LocalPhase.CONTRACT_TEST,
+            ),
+        )
+        plan.validate_for_context(context)
+        self.assertEqual(plan.emission_kernels_for_context(context), (kernel,))
 
     def test_specialized_form_manipulation_returns_generation_plan(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
@@ -800,6 +849,10 @@ class GenApiTest(unittest.TestCase):
                 gen.MeshPhase.SCATTER,
             ),
         )
+        self.assertTrue(all(isinstance(phase, gen.MeshPhasePlan) for phase in energy_plan.units[0].mesh_phase_plans))
+        self.assertTrue(energy_plan.units[0].mesh_phase_plans[0].is_geometry)
+        self.assertTrue(energy_plan.units[0].mesh_phase_plans[1].is_local_call)
+        self.assertTrue(energy_plan.units[0].mesh_phase_plans[2].is_scatter)
 
         residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         residual_plan = gen.SpecializedFormManipulationStage(
@@ -814,6 +867,132 @@ class GenApiTest(unittest.TestCase):
                 gen.MeshPhase.GEOMETRY,
                 gen.MeshPhase.LOCAL_CALL,
                 gen.MeshPhase.SCATTER,
+            ),
+        )
+        self.assertTrue(residual_plan.units[0].mesh_phase_plans[0].is_gather)
+        self.assertTrue(residual_plan.units[0].mesh_phase_plans[1].is_geometry)
+        self.assertTrue(residual_plan.units[0].mesh_phase_plans[2].is_local_call)
+        self.assertTrue(residual_plan.units[0].mesh_phase_plans[3].is_scatter)
+        self.assertTrue(residual_plan.units[0].is_monolithic)
+        self.assertEqual(residual_plan.monolithic_kernels, residual_plan.units)
+        self.assertEqual(len(residual_plan.units[0].blocks), 6)
+        self.assertEqual(len(residual_plan.units[0].block_kernels), 6)
+        self.assertEqual(residual_plan.block_kernels, residual_plan.units[0].block_kernels)
+        self.assertTrue(all(kernel.is_block for kernel in residual_plan.block_kernels))
+        self.assertEqual(
+            tuple(kernel.block.name for kernel in residual_plan.block_kernels),
+            (
+                "form_1_p_w",
+                "form_1_p_c",
+                "form_2_p_w_p_w",
+                "form_2_p_w_p_c",
+                "form_2_p_c_p_w",
+                "form_2_p_c_p_c",
+            ),
+        )
+        self.assertEqual(
+            tuple(kernel.mesh_phase_plans[2].blocks for kernel in residual_plan.block_kernels),
+            tuple((kernel.block,) for kernel in residual_plan.block_kernels),
+        )
+        self.assertEqual(
+            tuple(phase.phase for phase in residual_plan.block_kernels[0].block.local_phase_plans),
+            (
+                gen.LocalPhase.EVALUATE_TRIAL,
+                gen.LocalPhase.TRANSFORM_REFERENCE,
+                gen.LocalPhase.EVALUATE_MATERIAL,
+                gen.LocalPhase.CONTRACT_TEST,
+            ),
+        )
+        self.assertEqual(
+            tuple(kernel.emission for kernel in residual_plan.block_kernels),
+            (gen.KernelEmission.COVERED_BY_PARENT,) * len(residual_plan.block_kernels),
+        )
+        self.assertEqual(residual_plan.emission_kernels_for_context(residual_input.element_contexts[0]), residual_plan.units)
+
+    def test_generation_plan_validation_rejects_unsupported_combinations(self):
+        context = gen.ElementGenerationContext.create("test_material", "TRI3", 16, None)
+        user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
+        form_collection = gen._evaluate_forms(user_input).by_dim[2].units[0].form_evaluation
+
+        with self.assertRaisesRegex(ValueError, "target 'cuda' is not supported"):
+            gen.GenerationPlan((
+                gen.KernelPlan(
+                    "cuda_kernel",
+                    "energy",
+                    form_collection,
+                    2,
+                    (gen.MeshPhase.LOCAL_CALL,),
+                    target=gen.KernelTarget.CUDA,
+                ),
+            )).validate_for_context(context)
+
+        with self.assertRaisesRegex(ValueError, "mesh phases are not in canonical order"):
+            gen.GenerationPlan((
+                gen.KernelPlan(
+                    "bad_order",
+                    "energy",
+                    form_collection,
+                    2,
+                    (
+                        gen.MeshPhase.SCATTER,
+                        gen.MeshPhase.LOCAL_CALL,
+                    ),
+                ),
+            )).validate_for_context(context)
+
+        bad_block = gen.BlockPlan(
+            "bad_field",
+            "missing",
+            "",
+            gen.FormOrder.ONE,
+            (gen.LocalPhase.EVALUATE_TRIAL,),
+        )
+        with self.assertRaisesRegex(ValueError, "row field 'missing'"):
+            gen.GenerationPlan((
+                gen.KernelPlan(
+                    "bad_block",
+                    "energy",
+                    form_collection,
+                    2,
+                    (gen.MeshPhase.LOCAL_CALL,),
+                    blocks=(bad_block,),
+                ),
+            )).validate_for_context(context)
+
+    def test_generation_plan_dumps_json_for_inspection(self):
+        residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        residual_plan = gen.SpecializedFormManipulationStage(
+            residual_input,
+            gen._evaluate_forms(residual_input),
+        ).run()
+        dump = residual_plan.to_dict()
+        parsed = json.loads(residual_plan.to_json())
+
+        self.assertEqual(dump["stage"], gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION.value)
+        self.assertEqual(parsed["n_monolithic_kernels"], 1)
+        self.assertEqual(parsed["n_block_kernels"], 6)
+        self.assertEqual(parsed["kernels"][0]["scope"], gen.KernelScope.MONOLITHIC.value)
+        self.assertEqual(parsed["kernels"][0]["mesh_phases"], ["gather", "geometry", "local_call", "scatter"])
+        self.assertEqual(
+            tuple(block["name"] for block in parsed["kernels"][0]["blocks"]),
+            (
+                "form_1_p_w",
+                "form_1_p_c",
+                "form_2_p_w_p_w",
+                "form_2_p_w_p_c",
+                "form_2_p_c_p_w",
+                "form_2_p_c_p_c",
+            ),
+        )
+        self.assertEqual(
+            tuple(kernel["selected_block"] for kernel in parsed["kernels"][0]["block_kernels"]),
+            (
+                "form_1_p_w",
+                "form_1_p_c",
+                "form_2_p_w_p_w",
+                "form_2_p_w_p_c",
+                "form_2_p_c_p_w",
+                "form_2_p_c_p_c",
             ),
         )
 
