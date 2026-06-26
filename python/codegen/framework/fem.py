@@ -608,6 +608,77 @@ def sfem_taylor_hood_element_types():
     )
 
 
+def sfem_taylor_hood_element_types_for_dim(dim):
+    dim = int(dim)
+    if dim == 2:
+        return tuple(
+            element
+            for element in sfem_taylor_hood_element_types()
+            if element.cell_element_type == "TRI6"
+        )
+    if dim == 3:
+        return tuple(
+            element
+            for element in sfem_taylor_hood_element_types()
+            if element.cell_element_type in ("TET10", "HEX27")
+        )
+    return ()
+
+
+def sfem_detect_taylor_hood_element_types(fields):
+    fields = tuple(fields)
+    if not _fields_request_taylor_hood(fields):
+        return ()
+    dim = _fields_geometric_dimension(fields)
+    return sfem_taylor_hood_element_types_for_dim(dim)
+
+
+def _fields_request_taylor_hood(fields):
+    has_displacement = False
+    has_pressure = False
+    for field in fields:
+        family = getattr(field, "family", "")
+        space = getattr(field, "metadata", {}).get("space")
+        if space is None:
+            continue
+        element = getattr(space, "element", None)
+        if element is None or str(getattr(element, "family", "")) != "Lagrange":
+            continue
+        degree = int(getattr(element, "degree", -1))
+        value_shape = tuple(getattr(element, "value_shape", ()))
+        components = int(getattr(field, "components", 1))
+        if family == "displacement" and degree == 2 and components > 1:
+            if value_shape in (("geometric",), (components,)):
+                has_displacement = True
+        elif family == "pressure" and degree == 1 and components == 1:
+            if not value_shape:
+                has_pressure = True
+    return has_displacement and has_pressure
+
+
+def _fields_geometric_dimension(fields):
+    dim = None
+    for field in fields:
+        metadata = getattr(field, "metadata", {})
+        field_dim = metadata.get("dim")
+        if field_dim is None and int(getattr(field, "components", 1)) > 1:
+            field_dim = int(field.components)
+        if field_dim is None:
+            continue
+        field_dim = int(field_dim)
+        if dim is None:
+            dim = field_dim
+        elif dim != field_dim:
+            raise ValueError("mixed finite-element fields have inconsistent dimensions")
+    if dim is None:
+        raise ValueError("mixed finite-element fields do not define a geometric dimension")
+    return dim
+
+
+def sfem_detect_compatible_element_types(fields):
+    return sfem_detect_taylor_hood_element_types(fields)
+
+
 def sfem_soa_element_specializations(element_types=None, vector_size=16, quadrature_order=None):
     element_types = sfem_supported_element_types() if element_types is None else tuple(element_types)
     return tuple(

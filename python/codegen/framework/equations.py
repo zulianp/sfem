@@ -46,11 +46,13 @@ class EquationField:
     name: str
     components: int = 1
     family: str = ""
+    metadata: object = None
 
     def __post_init__(self):
         name = str(self.name)
         family = str(self.family)
         components = int(self.components)
+        metadata = dict(self.metadata or ())
         if not name or not name.isidentifier():
             raise ValueError("equation field name must be a valid identifier")
         if components <= 0:
@@ -60,6 +62,7 @@ class EquationField:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "components", components)
         object.__setattr__(self, "family", family)
+        object.__setattr__(self, "metadata", metadata)
 
     @property
     def is_scalar(self):
@@ -154,18 +157,18 @@ class EquationSystem:
             for equation in self._equations
         )
 
-    def field(self, name, components=1, family=""):
-        field = EquationField(name, components, family)
+    def field(self, name, components=1, family="", metadata=None):
+        field = EquationField(name, components, family, metadata)
         if any(existing.name == field.name for existing in self._fields):
             raise ValueError("equation field '%s' is already registered" % field.name)
         self._fields.append(field)
         return field
 
-    def scalar_field(self, name, family=""):
-        return self.field(name, 1, family)
+    def scalar_field(self, name, family="", metadata=None):
+        return self.field(name, 1, family, metadata)
 
-    def vector_field(self, name, components=None, family=""):
-        return self.field(name, self.dim if components is None else components, family)
+    def vector_field(self, name, components=None, family="", metadata=None):
+        return self.field(name, self.dim if components is None else components, family, metadata)
 
     def equation(
         self,
@@ -501,6 +504,7 @@ class EquationSystemBuilder:
             symbolic.name,
             components,
             symbolic.family,
+            symbolic.metadata,
         )
         self._symbolic_fields.append(symbolic)
         self._equation_fields_by_name[symbolic.name] = equation_field
