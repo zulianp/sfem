@@ -67,9 +67,13 @@ from codegen.framework import (
     GeometryPlan,
     GeometryPlanNode,
     KernelPlan,
+    KernelEmission,
+    KernelScope,
     KernelTarget,
     LocalPhase,
+    LocalPhasePlan,
     MeshPhase,
+    MeshPhasePlan,
     PipelineStage,
     StandardFormName,
     VectorField,
@@ -175,6 +179,8 @@ class CodeGenerator:
 class GenerationResult:
     sources: tuple
     objects: tuple = ()
+    plan: object = None
+    plan_dump: object = None
 
 
 @dataclass(frozen=True)
@@ -406,7 +412,7 @@ class CodeGenerationStage:
     def run(self):
         outputs = {}
         for context in self.user_input.element_contexts:
-            for unit in self.codegen_plan.units_for_context(context):
+            for unit in self.codegen_plan.emission_kernels_for_context(context):
                 _merge_files(outputs, _emit_codegen_unit(unit, context))
         return outputs
 
@@ -420,6 +426,8 @@ def generate(
     quadrature_order=None,
     compile=False,
     clean=True,
+    dump_plan=False,
+    plan_out=None,
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
@@ -445,6 +453,7 @@ def generate(
         user_input,
         form_evaluation,
     ).run()
+    plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out) if dump_plan or plan_out else None
     files = CodeGenerationStage(user_input, codegen_plan).run()
 
     if material.op_name:
@@ -452,7 +461,7 @@ def generate(
 
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
-    return GenerationResult(source_paths, object_paths)
+    return GenerationResult(source_paths, object_paths, codegen_plan, plan_dump)
 
 
 def run(material, default_out_dir, argv=None):
@@ -471,6 +480,15 @@ def run(material, default_out_dir, argv=None):
     parser.add_argument("--vector-size", type=int, default=DEFAULT_VECTOR_SIZE)
     parser.add_argument("--compile", action="store_true")
     parser.add_argument(
+        "--dump-plan",
+        action="store_true",
+        help="Write a JSON generation-plan dump next to generated sources.",
+    )
+    parser.add_argument(
+        "--plan-out",
+        help="Path for the JSON generation-plan dump. Implies --dump-plan.",
+    )
+    parser.add_argument(
         "--keep-existing",
         action="store_true",
         help="Keep stale outputs from previous generator runs.",
@@ -485,6 +503,8 @@ def run(material, default_out_dir, argv=None):
             quadrature_order=args.quadrature_order,
             compile=args.compile,
             clean=not args.keep_existing,
+            dump_plan=args.dump_plan,
+            plan_out=args.plan_out,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
@@ -496,7 +516,26 @@ def run(material, default_out_dir, argv=None):
         print("Compiled:")
         for path in result.objects:
             print("  %s" % path)
+    if result.plan_dump:
+        print("Plan:")
+        print("  %s" % result.plan_dump)
     return result
+
+
+def _write_plan_dump(plan, out_dir, material_name, plan_out=None):
+    if plan_out is None:
+        path = os.path.join(out_dir, "generated_%s_plan.json" % material_name)
+    else:
+        path = os.fspath(plan_out)
+        if os.path.isdir(path):
+            path = os.path.join(path, "generated_%s_plan.json" % material_name)
+        elif not os.path.isabs(path):
+            path = os.path.abspath(path)
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    plan.write_json(path)
+    return path
 
 
 def _evaluate_forms(user_input):
@@ -593,6 +632,11 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             MeshPhase.LOCAL_CALL,
             MeshPhase.SCATTER,
         ),
+        mesh_phase_plans=(
+            MeshPhasePlan(MeshPhase.GEOMETRY),
+            MeshPhasePlan(MeshPhase.LOCAL_CALL),
+            MeshPhasePlan(MeshPhase.SCATTER),
+        ),
         target=KernelTarget.OPENMP,
         payload=EnergyCodeGenerationPayload(
             kernel_forms,
@@ -605,6 +649,13 @@ def _energy_codegen_unit(material_name, dim, evaluated):
 
 
 def _residual_codegen_unit(material_name, dim, evaluated):
+    blocks = _block_plans_from_form_collection(evaluated.form_evaluation)
+    block_kernels = _block_codegen_units(
+        material_name,
+        dim,
+        evaluated,
+        blocks,
+    )
     return CodeGenerationUnit(
         name=_unit_output_name_from_parts(material_name, evaluated.name),
         kind=CodeGenerationKind.RESIDUAL_SOA,
@@ -616,10 +667,86 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             MeshPhase.LOCAL_CALL,
             MeshPhase.SCATTER,
         ),
+        mesh_phase_plans=(
+            MeshPhasePlan(MeshPhase.GATHER),
+            MeshPhasePlan(MeshPhase.GEOMETRY),
+            MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=blocks),
+            MeshPhasePlan(MeshPhase.SCATTER),
+        ),
+        blocks=blocks,
+        block_kernels=block_kernels,
+        scope=KernelScope.MONOLITHIC,
         target=KernelTarget.OPENMP,
         material_name=material_name,
         unit_name=evaluated.name,
     )
+
+
+def _block_plans_from_form_collection(collection):
+    return tuple(_block_plan_from_form_block(block) for block in collection.blocks)
+
+
+def _block_plan_from_form_block(block):
+    return BlockPlan(
+        block.name,
+        block.row_field,
+        block.column_field or "",
+        block.order,
+        local_phase_plans=_residual_local_phase_plans(),
+    )
+
+
+def _residual_local_phase_plans():
+    return (
+        LocalPhasePlan(LocalPhase.EVALUATE_TRIAL),
+        LocalPhasePlan(LocalPhase.TRANSFORM_REFERENCE),
+        LocalPhasePlan(LocalPhase.EVALUATE_MATERIAL),
+        LocalPhasePlan(LocalPhase.CONTRACT_TEST),
+    )
+
+
+def _residual_local_phases():
+    return tuple(plan.phase for plan in _residual_local_phase_plans())
+
+
+def _block_codegen_units(material_name, dim, evaluated, blocks):
+    return tuple(
+        CodeGenerationUnit(
+            name=_unit_output_name_from_parts(
+                material_name,
+                _block_unit_name(evaluated.name, block),
+            ),
+            kind=CodeGenerationKind.RESIDUAL_SOA,
+            form_collection=evaluated.form_evaluation,
+            dim=dim,
+            mesh_phases=(
+                MeshPhase.GATHER,
+                MeshPhase.GEOMETRY,
+                MeshPhase.LOCAL_CALL,
+                MeshPhase.SCATTER,
+            ),
+            mesh_phase_plans=(
+                MeshPhasePlan(MeshPhase.GATHER),
+                MeshPhasePlan(MeshPhase.GEOMETRY),
+                MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=(block,)),
+                MeshPhasePlan(MeshPhase.SCATTER),
+            ),
+            blocks=(block,),
+            scope=KernelScope.BLOCK,
+            block=block,
+            emission=KernelEmission.COVERED_BY_PARENT,
+            target=KernelTarget.OPENMP,
+            material_name=material_name,
+            unit_name=_block_unit_name(evaluated.name, block),
+        )
+        for block in blocks
+    )
+
+
+def _block_unit_name(unit_name, block):
+    if unit_name:
+        return "%s_%s" % (unit_name, block.name)
+    return block.name
 
 
 def _emit_codegen_unit(unit, context):
@@ -1113,9 +1240,13 @@ __all__ = [
     "GeometryPlan",
     "GeometryPlanNode",
     "KernelPlan",
+    "KernelEmission",
+    "KernelScope",
     "KernelTarget",
     "LocalPhase",
+    "LocalPhasePlan",
     "MeshPhase",
+    "MeshPhasePlan",
     "current_geometric_dimension",
     "geometric_dimension_context",
     "HyperelasticQualifier",
