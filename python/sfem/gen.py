@@ -220,7 +220,7 @@ class UserInputStage:
 @dataclass(frozen=True)
 class EnergyDimensionEvaluation:
     name: str
-    form_evaluation: FormEvaluation
+    form_evaluation: FormCollection
     deformation_gradient: object
     variables: tuple
     kernels: tuple
@@ -230,9 +230,7 @@ class EnergyDimensionEvaluation:
 @dataclass(frozen=True)
 class ResidualDimensionEvaluation:
     name: str
-    system: CoupledResidualSystem
-    form_evaluation: FormEvaluation
-    fields: tuple
+    form_evaluation: FormCollection
 
 
 @dataclass(frozen=True)
@@ -262,7 +260,8 @@ class CodeGenerationUnit:
     material_name: str
     unit_name: str
     dim: int
-    payload: object
+    form_collection: FormCollection
+    payload: object = None
 
     def matches(self, context):
         return self.dim == context.specialization.dim
@@ -273,14 +272,6 @@ class EnergyCodeGenerationPayload:
     kernel_forms: tuple
     diagnostic_graph: object
     diagnostics: bool
-
-
-@dataclass(frozen=True)
-class ResidualCodeGenerationPayload:
-    system: CoupledResidualSystem
-    residual_coeffs: tuple
-    action_coeffs: tuple
-    equation_fields: tuple
 
 
 @dataclass(frozen=True)
@@ -498,6 +489,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
         material_name,
         evaluated.name,
         dim,
+        evaluated.form_evaluation,
         EnergyCodeGenerationPayload(
             kernel_forms,
             diagnostic_graph,
@@ -512,12 +504,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         material_name,
         evaluated.name,
         dim,
-        ResidualCodeGenerationPayload(
-            evaluated.system,
-            evaluated.form_evaluation.form_metadata(FormOrder.ONE).coefficients,
-            evaluated.form_evaluation.form_metadata(FormOrder.TWO).coefficients,
-            evaluated.fields,
-        ),
+        evaluated.form_evaluation,
     )
 
 
@@ -570,31 +557,33 @@ def _emit_energy_soa(unit, context):
 
 
 def _emit_residual_soa(unit, context):
+    collection = unit.form_collection
+    system = collection.source
+    residual_coeffs = collection.form_metadata(FormOrder.ONE).coefficients
+    action_coeffs = collection.form_metadata(FormOrder.TWO).coefficients
     if context.is_mixed_order:
-        payload = unit.payload
         return generate_mixed_residual_sfem_files(
-            payload.system,
+            system,
             prefix=_unit_generated_prefix(unit),
             compatible_element=context.compatible_element,
             vector_size=context.specialization.vector_size,
             quadrature_order=context.specialization.quadrature_rule.order,
-            residual_coeffs=payload.residual_coeffs,
-            action_coeffs=payload.action_coeffs,
+            residual_coeffs=residual_coeffs,
+            action_coeffs=action_coeffs,
             field_element_types=_field_element_types_for_context(
-                payload.equation_fields,
+                collection.fields,
                 context,
             ),
         )
-    payload = unit.payload
     return generate_coupled_residual_sfem_files(
-        payload.system,
+        system,
         prefix=_unit_generated_prefix(unit),
         element_type=context.element_type,
         vector_size=context.specialization.vector_size,
         quadrature_order=context.specialization.quadrature_rule.order,
         specialization=context.specialization,
-        residual_coeffs=payload.residual_coeffs,
-        action_coeffs=payload.action_coeffs,
+        residual_coeffs=residual_coeffs,
+        action_coeffs=action_coeffs,
     )
 
 
@@ -725,9 +714,7 @@ def _evaluate_residual_equation(dim, equation, form_collection=None):
         form_evaluation = form_collection
     return ResidualDimensionEvaluation(
         equation.name,
-        system,
         form_evaluation,
-        equation.fields,
     )
 
 

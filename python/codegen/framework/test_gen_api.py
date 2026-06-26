@@ -285,6 +285,13 @@ class GenApiTest(unittest.TestCase):
         self.assertFalse(action_metadata.dependencies.previous)
         self.assertTrue(residual_forms.blocks)
         self.assertEqual(residual_forms.blocks, action_metadata.blocks)
+        residual_unit = gen._residual_codegen_unit(
+            "material",
+            1,
+            gen._evaluate_equation(1, residual, residual_forms),
+        )
+        self.assertIs(residual_unit.form_collection, residual_forms)
+        self.assertIsNone(residual_unit.payload)
         self.assertIs(system.form_collection(energy), energy_forms)
         self.assertEqual(system.form_collections(), (energy_forms, residual_forms))
 
