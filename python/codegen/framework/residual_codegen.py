@@ -181,6 +181,10 @@ def generate_coupled_residual_sfem_files(
     specialization=None,
     residual_coeffs=None,
     action_coeffs=None,
+    local_prefix=None,
+    local_name=None,
+    operator_prefix=None,
+    operator_name=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -201,10 +205,10 @@ def generate_coupled_residual_sfem_files(
         if specialization.quadrature_rule.is_tensor_product
         else "simplex"
     )
-    local_prefix = "%s_d%d_%s" % (prefix, system.dim, family)
-    element_prefix = "%s_%s" % (prefix, element_type.lower())
-    local_name = "%s_local.hpp" % local_prefix
-    operator_name = "%s_operator.cpp" % element_prefix
+    local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
+    element_prefix = "%s_%s" % (prefix, element_type.lower()) if operator_prefix is None else str(operator_prefix)
+    local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
+    operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
     local_source = _local_header(
         system,
         local_prefix,
@@ -245,6 +249,9 @@ def generate_mixed_residual_sfem_files(
     residual_coeffs=None,
     action_coeffs=None,
     field_element_types=None,
+    local_prefix=None,
+    operator_prefix=None,
+    operator_name=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -273,8 +280,9 @@ def generate_mixed_residual_sfem_files(
         if cell_specialization.quadrature_rule.is_tensor_product
         else "simplex"
     )
-    local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family)
-    operator_name = "%s_%s_operator.cpp" % (prefix, compatible_element.name.lower())
+    local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
+    element_prefix = "%s_%s" % (prefix, compatible_element.name.lower()) if operator_prefix is None else str(operator_prefix)
+    operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
     operator_source = _mixed_operator_source(
         system,
         prefix,
@@ -2230,4 +2238,3 @@ def _reference_data_lines(prefix, rule):
                 )
             )
     return lines
-

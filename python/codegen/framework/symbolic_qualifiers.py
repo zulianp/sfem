@@ -116,6 +116,7 @@ class MaterialParameter:
 DEFORMATION_GRADIENT = HyperelasticQualifier("deformation_gradient")
 MATERIAL_PARAMETER = MaterialParameterQualifier("material_parameter")
 DISPLACEMENT = FieldQualifier("displacement")
+VELOCITY = FieldQualifier("velocity")
 PRESSURE = FieldQualifier("pressure")
 
 
@@ -167,6 +168,7 @@ __all__ = [
     "MaterialParameterQualifier",
     "PRESSURE",
     "QualifiedExpression",
+    "VELOCITY",
     "material_parameter",
     "qualifiers",
     "qualify",

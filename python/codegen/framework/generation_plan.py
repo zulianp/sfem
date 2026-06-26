@@ -56,6 +56,82 @@ class KernelEmission(Enum):
 
 
 @dataclass(frozen=True)
+class LocalKernelPlan:
+    prefix: str
+    dim: int
+    family: str
+    suffix: str = ""
+
+    def __post_init__(self):
+        prefix = str(self.prefix)
+        dim = int(self.dim)
+        family = str(self.family)
+        suffix = str(self.suffix)
+        if not prefix:
+            raise ValueError("local kernel plan requires a prefix")
+        if dim <= 0:
+            raise ValueError("local kernel plan dimension must be positive")
+        if family not in ("simplex", "tensor_product"):
+            raise ValueError("unsupported local kernel family '%s'" % family)
+        if suffix and (not suffix.startswith("_") or not suffix[1:].isidentifier()):
+            raise ValueError("local kernel suffix must be empty or an identifier prefixed by '_'")
+        object.__setattr__(self, "prefix", prefix)
+        object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "family", family)
+        object.__setattr__(self, "suffix", suffix)
+
+    @property
+    def name(self):
+        return "%s_d%d_%s%s" % (self.prefix, self.dim, self.family, self.suffix)
+
+    @property
+    def header(self):
+        return "%s_local.hpp" % self.name
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "prefix": self.prefix,
+            "dim": self.dim,
+            "family": self.family,
+            "suffix": self.suffix,
+            "header": self.header,
+        }
+
+
+@dataclass(frozen=True)
+class MeshKernelPlan:
+    prefix: str
+    element_label: str
+
+    def __post_init__(self):
+        prefix = str(self.prefix)
+        element_label = str(self.element_label).lower()
+        if not prefix:
+            raise ValueError("mesh kernel plan requires a prefix")
+        if not element_label or not all(ch.isalnum() or ch == "_" for ch in element_label):
+            raise ValueError("mesh kernel element label must be a non-empty identifier fragment")
+        object.__setattr__(self, "prefix", prefix)
+        object.__setattr__(self, "element_label", element_label)
+
+    @property
+    def name(self):
+        return "%s_%s" % (self.prefix, self.element_label)
+
+    @property
+    def source(self):
+        return "%s_operator.cpp" % self.name
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "prefix": self.prefix,
+            "element_label": self.element_label,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
 class DataStreamPlan:
     name: str
     role: DataStreamRole
@@ -463,6 +539,17 @@ class KernelPlan:
             _validate_local_phase_sequence(self.block)
         for block_kernel in self.block_kernels:
             block_kernel.validate_for_context(context)
+
+    def local_kernel_plan(self, context, prefix, suffix=""):
+        return LocalKernelPlan(
+            prefix,
+            context.specialization.dim,
+            context.family,
+            suffix,
+        )
+
+    def mesh_kernel_plan(self, context, prefix):
+        return MeshKernelPlan(prefix, context.label)
 
     def to_dict(self, include_block_kernels=True):
         return {

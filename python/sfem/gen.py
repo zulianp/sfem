@@ -70,8 +70,10 @@ from codegen.framework import (
     KernelEmission,
     KernelScope,
     KernelTarget,
+    LocalKernelPlan,
     LocalPhase,
     LocalPhasePlan,
+    MeshKernelPlan,
     MeshPhase,
     MeshPhasePlan,
     PipelineStage,
@@ -81,6 +83,7 @@ from codegen.framework import (
     VectorFunctionSpace,
     VectorFunction,
     TensorFunction,
+    VELOCITY,
     current_geometric_dimension,
     energy_form_pipeline,
     generate_coupled_residual_sfem_files,
@@ -760,12 +763,13 @@ def _emit_codegen_unit(unit, context):
 def _emit_energy_soa(unit, context):
     payload = unit.payload
     generated_prefix = _unit_generated_prefix(unit)
+    local_kernel = _local_kernel_plan(unit, context)
+    mesh_kernel = _mesh_kernel_plan(unit, context, context.element_type)
     files = list(
         generate_sfem_soa_cpp_files_for_element(
             payload.kernel_forms,
-            prefix="%s_%s" % (generated_prefix, context.element_type.lower()),
-            local_prefix="%s_d%d_%s"
-            % (generated_prefix, context.specialization.dim, context.family),
+            prefix=mesh_kernel.name,
+            local_prefix=local_kernel.name,
             specialization=context.specialization,
         )
     )
@@ -802,6 +806,12 @@ def _emit_residual_soa(unit, context):
     system = collection.source
     residual_coeffs = collection.form_metadata(FormOrder.ONE).coefficients
     action_coeffs = collection.form_metadata(FormOrder.TWO).coefficients
+    local_kernel = _local_kernel_plan(
+        unit,
+        context,
+        suffix="_mixed" if context.is_mixed_order else "",
+    )
+    mesh_kernel = _mesh_kernel_plan(unit, context)
     if context.is_mixed_order:
         return generate_mixed_residual_sfem_files(
             system,
@@ -815,6 +825,9 @@ def _emit_residual_soa(unit, context):
                 collection.fields,
                 context,
             ),
+            local_prefix=local_kernel.name,
+            operator_prefix=mesh_kernel.name,
+            operator_name=mesh_kernel.source,
         )
     return generate_coupled_residual_sfem_files(
         system,
@@ -825,7 +838,21 @@ def _emit_residual_soa(unit, context):
         specialization=context.specialization,
         residual_coeffs=residual_coeffs,
         action_coeffs=action_coeffs,
+        local_prefix=local_kernel.name,
+        local_name=local_kernel.header,
+        operator_prefix=mesh_kernel.name,
+        operator_name=mesh_kernel.source,
     )
+
+
+def _local_kernel_plan(unit, context, suffix=""):
+    return unit.local_kernel_plan(context, _unit_generated_prefix(unit), suffix)
+
+
+def _mesh_kernel_plan(unit, context, element_label=None):
+    if element_label is None:
+        return unit.mesh_kernel_plan(context, _unit_generated_prefix(unit))
+    return MeshKernelPlan(_unit_generated_prefix(unit), element_label)
 
 
 def _material_equations(material, dim):
@@ -1243,8 +1270,10 @@ __all__ = [
     "KernelEmission",
     "KernelScope",
     "KernelTarget",
+    "LocalKernelPlan",
     "LocalPhase",
     "LocalPhasePlan",
+    "MeshKernelPlan",
     "MeshPhase",
     "MeshPhasePlan",
     "current_geometric_dimension",
@@ -1278,6 +1307,7 @@ __all__ = [
     "TrialFunction",
     "TwoPhaseFlowConstitutiveModel",
     "CodeGenerator",
+    "VELOCITY",
     "VectorField",
     "VectorFunction",
     "VectorElement",
