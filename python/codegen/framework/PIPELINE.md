@@ -151,6 +151,12 @@ The same context carries basis plan nodes:
   field shape counts and scatter sizes come from field-family compatibility
   metadata while still being evaluated on the cell quadrature rule.
 
+Tensor-product basis and geometry nodes carry `TensorProductSumFactorizationPlan`
+objects. The same abstraction identifies field value evaluation, field gradient
+evaluation, geometry Jacobian evaluation, and test contractions, so later code
+generation stages can route all tensor-product operations through one shared
+sum-factorization policy instead of separate material-specific branches.
+
 ### 4. Unified Code Generation
 
 `CodeGenerationStage` is the only stage that emits generated source files.

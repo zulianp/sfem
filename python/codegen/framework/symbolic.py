@@ -3965,6 +3965,7 @@ def _sfem_soa_mesh_operator_function(
             tensor_product_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=n_nodes,
+                n_qp=quadrature_rule.n_qp,
                 coordinate_streams=[
                     "block_%s" % stream
                     for stream in streams_in_shape_order(

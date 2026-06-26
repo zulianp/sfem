@@ -2027,6 +2027,7 @@ def _isoparametric_mesh_operator_source(
             tensor_product_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=n_shape,
+                n_qp=rule.n_qp,
                 coordinate_streams=[
                     "block_coordinates[%d]" % i
                     for i in coordinate_stream_order
