@@ -28,6 +28,38 @@ class WeakResidualCoefficients:
     gradient: tuple
 
 
+@dataclass(frozen=True)
+class ResidualCodegenDependencies:
+    current: bool
+    previous: bool
+    direction: bool
+    parameters: tuple
+    current_value: bool
+    current_gradient: bool
+    previous_value: bool
+    previous_gradient: bool
+    direction_value: bool
+    direction_gradient: bool
+    value_coefficients: tuple
+    gradient_coefficients: tuple
+
+    @property
+    def uses_trial_gradients(self):
+        return self.current_gradient or self.previous_gradient or self.direction_gradient
+
+    @property
+    def uses_test_gradients(self):
+        return any(any(row) for row in self.gradient_coefficients)
+
+    @property
+    def uses_reference_gradients(self):
+        return self.uses_trial_gradients or self.uses_test_gradients
+
+    @property
+    def uses_adjugate(self):
+        return self.uses_reference_gradients
+
+
 def weak_residual_coefficients(system, expression, row_field):
     field = system.field(row_field)
     expression = sp.sympify(expression)
@@ -76,6 +108,50 @@ def coupled_residual_weak_coefficients(system, jacobian_action=False):
                 )
             )
     return tuple(coefficients)
+
+
+def _codegen_dependencies(system, coefficients, dependencies):
+    free_symbols = set()
+    for coefficient in coefficients:
+        free_symbols.update(sp.sympify(coefficient.value).free_symbols)
+        for expression in coefficient.gradient:
+            free_symbols.update(sp.sympify(expression).free_symbols)
+    return ResidualCodegenDependencies(
+        current=dependencies.current,
+        previous=dependencies.previous,
+        direction=dependencies.direction,
+        parameters=tuple(dependencies.parameters),
+        current_value=any(field.value in free_symbols for field in system.fields),
+        current_gradient=any(
+            free_symbols.intersection(field.gradient) for field in system.fields
+        ),
+        previous_value=any(
+            field.previous_value is not None and field.previous_value in free_symbols
+            for field in system.fields
+        ),
+        previous_gradient=any(
+            free_symbols.intersection(field.previous_gradient)
+            for field in system.fields
+        ),
+        direction_value=any(
+            field.direction_value in free_symbols for field in system.fields
+        ),
+        direction_gradient=any(
+            free_symbols.intersection(field.direction_gradient)
+            for field in system.fields
+        ),
+        value_coefficients=tuple(
+            not _is_zero(coefficient.value) for coefficient in coefficients
+        ),
+        gradient_coefficients=tuple(
+            tuple(not _is_zero(expression) for expression in coefficient.gradient)
+            for coefficient in coefficients
+        ),
+    )
+
+
+def _is_zero(expression):
+    return sp.simplify(expression) == 0
 
 
 def generate_coupled_residual_sfem_files(
