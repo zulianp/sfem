@@ -201,26 +201,61 @@ namespace sfem {
                              const int dim,
                              real_t *const values) {
             int index = 0;
-            values[index++] = parameters.require_real_value("porosity");
-            values[index++] = parameters.require_real_value("S_res");
-            values[index++] = parameters.require_real_value("P_r");
-            values[index++] = parameters.require_real_value("m");
-            values[index++] = parameters.require_real_value("rho_w0");
-            values[index++] = parameters.require_real_value("kappa_T");
-            values[index++] = parameters.require_real_value("p_wr");
-            values[index++] = parameters.require_real_value("M_c");
-            values[index++] = parameters.require_real_value("Z");
-            values[index++] = parameters.require_real_value("R");
-            values[index++] = parameters.require_real_value("T");
-            values[index++] = parameters.require_real_value("mu_w");
-            values[index++] = parameters.require_real_value("mu_c");
-            values[index++] = parameters.require_real_value("C_kw1");
-            values[index++] = parameters.require_real_value("C_ka1");
-            values[index++] = parameters.require_real_value("C_ka2");
-            values[index++] = parameters.require_real_value("dt");
-            for (int i = 0; i < dim * dim; ++i) {
-                values[index++] =
-                        parameters.require_real_value("K_" + std::to_string(i));
+            switch (dim) {
+                case 2:
+                    values[index++] = parameters.require_real_value("C_ka1");
+                    values[index++] = parameters.require_real_value("C_ka2");
+                    values[index++] = parameters.require_real_value("C_kw1");
+                    values[index++] = parameters.require_real_value("K_0");
+                    values[index++] = parameters.require_real_value("K_1");
+                    values[index++] = parameters.require_real_value("K_2");
+                    values[index++] = parameters.require_real_value("K_3");
+                    values[index++] = parameters.require_real_value("M_c");
+                    values[index++] = parameters.require_real_value("P_r");
+                    values[index++] = parameters.require_real_value("R");
+                    values[index++] = parameters.require_real_value("S_res");
+                    values[index++] = parameters.require_real_value("T");
+                    values[index++] = parameters.require_real_value("Z");
+                    values[index++] = parameters.require_real_value("dt");
+                    values[index++] = parameters.require_real_value("kappa_T");
+                    values[index++] = parameters.require_real_value("m");
+                    values[index++] = parameters.require_real_value("mu_c");
+                    values[index++] = parameters.require_real_value("mu_w");
+                    values[index++] = parameters.require_real_value("p_wr");
+                    values[index++] = parameters.require_real_value("porosity");
+                    values[index++] = parameters.require_real_value("rho_w0");
+                    break;
+                case 3:
+                    values[index++] = parameters.require_real_value("C_ka1");
+                    values[index++] = parameters.require_real_value("C_ka2");
+                    values[index++] = parameters.require_real_value("C_kw1");
+                    values[index++] = parameters.require_real_value("K_0");
+                    values[index++] = parameters.require_real_value("K_1");
+                    values[index++] = parameters.require_real_value("K_2");
+                    values[index++] = parameters.require_real_value("K_3");
+                    values[index++] = parameters.require_real_value("K_4");
+                    values[index++] = parameters.require_real_value("K_5");
+                    values[index++] = parameters.require_real_value("K_6");
+                    values[index++] = parameters.require_real_value("K_7");
+                    values[index++] = parameters.require_real_value("K_8");
+                    values[index++] = parameters.require_real_value("M_c");
+                    values[index++] = parameters.require_real_value("P_r");
+                    values[index++] = parameters.require_real_value("R");
+                    values[index++] = parameters.require_real_value("S_res");
+                    values[index++] = parameters.require_real_value("T");
+                    values[index++] = parameters.require_real_value("Z");
+                    values[index++] = parameters.require_real_value("dt");
+                    values[index++] = parameters.require_real_value("kappa_T");
+                    values[index++] = parameters.require_real_value("m");
+                    values[index++] = parameters.require_real_value("mu_c");
+                    values[index++] = parameters.require_real_value("mu_w");
+                    values[index++] = parameters.require_real_value("p_wr");
+                    values[index++] = parameters.require_real_value("porosity");
+                    values[index++] = parameters.require_real_value("rho_w0");
+                    break;
+                default:
+                    SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\n", dim);
+                    break;
             }
         }
     }  // namespace
