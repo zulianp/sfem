@@ -58,6 +58,11 @@ except ImportError:
     from targets import OpenMPTarget
 
 try:
+    from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+except ImportError:
+    from tensor_product_kernels import sfem_tensor_product_kernels_header_source
+
+try:
     import networkx as nx
 except ModuleNotFoundError:
     try:
@@ -1524,12 +1529,17 @@ def generate_sfem_soa_cpp_files(
     use_shared_weak_local = local_prefix != prefix
     local_name = "%s_local.hpp" % local_prefix
     math_name = "kernel_math.hpp"
+    tensor_product_name = "tensor_product_kernels.hpp"
     diagnostics_name = "kernel_diagnostics.hpp"
     operator_name = "%s_operator.cpp" % prefix
     return (
         GeneratedKernelFile(
             math_name,
             _sfem_math_header_source(),
+        ),
+        GeneratedKernelFile(
+            tensor_product_name,
+            sfem_tensor_product_kernels_header_source(),
         ),
         GeneratedKernelFile(
             diagnostics_name,
@@ -1546,6 +1556,7 @@ def generate_sfem_soa_cpp_files(
                 quadrature_rule,
                 use_shared_weak_local,
                 math_name,
+                tensor_product_name,
             ),
         ),
         GeneratedKernelFile(
@@ -1607,6 +1618,7 @@ def _sfem_soa_local_header(
     quadrature_rule,
     use_shared_weak_local=False,
     math_name="kernel_math.hpp",
+    tensor_product_name="tensor_product_kernels.hpp",
 ):
     guard = "%s_LOCAL_HPP" % _cpp_macro_name(prefix)
     lines = [
@@ -1623,6 +1635,7 @@ def _sfem_soa_local_header(
         "#endif",
         "",
         '#include "%s"' % math_name,
+        '#include "%s"' % tensor_product_name,
         "",
         "#ifndef SFEM_INLINE",
         "#define SFEM_INLINE inline",
@@ -1640,28 +1653,7 @@ def _sfem_soa_local_header(
         "#endif",
         "",
     ]
-    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
-        lines.extend(
-            [
-                "#ifndef SFEM_GENERATED_INTEGER_ROOT",
-                "#define SFEM_GENERATED_INTEGER_ROOT",
-                "static constexpr int sfem_generated_ipow(const int base, const int exponent) {",
-                "    return exponent == 0 ? 1 : base * sfem_generated_ipow(base, exponent - 1);",
-                "}",
-                "static constexpr int sfem_generated_integer_root_search(const int value, const int exponent, const int candidate) {",
-                "    return sfem_generated_ipow(candidate, exponent) >= value ? candidate : sfem_generated_integer_root_search(value, exponent, candidate + 1);",
-                "}",
-                "static constexpr int sfem_generated_integer_root(const int value, const int exponent) {",
-                "    return sfem_generated_integer_root_search(value, exponent, 1);",
-                "}",
-                "#endif",
-                "",
-            ]
-        )
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
-    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
-        lines.extend(_sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim))
-        lines.append("")
 
     for form in forms:
         lines.extend(
@@ -1679,496 +1671,6 @@ def _sfem_soa_local_header(
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
-
-
-def _sfem_tensor_product_sum_factorization_soa_helpers(prefix, dim):
-    if dim not in (2, 3):
-        raise ValueError("tensor-product sum factorization supports dimensions 2 and 3")
-
-    p = prefix
-    lines = []
-
-    if dim == 2:
-        lines.extend(
-            [
-                "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-                "static SFEM_INLINE void %s_tensor_gradient(" % p,
-                "        const ptrdiff_t nelems,",
-                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-                "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],",
-                "        const int component,",
-                "        scalar_t *const SFEM_RESTRICT gradient) {",
-                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
-                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
-                "    scalar_t value_x[Q * S * VECTOR_SIZE];",
-                "    scalar_t grad_x[Q * S * VECTOR_SIZE];",
-                "    for (int qx = 0; qx < Q; ++qx) {",
-                "        for (int sy = 0; sy < S; ++sy) {",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0);",
-                "                for (int sx = 0; sx < S; ++sx) {",
-                "                    const int shape = sx + S * sy;",
-                "                    const scalar_t u = streams[shape * 2 + component][lane];",
-                "                    v += u * shape_1d[qx * S + sx];",
-                "                    gx += u * grad_1d[qx * S + sx];",
-                "                }",
-                "                const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
-                "                value_x[i] = v; grad_x[i] = gx;",
-                "            }",
-                "        }",
-                "    }",
-                "    for (int qy = 0; qy < Q; ++qy) {",
-                "        for (int qx = 0; qx < Q; ++qx) {",
-                "            const int q = qx + Q * qy;",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);",
-                "                for (int sy = 0; sy < S; ++sy) {",
-                "                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
-                "                    gx += grad_x[i] * shape_1d[qy * S + sy];",
-                "                    gy += value_x[i] * grad_1d[qy * S + sy];",
-                "                }",
-                "                gradient[(q * 2 + 0) * VECTOR_SIZE + lane] = gx;",
-                "                gradient[(q * 2 + 1) * VECTOR_SIZE + lane] = gy;",
-                "            }",
-                "        }",
-                "    }",
-                "}",
-                "",
-                "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-                "static SFEM_INLINE void %s_tensor_test(" % p,
-                "        const ptrdiff_t nelems,",
-                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-                "        const scalar_t *const SFEM_RESTRICT flux,",
-                "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2],",
-                "        const int component) {",
-                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
-                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
-                "    scalar_t stage_x[Q * S * VECTOR_SIZE];",
-                "    scalar_t stage_y[Q * S * VECTOR_SIZE];",
-                "    for (int qx = 0; qx < Q; ++qx) {",
-                "        for (int sy = 0; sy < S; ++sy) {",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0);",
-                "                for (int qy = 0; qy < Q; ++qy) {",
-                "                    const int q = qx + Q * qy;",
-                "                    tx += flux[(q * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];",
-                "                    ty += flux[(q * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];",
-                "                }",
-                "                const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
-                "                stage_x[i] = tx; stage_y[i] = ty;",
-                "            }",
-                "        }",
-                "    }",
-                "    for (int sy = 0; sy < S; ++sy) {",
-                "        for (int sx = 0; sx < S; ++sx) {",
-                "            const int shape = sx + S * sy;",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                scalar_t value = scalar_t(0);",
-                "                for (int qx = 0; qx < Q; ++qx) {",
-                "                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;",
-                "                    value += stage_x[i] * grad_1d[qx * S + sx]",
-                "                           + stage_y[i] * shape_1d[qx * S + sx];",
-                "                }",
-                "                out_streams[shape * 2 + component][lane] += value;",
-                "            }",
-                "        }",
-                "    }",
-                "}",
-            ]
-        )
-        return lines
-
-    lines.extend(
-        [
-            "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-            "static SFEM_INLINE void %s_tensor_gradient(" % p,
-            "        const ptrdiff_t nelems,",
-            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-            "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],",
-            "        const int component,",
-            "        scalar_t *const SFEM_RESTRICT gradient) {",
-            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
-            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
-            "    scalar_t value_x[Q * S * S * VECTOR_SIZE];",
-            "    scalar_t grad_x[Q * S * S * VECTOR_SIZE];",
-            "    scalar_t value_xy[Q * Q * S * VECTOR_SIZE];",
-            "    scalar_t grad_x_xy[Q * Q * S * VECTOR_SIZE];",
-            "    scalar_t grad_y_xy[Q * Q * S * VECTOR_SIZE];",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int sy = 0; sy < S; ++sy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0);",
-            "                    for (int sx = 0; sx < S; ++sx) {",
-            "                        const int shape = sx + S * (sy + S * sz);",
-            "                        const scalar_t u = streams[shape * 3 + component][lane];",
-            "                        v += u * shape_1d[qx * S + sx];",
-            "                        gx += u * grad_1d[qx * S + sx];",
-            "                    }",
-            "                    const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
-            "                    value_x[i] = v; grad_x[i] = gx;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);",
-            "                    for (int sy = 0; sy < S; ++sy) {",
-            "                        const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
-            "                        v += value_x[i] * shape_1d[qy * S + sy];",
-            "                        gx += grad_x[i] * shape_1d[qy * S + sy];",
-            "                        gy += value_x[i] * grad_1d[qy * S + sy];",
-            "                    }",
-            "                    const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
-            "                    value_xy[j] = v; grad_x_xy[j] = gx; grad_y_xy[j] = gy;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int qz = 0; qz < Q; ++qz) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int qx = 0; qx < Q; ++qx) {",
-            "                const int q = qx + Q * (qy + Q * qz);",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0); scalar_t gz = scalar_t(0);",
-            "                    for (int sz = 0; sz < S; ++sz) {",
-            "                        const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
-            "                        gx += grad_x_xy[j] * shape_1d[qz * S + sz];",
-            "                        gy += grad_y_xy[j] * shape_1d[qz * S + sz];",
-            "                        gz += value_xy[j] * grad_1d[qz * S + sz];",
-            "                    }",
-            "                    gradient[(q * 3 + 0) * VECTOR_SIZE + lane] = gx;",
-            "                    gradient[(q * 3 + 1) * VECTOR_SIZE + lane] = gy;",
-            "                    gradient[(q * 3 + 2) * VECTOR_SIZE + lane] = gz;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "}",
-            "",
-            "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-            "static SFEM_INLINE void %s_tensor_test(" % p,
-            "        const ptrdiff_t nelems,",
-            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-            "        const scalar_t *const SFEM_RESTRICT flux,",
-            "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3],",
-            "        const int component) {",
-            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
-            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
-            "    scalar_t stage_x[Q * Q * S * VECTOR_SIZE];",
-            "    scalar_t stage_y[Q * Q * S * VECTOR_SIZE];",
-            "    scalar_t stage_z[Q * Q * S * VECTOR_SIZE];",
-            "    scalar_t stage_xy_x[Q * S * S * VECTOR_SIZE];",
-            "    scalar_t stage_xy_y[Q * S * S * VECTOR_SIZE];",
-            "    scalar_t stage_xy_z[Q * S * S * VECTOR_SIZE];",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);",
-            "                    for (int qz = 0; qz < Q; ++qz) {",
-            "                        const int q = qx + Q * (qy + Q * qz);",
-            "                        tx += flux[(q * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
-            "                        ty += flux[(q * 3 + 1) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];",
-            "                        tz += flux[(q * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];",
-            "                    }",
-            "                    const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
-            "                    stage_x[i] = tx; stage_y[i] = ty; stage_z[i] = tz;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int sy = 0; sy < S; ++sy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);",
-            "                    for (int qy = 0; qy < Q; ++qy) {",
-            "                        const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
-            "                        tx += stage_x[i] * shape_1d[qy * S + sy];",
-            "                        ty += stage_y[i] * grad_1d[qy * S + sy];",
-            "                        tz += stage_z[i] * shape_1d[qy * S + sy];",
-            "                    }",
-            "                    const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
-            "                    stage_xy_x[j] = tx; stage_xy_y[j] = ty; stage_xy_z[j] = tz;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int sz = 0; sz < S; ++sz) {",
-            "        for (int sy = 0; sy < S; ++sy) {",
-            "            for (int sx = 0; sx < S; ++sx) {",
-            "                const int shape = sx + S * (sy + S * sz);",
-            "#pragma omp simd",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                    scalar_t value = scalar_t(0);",
-            "                    for (int qx = 0; qx < Q; ++qx) {",
-            "                        const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;",
-            "                        value += stage_xy_x[j] * grad_1d[qx * S + sx]",
-            "                               + (stage_xy_y[j] + stage_xy_z[j]) * shape_1d[qx * S + sx];",
-            "                    }",
-            "                    out_streams[shape * 3 + component][lane] += value;",
-            "                }",
-            "            }",
-            "        }",
-            "    }",
-            "}",
-        ]
-    )
-    return lines
-
-
-def _sfem_tensor_product_sum_factorization_helpers(prefix, dim):
-    if dim not in (2, 3):
-        raise ValueError("tensor-product sum factorization supports dimensions 2 and 3")
-
-    p = prefix
-    lines = [
-        "template <int N_SHAPE_1D>",
-        "static SFEM_INLINE int %s_tensor_shape_x(const int shape) {" % p,
-        "    return N_SHAPE_1D == 2 ? (((shape + 1) >> 1) & 1) : shape % N_SHAPE_1D;",
-        "}",
-        "",
-        "template <int N_SHAPE_1D>",
-        "static SFEM_INLINE int %s_tensor_shape_y(const int shape) {" % p,
-    ]
-    if dim == 2:
-        lines.append("    return N_SHAPE_1D == 2 ? (shape >> 1) : shape / N_SHAPE_1D;")
-    else:
-        lines.append(
-            "    return N_SHAPE_1D == 2 ? ((shape >> 1) & 1) : (shape / N_SHAPE_1D) % N_SHAPE_1D;"
-        )
-    lines.extend(["}", ""])
-    if dim == 3:
-        lines.extend(
-            [
-                "template <int N_SHAPE_1D>",
-                "static SFEM_INLINE int %s_tensor_shape_z(const int shape) {" % p,
-                "    return shape / (N_SHAPE_1D * N_SHAPE_1D);",
-                "}",
-                "",
-            ]
-        )
-
-    if dim == 2:
-        lines.extend(
-            [
-                "template <typename scalar_t, int N_QP, int N_SHAPE>",
-                "static SFEM_INLINE void %s_tensor_gradient(" % p,
-                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-                "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],",
-                "        const int component,",
-                "        const ptrdiff_t lane,",
-                "        scalar_t *const SFEM_RESTRICT gradient) {",
-                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
-                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
-                "    scalar_t value_x[Q * S];",
-                "    scalar_t grad_x[Q * S];",
-                "    for (int i = 0; i < Q * S; ++i) { value_x[i] = scalar_t(0); grad_x[i] = scalar_t(0); }",
-                "    for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "        const int sx = %s_tensor_shape_x<S>(shape);" % p,
-                "        const int sy = %s_tensor_shape_y<S>(shape);" % p,
-                "        const scalar_t u = streams[shape * 2 + component][lane];",
-                "        for (int qx = 0; qx < Q; ++qx) {",
-                "            value_x[qx * S + sy] += u * shape_1d[qx * S + sx];",
-                "            grad_x[qx * S + sy] += u * grad_1d[qx * S + sx];",
-                "        }",
-                "    }",
-                "    for (int qy = 0; qy < Q; ++qy) {",
-                "        for (int qx = 0; qx < Q; ++qx) {",
-                "            scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);",
-                "            for (int sy = 0; sy < S; ++sy) {",
-                "                gx += grad_x[qx * S + sy] * shape_1d[qy * S + sy];",
-                "                gy += value_x[qx * S + sy] * grad_1d[qy * S + sy];",
-                "            }",
-                "            const int q = qx + Q * qy;",
-                "            gradient[q * 2 + 0] = gx;",
-                "            gradient[q * 2 + 1] = gy;",
-                "        }",
-                "    }",
-                "}",
-                "",
-                "template <typename scalar_t, int N_QP, int N_SHAPE>",
-                "static SFEM_INLINE void %s_tensor_test(" % p,
-                "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-                "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-                "        const scalar_t *const SFEM_RESTRICT flux,",
-                "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2],",
-                "        const int component,",
-                "        const ptrdiff_t lane) {",
-                "    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);",
-                "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);",
-                "    scalar_t stage_x[Q * S];",
-                "    scalar_t stage_y[Q * S];",
-                "    for (int qx = 0; qx < Q; ++qx) {",
-                "        for (int sy = 0; sy < S; ++sy) {",
-                "            scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0);",
-                "            for (int qy = 0; qy < Q; ++qy) {",
-                "                const int q = qx + Q * qy;",
-                "                tx += flux[q * 2 + 0] * shape_1d[qy * S + sy];",
-                "                ty += flux[q * 2 + 1] * grad_1d[qy * S + sy];",
-                "            }",
-                "            stage_x[qx * S + sy] = tx;",
-                "            stage_y[qx * S + sy] = ty;",
-                "        }",
-                "    }",
-                "    for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "        const int sx = %s_tensor_shape_x<S>(shape);" % p,
-                "        const int sy = %s_tensor_shape_y<S>(shape);" % p,
-                "        scalar_t value = scalar_t(0);",
-                "        for (int qx = 0; qx < Q; ++qx) {",
-                "            value += stage_x[qx * S + sy] * grad_1d[qx * S + sx]",
-                "                   + stage_y[qx * S + sy] * shape_1d[qx * S + sx];",
-                "        }",
-                "        out_streams[shape * 2 + component][lane] += value;",
-                "    }",
-                "}",
-            ]
-        )
-        return lines
-
-    lines.extend(
-        [
-            "template <typename scalar_t, int N_QP, int N_SHAPE>",
-            "static SFEM_INLINE void %s_tensor_gradient(" % p,
-            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-            "        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],",
-            "        const int component,",
-            "        const ptrdiff_t lane,",
-            "        scalar_t *const SFEM_RESTRICT gradient) {",
-            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
-            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
-            "    scalar_t value_x[Q * S * S];",
-            "    scalar_t grad_x[Q * S * S];",
-            "    scalar_t value_xy[Q * Q * S];",
-            "    scalar_t grad_x_xy[Q * Q * S];",
-            "    scalar_t grad_y_xy[Q * Q * S];",
-            "    for (int i = 0; i < Q * S * S; ++i) { value_x[i] = scalar_t(0); grad_x[i] = scalar_t(0); }",
-            "    for (int shape = 0; shape < N_SHAPE; ++shape) {",
-            "        const int sx = %s_tensor_shape_x<S>(shape);" % p,
-            "        const int sy = %s_tensor_shape_y<S>(shape);" % p,
-            "        const int sz = %s_tensor_shape_z<S>(shape);" % p,
-            "        const scalar_t u = streams[shape * 3 + component][lane];",
-            "        for (int qx = 0; qx < Q; ++qx) {",
-            "            const int i = (qx * S + sy) * S + sz;",
-            "            value_x[i] += u * shape_1d[qx * S + sx];",
-            "            grad_x[i] += u * grad_1d[qx * S + sx];",
-            "        }",
-            "    }",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "                scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);",
-            "                for (int sy = 0; sy < S; ++sy) {",
-            "                    const int i = (qx * S + sy) * S + sz;",
-            "                    v += value_x[i] * shape_1d[qy * S + sy];",
-            "                    gx += grad_x[i] * shape_1d[qy * S + sy];",
-            "                    gy += value_x[i] * grad_1d[qy * S + sy];",
-            "                }",
-            "                const int j = (qx * Q + qy) * S + sz;",
-            "                value_xy[j] = v; grad_x_xy[j] = gx; grad_y_xy[j] = gy;",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int qz = 0; qz < Q; ++qz) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int qx = 0; qx < Q; ++qx) {",
-            "                scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0); scalar_t gz = scalar_t(0);",
-            "                for (int sz = 0; sz < S; ++sz) {",
-            "                    const int j = (qx * Q + qy) * S + sz;",
-            "                    gx += grad_x_xy[j] * shape_1d[qz * S + sz];",
-            "                    gy += grad_y_xy[j] * shape_1d[qz * S + sz];",
-            "                    gz += value_xy[j] * grad_1d[qz * S + sz];",
-            "                }",
-            "                const int q = qx + Q * (qy + Q * qz);",
-            "                gradient[q * 3 + 0] = gx;",
-            "                gradient[q * 3 + 1] = gy;",
-            "                gradient[q * 3 + 2] = gz;",
-            "            }",
-            "        }",
-            "    }",
-            "}",
-            "",
-            "template <typename scalar_t, int N_QP, int N_SHAPE>",
-            "static SFEM_INLINE void %s_tensor_test(" % p,
-            "        const scalar_t *const SFEM_RESTRICT shape_1d,",
-            "        const scalar_t *const SFEM_RESTRICT grad_1d,",
-            "        const scalar_t *const SFEM_RESTRICT flux,",
-            "        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3],",
-            "        const int component,",
-            "        const ptrdiff_t lane) {",
-            "    static constexpr int Q = sfem_generated_integer_root(N_QP, 3);",
-            "    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 3);",
-            "    scalar_t stage_x[Q * Q * S];",
-            "    scalar_t stage_y[Q * Q * S];",
-            "    scalar_t stage_z[Q * Q * S];",
-            "    scalar_t stage_xy_x[Q * S * S];",
-            "    scalar_t stage_xy_y[Q * S * S];",
-            "    scalar_t stage_xy_z[Q * S * S];",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int qy = 0; qy < Q; ++qy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "                scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);",
-            "                for (int qz = 0; qz < Q; ++qz) {",
-            "                    const int q = qx + Q * (qy + Q * qz);",
-            "                    tx += flux[q * 3 + 0] * shape_1d[qz * S + sz];",
-            "                    ty += flux[q * 3 + 1] * shape_1d[qz * S + sz];",
-            "                    tz += flux[q * 3 + 2] * grad_1d[qz * S + sz];",
-            "                }",
-            "                const int i = (qx * Q + qy) * S + sz;",
-            "                stage_x[i] = tx; stage_y[i] = ty; stage_z[i] = tz;",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int qx = 0; qx < Q; ++qx) {",
-            "        for (int sy = 0; sy < S; ++sy) {",
-            "            for (int sz = 0; sz < S; ++sz) {",
-            "                scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);",
-            "                for (int qy = 0; qy < Q; ++qy) {",
-            "                    const int i = (qx * Q + qy) * S + sz;",
-            "                    tx += stage_x[i] * shape_1d[qy * S + sy];",
-            "                    ty += stage_y[i] * grad_1d[qy * S + sy];",
-            "                    tz += stage_z[i] * shape_1d[qy * S + sy];",
-            "                }",
-            "                const int j = (qx * S + sy) * S + sz;",
-            "                stage_xy_x[j] = tx; stage_xy_y[j] = ty; stage_xy_z[j] = tz;",
-            "            }",
-            "        }",
-            "    }",
-            "    for (int shape = 0; shape < N_SHAPE; ++shape) {",
-            "        const int sx = %s_tensor_shape_x<S>(shape);" % p,
-            "        const int sy = %s_tensor_shape_y<S>(shape);" % p,
-            "        const int sz = %s_tensor_shape_z<S>(shape);" % p,
-            "        scalar_t value = scalar_t(0);",
-            "        for (int qx = 0; qx < Q; ++qx) {",
-            "            const int j = (qx * S + sy) * S + sz;",
-            "            value += stage_xy_x[j] * grad_1d[qx * S + sx]",
-            "                   + (stage_xy_y[j] + stage_xy_z[j]) * shape_1d[qx * S + sx];",
-            "        }",
-            "        out_streams[shape * 3 + component][lane] += value;",
-            "    }",
-            "}",
-        ]
-    )
-    return lines
 
 
 def _sfem_soa_block_function(
@@ -2293,13 +1795,13 @@ def _sfem_soa_block_function(
         if use_stream_arrays:
             lines.extend(
                 [
-                    "    static constexpr int N_QP_1D = sfem_generated_integer_root(N_QP, %d);"
+                    "    static constexpr int N_QP_1D = integer_root(N_QP, %d);"
                     % quadrature_rule.dim,
-                    "    static constexpr int N_SHAPE_1D = sfem_generated_integer_root(N_SHAPE, %d);"
+                    "    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, %d);"
                     % quadrature_rule.dim,
-                    "    static_assert(sfem_generated_ipow(N_QP_1D, %d) == N_QP, \"N_QP must be tensor-product compatible\");"
+                    "    static_assert(ipow(N_QP_1D, %d) == N_QP, \"N_QP must be tensor-product compatible\");"
                     % quadrature_rule.dim,
-                    "    static_assert(sfem_generated_ipow(N_SHAPE_1D, %d) == N_SHAPE, \"N_SHAPE must be tensor-product compatible\");"
+                    "    static_assert(ipow(N_SHAPE_1D, %d) == N_SHAPE, \"N_SHAPE must be tensor-product compatible\");"
                     % quadrature_rule.dim,
                 ]
             )
@@ -2507,13 +2009,13 @@ def _append_sfem_soa_tensor_weak_form_lines(
     for row in range(dim):
         output_offset = "%d * N_QP * %d * VECTOR_SIZE" % (row, dim)
         lines.append(
-            "    %s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
-            % (prefix, u_streams, row, output_offset)
+            "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
+            % (dim, u_streams, row, output_offset)
         )
         if form.has_direction:
             lines.append(
-                "    %s_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
-                % (prefix, h_streams, row, output_offset)
+                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
+                % (dim, h_streams, row, output_offset)
             )
 
     lines.append("    for (int q = 0; q < N_QP; ++q) {")
@@ -2632,8 +2134,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
     lines.extend(["        }", "    }"])
     for row in range(dim):
         lines.append(
-            "    %s_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
-            % (prefix, row, dim, out_streams, row)
+            "    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
+            % (dim, row, dim, out_streams, row)
         )
 
 
@@ -2657,6 +2159,8 @@ def _append_sfem_soa_weak_form_lines(
         raise ValueError("weak form apply kernel requires has_direction=True")
     if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
         raise ValueError("weak form kernels require one grad_ref reference input")
+    if use_tensor_product_reference:
+        raise AssertionError("tensor-product weak forms must use the SoA tensor weak-form emitter")
 
     def reference_gradient(component):
         if use_tensor_product_reference:
@@ -2674,25 +2178,6 @@ def _append_sfem_soa_weak_form_lines(
 
     def geometry_value(name, component):
         return "%s_lane%d" % (name, component)
-
-    if use_tensor_product_reference:
-        lines.append("        scalar_t grad_u_ref_q[N_QP * %d];" % (dim * dim))
-        if form.has_direction:
-            lines.append("        scalar_t grad_h_ref_q[N_QP * %d];" % (dim * dim))
-        u_stream_name = "u_streams" if use_stream_arrays else "weak_u_streams"
-        h_stream_name = "h_streams" if use_stream_arrays else "weak_h_streams"
-        for row in range(dim):
-            lines.append(
-                "        %s_tensor_gradient<scalar_t, N_QP, N_SHAPE>(shape_1d, grad_1d, %s, %d, lane, &grad_u_ref_q[%d * N_QP * %d]);"
-                % (prefix, u_stream_name, row, row, dim)
-            )
-            if form.has_direction:
-                lines.append(
-                    "        %s_tensor_gradient<scalar_t, N_QP, N_SHAPE>(shape_1d, grad_1d, %s, %d, lane, &grad_h_ref_q[%d * N_QP * %d]);"
-                    % (prefix, h_stream_name, row, row, dim)
-                )
-        if form.name != "objective":
-            lines.append("        scalar_t loperand_q[%d * N_QP * %d];" % (dim, dim))
 
     lines.append("        for (int q = 0; q < N_QP; ++q) {")
     lines.extend(
@@ -2815,22 +2300,6 @@ def _append_sfem_soa_weak_form_lines(
         geometry_value,
         scalar_temporaries=True,
     )
-
-    if use_tensor_product_reference:
-        for row in range(dim):
-            for col in range(dim):
-                lines.append(
-                    "            loperand_q[(%d * N_QP + q) * %d + %d] = loperand%d;"
-                    % (row, dim, col, row * dim + col)
-                )
-        lines.append("        }")
-        output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-        for row in range(dim):
-            lines.append(
-                "        %s_tensor_test<scalar_t, N_QP, N_SHAPE>(shape_1d, grad_1d, &loperand_q[%d * N_QP * %d], %s, %d, lane);"
-                % (prefix, row, dim, output_streams, row)
-            )
-        return
 
     lines.extend(["            for (int shape = 0; shape < N_SHAPE; ++shape) {"])
     for row in range(dim):

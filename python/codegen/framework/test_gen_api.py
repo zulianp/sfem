@@ -699,7 +699,7 @@ class GenApiTest(unittest.TestCase):
                 determinant_target=lambda index: "det[%s]" % index,
             )
         )
-        self.assertIn("residual_tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>", residual_lines)
+        self.assertIn("tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>", residual_lines)
         self.assertIn("scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];", residual_lines)
         self.assertIn("adj0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;", residual_lines)
         self.assertIn("det[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21)", residual_lines)
@@ -715,7 +715,7 @@ class GenApiTest(unittest.TestCase):
                 determinant_target=lambda index: "det[%s]" % index,
             )
         )
-        self.assertIn("hyper_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>", hyper_lines)
+        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>", hyper_lines)
         self.assertIn("coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE", hyper_lines)
         self.assertNotIn("coordinate_value", hyper_lines)
 

@@ -11,6 +11,7 @@
 #endif
 
 #include "kernel_math.hpp"
+#include "tensor_product_kernels.hpp"
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
@@ -27,111 +28,8 @@ typedef ptrdiff_t idx_t;
 typedef double geom_t;
 #endif
 
-#ifndef SFEM_GENERATED_INTEGER_ROOT
-#define SFEM_GENERATED_INTEGER_ROOT
-static constexpr int sfem_generated_ipow(const int base, const int exponent) {
-    return exponent == 0 ? 1 : base * sfem_generated_ipow(base, exponent - 1);
-}
-static constexpr int sfem_generated_integer_root_search(const int value, const int exponent, const int candidate) {
-    return sfem_generated_ipow(candidate, exponent) >= value ? candidate : sfem_generated_integer_root_search(value, exponent, candidate + 1);
-}
-static constexpr int sfem_generated_integer_root(const int value, const int exponent) {
-    return sfem_generated_integer_root_search(value, exponent, 1);
-}
-#endif
-
 namespace sfem {
 namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_tensor_gradient(
-        const ptrdiff_t nelems,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],
-        const int component,
-        scalar_t *const SFEM_RESTRICT gradient) {
-    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);
-    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);
-    scalar_t value_x[Q * S * VECTOR_SIZE];
-    scalar_t grad_x[Q * S * VECTOR_SIZE];
-    for (int qx = 0; qx < Q; ++qx) {
-        for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0);
-                for (int sx = 0; sx < S; ++sx) {
-                    const int shape = sx + S * sy;
-                    const scalar_t u = streams[shape * 2 + component][lane];
-                    v += u * shape_1d[qx * S + sx];
-                    gx += u * grad_1d[qx * S + sx];
-                }
-                const int i = (qx * S + sy) * VECTOR_SIZE + lane;
-                value_x[i] = v; grad_x[i] = gx;
-            }
-        }
-    }
-    for (int qy = 0; qy < Q; ++qy) {
-        for (int qx = 0; qx < Q; ++qx) {
-            const int q = qx + Q * qy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);
-                for (int sy = 0; sy < S; ++sy) {
-                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;
-                    gx += grad_x[i] * shape_1d[qy * S + sy];
-                    gy += value_x[i] * grad_1d[qy * S + sy];
-                }
-                gradient[(q * 2 + 0) * VECTOR_SIZE + lane] = gx;
-                gradient[(q * 2 + 1) * VECTOR_SIZE + lane] = gy;
-            }
-        }
-    }
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_tensor_test(
-        const ptrdiff_t nelems,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT flux,
-        scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2],
-        const int component) {
-    static constexpr int Q = sfem_generated_integer_root(N_QP, 2);
-    static constexpr int S = sfem_generated_integer_root(N_SHAPE, 2);
-    scalar_t stage_x[Q * S * VECTOR_SIZE];
-    scalar_t stage_y[Q * S * VECTOR_SIZE];
-    for (int qx = 0; qx < Q; ++qx) {
-        for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0);
-                for (int qy = 0; qy < Q; ++qy) {
-                    const int q = qx + Q * qy;
-                    tx += flux[(q * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
-                    ty += flux[(q * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];
-                }
-                const int i = (qx * S + sy) * VECTOR_SIZE + lane;
-                stage_x[i] = tx; stage_y[i] = ty;
-            }
-        }
-    }
-    for (int sy = 0; sy < S; ++sy) {
-        for (int sx = 0; sx < S; ++sx) {
-            const int shape = sx + S * sy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t value = scalar_t(0);
-                for (int qx = 0; qx < Q; ++qx) {
-                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;
-                    value += stage_x[i] * grad_1d[qx * S + sx]
-                           + stage_y[i] * shape_1d[qx * S + sx];
-                }
-                out_streams[shape * 2 + component][lane] += value;
-            }
-        }
-    }
-}
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_objective_block(
@@ -152,13 +50,13 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_objective_b
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = sfem_generated_integer_root(N_QP, 2);
-    static constexpr int N_SHAPE_1D = sfem_generated_integer_root(N_SHAPE, 2);
-    static_assert(sfem_generated_ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
-    static_assert(sfem_generated_ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
+    static constexpr int N_QP_1D = integer_root(N_QP, 2);
+    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, 2);
+    static_assert(ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
+    static_assert(ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
     scalar_t grad_u_ref_q[N_QP * 4 * VECTOR_SIZE];
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
@@ -209,14 +107,14 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_gradient_bl
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = sfem_generated_integer_root(N_QP, 2);
-    static constexpr int N_SHAPE_1D = sfem_generated_integer_root(N_SHAPE, 2);
-    static_assert(sfem_generated_ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
-    static_assert(sfem_generated_ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
+    static constexpr int N_QP_1D = integer_root(N_QP, 2);
+    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, 2);
+    static_assert(ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
+    static_assert(ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
     scalar_t grad_u_ref_q[N_QP * 4 * VECTOR_SIZE];
     scalar_t loperand_q[N_QP * 4 * VECTOR_SIZE];
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
@@ -265,8 +163,8 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_gradient_bl
             loperand_q[((1 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = loperand[3];
         }
     }
-    generated_neohookean_ogden_d2_tensor_product_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 2 * VECTOR_SIZE], out_streams, 0);
-    generated_neohookean_ogden_d2_tensor_product_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 2 * VECTOR_SIZE], out_streams, 1);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 2 * VECTOR_SIZE], out_streams, 0);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 2 * VECTOR_SIZE], out_streams, 1);
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
@@ -289,17 +187,17 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_apply_block
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = sfem_generated_integer_root(N_QP, 2);
-    static constexpr int N_SHAPE_1D = sfem_generated_integer_root(N_SHAPE, 2);
-    static_assert(sfem_generated_ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
-    static_assert(sfem_generated_ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
+    static constexpr int N_QP_1D = integer_root(N_QP, 2);
+    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, 2);
+    static_assert(ipow(N_QP_1D, 2) == N_QP, "N_QP must be tensor-product compatible");
+    static_assert(ipow(N_SHAPE_1D, 2) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
     scalar_t grad_u_ref_q[N_QP * 4 * VECTOR_SIZE];
     scalar_t grad_h_ref_q[N_QP * 4 * VECTOR_SIZE];
     scalar_t loperand_q[N_QP * 4 * VECTOR_SIZE];
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
-    generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * N_QP * 2 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
@@ -378,8 +276,8 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_tensor_product_apply_block
             loperand_q[((1 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = loperand[3];
         }
     }
-    generated_neohookean_ogden_d2_tensor_product_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 2 * VECTOR_SIZE], out_streams, 0);
-    generated_neohookean_ogden_d2_tensor_product_tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 2 * VECTOR_SIZE], out_streams, 1);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 2 * VECTOR_SIZE], out_streams, 0);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 2 * VECTOR_SIZE], out_streams, 1);
 }
 
 } // namespace codegen

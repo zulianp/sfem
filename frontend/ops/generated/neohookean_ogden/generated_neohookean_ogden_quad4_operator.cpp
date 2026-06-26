@@ -339,10 +339,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
@@ -614,10 +614,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
@@ -1055,10 +1055,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
@@ -1404,10 +1404,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
@@ -1929,10 +1929,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
@@ -2332,10 +2332,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_x1, block_y1, block_x3, block_y3, block_x2, block_y2};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        generated_neohookean_ogden_d2_tensor_product_tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
                 nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
 
