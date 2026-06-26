@@ -63,7 +63,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_grad
             for (int sz = 0; sz < S; ++sz) {
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t v = 0; scalar_t gx = 0;
+                    scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0);
                     for (int sx = 0; sx < S; ++sx) {
                         const int shape = sx + S * (sy + S * sz);
                         const scalar_t u = streams[shape * 3 + component][lane];
@@ -81,7 +81,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_grad
             for (int sz = 0; sz < S; ++sz) {
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t v = 0; scalar_t gx = 0; scalar_t gy = 0;
+                    scalar_t v = scalar_t(0); scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0);
                     for (int sy = 0; sy < S; ++sy) {
                         const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
                         v += value_x[i] * shape_1d[qy * S + sy];
@@ -100,7 +100,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_grad
                 const int q = qx + Q * (qy + Q * qz);
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t gx = 0; scalar_t gy = 0; scalar_t gz = 0;
+                    scalar_t gx = scalar_t(0); scalar_t gy = scalar_t(0); scalar_t gz = scalar_t(0);
                     for (int sz = 0; sz < S; ++sz) {
                         const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
                         gx += grad_x_xy[j] * shape_1d[qz * S + sz];
@@ -137,7 +137,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_test
             for (int sz = 0; sz < S; ++sz) {
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t tx = 0; scalar_t ty = 0; scalar_t tz = 0;
+                    scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);
                     for (int qz = 0; qz < Q; ++qz) {
                         const int q = qx + Q * (qy + Q * qz);
                         tx += flux[(q * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
@@ -155,7 +155,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_test
             for (int sz = 0; sz < S; ++sz) {
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t tx = 0; scalar_t ty = 0; scalar_t tz = 0;
+                    scalar_t tx = scalar_t(0); scalar_t ty = scalar_t(0); scalar_t tz = scalar_t(0);
                     for (int qy = 0; qy < Q; ++qy) {
                         const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
                         tx += stage_x[i] * shape_1d[qy * S + sy];
@@ -174,7 +174,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_tensor_test
                 const int shape = sx + S * (sy + S * sz);
 #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    scalar_t value = 0;
+                    scalar_t value = scalar_t(0);
                     for (int qx = 0; qx < Q; ++qx) {
                         const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
                         value += stage_xy_x[j] * grad_1d[qx * S + sx]
@@ -248,7 +248,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_objective_b
             grad_u_ref[7] = grad_u_ref_q[((2 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];
             grad_u_ref[8] = grad_u_ref_q[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];
             scalar_t grad_u[9];
-            const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant_lane0;
+            const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
             grad_u[0] = (grad_u_ref[0] * jacobian_adjugate_lane0 + grad_u_ref[1] * jacobian_adjugate_lane3 + grad_u_ref[2] * jacobian_adjugate_lane6) * inv_jacobian_determinant;
             grad_u[1] = (grad_u_ref[0] * jacobian_adjugate_lane1 + grad_u_ref[1] * jacobian_adjugate_lane4 + grad_u_ref[2] * jacobian_adjugate_lane7) * inv_jacobian_determinant;
             grad_u[2] = (grad_u_ref[0] * jacobian_adjugate_lane2 + grad_u_ref[1] * jacobian_adjugate_lane5 + grad_u_ref[2] * jacobian_adjugate_lane8) * inv_jacobian_determinant;
@@ -258,11 +258,11 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_objective_b
             grad_u[6] = (grad_u_ref[6] * jacobian_adjugate_lane0 + grad_u_ref[7] * jacobian_adjugate_lane3 + grad_u_ref[8] * jacobian_adjugate_lane6) * inv_jacobian_determinant;
             grad_u[7] = (grad_u_ref[6] * jacobian_adjugate_lane1 + grad_u_ref[7] * jacobian_adjugate_lane4 + grad_u_ref[8] * jacobian_adjugate_lane7) * inv_jacobian_determinant;
             grad_u[8] = (grad_u_ref[6] * jacobian_adjugate_lane2 + grad_u_ref[7] * jacobian_adjugate_lane5 + grad_u_ref[8] * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const scalar_t weak_obj_tmp0 = grad_u[0] + 1;
-        const scalar_t weak_obj_tmp1 = grad_u[4] + 1;
-        const scalar_t weak_obj_tmp2 = grad_u[8] + 1;
+        const scalar_t weak_obj_tmp0 = grad_u[0] + scalar_t(1);
+        const scalar_t weak_obj_tmp1 = grad_u[4] + scalar_t(1);
+        const scalar_t weak_obj_tmp2 = grad_u[8] + scalar_t(1);
         const scalar_t weak_obj_tmp3 = log(-grad_u[1]*grad_u[3]*weak_obj_tmp2 + grad_u[1]*grad_u[5]*grad_u[6] + grad_u[2]*grad_u[3]*grad_u[7] - grad_u[2]*grad_u[6]*weak_obj_tmp1 - grad_u[5]*grad_u[7]*weak_obj_tmp0 + weak_obj_tmp0*weak_obj_tmp1*weak_obj_tmp2);
-        value[lane] += qw * jacobian_determinant_lane0 * ((1.0/2.0)*lmbda*pow_2(weak_obj_tmp3) - mu*weak_obj_tmp3 + (1.0/2.0)*mu*(pow_2(grad_u[1]) + pow_2(grad_u[2]) + pow_2(grad_u[3]) + pow_2(grad_u[5]) + pow_2(grad_u[6]) + pow_2(grad_u[7]) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + pow_2(weak_obj_tmp2) - 3));
+        value[lane] += qw * jacobian_determinant_lane0 * (((scalar_t(1) / scalar_t(2)))*lmbda*pow_2(weak_obj_tmp3) - mu*weak_obj_tmp3 + ((scalar_t(1) / scalar_t(2)))*mu*(pow_2(grad_u[1]) + pow_2(grad_u[2]) + pow_2(grad_u[3]) + pow_2(grad_u[5]) + pow_2(grad_u[6]) + pow_2(grad_u[7]) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + pow_2(weak_obj_tmp2) + scalar_t(-3)));
         }
     }
 }
@@ -329,7 +329,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_gradient_bl
             grad_u_ref[7] = grad_u_ref_q[((2 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];
             grad_u_ref[8] = grad_u_ref_q[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];
             scalar_t grad_u[9];
-            const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant_lane0;
+            const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
             grad_u[0] = (grad_u_ref[0] * jacobian_adjugate_lane0 + grad_u_ref[1] * jacobian_adjugate_lane3 + grad_u_ref[2] * jacobian_adjugate_lane6) * inv_jacobian_determinant;
             grad_u[1] = (grad_u_ref[0] * jacobian_adjugate_lane1 + grad_u_ref[1] * jacobian_adjugate_lane4 + grad_u_ref[2] * jacobian_adjugate_lane7) * inv_jacobian_determinant;
             grad_u[2] = (grad_u_ref[0] * jacobian_adjugate_lane2 + grad_u_ref[1] * jacobian_adjugate_lane5 + grad_u_ref[2] * jacobian_adjugate_lane8) * inv_jacobian_determinant;
@@ -341,10 +341,10 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_gradient_bl
             grad_u[8] = (grad_u_ref[6] * jacobian_adjugate_lane2 + grad_u_ref[7] * jacobian_adjugate_lane5 + grad_u_ref[8] * jacobian_adjugate_lane8) * inv_jacobian_determinant;
             scalar_t loperand[9];
         scalar_t material[9];
-        const scalar_t weak_mat_tmp0 = grad_u[0] + 1;
+        const scalar_t weak_mat_tmp0 = grad_u[0] + scalar_t(1);
         const scalar_t weak_mat_tmp1 = grad_u[5]*grad_u[7];
-        const scalar_t weak_mat_tmp2 = grad_u[4] + 1;
-        const scalar_t weak_mat_tmp3 = grad_u[8] + 1;
+        const scalar_t weak_mat_tmp2 = grad_u[4] + scalar_t(1);
+        const scalar_t weak_mat_tmp3 = grad_u[8] + scalar_t(1);
         const scalar_t weak_mat_tmp4 = -weak_mat_tmp1 + weak_mat_tmp2*weak_mat_tmp3;
         const scalar_t weak_mat_tmp5 = grad_u[3]*weak_mat_tmp3;
         const scalar_t weak_mat_tmp6 = grad_u[6]*weak_mat_tmp2;
@@ -472,7 +472,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_apply_block
             grad_h_ref[8] = grad_h_ref_q[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];
             scalar_t grad_u[9];
             scalar_t trial_grad[9];
-            const scalar_t inv_jacobian_determinant = 1.0 / jacobian_determinant_lane0;
+            const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
             grad_u[0] = (grad_u_ref[0] * jacobian_adjugate_lane0 + grad_u_ref[1] * jacobian_adjugate_lane3 + grad_u_ref[2] * jacobian_adjugate_lane6) * inv_jacobian_determinant;
             trial_grad[0] = (grad_h_ref[0] * jacobian_adjugate_lane0 + grad_h_ref[1] * jacobian_adjugate_lane3 + grad_h_ref[2] * jacobian_adjugate_lane6) * inv_jacobian_determinant;
             grad_u[1] = (grad_u_ref[0] * jacobian_adjugate_lane1 + grad_u_ref[1] * jacobian_adjugate_lane4 + grad_u_ref[2] * jacobian_adjugate_lane7) * inv_jacobian_determinant;
@@ -494,13 +494,13 @@ static SFEM_INLINE void generated_neohookean_ogden_d3_tensor_product_apply_block
             scalar_t loperand[9];
         scalar_t material[9];
         const scalar_t weak_mat_tmp0 = grad_u[5]*grad_u[7];
-        const scalar_t weak_mat_tmp1 = grad_u[4] + 1;
-        const scalar_t weak_mat_tmp2 = grad_u[8] + 1;
+        const scalar_t weak_mat_tmp1 = grad_u[4] + scalar_t(1);
+        const scalar_t weak_mat_tmp2 = grad_u[8] + scalar_t(1);
         const scalar_t weak_mat_tmp3 = weak_mat_tmp0 - weak_mat_tmp1*weak_mat_tmp2;
         const scalar_t weak_mat_tmp4 = -weak_mat_tmp3;
         const scalar_t weak_mat_tmp5 = grad_u[3]*weak_mat_tmp2;
         const scalar_t weak_mat_tmp6 = grad_u[6]*weak_mat_tmp1;
-        const scalar_t weak_mat_tmp7 = grad_u[0] + 1;
+        const scalar_t weak_mat_tmp7 = grad_u[0] + scalar_t(1);
         const scalar_t weak_mat_tmp8 = grad_u[1]*grad_u[5]*grad_u[6] - grad_u[1]*weak_mat_tmp5 + grad_u[2]*grad_u[3]*grad_u[7] - grad_u[2]*weak_mat_tmp6 - weak_mat_tmp0*weak_mat_tmp7 + weak_mat_tmp1*weak_mat_tmp2*weak_mat_tmp7;
         const scalar_t weak_mat_tmp9 = pow_m2(weak_mat_tmp8);
         const scalar_t weak_mat_tmp10 = lmbda*weak_mat_tmp9;

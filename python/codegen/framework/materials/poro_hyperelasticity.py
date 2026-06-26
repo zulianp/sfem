@@ -12,43 +12,64 @@ alpha = gen.material_parameter("alpha")
 storage = gen.material_parameter("storage")
 dt = gen.material_parameter("dt")
 hydraulic_conductivity = gen.material_parameter("hydraulic_conductivity")
-
-
-def define(system):
-    u = system.VectorCoefficient("u", family="displacement")
-    p = system.Coefficient("p", family="pressure")
-    v = gen.TestFunction(u)
-    q = gen.TestFunction(p)
-
-    F = gen.variable(
-        gen.Identity(system.dim) + gen.grad(u),
-        name="F",
-        qualifier=gen.DEFORMATION_GRADIENT,
+V = gen.FunctionSpace(
+    gen.VectorElement(
+        "Lagrange",
+        degree=2,
     )
-    J = gen.det(F)
-    psi = (
-        mu * (gen.inner(F, F) - system.dim) / 2
-        - mu * sp.log(J)
-        + lmbda * sp.log(J) ** 2 / 2
+)
+Q = gen.FunctionSpace(
+    gen.FiniteElement(
+        "Lagrange",
+        degree=1,
     )
-    system.energy("solid", psi, fields=(u,))
+)
+W = gen.MixedFunctionSpace(V, Q)
 
-    form = (
-        -alpha * p * gen.div(v)
-        + (
-            storage * (p - gen.old(p))
-            + alpha * (gen.div(u) - gen.div(gen.old(u)))
+
+def _build_system(dim):
+    system = gen.EquationSystemBuilder(dim)
+    with gen.geometric_dimension_context(dim):
+        u = gen.Function(W[0], "u", qualifier=gen.DISPLACEMENT)
+        p = gen.Function(W[1], "p", qualifier=gen.PRESSURE)
+        v = gen.TestFunction(W[0], name="u_test")
+        q = gen.TestFunction(W[1], name="p_test")
+
+        F = gen.variable(
+            gen.Identity(system.dim) + gen.grad(u),
+            name="F",
+            qualifier=gen.DEFORMATION_GRADIENT,
         )
-        * q
-        / dt
-        + hydraulic_conductivity * gen.inner(gen.grad(p), gen.grad(q))
-    )
-    system.residual("poro", form, fields=(u, p))
+        J = gen.det(F)
+        psi = (
+            mu * (gen.inner(F, F) - system.dim) / 2
+            - mu * sp.log(J)
+            + lmbda * sp.log(J) ** 2 / 2
+        )
+        system.add_energy("solid", psi, fields=(u,), variables=(F,))
+
+        form = (
+            -alpha * p * gen.div(v)
+            + (
+                storage * (p - gen.old(p))
+                + alpha * (gen.div(u) - gen.div(gen.old(u)))
+            )
+            * q
+            / dt
+            + hydraulic_conductivity * gen.inner(gen.grad(p), gen.grad(q))
+        )
+        system.residual("poro", form, fields=(u, p))
+    return system.build()
 
 
-material = gen.UnifiedMaterial(
+systems = gen.EquationSystems()
+for dim in (2, 3):
+    systems.add(_build_system(dim))
+
+
+material = gen.CodeGenerator(
     "poro_hyperelasticity",
-    define,
+    systems,
     elements=gen.sfem_taylor_hood_element_types(),
     parameter_defaults=(
         ("mu", 1.0),

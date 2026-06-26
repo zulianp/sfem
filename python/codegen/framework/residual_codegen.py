@@ -498,10 +498,10 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
         if dependencies.previous:
             groups.append(("_old", "previous"))
         for stem, stream in groups:
-            lines.append("%sscalar_t %s%s = 0;" % (indent, field.name, stem))
+            lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, stem))
             for d in range(dim):
                 lines.append(
-                    "%sscalar_t %s%s_grad_%d_ref = 0;"
+                    "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
                     % (indent, field.name, stem, d)
                 )
             lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
@@ -523,10 +523,10 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                 _physical_gradient_lines(field.name + stem, dim, indent)
             )
         if dependencies.direction:
-            lines.append("%sscalar_t %s_direction = 0;" % (indent, field.name))
+            lines.append("%sscalar_t %s_direction = scalar_t(0);" % (indent, field.name))
             for d in range(dim):
                 lines.append(
-                    "%sscalar_t %s_direction_grad_%d_ref = 0;"
+                    "%sscalar_t %s_direction_grad_%d_ref = scalar_t(0);"
                     % (indent, field.name, d)
                 )
             lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
@@ -861,7 +861,7 @@ def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
                     name,
                     suffix,
                     len(values),
-                    _cpp_scalar_initializer_list(values),
+                    _cpp_scalar_initializer_list(values, scalar_type),
                 )
             )
     return lines
@@ -1634,7 +1634,7 @@ def _mesh_operator_source(
                     "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
                     % (stream, field.name, node)
                 )
-            lines.append("            block_output[%d][lane] = 0;" % stream)
+            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.extend(["        }", ""])
     if dependencies.current:
         lines.append(
@@ -1931,7 +1931,7 @@ def _isoparametric_mesh_operator_source(
             "    static const scalar_t geometry_grad_ref[%d] = {%s};"
             % (
                 len(rule.reference_gradients),
-                _cpp_scalar_initializer_list(rule.reference_gradients),
+                _cpp_scalar_initializer_list(rule.reference_gradients, "scalar_t"),
             )
         )
     lines.extend(
@@ -1998,7 +1998,7 @@ def _isoparametric_mesh_operator_source(
                     "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
                     % (stream, field.name, node)
                 )
-            lines.append("            block_output[%d][lane] = 0;" % stream)
+            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.extend(
         [
             "        }",
@@ -2205,7 +2205,7 @@ def _mesh_reference_data_lines(rule):
         )
     return [
         "    static const scalar_t %s[%d] = {%s};"
-        % (name, len(values), _cpp_scalar_initializer_list(values))
+        % (name, len(values), _cpp_scalar_initializer_list(values, "scalar_t"))
         for name, values in data
     ]
 
@@ -2236,7 +2236,7 @@ def _reference_data_lines(prefix, rule):
                     name,
                     suffix,
                     len(values),
-                    _cpp_scalar_initializer_list(values),
+                    _cpp_scalar_initializer_list(values, scalar_type),
                 )
             )
     return lines
@@ -2293,7 +2293,7 @@ def _tensor_evaluate_2d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t v = 0, g = 0;",
+        "            scalar_t v = scalar_t(0), g = scalar_t(0);",
         "            for (int sx = 0; sx < S; ++sx) {",
         "                const int s = sx + S * sy;",
         "                const scalar_t u = streams[s * N_FIELDS + f][lane];",
@@ -2307,7 +2307,7 @@ def _tensor_evaluate_2d(prefix):
         "        const int q = qx + Q * qy;",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t v = 0, g0 = 0, g1 = 0;",
+        "            scalar_t v = scalar_t(0), g0 = scalar_t(0), g1 = scalar_t(0);",
         "            for (int sy = 0; sy < S; ++sy) {",
         "                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;",
         "                v += vx[i] * shape_1d[qy * S + sy];",
@@ -2336,7 +2336,7 @@ def _tensor_evaluate_3d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t v = 0, g = 0;",
+        "            scalar_t v = scalar_t(0), g = scalar_t(0);",
         "            for (int sx = 0; sx < S; ++sx) {",
         "                const int s = sx + S * (sy + S * sz);",
         "                const scalar_t u = streams[s * N_FIELDS + f][lane];",
@@ -2349,7 +2349,7 @@ def _tensor_evaluate_3d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t v = 0, g0 = 0, g1 = 0;",
+        "            scalar_t v = scalar_t(0), g0 = scalar_t(0), g1 = scalar_t(0);",
         "            for (int sy = 0; sy < S; ++sy) {",
         "                const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;",
         "                v += vx[i] * shape_1d[qy * S + sy]; g0 += gx[i] * shape_1d[qy * S + sy]; g1 += vx[i] * grad_1d[qy * S + sy];",
@@ -2362,7 +2362,7 @@ def _tensor_evaluate_3d(prefix):
         "        const int q = qx + Q * (qy + Q * qz);",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t v = 0, g0 = 0, g1 = 0, g2 = 0;",
+        "            scalar_t v = scalar_t(0), g0 = scalar_t(0), g1 = scalar_t(0), g2 = scalar_t(0);",
         "            for (int sz = 0; sz < S; ++sz) {",
         "                const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
         "                v += vxy[j] * shape_1d[qz * S + sz]; g0 += g0xy[j] * shape_1d[qz * S + sz];",
@@ -2396,7 +2396,7 @@ def _tensor_integrate_2d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {",
         "#pragma omp simd",
         "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-        "            scalar_t a = 0, b = 0;",
+        "            scalar_t a = scalar_t(0), b = scalar_t(0);",
         "            for (int qy = 0; qy < Q; ++qy) { const int q = qx + Q * qy;",
         "                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy]",
         "                   + grad_coeff[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];",
@@ -2407,7 +2407,7 @@ def _tensor_integrate_2d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
         "        const int s = sx + S * sy;",
         "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = 0;",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = scalar_t(0);",
         "            for (int qx = 0; qx < Q; ++qx) { const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;",
         "                v += sv[i] * shape_1d[qx * S + sx] + sg[i] * grad_1d[qx * S + sx]; }",
         "            output[s * N_FIELDS + f][lane] += v;",
@@ -2429,7 +2429,7 @@ def _tensor_integrate_3d(prefix):
         "    scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE], yz1[N_FIELDS * Q * S * S * VECTOR_SIZE];",
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {",
         "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t a = 0, b = 0, c = 0;",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t a = scalar_t(0), b = scalar_t(0), c = scalar_t(0);",
         "            for (int qz = 0; qz < Q; ++qz) { const int q = qx + Q * (qy + Q * qz);",
         "                a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz]",
         "                   + grad_coeff[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];",
@@ -2440,7 +2440,7 @@ def _tensor_integrate_3d(prefix):
         "    }",
         "    for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {",
         "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t a = 0, b = 0;",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t a = scalar_t(0), b = scalar_t(0);",
         "            for (int qy = 0; qy < Q; ++qy) { const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;",
         "                a += z0[i] * shape_1d[qy * S + sy] + z2[i] * grad_1d[qy * S + sy];",
         "                b += z1[i] * shape_1d[qy * S + sy]; }",
@@ -2450,7 +2450,7 @@ def _tensor_integrate_3d(prefix):
         "    for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {",
         "        const int s = sx + S * (sy + S * sz);",
         "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = 0;",
+        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) { scalar_t v = scalar_t(0);",
         "            for (int qx = 0; qx < Q; ++qx) { const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;",
         "                v += yz0[j] * shape_1d[qx * S + sx] + yz1[j] * grad_1d[qx * S + sx]; }",
         "            output[s * N_FIELDS + f][lane] += v;",

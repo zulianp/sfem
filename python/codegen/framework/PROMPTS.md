@@ -100,3 +100,13 @@ add generation for PROTEUS discretization (smesh element types)
 
 The generated Op subclass (e.g., GeneratedNeoHookeanOgden) should allow to choose (independently) for affine version of the objective, gradient, and hessian action
 The generated Op subclass should also include the create_from_yaml function (see sfem_LinearElasticity.hpp) to include  the model parameters
+
+
+
+
+
+energy.energy, should be energy.add_energy as we may want to add multiple energies, e.g., for contact and friction. Also the signature must allow to have a tuple of differentiating variables matching the fields, (e.g., variables=(F, ) in neo hookean)
+
+
+
+Constants in the kernels and micro-kernles need to be casted to scalar_t to avoid unwanted implicit conversions

@@ -16,10 +16,10 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref[36] = {-1.666666666666667, -1.666666666666667, -0.33333333333333337, 0.0, 0.0, -0.33333333333333337, 2.0000000000000004, -0.66666666666666663, 0.66666666666666663, 0.66666666666666663, -0.66666666666666663, 2, 0.33333333333333315, 0.33333333333333315, 1.6666666666666665, 0.0, 0.0, -0.33333333333333337, -1.9999999999999996, -2.6666666666666665, 0.66666666666666663, 2.6666666666666665, -0.66666666666666663, 2.2204460492503131e-16, 0.33333333333333304, 0.33333333333333304, -0.33333333333333337, 0.0, 0.0, 1.6666666666666665, 4.4408920985006262e-16, -0.66666666666666663, 2.6666666666666665, 0.66666666666666663, -2.6666666666666665, -1.9999999999999996};
-static const real_t generated_neohookean_ogden_tri6_tri6_q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
-static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
+static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref[36] = {real_t(-1.666666666666667), real_t(-1.666666666666667), real_t(-0.33333333333333337), real_t(0), real_t(0), real_t(-0.33333333333333337), real_t(2.0000000000000004), real_t(-0.66666666666666663), real_t(0.66666666666666663), real_t(0.66666666666666663), real_t(-0.66666666666666663), real_t(2), real_t(0.33333333333333315), real_t(0.33333333333333315), real_t(1.6666666666666665), real_t(0), real_t(0), real_t(-0.33333333333333337), real_t(-1.9999999999999996), real_t(-2.6666666666666665), real_t(0.66666666666666663), real_t(2.6666666666666665), real_t(-0.66666666666666663), real_t(2.2204460492503131e-16), real_t(0.33333333333333304), real_t(0.33333333333333304), real_t(-0.33333333333333337), real_t(0), real_t(0), real_t(1.6666666666666665), real_t(4.4408920985006262e-16), real_t(-0.66666666666666663), real_t(2.6666666666666665), real_t(0.66666666666666663), real_t(-2.6666666666666665), real_t(-1.9999999999999996)};
+static const real_t generated_neohookean_ogden_tri6_tri6_q_weight[3] = {real_t(0.16666666666666666), real_t(0.16666666666666666), real_t(0.16666666666666666)};
+static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_x[18] = {real_t(-1.666666666666667), real_t(-0.33333333333333337), real_t(0), real_t(2.0000000000000004), real_t(0.66666666666666663), real_t(-0.66666666666666663), real_t(0.33333333333333315), real_t(1.6666666666666665), real_t(0), real_t(-1.9999999999999996), real_t(0.66666666666666663), real_t(-0.66666666666666663), real_t(0.33333333333333304), real_t(-0.33333333333333337), real_t(0), real_t(4.4408920985006262e-16), real_t(2.6666666666666665), real_t(-2.6666666666666665)};
+static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_y[18] = {real_t(-1.666666666666667), real_t(0), real_t(-0.33333333333333337), real_t(-0.66666666666666663), real_t(0.66666666666666663), real_t(2), real_t(0.33333333333333315), real_t(0), real_t(-0.33333333333333337), real_t(-2.6666666666666665), real_t(2.6666666666666665), real_t(2.2204460492503131e-16), real_t(0.33333333333333304), real_t(0), real_t(1.6666666666666665), real_t(-0.66666666666666663), real_t(0.66666666666666663), real_t(-1.9999999999999996)};
 
 } // namespace codegen
 } // namespace sfem
@@ -377,10 +377,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
@@ -469,9 +469,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_affine_mes
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -515,7 +515,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_affine_mes
             block_uy4[lane] = uy[ev[lane * N_SHAPE + 4] * u_stride];
             block_ux5[lane] = ux[ev[lane * N_SHAPE + 5] * u_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
-            block_value[lane] = 0;
+            block_value[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -596,9 +596,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -675,7 +675,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
             block_uy4[lane] = uy[ev[lane * N_SHAPE + 4] * u_stride];
             block_ux5[lane] = ux[ev[lane * N_SHAPE + 5] * u_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
-            block_value[lane] = 0;
+            block_value[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -685,10 +685,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
@@ -1193,10 +1193,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
@@ -1309,9 +1309,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_affine_mesh
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1366,18 +1366,18 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_affine_mesh
             block_uy4[lane] = uy[ev[lane * N_SHAPE + 4] * u_stride];
             block_ux5[lane] = ux[ev[lane * N_SHAPE + 5] * u_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
-            block_outx4[lane] = 0;
-            block_outy4[lane] = 0;
-            block_outx5[lane] = 0;
-            block_outy5[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
+            block_outx4[lane] = scalar_t(0);
+            block_outy4[lane] = scalar_t(0);
+            block_outx5[lane] = scalar_t(0);
+            block_outy5[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -1499,9 +1499,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1589,18 +1589,18 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
             block_uy4[lane] = uy[ev[lane * N_SHAPE + 4] * u_stride];
             block_ux5[lane] = ux[ev[lane * N_SHAPE + 5] * u_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
-            block_outx4[lane] = 0;
-            block_outy4[lane] = 0;
-            block_outx5[lane] = 0;
-            block_outy5[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
+            block_outx4[lane] = scalar_t(0);
+            block_outy4[lane] = scalar_t(0);
+            block_outx5[lane] = scalar_t(0);
+            block_outy5[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -1611,10 +1611,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
@@ -2243,10 +2243,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
@@ -2374,9 +2374,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_affine_mesh_so
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -2455,18 +2455,18 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_affine_mesh_so
             block_hx5[lane] = hx[ev[lane * N_SHAPE + 5] * h_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
             block_hy5[lane] = hy[ev[lane * N_SHAPE + 5] * h_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
-            block_outx4[lane] = 0;
-            block_outy4[lane] = 0;
-            block_outx5[lane] = 0;
-            block_outy5[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
+            block_outx4[lane] = scalar_t(0);
+            block_outy4[lane] = scalar_t(0);
+            block_outx5[lane] = scalar_t(0);
+            block_outy5[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -2598,9 +2598,9 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {-1.666666666666667, -0.33333333333333337, 0.0, 2.0000000000000004, 0.66666666666666663, -0.66666666666666663, 0.33333333333333315, 1.6666666666666665, 0.0, -1.9999999999999996, 0.66666666666666663, -0.66666666666666663, 0.33333333333333304, -0.33333333333333337, 0.0, 4.4408920985006262e-16, 2.6666666666666665, -2.6666666666666665};
-    static const scalar_t grad_ref_y[18] = {-1.666666666666667, 0.0, -0.33333333333333337, -0.66666666666666663, 0.66666666666666663, 2, 0.33333333333333315, 0.0, -0.33333333333333337, -2.6666666666666665, 2.6666666666666665, 2.2204460492503131e-16, 0.33333333333333304, 0.0, 1.6666666666666665, -0.66666666666666663, 0.66666666666666663, -1.9999999999999996};
-    static const scalar_t q_weight[3] = {0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
+    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -2712,18 +2712,18 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
             block_hx5[lane] = hx[ev[lane * N_SHAPE + 5] * h_stride];
             block_uy5[lane] = uy[ev[lane * N_SHAPE + 5] * u_stride];
             block_hy5[lane] = hy[ev[lane * N_SHAPE + 5] * h_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
-            block_outx4[lane] = 0;
-            block_outy4[lane] = 0;
-            block_outx5[lane] = 0;
-            block_outy5[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
+            block_outx4[lane] = scalar_t(0);
+            block_outy4[lane] = scalar_t(0);
+            block_outx5[lane] = scalar_t(0);
+            block_outy5[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2, block_ux3, block_uy3, block_ux4, block_uy4, block_ux5, block_uy5};
@@ -2735,10 +2735,10 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
                     const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];

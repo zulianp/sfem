@@ -11,7 +11,12 @@ from .symbolic_fields import (
     SymbolicField,
     TensorField,
     VectorField,
+    Function,
+    VectorFunction,
+    TensorFunction,
+    _family_from_qualifier,
     scalar_field,
+    geometric_dimension_context,
     tensor_field,
     test_function,
     trial_function,
@@ -59,6 +64,8 @@ class Equation:
     form: EquationForm
     define: object
     fields: tuple = ()
+    variables: tuple = ()
+    directions: tuple = ()
     kernels: tuple = ()
     diagnostics: bool = True
 
@@ -66,14 +73,26 @@ class Equation:
         name = str(self.name)
         if name and not name.isidentifier():
             raise ValueError("equation name must be empty or a valid identifier")
-        if not callable(self.define):
-            raise TypeError("equation definition must be callable")
+        form = EquationForm(self.form)
         fields = tuple(self.fields)
         if not all(isinstance(field, EquationField) for field in fields):
             raise TypeError("equation fields must be EquationField instances")
+        variables = tuple(self.variables)
+        define = self.define
+        if form is EquationForm.ENERGY:
+            if callable(define):
+                raise TypeError("energy equations require an expression, not a callable")
+            if not variables:
+                raise ValueError("energy equations require explicit variables")
+            define = _expression_value(define)
+        elif not callable(define):
+            raise TypeError("residual equations require a callable definition")
         object.__setattr__(self, "name", name)
-        object.__setattr__(self, "form", EquationForm(self.form))
+        object.__setattr__(self, "form", form)
+        object.__setattr__(self, "define", define)
         object.__setattr__(self, "fields", fields)
+        object.__setattr__(self, "variables", variables)
+        object.__setattr__(self, "directions", tuple(self.directions))
         object.__setattr__(self, "kernels", tuple(self.kernels))
         object.__setattr__(self, "diagnostics", bool(self.diagnostics))
 
@@ -122,6 +141,8 @@ class EquationSystem:
         define,
         *,
         fields=(),
+        variables=(),
+        directions=(),
         kernels=(),
         diagnostics=True,
     ):
@@ -130,6 +151,8 @@ class EquationSystem:
             form,
             define,
             fields=tuple(fields),
+            variables=_symbols_from_variables(variables),
+            directions=_symbols_from_variables(directions),
             kernels=tuple(kernels),
             diagnostics=diagnostics,
         )
@@ -138,20 +161,25 @@ class EquationSystem:
         self._equations.append(equation)
         return equation
 
-    def energy(
+    def add_energy(
         self,
         name,
         define,
         *,
         fields=(),
+        variables=None,
+        directions=(),
         kernels=("objective", "gradient", "apply"),
         diagnostics=True,
     ):
+        _validate_energy_variable_groups(fields, variables)
         return self.equation(
             name,
             EquationForm.ENERGY,
             define,
             fields=fields,
+            variables=variables,
+            directions=directions,
             kernels=kernels,
             diagnostics=diagnostics,
         )
@@ -164,22 +192,44 @@ class EquationSystem:
             fields=fields,
         )
 
-    def hyperelastic(
-        self,
-        name,
-        define,
-        *,
-        fields=(),
-        kernels=("objective", "gradient", "apply"),
-        diagnostics=True,
-    ):
-        return self.energy(
-            name,
-            define,
-            fields=fields,
-            kernels=kernels,
-            diagnostics=diagnostics,
-        )
+
+class EquationSystems:
+    def __init__(self, *systems):
+        if len(systems) == 1 and isinstance(systems[0], (tuple, list)):
+            systems = tuple(systems[0])
+        self._by_dim = {}
+        for system in systems:
+            self.add(system)
+
+    @property
+    def systems(self):
+        return tuple(self._by_dim[dim] for dim in sorted(self._by_dim))
+
+    @property
+    def dims(self):
+        return tuple(sorted(self._by_dim))
+
+    def add(self, system):
+        if not isinstance(system, EquationSystem):
+            raise TypeError("EquationSystems entries must be EquationSystem instances")
+        if system.dim in self._by_dim:
+            raise ValueError("equation system for dim %d is already registered" % system.dim)
+        self._by_dim[system.dim] = system
+        return system
+
+    def for_dim(self, dim):
+        dim = int(dim)
+        try:
+            return self._by_dim[dim]
+        except KeyError:
+            raise ValueError("material does not define an equation system for dim %d" % dim)
+
+    def __len__(self):
+        return len(self._by_dim)
+
+    def __iter__(self):
+        return iter(self.systems)
+
 
 class EquationSystemBuilder:
     def __init__(self, dim):
@@ -220,8 +270,11 @@ class EquationSystemBuilder:
             1,
         )
 
-    def Coefficient(self, name, family=""):
-        return self.scalar_field(name, family)
+    def Function(self, space_or_name, name=None, family="", qualifier=None):
+        if name is None:
+            return self.scalar_field(space_or_name, _family_from_qualifier(qualifier) or family)
+        with geometric_dimension_context(self.dim):
+            return self._register_external_field(Function(space_or_name, name, qualifier=qualifier))
 
     def vector_field(self, name, components=None, family=""):
         components = self.dim if components is None else int(components)
@@ -230,15 +283,28 @@ class EquationSystemBuilder:
             components,
         )
 
-    def VectorCoefficient(self, name, components=None, family=""):
-        return self.vector_field(name, components, family)
+    def VectorFunction(self, space_or_name, name=None, components=None, family="", qualifier=None):
+        if name is None:
+            return self.vector_field(
+                space_or_name,
+                components,
+                _family_from_qualifier(qualifier) or family,
+            )
+        with geometric_dimension_context(self.dim):
+            return self._register_external_field(VectorFunction(space_or_name, name, qualifier=qualifier))
 
     def tensor_field(self, name, shape, family=""):
         field = tensor_field(name, shape, family, {"dim": self.dim})
         return self._register_symbolic_field(field, math.prod(field.shape))
 
-    def TensorCoefficient(self, name, shape, family=""):
-        return self.tensor_field(name, shape, family)
+    def TensorFunction(self, space_or_name, name=None, shape=None, family="", qualifier=None):
+        if name is None:
+            return self.tensor_field(
+                space_or_name,
+                shape,
+                _family_from_qualifier(qualifier) or family,
+            )
+        return self._register_external_field(TensorFunction(space_or_name, name, qualifier=qualifier))
 
     def equation(
         self,
@@ -247,6 +313,8 @@ class EquationSystemBuilder:
         define,
         *,
         fields=(),
+        variables=(),
+        directions=(),
         kernels=(),
         diagnostics=True,
     ):
@@ -255,23 +323,36 @@ class EquationSystemBuilder:
             form,
             define,
             fields=self._resolve_fields(fields),
+            variables=_symbols_from_variables(variables),
+            directions=_symbols_from_variables(directions),
             kernels=kernels,
             diagnostics=diagnostics,
         )
 
-    def energy(
+    def add_energy(
         self,
         name,
         define,
         *,
         fields=(),
+        variables=None,
+        directions=None,
         kernels=("objective", "gradient", "apply"),
         diagnostics=True,
     ):
-        return self._system.energy(
+        if variables is None:
+            raise ValueError("energy requires explicit variables")
+        _validate_energy_variable_groups(fields, variables)
+        variable_symbols = _symbols_from_variables(variables)
+        if not variable_symbols:
+            raise ValueError("energy requires explicit variables")
+        direction_symbols = () if directions is None else _symbols_from_variables(directions)
+        return self._system.add_energy(
             name,
-            _energy_define(define),
+            _expression_value(define),
             fields=self._resolve_fields(fields),
+            variables=variables,
+            directions=direction_symbols,
             kernels=kernels,
             diagnostics=diagnostics,
         )
@@ -284,33 +365,24 @@ class EquationSystemBuilder:
             fields=self._resolve_fields(fields),
         )
 
-    def hyperelastic(
+    def derive_energy_forms(
         self,
-        name,
-        define,
+        expression,
         *,
-        fields=(),
-        kernels=("objective", "gradient", "apply"),
-        diagnostics=True,
+        variables=None,
+        fields=None,
+        directions=None,
+        orders=None,
     ):
-        return self.energy(
-            name,
-            define,
-            fields=fields,
-            kernels=kernels,
-            diagnostics=diagnostics,
-        )
-
-    def derive_energy_forms(self, expression, *, fields, directions=None, orders=None):
-        variables = _symbols_from_fields(fields)
+        if variables is None:
+            if fields is None:
+                raise ValueError("derive_energy_forms requires variables")
+            variables = fields
+        variables = _symbols_from_variables(variables)
         if directions is None:
-            directions = tuple(
-                symbol
-                for field in fields
-                for symbol in trial_function(field).symbols
-            )
+            directions = _default_direction_symbols(variables)
         else:
-            directions = _symbols_from_fields(directions)
+            directions = _symbols_from_variables(directions)
         pipeline = energy_form_pipeline(
             _expression_value(expression),
             variables,
@@ -320,9 +392,18 @@ class EquationSystemBuilder:
             return pipeline.evaluate()
         return pipeline.evaluate(orders)
 
-    def derive_merit_forms(self, expression, *, fields, directions=None, orders=None):
+    def derive_merit_forms(
+        self,
+        expression,
+        *,
+        variables=None,
+        fields=None,
+        directions=None,
+        orders=None,
+    ):
         return self.derive_energy_forms(
             expression,
+            variables=variables,
             fields=fields,
             directions=directions,
             orders=orders,
@@ -362,6 +443,9 @@ class EquationSystemBuilder:
         try:
             return self._equation_fields_by_name[name]
         except KeyError:
+            if isinstance(field, SymbolicField):
+                self._register_external_field(field)
+                return self._equation_fields_by_name[name]
             raise ValueError("unknown equation field '%s'" % name)
 
     def _register_symbolic_field(self, symbolic, components):
@@ -375,6 +459,12 @@ class EquationSystemBuilder:
         self._symbolic_fields.append(symbolic)
         self._equation_fields_by_name[symbolic.name] = equation_field
         return symbolic
+
+    def _register_external_field(self, symbolic):
+        if not isinstance(symbolic, SymbolicField):
+            raise TypeError("external equation fields must be symbolic fields")
+        components = math.prod(symbolic.shape) if symbolic.shape else 1
+        return self._register_symbolic_field(symbolic, components)
 
     def _resolve_fields(self, fields):
         return tuple(self.equation_field(field) for field in fields)
@@ -392,6 +482,52 @@ def _symbols_from_fields(fields):
     return tuple(symbols)
 
 
+def _validate_energy_variable_groups(fields, variables):
+    if variables is None:
+        raise ValueError("energy requires explicit variables")
+    field_groups = tuple(fields)
+    variable_groups = tuple(variables) if isinstance(variables, (tuple, list)) else None
+    if variable_groups is None:
+        raise TypeError("energy variables must be a tuple/list with one entry per field")
+    if len(variable_groups) != len(field_groups):
+        raise ValueError(
+            "energy variables must provide one differentiating variable group per field"
+        )
+
+
+def _symbols_from_variables(variables):
+    if variables is None:
+        return ()
+    if isinstance(variables, (SymbolicField, ScalarField, VectorField, TensorField)):
+        return tuple(variables.symbols)
+    if isinstance(variables, (tuple, list)):
+        symbols = []
+        for variable in variables:
+            symbols.extend(_symbols_from_variables(variable))
+        return tuple(symbols)
+    value = _expression_value(variables)
+    if isinstance(value, sp.MatrixBase):
+        return tuple(value)
+    if isinstance(value, sp.NDimArray):
+        return tuple(value)
+    if hasattr(variables, "symbols"):
+        return tuple(variables.symbols)
+    return (sp.sympify(variables),)
+
+
+def _default_direction_symbols(variables):
+    directions = []
+    for variable in variables:
+        name = str(variable)
+        if name.startswith("F["):
+            directions.append(sp.Symbol("d%s" % name))
+        elif "[" in name:
+            directions.append(sp.Symbol("d_%s" % name))
+        else:
+            directions.append(sp.Symbol("%s_trial" % name))
+    return tuple(directions)
+
+
 def _expression_value(expression):
     if hasattr(expression, "value"):
         return expression.value
@@ -404,21 +540,6 @@ def _residual_value(residual):
     if isinstance(residual, (tuple, list)):
         return sp.Matrix([_expression_value(entry) for entry in residual])
     return sp.Matrix([_expression_value(residual)])
-
-
-def _energy_define(define):
-    if callable(define):
-        return define
-    expression = _expression_value(define)
-
-    def evaluate(F):
-        substitutions = {
-            sp.Symbol("F[%d]" % i): tuple(F)[i]
-            for i in range(len(tuple(F)))
-        }
-        return expression.xreplace(substitutions)
-
-    return evaluate
 
 
 def _residual_define(define, fields, dim):

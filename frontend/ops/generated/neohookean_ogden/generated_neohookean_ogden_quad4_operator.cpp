@@ -16,9 +16,9 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_quad4_quad4_shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-static const real_t generated_neohookean_ogden_quad4_quad4_grad_1d[4] = {-1, 1, -1, 1};
-static const real_t generated_neohookean_ogden_quad4_quad4_q_weight_1d[2] = {0.5, 0.5};
+static const real_t generated_neohookean_ogden_quad4_quad4_shape_1d[4] = {real_t(0.78867513459481287), real_t(0.21132486540518708), real_t(0.21132486540518713), real_t(0.78867513459481287)};
+static const real_t generated_neohookean_ogden_quad4_quad4_grad_1d[4] = {real_t(-1), real_t(1), real_t(-1), real_t(1)};
+static const real_t generated_neohookean_ogden_quad4_quad4_q_weight_1d[2] = {real_t(0.5), real_t(0.5)};
 
 } // namespace codegen
 } // namespace sfem
@@ -342,10 +342,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
             const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const int sx = ((shape + 1) >> 1) & 1;
                     const int sy = shape >> 1;
@@ -428,9 +428,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_m
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -466,7 +466,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_m
             block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_ux3[lane] = ux[ev[lane * N_SHAPE + 3] * u_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
-            block_value[lane] = 0;
+            block_value[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
@@ -547,9 +547,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -610,7 +610,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
             block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_ux3[lane] = ux[ev[lane * N_SHAPE + 3] * u_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
-            block_value[lane] = 0;
+            block_value[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
@@ -1061,10 +1061,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
             const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const int sx = ((shape + 1) >> 1) & 1;
                     const int sy = shape >> 1;
@@ -1163,9 +1163,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_me
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -1208,14 +1208,14 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_me
             block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_ux3[lane] = ux[ev[lane * N_SHAPE + 3] * u_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
@@ -1325,9 +1325,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -1395,14 +1395,14 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
             block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_ux3[lane] = ux[ev[lane * N_SHAPE + 3] * u_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
@@ -1938,10 +1938,10 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
             const int qy = q / N_QP_1D;
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = 0.0;
-                scalar_t J01 = 0.0;
-                scalar_t J10 = 0.0;
-                scalar_t J11 = 0.0;
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const int sx = ((shape + 1) >> 1) & 1;
                     const int sy = shape >> 1;
@@ -2051,9 +2051,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -2112,14 +2112,14 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_
             block_hx3[lane] = hx[ev[lane * N_SHAPE + 3] * h_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
             block_hy3[lane] = hy[ev[lane * N_SHAPE + 3] * h_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
@@ -2239,9 +2239,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t shape_1d[4] = {0.78867513459481287, 0.21132486540518708, 0.21132486540518713, 0.78867513459481287};
-    static const scalar_t grad_1d[4] = {-1, 1, -1, 1};
-    static const scalar_t q_weight_1d[2] = {0.5, 0.5};
+    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -2325,14 +2325,14 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
             block_hx3[lane] = hx[ev[lane * N_SHAPE + 3] * h_stride];
             block_uy3[lane] = uy[ev[lane * N_SHAPE + 3] * u_stride];
             block_hy3[lane] = hy[ev[lane * N_SHAPE + 3] * h_stride];
-            block_outx0[lane] = 0;
-            block_outy0[lane] = 0;
-            block_outx1[lane] = 0;
-            block_outy1[lane] = 0;
-            block_outx2[lane] = 0;
-            block_outy2[lane] = 0;
-            block_outx3[lane] = 0;
-            block_outy3[lane] = 0;
+            block_outx0[lane] = scalar_t(0);
+            block_outy0[lane] = scalar_t(0);
+            block_outx1[lane] = scalar_t(0);
+            block_outy1[lane] = scalar_t(0);
+            block_outx2[lane] = scalar_t(0);
+            block_outy2[lane] = scalar_t(0);
+            block_outx3[lane] = scalar_t(0);
+            block_outy3[lane] = scalar_t(0);
         }
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
