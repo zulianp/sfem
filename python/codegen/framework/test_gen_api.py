@@ -521,6 +521,56 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(context.family, "tensor_product")
         self.assertTrue(context.is_mixed_order)
 
+    def test_geometry_policy_nodes_describe_affine_and_isoparametric_paths(self):
+        tri_context = gen.ElementGenerationContext.create(
+            "test_material",
+            "TRI3",
+            16,
+            None,
+        )
+        tri_affine = tri_context.geometry_plan(gen.GeometryMode.AFFINE)
+        tri_iso = tri_context.geometry_plan(gen.GeometryMode.ISOPARAMETRIC)
+
+        self.assertTrue(tri_affine.is_affine)
+        self.assertEqual(tri_affine.input_layout, gen.GeometryInputLayout.ADJUGATE_DETERMINANT_SOA)
+        self.assertEqual(tri_affine.evaluation, gen.GeometryEvaluation.ROUTE_PRECOMPUTED_AFFINE)
+        self.assertEqual(tri_affine.jacobian_scope, "element")
+        self.assertEqual(tri_affine.geometry_points_per_element, 1)
+        self.assertEqual(tri_affine.geometry_stream_count, 2 * 2 + 1)
+        self.assertTrue(tri_affine.requires_adjugate_determinant_streams)
+        self.assertFalse(tri_affine.uses_sum_factorization)
+
+        self.assertTrue(tri_iso.is_isoparametric)
+        self.assertEqual(tri_iso.input_layout, gen.GeometryInputLayout.COORDINATE_AOS)
+        self.assertEqual(tri_iso.evaluation, gen.GeometryEvaluation.SIMPLEX_REFERENCE)
+        self.assertEqual(tri_iso.jacobian_scope, "quadrature_point")
+        self.assertEqual(tri_iso.geometry_points_per_element, tri_context.specialization.n_qp)
+        self.assertTrue(tri_iso.requires_coordinates)
+        self.assertFalse(tri_iso.uses_sum_factorization)
+
+        hex_context = gen.ElementGenerationContext.create(
+            "test_material",
+            "HEX8",
+            16,
+            None,
+        )
+        hex_iso = hex_context.geometry_plan("isoparametric")
+        self.assertEqual(hex_iso.element_type, "HEX8")
+        self.assertEqual(hex_iso.evaluation, gen.GeometryEvaluation.TENSOR_PRODUCT_SUM_FACTOR)
+        self.assertEqual(hex_iso.geometry_points_per_element, hex_context.specialization.n_qp)
+        self.assertTrue(hex_iso.uses_sum_factorization)
+
+        mixed_context = gen.ElementGenerationContext.create(
+            "test_material",
+            poro_hyperelasticity.elements[2],
+            16,
+            None,
+        )
+        mixed_iso = mixed_context.geometry_plan("isoparametric")
+        self.assertEqual(mixed_iso.element_type, "HEX27")
+        self.assertEqual(mixed_iso.n_shape, 27)
+        self.assertTrue(mixed_iso.uses_sum_factorization)
+
     def test_rejects_equal_order_poro_hyperelastic_element(self):
         with tempfile.TemporaryDirectory() as out_dir:
             with self.assertRaisesRegex(ValueError, "not enabled"):
