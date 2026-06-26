@@ -559,6 +559,12 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(hex_iso.evaluation, gen.GeometryEvaluation.TENSOR_PRODUCT_SUM_FACTOR)
         self.assertEqual(hex_iso.geometry_points_per_element, hex_context.specialization.n_qp)
         self.assertTrue(hex_iso.uses_sum_factorization)
+        self.assertIsInstance(hex_iso.sum_factorization_plan, gen.TensorProductSumFactorizationPlan)
+        self.assertTrue(hex_iso.sum_factorization_plan.evaluates_geometry_jacobian)
+        self.assertEqual(
+            hex_iso.sum_factorization_plan.operations,
+            (gen.TensorProductOperation.GEOMETRY_JACOBIAN,),
+        )
 
         mixed_context = gen.ElementGenerationContext.create(
             "test_material",
@@ -607,6 +613,11 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(hex_basis.reference_shape_size, 9)
         self.assertEqual(hex_basis.reference_gradient_size, 9)
         self.assertTrue(hex_basis.uses_sum_factorization)
+        self.assertEqual(len(hex_basis.sum_factorization_plans), 2)
+        self.assertTrue(hex_basis.field_evaluation_sum_factorization.evaluates_values)
+        self.assertTrue(hex_basis.field_evaluation_sum_factorization.evaluates_gradients)
+        self.assertTrue(hex_basis.test_contraction_sum_factorization.contracts_tests)
+        self.assertTrue(hex_basis.test_contraction_sum_factorization.uses_1d_basis)
 
         mixed_context = gen.ElementGenerationContext.create(
             "test_material",
@@ -632,6 +643,20 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(pressure_basis.n_qp_1d, 3)
         self.assertEqual(pressure_basis.scatter_n_shape, 8)
         self.assertTrue(pressure_basis.uses_sum_factorization)
+        self.assertEqual(
+            pressure_basis.field_evaluation_sum_factorization.operations,
+            (
+                gen.TensorProductOperation.FIELD_VALUE,
+                gen.TensorProductOperation.FIELD_GRADIENT,
+            ),
+        )
+        self.assertEqual(
+            pressure_basis.test_contraction_sum_factorization.operations,
+            (
+                gen.TensorProductOperation.TEST_VALUE_CONTRACTION,
+                gen.TensorProductOperation.TEST_GRADIENT_CONTRACTION,
+            ),
+        )
 
         simplex_mixed_context = gen.ElementGenerationContext.create(
             "test_material",
