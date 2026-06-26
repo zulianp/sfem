@@ -18,6 +18,10 @@ from codegen.framework import (
     BasisEvaluation,
     BasisFamily,
     BasisPlanNode,
+    BlockPlan,
+    DataStreamLayout,
+    DataStreamPlan,
+    DataStreamRole,
     EquationForm,
     EquationSystem,
     EquationSystemBuilder,
@@ -56,10 +60,16 @@ from codegen.framework import (
     FormMetadata,
     FormOrder,
     FormQualifier,
+    GenerationPlan,
     GeometryEvaluation,
     GeometryInputLayout,
     GeometryMode,
+    GeometryPlan,
     GeometryPlanNode,
+    KernelPlan,
+    KernelTarget,
+    LocalPhase,
+    MeshPhase,
     PipelineStage,
     StandardFormName,
     VectorField,
@@ -356,16 +366,9 @@ class CodeGenerationKind(Enum):
 
 
 @dataclass(frozen=True)
-class CodeGenerationUnit:
-    kind: CodeGenerationKind
-    material_name: str
-    unit_name: str
-    dim: int
-    form_collection: FormCollection
-    payload: object = None
-
-    def matches(self, context):
-        return self.dim == context.specialization.dim
+class CodeGenerationUnit(KernelPlan):
+    material_name: str = ""
+    unit_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -375,12 +378,7 @@ class EnergyCodeGenerationPayload:
     diagnostics: bool
 
 
-@dataclass(frozen=True)
-class CodeGenerationPlan:
-    units: tuple
-
-    def units_for_context(self, context):
-        return tuple(unit for unit in self.units if unit.matches(context))
+CodeGenerationPlan = GenerationPlan
 
 
 @dataclass(frozen=True)
@@ -549,7 +547,7 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
                 raise TypeError(
                     "unsupported evaluated form unit %s" % type(evaluated).__name__
                 )
-    return CodeGenerationPlan(tuple(units))
+    return GenerationPlan(tuple(units))
 
 
 def _energy_codegen_unit(material_name, dim, evaluated):
@@ -586,26 +584,41 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             )
         )
     return CodeGenerationUnit(
-        CodeGenerationKind.ENERGY_SOA,
-        material_name,
-        evaluated.name,
-        dim,
-        evaluated.form_evaluation,
-        EnergyCodeGenerationPayload(
+        name=_unit_output_name_from_parts(material_name, evaluated.name),
+        kind=CodeGenerationKind.ENERGY_SOA,
+        form_collection=evaluated.form_evaluation,
+        dim=dim,
+        mesh_phases=(
+            MeshPhase.GEOMETRY,
+            MeshPhase.LOCAL_CALL,
+            MeshPhase.SCATTER,
+        ),
+        target=KernelTarget.OPENMP,
+        payload=EnergyCodeGenerationPayload(
             kernel_forms,
             diagnostic_graph,
             evaluated.diagnostics,
         ),
+        material_name=material_name,
+        unit_name=evaluated.name,
     )
 
 
 def _residual_codegen_unit(material_name, dim, evaluated):
     return CodeGenerationUnit(
-        CodeGenerationKind.RESIDUAL_SOA,
-        material_name,
-        evaluated.name,
-        dim,
-        evaluated.form_evaluation,
+        name=_unit_output_name_from_parts(material_name, evaluated.name),
+        kind=CodeGenerationKind.RESIDUAL_SOA,
+        form_collection=evaluated.form_evaluation,
+        dim=dim,
+        mesh_phases=(
+            MeshPhase.GATHER,
+            MeshPhase.GEOMETRY,
+            MeshPhase.LOCAL_CALL,
+            MeshPhase.SCATTER,
+        ),
+        target=KernelTarget.OPENMP,
+        material_name=material_name,
+        unit_name=evaluated.name,
     )
 
 
@@ -848,9 +861,13 @@ def _unit_generated_prefix(unit):
 
 
 def _unit_output_name(unit):
-    if unit.unit_name:
-        return "%s_%s" % (unit.material_name, unit.unit_name)
-    return unit.material_name
+    return _unit_output_name_from_parts(unit.material_name, unit.unit_name)
+
+
+def _unit_output_name_from_parts(material_name, unit_name):
+    if unit_name:
+        return "%s_%s" % (material_name, unit_name)
+    return material_name
 
 
 def _unit_report_name(unit):
@@ -1085,10 +1102,20 @@ __all__ = [
     "BasisEvaluation",
     "BasisFamily",
     "BasisPlanNode",
+    "BlockPlan",
+    "DataStreamLayout",
+    "DataStreamPlan",
+    "DataStreamRole",
+    "GenerationPlan",
     "GeometryEvaluation",
     "GeometryInputLayout",
     "GeometryMode",
+    "GeometryPlan",
     "GeometryPlanNode",
+    "KernelPlan",
+    "KernelTarget",
+    "LocalPhase",
+    "MeshPhase",
     "current_geometric_dimension",
     "geometric_dimension_context",
     "HyperelasticQualifier",
