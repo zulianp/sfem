@@ -283,8 +283,16 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(action_metadata.coefficients[0].value, sp.Symbol("p_direction"))
         self.assertTrue(action_metadata.dependencies.direction)
         self.assertFalse(action_metadata.dependencies.previous)
-        self.assertTrue(residual_forms.blocks)
-        self.assertEqual(residual_forms.blocks, action_metadata.blocks)
+        self.assertTrue(residual_metadata.blocks)
+        self.assertTrue(action_metadata.blocks)
+        residual_block = residual_forms.block(gen.FormOrder.ONE, "p")
+        action_block = residual_forms.block(gen.FormOrder.TWO, "p", "p")
+        self.assertIsInstance(residual_block, gen.FormBlock)
+        self.assertIsInstance(action_block, gen.FormBlock)
+        self.assertEqual(residual_block.expression, p.value * q.value)
+        self.assertEqual(action_block.expression, sp.Symbol("p_direction") * q.value)
+        self.assertEqual(action_metadata.blocks, residual_forms.blocks_for(gen.FormOrder.TWO))
+        self.assertEqual(residual_forms.block_matrix(gen.FormOrder.TWO), ((action_block,),))
         residual_unit = gen._residual_codegen_unit(
             "material",
             1,
@@ -360,6 +368,39 @@ class GenApiTest(unittest.TestCase):
             tuple(field.family for field in builder.build().fields),
             ("displacement", "pressure"),
         )
+
+    def test_residual_form_collection_exposes_coupled_block_matrix(self):
+        builder = gen.EquationSystemBuilder(2)
+        u = builder.scalar_field("u")
+        v = builder.scalar_field("v")
+        q_u = gen.test_function(u)
+        q_v = gen.test_function(v)
+        builder.add_residual(
+            "coupled",
+            (u.value + 2 * v.value) * q_u + (3 * u.value - v.value) * q_v,
+            fields=(u, v),
+        )
+        forms = builder.build().form_collection("coupled")
+
+        residual_blocks = forms.blocks_for(gen.FormOrder.ONE)
+        action_blocks = forms.blocks_for(gen.FormOrder.TWO)
+        self.assertEqual(tuple(block.row_field for block in residual_blocks), ("u", "v"))
+        self.assertEqual(len(action_blocks), 4)
+
+        matrix = forms.block_matrix(gen.FormOrder.TWO)
+        self.assertEqual(
+            tuple(tuple(block.name for block in row) for row in matrix),
+            (
+                ("form_2_u_u", "form_2_u_v"),
+                ("form_2_v_u", "form_2_v_v"),
+            ),
+        )
+        self.assertEqual(matrix[0][1].expression, 2 * sp.Symbol("v_direction") * q_u.value)
+        self.assertEqual(matrix[1][0].expression, 3 * sp.Symbol("u_direction") * q_v.value)
+        self.assertTrue(matrix[0][1].is_coupling)
+        self.assertTrue(matrix[1][1].is_diagonal)
+        self.assertEqual(matrix[0][1].coefficients[0].row_field, "u")
+        self.assertTrue(matrix[0][1].dependencies.direction)
 
     def test_generates_hyperelastic_material(self):
         with tempfile.TemporaryDirectory() as out_dir:

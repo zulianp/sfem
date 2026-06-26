@@ -68,6 +68,8 @@ Shared form abstractions live in `codegen.framework.forms`:
 - `FormPipeline`
 - `FormEvaluation`
 - `FormCollection`
+- `FormMetadata`
+- `FormBlock`
 - `UnifiedForm`
 
 The form order mapping is:
@@ -109,6 +111,16 @@ For variational residual forms, this stage builds:
 Those residual coefficients are stored in the per-order `FormMetadata` of the
 same `FormCollection`; the code generation unit does not create a separate
 residual payload schema for fields, coefficients, dependencies, or blocks.
+Residual systems also store explicit `FormBlock` objects:
+
+- `FormOrder.ONE` blocks are row blocks, one per residual field.
+- `FormOrder.TWO` blocks are row/column Jacobian-action blocks.
+- Each block carries its expression, weak coefficients, dependencies, and
+  diagonal/coupling classification.
+- `FormCollection.blocks_for(...)`, `FormCollection.block(...)`, and
+  `FormCollection.block_matrix(...)` expose the block structure before code
+  generation, so monolithic and subproblem/block kernels can be planned from
+  the same form schema.
 
 The output is always a `CodeGenerationPlan`: a flat list of
 `CodeGenerationUnit` objects. This is the common interface to the next stage.
@@ -290,8 +302,14 @@ state is read from:
 
 - `FormCollection.source` for the lowered `CoupledResidualSystem`
 - `FormMetadata(FormOrder.ONE).coefficients` for residual weak coefficients
+- `FormMetadata(FormOrder.ONE).blocks` for residual row blocks
 - `FormMetadata(FormOrder.TWO).coefficients` for Jacobian-action weak coefficients
-- `FormMetadata(FormOrder.TWO).blocks` for coupled block structure
+- `FormMetadata(FormOrder.TWO).blocks` for coupled row/column block structure
+
+`FormCollection.block_matrix(FormOrder.TWO)` returns the coupled Jacobian-action
+matrix in field order. Off-diagonal `FormBlock.is_coupling` entries are the
+mixed terms that a later generation-plan stage can emit as separate block
+kernels or assemble into a monolithic operator.
 
 ### Unified Code Generation
 

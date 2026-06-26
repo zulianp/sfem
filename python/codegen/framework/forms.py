@@ -158,6 +158,37 @@ class FormCollection:
                 return metadata
         raise ValueError("metadata for form order %s is not available" % order.name)
 
+    def blocks_for(self, order):
+        return self.form_metadata(order).blocks
+
+    def block(self, order, row_field, column_field=None):
+        order = FormOrder(order)
+        row_field = str(row_field)
+        column_field = None if column_field is None else str(column_field)
+        for block in self.blocks_for(order):
+            if block.row_field == row_field and block.column_field == column_field:
+                return block
+        if column_field is None:
+            raise ValueError(
+                "block for form order %s and row field '%s' is not available"
+                % (order.name, row_field)
+            )
+        raise ValueError(
+            "block for form order %s, row field '%s', and column field '%s' is not available"
+            % (order.name, row_field, column_field)
+        )
+
+    def block_matrix(self, order):
+        fields = tuple(field.name for field in self.fields)
+        blocks = {
+            (block.row_field, block.column_field): block
+            for block in self.blocks_for(order)
+        }
+        return tuple(
+            tuple(blocks.get((row, column)) for column in fields)
+            for row in fields
+        )
+
     @classmethod
     def from_evaluation(
         cls,
@@ -199,6 +230,45 @@ class FormQualifier:
     def __post_init__(self):
         object.__setattr__(self, "target", str(self.target))
         object.__setattr__(self, "name", str(self.name))
+
+
+@dataclass(frozen=True)
+class FormBlock:
+    order: FormOrder
+    row_field: str
+    column_field: str = None
+    expression: object = None
+    coefficients: tuple = ()
+    dependencies: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "order", FormOrder(self.order))
+        object.__setattr__(self, "row_field", str(self.row_field))
+        if self.column_field is not None:
+            object.__setattr__(self, "column_field", str(self.column_field))
+        object.__setattr__(self, "expression", sp.sympify(self.expression))
+        object.__setattr__(self, "coefficients", tuple(self.coefficients))
+
+    @property
+    def name(self):
+        if self.column_field is None:
+            return "%s_%s" % (
+                StandardFormName.from_order(self.order).value,
+                self.row_field,
+            )
+        return "%s_%s_%s" % (
+            StandardFormName.from_order(self.order).value,
+            self.row_field,
+            self.column_field,
+        )
+
+    @property
+    def is_diagonal(self):
+        return self.column_field is None or self.row_field == self.column_field
+
+    @property
+    def is_coupling(self):
+        return self.column_field is not None and self.row_field != self.column_field
 
 
 @dataclass(frozen=True)
