@@ -49,6 +49,10 @@ from codegen.framework import (
     FormMetadata,
     FormOrder,
     FormQualifier,
+    GeometryEvaluation,
+    GeometryInputLayout,
+    GeometryMode,
+    GeometryPlanNode,
     PipelineStage,
     StandardFormName,
     VectorField,
@@ -61,6 +65,7 @@ from codegen.framework import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
     generate_sfem_soa_cpp_files_for_element,
+    geometry_plans_for_fem_policy,
     geometric_dimension_context,
     matrix_inner,
     residual_form_pipeline,
@@ -72,6 +77,7 @@ from codegen.framework import (
     trial_function,
     vector_field,
     adjugate,
+    affine_geometry_plan,
     det,
     deformation_gradient,
     derivative,
@@ -79,6 +85,7 @@ from codegen.framework import (
     grad,
     inner,
     inv,
+    isoparametric_geometry_plan,
     material_parameter,
     old,
     previous_function,
@@ -161,7 +168,28 @@ class ElementGenerationContext:
     label: str
     specialization: object
     fem_policy: object
+    geometry_plans: tuple
     compatible_element: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "geometry_plans", tuple(self.geometry_plans))
+        seen = set()
+        for plan in self.geometry_plans:
+            if not isinstance(plan, GeometryPlanNode):
+                raise TypeError("geometry_plans must contain GeometryPlanNode objects")
+            if plan.element_type != self.element_type:
+                raise ValueError(
+                    "geometry plan element '%s' does not match context element '%s'"
+                    % (plan.element_type, self.element_type)
+                )
+            if plan.dim != self.specialization.dim:
+                raise ValueError(
+                    "geometry plan dimension %d does not match context dimension %d"
+                    % (plan.dim, self.specialization.dim)
+                )
+            if plan.mode in seen:
+                raise ValueError("duplicate geometry plan mode '%s'" % plan.mode.value)
+            seen.add(plan.mode)
 
     @classmethod
     def create(cls, material_name, element, vector_size, quadrature_order):
@@ -172,6 +200,7 @@ class ElementGenerationContext:
             policy.label,
             policy.specialization,
             policy,
+            geometry_plans_for_fem_policy(policy),
             policy.compatible_element,
         )
 
@@ -198,6 +227,13 @@ class ElementGenerationContext:
     @property
     def is_mixed_order(self):
         return self.fem_policy.is_mixed_order
+
+    def geometry_plan(self, mode):
+        mode = GeometryMode(mode)
+        for plan in self.geometry_plans:
+            if plan.mode is mode:
+                return plan
+        raise ValueError("geometry mode '%s' is not available" % mode.value)
 
 
 @dataclass(frozen=True)
@@ -966,6 +1002,10 @@ __all__ = [
     "FormBlock",
     "FormQualifier",
     "GenerationResult",
+    "GeometryEvaluation",
+    "GeometryInputLayout",
+    "GeometryMode",
+    "GeometryPlanNode",
     "current_geometric_dimension",
     "geometric_dimension_context",
     "HyperelasticQualifier",
@@ -999,14 +1039,17 @@ __all__ = [
     "VectorElement",
     "VectorFunctionSpace",
     "adjugate",
+    "affine_geometry_plan",
     "det",
     "deformation_gradient",
     "derivative",
     "div",
     "generate",
+    "geometry_plans_for_fem_policy",
     "grad",
     "inner",
     "inv",
+    "isoparametric_geometry_plan",
     "material_parameter",
     "matrix_inner",
     "old",

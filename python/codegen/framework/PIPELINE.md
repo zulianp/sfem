@@ -129,6 +129,18 @@ This is also the natural extension point for thermo-hyperelasticity and other
 coupled models: one material can produce more than one `CodeGenerationUnit`,
 including both energy-derived and residual-derived units.
 
+Each `ElementGenerationContext` also carries explicit geometry plan nodes:
+
+- affine geometry routes precomputed adjugate/determinant SoA streams, one
+  geometry point per element;
+- isoparametric geometry computes adjugate/determinant from coordinate streams
+  at quadrature points;
+- tensor-product isoparametric elements mark the geometry evaluation as
+  sum-factorized, while simplex elements use reference-gradient evaluation.
+
+This keeps geometry policy at the form-manipulation boundary instead of hiding
+it inside material-specific code generators.
+
 ### 4. Unified Code Generation
 
 `CodeGenerationStage` is the only stage that emits generated source files.
