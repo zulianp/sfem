@@ -452,19 +452,19 @@ def _residual_op(material, elements):
     residual_cases = []
     action_cases = []
     dependencies_by_dim = {}
+    parameter_names_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
         if dependencies is None:
-            from codegen.framework.residual import CoupledResidualSystem
-
-            system = CoupledResidualSystem(dim)
-            material.define(system)
+            collection = _residual_form_collection(material, dim)
+            system = collection.source
             dependencies = (
-                system.residual_dependencies(),
-                system.jacobian_action_dependencies(),
+                collection.form_metadata(_form_order_one()).dependencies,
+                collection.form_metadata(_form_order_two()).dependencies,
             )
             dependencies_by_dim[dim] = dependencies
+            parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in system.parameters)
         residual_dependencies, action_dependencies = dependencies
         stem = "generated_%s_%s" % (material.name, element.lower())
         residual_pointer_params = []
@@ -534,13 +534,8 @@ def _residual_op(material, elements):
         dependencies[1].previous for dependencies in dependencies_by_dim.values()
     )
 
-    parameter_names = tuple(str(name) for name, _ in material.parameter_defaults)
-    parameter_lines = "\n".join(
-        '            values[index++] = parameters.require_real_value("%s");' % name
-        for name in parameter_names
-        if not name.startswith("K_")
-    )
-    max_parameters = len(parameter_names)
+    max_parameters = max(len(names) for names in parameter_names_by_dim.values())
+    parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
     source = """#include "sfem_%(op)s.hpp"
 
 #include "sfem_FunctionSpace.hpp"
@@ -575,10 +570,6 @@ namespace sfem {
                              real_t *const values) {
             int index = 0;
 %(parameter_lines)s
-            for (int i = 0; i < dim * dim; ++i) {
-                values[index++] =
-                        parameters.require_real_value("K_" + std::to_string(i));
-            }
         }
     }  // namespace
 
@@ -810,6 +801,51 @@ namespace sfem {
         ),
     }
     return _header(material, True), source
+
+
+def _residual_form_collection(material, dim):
+    collections = getattr(material, "form_collections", None)
+    if collections is not None:
+        return collections[dim]
+
+    from codegen.framework.equations import EquationSystem
+
+    system = EquationSystem(dim)
+    equation = system.add_residual("", material.define, fields=())
+    return system.form_collection(equation)
+
+
+def _form_order_one():
+    from codegen.framework.forms import FormOrder
+
+    return FormOrder.ONE
+
+
+def _form_order_two():
+    from codegen.framework.forms import FormOrder
+
+    return FormOrder.TWO
+
+
+def _residual_parameter_array_lines(parameter_names_by_dim):
+    lines = ["            switch (dim) {"]
+    for dim in sorted(parameter_names_by_dim):
+        lines.append("                case %d:" % dim)
+        for name in parameter_names_by_dim[dim]:
+            lines.append(
+                '                    values[index++] = parameters.require_real_value("%s");'
+                % name
+            )
+        lines.append("                    break;")
+    lines.extend(
+        [
+            "                default:",
+            '                    SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\\n", dim);',
+            "                    break;",
+            "            }",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _hyperelastic_declarations(stem, dim, parameters):

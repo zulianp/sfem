@@ -137,6 +137,7 @@ class _ResidualOpMaterialAdapter:
     define: object
     op_name: str
     parameter_defaults: tuple
+    form_collections: object = None
 
 
 @dataclass(frozen=True)
@@ -613,12 +614,24 @@ def _generate_op_wrapper_files(material, selected, user_input):
             selected,
         )
     if equation.is_residual:
+        systems_by_dim = {
+            context.specialization.dim: material.systems.for_dim(context.specialization.dim)
+            for context in user_input.element_contexts
+        }
+        form_collections = {
+            dim: system.form_collection(
+                system.equations[0],
+                orders=_equation_form_orders(equation),
+            )
+            for dim, system in systems_by_dim.items()
+        }
         return generate_op_files(
             _ResidualOpMaterialAdapter(
                 material.name,
                 equation.define,
                 material.op_name,
                 material.parameter_defaults,
+                form_collections,
             ),
             selected,
         )
