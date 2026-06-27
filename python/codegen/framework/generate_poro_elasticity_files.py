@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-import os
-import sys
+from _script_common import bootstrap_python_path, generated_output_dir
 
 
-PYTHON_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, PYTHON_DIR)
+bootstrap_python_path(__file__, 2)
 
 from codegen.framework.materials.poro_hyperelasticity import material  # noqa: E402
 from sfem import gen  # noqa: E402
 
 
 if __name__ == "__main__":
-    gen.run(
-        material,
-        os.path.join(
-            os.path.dirname(__file__),
-            "../../../frontend/ops/generated/poro_hyperelasticity",
-        ),
-    )
+    gen.run(material, generated_output_dir(__file__, "poro_hyperelasticity", 3))

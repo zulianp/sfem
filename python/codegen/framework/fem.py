@@ -223,6 +223,10 @@ class SfemSoAElementSpecialization:
         )
 
 
+def _has_mixed_order_fields(cell_element_type, field_element_types):
+    return any(element != cell_element_type for _, element in field_element_types)
+
+
 @dataclass(frozen=True)
 class SfemCompatibleElement:
     name: str
@@ -243,7 +247,10 @@ class SfemCompatibleElement:
 
     @property
     def is_mixed_order(self):
-        return any(element != self.cell_element_type for _, element in self.field_element_types)
+        return _has_mixed_order_fields(
+            self.cell_element_type,
+            self.field_element_types,
+        )
 
     def element_for_field(self, field_name):
         field_name = str(field_name)
@@ -308,9 +315,9 @@ class SfemFieldFamilyCompatibilityPolicy:
 
     @property
     def is_mixed_order(self):
-        return any(
-            element != self.cell_element_type
-            for _, element in self.field_element_types
+        return _has_mixed_order_fields(
+            self.cell_element_type,
+            self.field_element_types,
         )
 
     def element_for_family(self, family):
