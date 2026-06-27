@@ -1806,8 +1806,8 @@ def _mixed_operator_source(
         "namespace codegen {",
         "",
     ]
-    reference_stage = "isoparametric"
-    lines.extend(_mixed_reference_data_lines(prefix, reference_stage, rule, system, field_element_types))
+    lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types))
+    lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     form_data = (
         (
@@ -1831,13 +1831,27 @@ def _mixed_operator_source(
     )
     for form, coefficients, dependencies in form_data:
         lines.extend(
+            _mixed_affine_function(
+                system,
+                prefix,
+                local_prefix,
+                element,
+                rule,
+                "affine",
+                cell_specialization.vector_size,
+                field_element_types,
+                form,
+                dependencies,
+            )
+        )
+        lines.extend(
             _mixed_isoparametric_function(
                 system,
                 prefix,
                 local_prefix,
                 element,
                 rule,
-                reference_stage,
+                "isoparametric",
                 cell_specialization.vector_size,
                 field_element_types,
                 form,
@@ -1940,6 +1954,203 @@ def _mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule
         )
         for d in range(cell_rule.dim)
     ]
+
+
+def _mixed_affine_function(
+    system,
+    prefix,
+    local_prefix,
+    element,
+    cell_rule,
+    reference_stage,
+    vector_size,
+    field_element_types,
+    form,
+    dependencies,
+):
+    dim = system.dim
+    layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+    ]
+    if dependencies.uses_adjugate:
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+            for i in range(dim * dim)
+        )
+    params.append("const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0")
+    params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
+    params.extend(_mixed_mesh_dependency_params(system, dependencies))
+    params.append("const ptrdiff_t out_stride")
+    params.extend("scalar_t *const SFEM_RESTRICT %s_out" % field.name for field in system.fields)
+
+    impl = "%s_%s_%s_affine_mesh_mixed_impl" % (prefix, element, form)
+    block = "%s_%s_block" % (local_prefix, form)
+    reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s(" % impl,
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % cell_rule.n_qp,
+            "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
+            "    static constexpr int N_SHAPE = CELL_N_SHAPE;",
+            "    static constexpr int N_FIELDS = %d;" % len(system.fields),
+            "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(
+        _mixed_reference_pointer_lines(
+            reference_data,
+            system,
+            cell_rule,
+            dependencies,
+            "    ",
+            field_element_types,
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
+        ]
+    )
+    if dependencies.current:
+        lines.append("        scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];")
+    if dependencies.previous:
+        lines.append("        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];")
+    if dependencies.direction:
+        lines.append("        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
+            "",
+            "#pragma omp simd",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for shape in range(cell_rule.n_shape):
+        lines.append(
+            "            ev[lane * CELL_N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            % (shape, shape)
+        )
+    lines.extend(
+        [
+            "        }",
+            "",
+            "#pragma omp simd",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for field_index, field in enumerate(system.fields):
+        for local_shape in range(layout.n_shape(field_index)):
+            stream = layout.stream_index(field_index, local_shape)
+            node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
+            for group in _dependency_stream_groups(dependencies, mesh=True):
+                lines.append(
+                    "            block_%s[%d][lane] = %s%s[%s * %s];"
+                    % (
+                        group.name,
+                        stream,
+                        field.name,
+                        group.pointer_suffix,
+                        node,
+                        group.stride,
+                    )
+                )
+            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
+    lines.append("        }")
+    if dependencies.uses_adjugate:
+        lines.append(
+            "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+            % ", ".join("g_jacobian_adjugate%d + evbegin" % i for i in range(dim * dim))
+        )
+    lines.extend(_mixed_block_stream_pointer_lines(layout, dependencies, "        "))
+    call_args = [
+        "nelems",
+        "0",
+        "g_jacobian_determinant0 + evbegin",
+    ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data))
+    call_args.extend(
+        "block_%s_streams" % group.name
+        for group in _dependency_stream_groups(dependencies)
+    )
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append("block_output_streams")
+    lines.extend(
+        [
+            "",
+            "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block, ", ".join(call_args)),
+            "",
+            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        ]
+    )
+    for field_index, field in enumerate(system.fields):
+        for local_shape in range(layout.n_shape(field_index)):
+            stream = layout.stream_index(field_index, local_shape)
+            lines.extend(
+                [
+                    "#pragma omp atomic update",
+                    "            %s_out[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
+                    % (field.name, local_shape, stream),
+                ]
+            )
+    lines.extend(
+        [
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+
+    function = "%s_%s_%s_affine_mesh_soa" % (prefix, element, form)
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [param.replace("scalar_t", scalar_type) for param in params]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        call_args = ["nelements", "nnodes", "elements"]
+        if dependencies.uses_adjugate:
+            call_args.extend("g_jacobian_adjugate%d" % i for i in range(dim * dim))
+        call_args.append("g_jacobian_determinant0")
+        call_args.extend(map(str, dependencies.parameters))
+        call_args.extend(_mixed_mesh_dependency_call_args(system, dependencies))
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
 
 
 def _mixed_isoparametric_function(
@@ -3087,4 +3298,3 @@ def _mesh_reference_alias_lines(prefix, rule, geometry_mode):
         )
         for reference in sfem_mesh_reference_data(rule)
     ]
-

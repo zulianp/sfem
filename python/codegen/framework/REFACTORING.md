@@ -291,7 +291,7 @@ Tasks:
    special cases.
 2. Emit mesh-level kernels per element type or compatible element type.
 3. Emit monolithic coupled kernels for complete systems.
-4. Emit separate block kernels for each block in a coupled system.
+4. Emit separate block kernels for each block in a coupled system. Make sure to detect 0 blocks!
 5. Ensure affine kernels receive adjugate and determinant as SoA inputs.
 6. Ensure isoparametric kernels compute geometry from coordinates according to
    the geometry plan.

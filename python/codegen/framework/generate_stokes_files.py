@@ -93,7 +93,9 @@ def validate_m6_3(result):
                 % os.path.basename(path)
             )
         for token in (
+            "_residual_affine_mesh_soa",
             "_residual_isoparametric_mesh_soa",
+            "_jacobian_action_affine_mesh_soa",
             "_jacobian_action_isoparametric_mesh_soa",
         ):
             if token not in contents:
