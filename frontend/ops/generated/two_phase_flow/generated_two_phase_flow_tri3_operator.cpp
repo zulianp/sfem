@@ -16,26 +16,6 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct generated_two_phase_flow_tri3_element_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
-        return data;
-    }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[18] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0)};
-        return data;
-    }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[18] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1)};
-        return data;
-    }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
-        return data;
-    }
-};
-
-template <typename scalar_t>
 struct generated_two_phase_flow_tri3_affine_reference_data {
     static const scalar_t *shape() {
         static const scalar_t data[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
@@ -720,7 +700,7 @@ extern "C" int generated_two_phase_flow_tri3_residual_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::shape(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -754,7 +734,7 @@ extern "C" int generated_two_phase_flow_tri3_residual_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::shape(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1240,7 +1220,7 @@ extern "C" int generated_two_phase_flow_tri3_jacobian_action_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::shape(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<double>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<double>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1274,7 +1254,7 @@ extern "C" int generated_two_phase_flow_tri3_jacobian_action_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::shape(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_element_reference_data<float>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::generated_two_phase_flow_tri3_isoparametric_reference_data<float>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 

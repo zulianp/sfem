@@ -18,30 +18,6 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct generated_neohookean_ogden_tet4_element_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[4] = {scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25)};
-        return data;
-    }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(0)};
-        return data;
-    }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0)};
-        return data;
-    }
-    static const scalar_t *grad_ref_z() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(0), scalar_t(0), scalar_t(1)};
-        return data;
-    }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[1] = {scalar_t(0.16666666666666666)};
-        return data;
-    }
-};
-
-template <typename scalar_t>
 struct generated_neohookean_ogden_tet4_affine_reference_data {
     static const scalar_t *shape() {
         static const scalar_t data[4] = {scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25)};
@@ -343,7 +319,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_objective_soa(
         const real_t *const SFEM_RESTRICT uz3,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_objective_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, value);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_objective_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, value);
 }
 
 namespace sfem {
@@ -544,7 +520,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_objective_isoparametric_soa(
         const real_t *const SFEM_RESTRICT uz3,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_objective_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, value);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_objective_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, value);
 }
 
 namespace sfem {
@@ -1201,7 +1177,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_gradient_soa(
         real_t *const SFEM_RESTRICT outy3,
         real_t *const SFEM_RESTRICT outz3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_gradient_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_gradient_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
 }
 
 namespace sfem {
@@ -1458,7 +1434,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_gradient_isoparametric_soa(
         real_t *const SFEM_RESTRICT outy3,
         real_t *const SFEM_RESTRICT outz3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_gradient_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_gradient_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
 }
 
 namespace sfem {
@@ -2296,7 +2272,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_apply_soa(
         real_t *const SFEM_RESTRICT outy3,
         real_t *const SFEM_RESTRICT outz3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_apply_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_apply_soa_impl<real_t, 1, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
 }
 
 namespace sfem {
@@ -2602,7 +2578,7 @@ extern "C" int generated_neohookean_ogden_tet4_tet4_apply_isoparametric_soa(
         real_t *const SFEM_RESTRICT outy3,
         real_t *const SFEM_RESTRICT outz3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_apply_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_element_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
+    return sfem::codegen::generated_neohookean_ogden_tet4_tet4_apply_isoparametric_soa_impl<real_t, 1, 4, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::generated_neohookean_ogden_tet4_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3);
 }
 
 namespace sfem {

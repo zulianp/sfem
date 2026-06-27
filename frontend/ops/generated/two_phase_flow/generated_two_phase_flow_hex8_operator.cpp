@@ -16,22 +16,6 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct generated_two_phase_flow_hex8_element_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
-        return data;
-    }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-        return data;
-    }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
-        return data;
-    }
-};
-
-template <typename scalar_t>
 struct generated_two_phase_flow_hex8_affine_reference_data {
     static const scalar_t *shape_1d() {
         static const scalar_t data[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
@@ -713,7 +697,7 @@ extern "C" int generated_two_phase_flow_hex8_residual_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_residual_block<double, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::q_weight_1d(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_residual_block<double, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::q_weight_1d(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -752,7 +736,7 @@ extern "C" int generated_two_phase_flow_hex8_residual_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_residual_block<float, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::q_weight_1d(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_residual_block<float, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::q_weight_1d(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1431,7 +1415,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<double, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<double>::q_weight_1d(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<double, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<double>::q_weight_1d(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1470,7 +1454,7 @@ extern "C" int generated_two_phase_flow_hex8_jacobian_action_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[16]
 ) {
-    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<float, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_element_reference_data<float>::q_weight_1d(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d3_tensor_product_jacobian_action_block<float, 64, 8, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::grad_1d(), sfem::codegen::generated_two_phase_flow_hex8_isoparametric_reference_data<float>::q_weight_1d(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 

@@ -13,7 +13,6 @@ try:
         SfemSoAElementSpecialization,
         sfem_element_quadrature_rule,
         sfem_mesh_reference_data,
-        sfem_reference_data,
         sfem_soa_array_input,
         sfem_soa_element_specialization,
         sfem_soa_element_specializations,
@@ -27,7 +26,6 @@ except ImportError:
         SfemSoAElementSpecialization,
         sfem_element_quadrature_rule,
         sfem_mesh_reference_data,
-        sfem_reference_data,
         sfem_soa_array_input,
         sfem_soa_element_specialization,
         sfem_soa_element_specializations,
@@ -2716,13 +2714,6 @@ def _sfem_soa_operator_source(
     ]
     if quadrature_rule is not None:
         lines.extend(["namespace sfem {", "namespace codegen {", ""])
-        lines.extend(
-            quadrature_reference_struct_lines(
-                prefix,
-                "element",
-                sfem_reference_data(quadrature_rule),
-            )
-        )
         if affine_quadrature_rule is not None:
             lines.extend(
                 quadrature_reference_struct_lines(
@@ -4083,15 +4074,15 @@ def _sfem_soa_specialized_wrapper_arguments(
         offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
         arguments.insert(
             offset,
-            quadrature_reference_accessor(prefix, "element", "shape_1d", "real_t"),
+            quadrature_reference_accessor(prefix, "isoparametric", "shape_1d", "real_t"),
         )
         arguments.insert(
             offset + 1,
-            quadrature_reference_accessor(prefix, "element", "grad_1d", "real_t"),
+            quadrature_reference_accessor(prefix, "isoparametric", "grad_1d", "real_t"),
         )
         arguments.insert(
             offset + 2,
-            quadrature_reference_accessor(prefix, "element", "q_weight_1d", "real_t"),
+            quadrature_reference_accessor(prefix, "isoparametric", "q_weight_1d", "real_t"),
         )
         return tuple(arguments)
     if use_reference_gradient_vectors:
@@ -4101,24 +4092,24 @@ def _sfem_soa_specialized_wrapper_arguments(
                 offset + component,
                 quadrature_reference_accessor(
                     prefix,
-                    "element",
+                    "isoparametric",
                     _sfem_reference_gradient_vector_name(component),
                     "real_t",
                 ),
             )
         arguments.insert(
             offset + quadrature_rule.dim,
-            quadrature_reference_accessor(prefix, "element", "q_weight", "real_t"),
+            quadrature_reference_accessor(prefix, "isoparametric", "q_weight", "real_t"),
         )
         return tuple(arguments)
     for array_input in reference_inputs:
         arguments.insert(
             1 + _sfem_soa_element_stream_count_from_params(wrapper_params),
-            quadrature_reference_accessor(prefix, "element", array_input.name, "real_t"),
+            quadrature_reference_accessor(prefix, "isoparametric", array_input.name, "real_t"),
         )
     arguments.insert(
         1 + _sfem_soa_element_stream_count_from_params(wrapper_params) + len(reference_inputs),
-        quadrature_reference_accessor(prefix, "element", "q_weight", "real_t"),
+        quadrature_reference_accessor(prefix, "isoparametric", "q_weight", "real_t"),
     )
     return tuple(arguments)
 
