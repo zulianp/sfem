@@ -368,9 +368,25 @@ class SfemFEMPolicy:
         return self.compatibility.field_element_types_for(fields)
 
 
-def sfem_fem_policy(element, vector_size=16, quadrature_order=None):
+def sfem_fem_policy(
+    element,
+    vector_size=16,
+    quadrature_order=None,
+    integration_case="standard",
+):
     compatible = element if isinstance(element, SfemCompatibleElement) else None
     cell_element_type = compatible.cell_element_type if compatible else str(element).upper()
+    if (
+        compatible is not None
+        and compatible.is_mixed_order
+        and str(integration_case) == "standard"
+    ):
+        integration_case = "isoparametric_mixed"
+    if quadrature_order is None:
+        quadrature_order = sfem_default_quadrature_order(
+            cell_element_type,
+            integration_case=integration_case,
+        )
     quadrature_rule = sfem_element_quadrature_rule(cell_element_type, quadrature_order)
     specialization = SfemSoAElementSpecialization(quadrature_rule, vector_size)
     return SfemFEMPolicy(
@@ -412,26 +428,49 @@ def _sfem_cell_name(element_type):
     raise ValueError("unsupported element type '%s'" % element_type)
 
 
+def sfem_default_quadrature_order(element_type, integration_case="standard"):
+    element_type = str(element_type).upper()
+    integration_case = str(integration_case)
+    if integration_case == "isoparametric_mixed":
+        if element_type in ("TRI6", "TET10", "HEX27"):
+            return 4
+    if integration_case == "value_linear_residual":
+        if element_type in ("TRI3", "TET4", "QUAD4", "HEX8"):
+            return 2
+        if element_type in ("TRI6", "TET10"):
+            return 4
+        if element_type == "HEX27":
+            return 3
+    if integration_case == "value_residual":
+        if element_type in ("TRI3", "TET4", "TRI6", "TET10", "QUAD4", "HEX8", "HEX27"):
+            return 4
+    if integration_case == "energy":
+        if element_type in ("TRI6", "TET10", "HEX27"):
+            return 4
+    if element_type == "HEX27":
+        return 3
+    if element_type in ("QUAD4", "HEX8", "TRI6", "TET10"):
+        return 2
+    return 1
+
+
 def sfem_element_quadrature_rule(element_type, order=None):
     element_type = str(element_type).upper()
     if order is None:
-        order = (
-            3
-            if element_type == "HEX27"
-            else 2
-            if element_type in ("QUAD4", "HEX8", "TRI6", "TET10")
-            else 1
-        )
+        order = sfem_default_quadrature_order(element_type)
     order = int(order)
 
     if element_type == "TRI3":
-        weights = (0.5,)
-        gradients = (-1.0, -1.0, 1.0, 0.0, 0.0, 1.0)
+        if order == 1:
+            weights = (0.5,)
+            gradients = (-1.0, -1.0, 1.0, 0.0, 0.0, 1.0)
+        else:
+            _, weights = _sfem_triangle_quadrature_rule(order)
+            gradients = (-1.0, -1.0, 1.0, 0.0, 0.0, 1.0) * len(weights)
         return SfemElementQuadratureRule(element_type, 2, 3, weights, gradients, order)
 
     if element_type == "TET4":
-        weights = (1.0 / 6.0,)
-        gradients = (
+        tet4_gradients = (
             -1.0,
             -1.0,
             -1.0,
@@ -445,34 +484,23 @@ def sfem_element_quadrature_rule(element_type, order=None):
             0.0,
             1.0,
         )
+        if order == 1:
+            weights = (1.0 / 6.0,)
+            gradients = tet4_gradients
+        else:
+            _, weights = _sfem_tetrahedron_quadrature_rule(order)
+            gradients = tet4_gradients * len(weights)
         return SfemElementQuadratureRule(element_type, 3, 4, weights, gradients, order)
 
     if element_type == "TRI6":
-        if order != 2:
-            raise ValueError("TRI6 currently supports quadrature order 2")
-        points = (
-            (1.0 / 6.0, 1.0 / 6.0),
-            (2.0 / 3.0, 1.0 / 6.0),
-            (1.0 / 6.0, 2.0 / 3.0),
-        )
-        weights = (1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0)
+        points, weights = _sfem_triangle_quadrature_rule(order)
         gradients = []
         for x, y in points:
             gradients.extend(_tri6_reference_gradients(x, y))
         return SfemElementQuadratureRule(element_type, 2, 6, weights, gradients, order)
 
     if element_type == "TET10":
-        if order != 2:
-            raise ValueError("TET10 currently supports quadrature order 2")
-        a = 0.5854101966249685
-        b = 0.1381966011250105
-        points = (
-            (b, b, b),
-            (a, b, b),
-            (b, a, b),
-            (b, b, a),
-        )
-        weights = (1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0)
+        points, weights = _sfem_tetrahedron_quadrature_rule(order)
         gradients = []
         for x, y, z in points:
             gradients.extend(_tet10_reference_gradients(x, y, z))
@@ -565,8 +593,6 @@ def sfem_element_quadrature_rule(element_type, order=None):
         )
 
     if element_type == "HEX27":
-        if order != 3:
-            raise ValueError("HEX27 currently supports quadrature order 3")
         points, weights_1d = _sfem_unit_interval_gauss_rule(order)
         shape_values_1d, shape_gradients_1d = _sfem_lagrange_q2_1d_shapes(points)
         gradients, weights = _sfem_tensor_product_hex_gradients_and_weights(
@@ -686,15 +712,35 @@ def sfem_detect_compatible_element_types(fields):
     return sfem_detect_taylor_hood_element_types(fields)
 
 
-def sfem_soa_element_specializations(element_types=None, vector_size=16, quadrature_order=None):
+def sfem_soa_element_specializations(
+    element_types=None,
+    vector_size=16,
+    quadrature_order=None,
+    integration_case="standard",
+):
     element_types = sfem_supported_element_types() if element_types is None else tuple(element_types)
     return tuple(
-        sfem_soa_element_specialization(element_type, vector_size, quadrature_order)
+        sfem_soa_element_specialization(
+            element_type,
+            vector_size,
+            quadrature_order,
+            integration_case=integration_case,
+        )
         for element_type in element_types
     )
 
 
-def sfem_soa_element_specialization(element_type, vector_size=16, quadrature_order=None):
+def sfem_soa_element_specialization(
+    element_type,
+    vector_size=16,
+    quadrature_order=None,
+    integration_case="standard",
+):
+    if quadrature_order is None:
+        quadrature_order = sfem_default_quadrature_order(
+            element_type,
+            integration_case=integration_case,
+        )
     return SfemSoAElementSpecialization(
         sfem_element_quadrature_rule(element_type, quadrature_order),
         vector_size,
@@ -743,34 +789,6 @@ def sfem_reference_data(rule):
 
 def sfem_mesh_reference_data(rule):
     return sfem_reference_data(rule)
-
-
-def sfem_mixed_reference_data(cell_rule, fields, field_element_types):
-    data = (
-        sfem_split_reference_gradient_data(
-            "cell_grad_ref",
-            cell_rule.reference_gradients,
-            cell_rule.n_qp,
-            cell_rule.n_shape,
-            cell_rule.dim,
-        )
-        + (SfemReferenceData("q_weight", cell_rule.weights),)
-    )
-    for field in fields:
-        element_type = field_element_types.get(field.name, cell_rule.element_type)
-        shape, gradients = sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule)
-        n_shape = len(shape) // cell_rule.n_qp
-        data += (
-            (SfemReferenceData("%s_shape" % field.name, shape),)
-            + sfem_split_reference_gradient_data(
-                "%s_grad_ref" % field.name,
-                gradients,
-                cell_rule.n_qp,
-                n_shape,
-                cell_rule.dim,
-            )
-        )
-    return data
 
 
 def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
@@ -890,19 +908,21 @@ def sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule):
 
 def sfem_cell_rule_points(rule):
     if rule.element_type == "TRI3":
-        return ((1.0 / 3.0, 1.0 / 3.0),)
+        if rule.order == 1:
+            return ((1.0 / 3.0, 1.0 / 3.0),)
+        points, _ = _sfem_triangle_quadrature_rule(rule.order)
+        return points
     if rule.element_type == "TRI6":
-        return (
-            (1.0 / 6.0, 1.0 / 6.0),
-            (2.0 / 3.0, 1.0 / 6.0),
-            (1.0 / 6.0, 2.0 / 3.0),
-        )
+        points, _ = _sfem_triangle_quadrature_rule(rule.order)
+        return points
     if rule.element_type == "TET4":
-        return ((0.25, 0.25, 0.25),)
+        if rule.order == 1:
+            return ((0.25, 0.25, 0.25),)
+        points, _ = _sfem_tetrahedron_quadrature_rule(rule.order)
+        return points
     if rule.element_type == "TET10":
-        a = 0.5854101966249685
-        b = 0.1381966011250105
-        return ((b, b, b), (a, b, b), (b, a, b), (b, b, a))
+        points, _ = _sfem_tetrahedron_quadrature_rule(rule.order)
+        return points
     if rule.element_type in ("HEX8", "HEX27"):
         points, _ = _sfem_unit_interval_gauss_rule(rule.order)
         return tuple((x, y, z) for z in points for y in points for x in points)
@@ -969,6 +989,73 @@ def _tet10_reference_gradients(x, y, z):
     return tuple(gradients)
 
 
+def _sfem_triangle_quadrature_rule(order):
+    if order == 2:
+        return (
+            (
+                (1.0 / 6.0, 1.0 / 6.0),
+                (2.0 / 3.0, 1.0 / 6.0),
+                (1.0 / 6.0, 2.0 / 3.0),
+            ),
+            (1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0),
+        )
+    if order == 3:
+        a = 1.0 / 3.0
+        b = 0.2
+        c = 0.6
+        return (
+            ((a, a), (b, b), (c, b), (b, c)),
+            (-27.0 / 96.0, 25.0 / 96.0, 25.0 / 96.0, 25.0 / 96.0),
+        )
+    if order == 4:
+        a = 0.4459484909159649
+        b = 0.1081030181680702
+        c = 0.09157621350977074
+        d = 0.8168475729804585
+        w0 = 0.1116907948390057
+        w1 = 0.0549758718276610
+        return (
+            ((a, a), (b, a), (a, b), (c, c), (d, c), (c, d)),
+            (w0, w0, w0, w1, w1, w1),
+        )
+    raise ValueError("triangle quadrature currently supports orders 2, 3, and 4")
+
+
+def _sfem_tetrahedron_quadrature_rule(order):
+    if order == 2:
+        a = 0.5854101966249685
+        b = 0.1381966011250105
+        return (
+            ((b, b, b), (a, b, b), (b, a, b), (b, b, a)),
+            (1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0),
+        )
+    if order == 4:
+        a = 0.7857142857142857
+        b = 0.07142857142857142
+        c = 0.3994035761667992
+        d = 0.1005964238332008
+        w0 = -0.013155555555555556
+        w1 = 0.007622222222222222
+        w2 = 0.024888888888888887
+        return (
+            (
+                (0.25, 0.25, 0.25),
+                (b, b, b),
+                (a, b, b),
+                (b, a, b),
+                (b, b, a),
+                (c, c, d),
+                (c, d, c),
+                (d, c, c),
+                (c, d, d),
+                (d, c, d),
+                (d, d, c),
+            ),
+            (w0, w1, w1, w1, w1, w2, w2, w2, w2, w2, w2),
+        )
+    raise ValueError("tetrahedron quadrature currently supports orders 2 and 4")
+
+
 def _sfem_unit_interval_gauss_rule(order):
     if order == 1:
         return (0.5,), (1.0,)
@@ -978,6 +1065,17 @@ def _sfem_unit_interval_gauss_rule(order):
     if order == 3:
         offset = 0.5 * math.sqrt(3.0 / 5.0)
         return (0.5 - offset, 0.5, 0.5 + offset), (5.0 / 18.0, 4.0 / 9.0, 5.0 / 18.0)
+    if order == 4:
+        outer = math.sqrt((3.0 + 2.0 * math.sqrt(6.0 / 5.0)) / 7.0)
+        inner = math.sqrt((3.0 - 2.0 * math.sqrt(6.0 / 5.0)) / 7.0)
+        w_outer = (18.0 - math.sqrt(30.0)) / 72.0
+        w_inner = (18.0 + math.sqrt(30.0)) / 72.0
+        return (
+            0.5 * (1.0 - outer),
+            0.5 * (1.0 - inner),
+            0.5 * (1.0 + inner),
+            0.5 * (1.0 + outer),
+        ), (w_outer, w_inner, w_inner, w_outer)
     raise ValueError("unsupported quadrature order %d" % order)
 
 

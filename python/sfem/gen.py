@@ -135,18 +135,22 @@ from codegen.framework.fem import (
     SfemFieldFamilyCompatibilityPolicy,
     SfemReferenceData,
     sfem_cell_rule_points,
+    sfem_default_quadrature_order,
     sfem_detect_compatible_element_types,
     sfem_detect_taylor_hood_element_types,
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
     sfem_fem_policy,
     sfem_mesh_reference_data,
-    sfem_mixed_reference_data,
     sfem_reference_data,
     sfem_shape_data_for_element_at_cell_rule,
     sfem_simplex_grad_ref_name,
+    sfem_simplex_field_reference_data,
+    sfem_soa_element_specialization,
+    sfem_soa_element_specializations,
     sfem_supported_element_types,
     sfem_taylor_hood_element_types,
+    sfem_tensor_product_field_reference_data,
     sfem_tensor_hex_shape_index,
 )
 from codegen.framework.openmp_backend import OpenMPSoABackend
@@ -157,12 +161,32 @@ OPENMP_SOA_BACKEND = OpenMPSoABackend()
 
 
 @dataclass(frozen=True)
+class QuadratureSetting:
+    element_type: str
+    order: int
+    integration_case: str = ""
+
+    def __post_init__(self):
+        element_type = str(self.element_type).upper()
+        integration_case = str(self.integration_case)
+        order = int(self.order)
+        if not element_type:
+            raise ValueError("quadrature setting requires an element type")
+        if order <= 0:
+            raise ValueError("quadrature setting order must be positive")
+        object.__setattr__(self, "element_type", element_type)
+        object.__setattr__(self, "integration_case", integration_case)
+        object.__setattr__(self, "order", order)
+
+
+@dataclass(frozen=True)
 class CodeGenerator:
     name: str
     systems: object
     elements: tuple = None
     op_name: str = None
     parameter_defaults: tuple = ()
+    quadrature_settings: tuple = ()
 
     def __post_init__(self):
         _validate_name(self.name)
@@ -175,6 +199,11 @@ class CodeGenerator:
         if not elements:
             raise ValueError("code generators require supported elements")
         object.__setattr__(self, "elements", elements)
+        object.__setattr__(
+            self,
+            "quadrature_settings",
+            tuple(_normalize_quadrature_setting(setting) for setting in self.quadrature_settings),
+        )
         _validate_op(self.op_name, self.parameter_defaults)
 
 
@@ -253,8 +282,20 @@ class ElementGenerationContext:
             seen.add(plan.role)
 
     @classmethod
-    def create(cls, material_name, element, vector_size, quadrature_order):
-        policy = sfem_fem_policy(element, vector_size, quadrature_order)
+    def create(
+        cls,
+        material_name,
+        element,
+        vector_size,
+        quadrature_order,
+        integration_case="standard",
+    ):
+        policy = sfem_fem_policy(
+            element,
+            vector_size,
+            quadrature_order,
+            integration_case=integration_case,
+        )
         return cls(
             material_name,
             policy.cell_element_type,
@@ -330,11 +371,125 @@ class UserInputStage:
                 material.name,
                 element,
                 vector_size,
-                quadrature_order,
+                _quadrature_order_for_material_element(
+                    material,
+                    element,
+                    quadrature_order,
+                ),
+                _integration_case_for_material_element(material, element),
             )
             for element in elements
         )
         return cls(material, tuple(elements), vector_size, quadrature_order, contexts)
+
+
+def _normalize_quadrature_setting(setting):
+    if isinstance(setting, QuadratureSetting):
+        return setting
+    if isinstance(setting, dict):
+        return QuadratureSetting(
+            setting.get("element_type", setting.get("element", "")),
+            setting["order"],
+            setting.get("integration_case", setting.get("case", "")),
+        )
+    values = tuple(setting)
+    if len(values) == 2:
+        element_type, order = values
+        return QuadratureSetting(element_type, order)
+    if len(values) == 3:
+        element_type, integration_case, order = values
+        return QuadratureSetting(element_type, order, integration_case)
+    raise ValueError(
+        "quadrature settings must be QuadratureSetting, dict, (element, order), "
+        "or (element, integration_case, order)"
+    )
+
+
+def _quadrature_order_for_material_element(material, element, explicit_order):
+    if explicit_order is not None:
+        return explicit_order
+    integration_case = _integration_case_for_material_element(material, element)
+    cell_element_type = _cell_element_type(element)
+    element_label = _element_label(element)
+    for setting in getattr(material, "quadrature_settings", ()):
+        if setting.integration_case and setting.integration_case != integration_case:
+            continue
+        if setting.element_type in (cell_element_type, element_label):
+            return setting.order
+    return None
+
+
+def _integration_case_for_material_element(material, element):
+    compatible = element if isinstance(element, SfemCompatibleElement) else None
+    if compatible is not None and compatible.is_mixed_order:
+        return "isoparametric_mixed"
+    cell_element_type = _cell_element_type(element)
+    system = material.systems.for_dim(_element_dim(element))
+    cases = []
+    if any(equation.is_energy for equation in system.equations):
+        cases.append("energy")
+    residual_case = _value_residual_integration_case(system)
+    if residual_case is not None:
+        cases.append(residual_case)
+    if not cases:
+        return "standard"
+    return max(
+        cases,
+        key=lambda case: sfem_default_quadrature_order(
+            cell_element_type,
+            integration_case=case,
+        ),
+    )
+
+
+def _value_residual_integration_case(system):
+    has_linear_value = False
+    for equation in system.equations:
+        if not equation.is_residual:
+            continue
+        residual_system = CoupledResidualSystem(system.dim)
+        equation.define(residual_system)
+        value_symbols = set()
+        for field in residual_system.fields:
+            value_symbols.add(field.value)
+            value_symbols.add(field.direction_value)
+            if field.previous_value is not None:
+                value_symbols.add(field.previous_value)
+        for field in residual_system.fields:
+            expression = residual_system.residual_expression(field)
+            expression = sp.sympify(expression)
+            expression_values = expression.free_symbols.intersection(value_symbols)
+            if not expression_values:
+                continue
+            if _is_linear_polynomial_in(expression, expression_values):
+                has_linear_value = True
+            else:
+                return "value_residual"
+    return "value_linear_residual" if has_linear_value else None
+
+
+def _is_linear_polynomial_in(expression, symbols):
+    try:
+        polynomial = sp.Poly(expression, *tuple(sorted(symbols, key=str)))
+    except (sp.PolynomialError, TypeError, ValueError):
+        return False
+    return polynomial.total_degree() <= 1
+
+
+def _cell_element_type(element):
+    if isinstance(element, SfemCompatibleElement):
+        return element.cell_element_type
+    return str(element).upper()
+
+
+def _element_label(element):
+    if isinstance(element, SfemCompatibleElement):
+        return element.name.upper()
+    return str(element).upper()
+
+
+def _element_dim(element):
+    return sfem_element_quadrature_rule(_cell_element_type(element)).dim
 
 
 @dataclass(frozen=True)
@@ -1228,6 +1383,7 @@ __all__ = [
     "PRESSURE",
     "PREVIOUS_ARGUMENT",
     "PreviousFunction",
+    "QuadratureSetting",
     "QualifiedExpression",
     "ScalarField",
     "SfemElementBasisPolicy",
@@ -1279,18 +1435,20 @@ __all__ = [
     "run",
     "scalar_field",
     "sfem_cell_rule_points",
+    "sfem_default_quadrature_order",
     "sfem_detect_compatible_element_types",
     "sfem_detect_taylor_hood_element_types",
     "sfem_element_quadrature_rule",
     "sfem_field_n_shape",
     "sfem_fem_policy",
     "sfem_mesh_reference_data",
-    "sfem_mixed_reference_data",
     "sfem_reference_data",
     "sfem_shape_data_for_element_at_cell_rule",
     "sfem_simplex_grad_ref_name",
+    "sfem_simplex_field_reference_data",
     "sfem_supported_element_types",
     "sfem_taylor_hood_element_types",
+    "sfem_tensor_product_field_reference_data",
     "sfem_tensor_hex_shape_index",
     "streams_in_shape_order",
     "tensor_field",
