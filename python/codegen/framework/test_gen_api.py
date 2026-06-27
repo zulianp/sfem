@@ -1189,6 +1189,77 @@ class GenApiTest(unittest.TestCase):
             self.assertNotIn("static const scalar_t shape_1d[", contents)
             self.assertNotIn("static const scalar_t grad_1d[", contents)
 
+    def test_stokes_simplex_operator_deduplicates_reference_data(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                stokes,
+                out_dir,
+                elements=("TRI6_TRI3", "TET10_TET4"),
+            )
+            tri_source = os.path.join(
+                out_dir,
+                "generated_stokes_tri6_tri3_operator.cpp",
+            )
+            tet_source = os.path.join(
+                out_dir,
+                "generated_stokes_tet10_tet4_operator.cpp",
+            )
+            with open(tri_source) as input_file:
+                tri = input_file.read()
+            with open(tet_source) as input_file:
+                tet = input_file.read()
+            with open(
+                os.path.join(out_dir, "generated_stokes_d2_simplex_mixed_local.hpp")
+            ) as input_file:
+                tri_local = input_file.read()
+            with open(
+                os.path.join(out_dir, "generated_stokes_d3_simplex_mixed_local.hpp")
+            ) as input_file:
+                tet_local = input_file.read()
+
+            self.assertIn("generated_stokes_tri6_shape_f64", tri)
+            self.assertIn("generated_stokes_tri6_grad_ref_x_f64", tri)
+            self.assertIn("generated_stokes_tri3_shape_f64", tri)
+            self.assertIn("generated_stokes_tri3_grad_ref_y_f64", tri)
+            self.assertIn(
+                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tri3_shape()}",
+                tri,
+            )
+            self.assertIn(
+                "cell_grad_ref_0 = sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_grad_ref_0()",
+                tri,
+            )
+
+            self.assertIn("generated_stokes_tet10_shape_f64", tet)
+            self.assertIn("generated_stokes_tet10_grad_ref_z_f64", tet)
+            self.assertIn("generated_stokes_tet4_shape_f64", tet)
+            self.assertIn("generated_stokes_tet4_grad_ref_z_f64", tet)
+            self.assertIn(
+                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet4_shape()}",
+                tet,
+            )
+            self.assertIn(
+                "cell_grad_ref_2 = sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_grad_ref_2()",
+                tet,
+            )
+
+            for contents in (tri, tet):
+                self.assertNotIn("generated_stokes_cell_grad_ref", contents)
+                self.assertNotIn("generated_stokes_u0_shape_", contents)
+                self.assertNotIn("generated_stokes_u1_shape_", contents)
+                self.assertNotIn("generated_stokes_u2_shape_", contents)
+                self.assertNotIn("generated_stokes_u0_grad_ref", contents)
+                self.assertNotIn("generated_stokes_u1_grad_ref", contents)
+                self.assertNotIn("generated_stokes_u2_grad_ref", contents)
+            for contents in (tri_local, tet_local):
+                self.assertNotIn("for (int trial", contents)
+                self.assertNotIn("for (int test", contents)
+
     def test_compiles_taylor_hood_stokes_operator(self):
         compiler = shutil.which("c++")
         if compiler is None:

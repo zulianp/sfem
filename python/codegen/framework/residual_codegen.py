@@ -15,9 +15,9 @@ from .fem import (
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
     sfem_mesh_reference_data,
-    sfem_mixed_reference_data,
     sfem_reference_data,
     sfem_simplex_grad_ref_name,
+    sfem_simplex_field_reference_data,
     sfem_soa_element_specialization,
     sfem_tensor_product_field_reference_data,
     SfemReferenceData,
@@ -248,7 +248,15 @@ def _mixed_reference_pointer_lines(
         % (
             indent,
             ", ".join(
-                "sfem::codegen::%s::%s_shape()" % (reference_data, field.name)
+                "sfem::codegen::%s::%s_shape()"
+                % (
+                    reference_data,
+                    _simplex_reference_prefix(
+                        field_element_types.get(field.name, cell_rule.element_type)
+                        if field_element_types
+                        else cell_rule.element_type
+                    ),
+                )
                 for field in system.fields
             ),
         )
@@ -259,7 +267,15 @@ def _mixed_reference_pointer_lines(
             for d in range(dim):
                 grad_refs.append(
                     "sfem::codegen::%s::%s_grad_ref_%d()"
-                    % (reference_data, field.name, d)
+                    % (
+                        reference_data,
+                        _simplex_reference_prefix(
+                            field_element_types.get(field.name, cell_rule.element_type)
+                            if field_element_types
+                            else cell_rule.element_type
+                        ),
+                        d,
+                    )
                 )
         lines.append(
             "%sconst scalar_t *const field_grad_ref[N_FIELDS * DIM] = {%s};"
@@ -842,6 +858,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             layout,
             dependencies,
             "            ",
+            unroll=True,
         )
     )
     lines.extend(
@@ -855,38 +872,38 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     )
     for row, field in enumerate(system.fields):
         offset = layout.offset(row)
-        lines.append("            for (int test = 0; test < %s_N_SHAPE; ++test) {" % field.name.upper())
-        if dependencies.value_coefficients[row]:
-            lines.append(
-                "                const scalar_t test_value = field_shape[%d][q * %s_N_SHAPE + test];"
-                % (row, field.name.upper())
+        n_shape_name = layout.n_shape_constant(field)
+        for test in range(layout.n_shape(row)):
+            if dependencies.value_coefficients[row]:
+                lines.append(
+                    "            const scalar_t test_value_%s_%d = field_shape[%d][q * %s + %d];"
+                    % (field.name, test, row, n_shape_name, test)
+                )
+            for d in range(dim):
+                if not dependencies.gradient_coefficients[row][d]:
+                    continue
+                terms = [
+                    "field_grad_ref[%d * DIM + %d][q * %s + %d] * adj%d"
+                    % (row, k, n_shape_name, test, k * dim + d)
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "            const scalar_t test_grad%d_%s_%d = (%s) / det;"
+                    % (d, field.name, test, " + ".join(terms))
+                )
+            terms = []
+            if dependencies.value_coefficients[row]:
+                terms.append("value_coeff%d * test_value_%s_%d" % (row, field.name, test))
+            terms.extend(
+                "grad_coeff%d_%d * test_grad%d_%s_%d" % (row, d, d, field.name, test)
+                for d in range(dim)
+                if dependencies.gradient_coefficients[row][d]
             )
-        for d in range(dim):
-            if not dependencies.gradient_coefficients[row][d]:
-                continue
-            terms = [
-                "field_grad_ref[%d * DIM + %d][q * %s_N_SHAPE + test] * adj%d"
-                % (row, k, field.name.upper(), k * dim + d)
-                for k in range(dim)
-            ]
-            lines.append(
-                "                const scalar_t test_grad%d = (%s) / det;"
-                % (d, " + ".join(terms))
-            )
-        terms = []
-        if dependencies.value_coefficients[row]:
-            terms.append("value_coeff%d * test_value" % row)
-        terms.extend(
-            "grad_coeff%d_%d * test_grad%d" % (row, d, d)
-            for d in range(dim)
-            if dependencies.gradient_coefficients[row][d]
-        )
-        if terms:
-            lines.append(
-                "                output[%d + test][lane] += q_weight[q] * det * (%s);"
-                % (offset, " + ".join(terms))
-            )
-        lines.append("            }")
+            if terms:
+                lines.append(
+                    "            output[%d][lane] += q_weight[q] * det * (%s);"
+                    % (offset + test, " + ".join(terms))
+                )
     lines.extend(["        }", "    }"])
     return lines
 
@@ -1080,7 +1097,14 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
     return lines
 
 
-def _mixed_local_field_evaluation_lines(system, layout, dependencies, indent):
+def _mixed_local_field_evaluation_lines(
+    system,
+    layout,
+    dependencies,
+    indent,
+    *,
+    unroll=False,
+):
     dim = system.dim
     lines = []
     groups = _dependency_stream_groups(dependencies)
@@ -1096,31 +1120,68 @@ def _mixed_local_field_evaluation_lines(system, layout, dependencies, indent):
                         "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
                         % (indent, field.name, group.symbol_suffix, d)
                     )
-            lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
-            lines.append(
-                "%s    const scalar_t coeff = %s[%d + trial][lane];"
-                % (indent, group.name, offset)
-            )
-            if group.uses_value:
-                lines.append(
-                    "%s    %s%s += coeff * field_shape[%d][q * %s + trial];"
-                    % (indent, field.name, group.symbol_suffix, field_index, n_shape_name)
-                )
-            if group.uses_gradient:
-                for d in range(dim):
+            if unroll:
+                for trial in range(layout.n_shape(field_index)):
+                    coeff_name = "coeff_%s_%s_%d" % (group.name, field.name, trial)
                     lines.append(
-                        "%s    %s%s_grad_%d_ref += coeff * field_grad_ref[%d * DIM + %d][q * %s + trial];"
-                        % (
-                            indent,
-                            field.name,
-                            group.symbol_suffix,
-                            d,
-                            field_index,
-                            d,
-                            n_shape_name,
-                        )
+                        "%sconst scalar_t %s = %s[%d][lane];"
+                        % (indent, coeff_name, group.name, offset + trial)
                     )
-            lines.append("%s}" % indent)
+                    if group.uses_value:
+                        lines.append(
+                            "%s%s%s += %s * field_shape[%d][q * %s + %d];"
+                            % (
+                                indent,
+                                field.name,
+                                group.symbol_suffix,
+                                coeff_name,
+                                field_index,
+                                n_shape_name,
+                                trial,
+                            )
+                        )
+                    if group.uses_gradient:
+                        for d in range(dim):
+                            lines.append(
+                                "%s%s%s_grad_%d_ref += %s * field_grad_ref[%d * DIM + %d][q * %s + %d];"
+                                % (
+                                    indent,
+                                    field.name,
+                                    group.symbol_suffix,
+                                    d,
+                                    coeff_name,
+                                    field_index,
+                                    d,
+                                    n_shape_name,
+                                    trial,
+                                )
+                            )
+            else:
+                lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
+                lines.append(
+                    "%s    const scalar_t coeff = %s[%d + trial][lane];"
+                    % (indent, group.name, offset)
+                )
+                if group.uses_value:
+                    lines.append(
+                        "%s    %s%s += coeff * field_shape[%d][q * %s + trial];"
+                        % (indent, field.name, group.symbol_suffix, field_index, n_shape_name)
+                    )
+                if group.uses_gradient:
+                    for d in range(dim):
+                        lines.append(
+                            "%s    %s%s_grad_%d_ref += coeff * field_grad_ref[%d * DIM + %d][q * %s + trial];"
+                            % (
+                                indent,
+                                field.name,
+                                group.symbol_suffix,
+                                d,
+                                field_index,
+                                d,
+                                n_shape_name,
+                            )
+                        )
+                lines.append("%s}" % indent)
             if group.uses_gradient:
                 lines.extend(
                     _physical_gradient_lines(field.name + group.symbol_suffix, dim, indent)
@@ -1787,7 +1848,17 @@ def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
                 _tensor_reference_prefix(element_type),
             )
     else:
-        data = sfem_mixed_reference_data(cell_rule, system.fields, field_element_types)
+        data = (SfemReferenceData("q_weight", cell_rule.weights),)
+        for element_type in _mixed_simplex_reference_element_types(
+            cell_rule,
+            system,
+            field_element_types,
+        ):
+            data += sfem_simplex_field_reference_data(
+                element_type,
+                cell_rule,
+                _simplex_reference_prefix(element_type),
+            )
     return _typed_static_reference_data_lines(
         data,
         lambda reference_name, suffix: "%s_%s_%s" % (prefix, reference_name, suffix),
@@ -1845,20 +1916,25 @@ def _mixed_reference_access_lines(prefix, system, cell_rule, field_element_types
             "    static const %s *q_weight() { return %s_q_weight_%s; }"
             % (scalar_type, prefix, suffix)
         )
-        for field in system.fields:
+        for element_type in _mixed_simplex_reference_element_types(
+            cell_rule,
+            system,
+            field_element_types,
+        ):
+            reference_prefix = _simplex_reference_prefix(element_type)
             lines.append(
                 "    static const %s *%s_shape() { return %s_%s_shape_%s; }"
-                % (scalar_type, field.name, prefix, field.name, suffix)
+                % (scalar_type, reference_prefix, prefix, reference_prefix, suffix)
             )
             for d in range(system.dim):
                 lines.append(
                     "    static const %s *%s_grad_ref_%d() { return %s_%s_%s_%s; }"
                     % (
                         scalar_type,
-                        field.name,
+                        reference_prefix,
                         d,
                         prefix,
-                        field.name,
+                        reference_prefix,
                         sfem_simplex_grad_ref_name("grad_ref", d),
                         suffix,
                     )
@@ -1882,7 +1958,26 @@ def _mixed_tensor_reference_element_types(cell_rule, system, field_element_types
     return tuple(element_types)
 
 
+def _mixed_simplex_reference_element_types(cell_rule, system, field_element_types):
+    seen = set()
+    element_types = []
+    for element_type in (cell_rule.element_type,) + tuple(
+        field_element_types.get(field.name, cell_rule.element_type)
+        for field in system.fields
+    ):
+        element_type = str(element_type).upper()
+        if element_type in seen:
+            continue
+        seen.add(element_type)
+        element_types.append(element_type)
+    return tuple(element_types)
+
+
 def _tensor_reference_prefix(element_type):
+    return str(element_type).lower()
+
+
+def _simplex_reference_prefix(element_type):
     return str(element_type).lower()
 
 
@@ -1894,6 +1989,16 @@ def _mixed_tensor_cell_reference_alias_lines(prefix, cell_rule):
         % (reference_data, reference_prefix),
         "    const scalar_t *const grad_1d = sfem::codegen::%s::%s_grad_1d();"
         % (reference_data, reference_prefix),
+    ]
+
+
+def _mixed_simplex_cell_reference_alias_lines(prefix, cell_rule):
+    reference_data = "%s_reference_data<scalar_t>" % prefix
+    reference_prefix = _simplex_reference_prefix(cell_rule.element_type)
+    return [
+        "    const scalar_t *const cell_grad_ref_%d = sfem::codegen::%s::%s_grad_ref_%d();"
+        % (d, reference_data, reference_prefix, d)
+        for d in range(cell_rule.dim)
     ]
 
 
@@ -1948,6 +2053,8 @@ def _mixed_isoparametric_function(
     reference_data = "%s_reference_data<scalar_t>" % prefix
     if cell_rule.is_tensor_product:
         lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, cell_rule))
+    else:
+        lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, cell_rule))
     lines.extend(
         [
             "#pragma omp parallel for schedule(static)",
@@ -2045,11 +2152,10 @@ def _mixed_isoparametric_function(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * %s_%s_f64[q * CELL_N_SHAPE + %d]"
+                    "block_coordinates[%d][lane] * cell_grad_ref_%d[q * CELL_N_SHAPE + %d]"
                     % (
                         shape * dim + i,
-                        prefix,
-                        sfem_simplex_grad_ref_name("cell_grad_ref", j),
+                        j,
                         shape,
                     )
                     for shape in range(cell_rule.n_shape)
