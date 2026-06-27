@@ -142,6 +142,7 @@ from codegen.framework.fem import (
     sfem_field_n_shape,
     sfem_fem_policy,
     sfem_mesh_reference_data,
+    sfem_normalize_integration_case,
     sfem_reference_data,
     sfem_shape_data_for_element_at_cell_rule,
     sfem_simplex_grad_ref_name,
@@ -168,7 +169,7 @@ class QuadratureSetting:
 
     def __post_init__(self):
         element_type = str(self.element_type).upper()
-        integration_case = str(self.integration_case)
+        integration_case = sfem_normalize_integration_case(self.integration_case)
         order = int(self.order)
         if not element_type:
             raise ValueError("quadrature setting requires an element type")
@@ -238,6 +239,7 @@ class ElementGenerationContext:
     element_type: str
     label: str
     specialization: object
+    affine_specialization: object
     fem_policy: object
     geometry_plans: tuple
     basis_plans: tuple
@@ -280,6 +282,10 @@ class ElementGenerationContext:
             if plan.role in seen:
                 raise ValueError("duplicate basis plan role '%s'" % plan.role)
             seen.add(plan.role)
+        if self.affine_specialization.dim != self.specialization.dim:
+            raise ValueError("affine and isoparametric specializations must have the same dimension")
+        if self.affine_specialization.n_shape != self.specialization.n_shape:
+            raise ValueError("affine and isoparametric specializations must have the same shape count")
 
     @classmethod
     def create(
@@ -287,20 +293,29 @@ class ElementGenerationContext:
         material_name,
         element,
         vector_size,
-        quadrature_order,
-        integration_case="standard",
+        isoparametric_quadrature_order,
+        isoparametric_integration_case="standard",
+        affine_quadrature_order=None,
+        affine_integration_case="standard",
     ):
         policy = sfem_fem_policy(
             element,
             vector_size,
-            quadrature_order,
-            integration_case=integration_case,
+            isoparametric_quadrature_order,
+            integration_case=isoparametric_integration_case,
+        )
+        affine_policy = sfem_fem_policy(
+            element,
+            vector_size,
+            affine_quadrature_order,
+            integration_case=affine_integration_case,
         )
         return cls(
             material_name,
             policy.cell_element_type,
             policy.label,
             policy.specialization,
+            affine_policy.specialization,
             policy,
             geometry_plans_for_fem_policy(policy),
             basis_plans_for_fem_policy(policy),
@@ -351,6 +366,10 @@ class ElementGenerationContext:
     def field_basis_plans(self, fields):
         return field_basis_plans_for_fem_policy(self.fem_policy, fields)
 
+    @property
+    def isoparametric_specialization(self):
+        return self.specialization
+
 
 @dataclass(frozen=True)
 class UserInputStage:
@@ -366,21 +385,44 @@ class UserInputStage:
 
     @classmethod
     def create(cls, material, elements, vector_size, quadrature_order):
-        contexts = tuple(
-            ElementGenerationContext.create(
-                material.name,
+        contexts = []
+        for element in elements:
+            isoparametric_case = _integration_case_for_material_element(
+                material,
                 element,
-                vector_size,
-                _quadrature_order_for_material_element(
-                    material,
-                    element,
-                    quadrature_order,
-                ),
-                _integration_case_for_material_element(material, element),
             )
-            for element in elements
+            affine_case = _affine_integration_case_for_material_element(
+                material,
+                element,
+            )
+            contexts.append(
+                ElementGenerationContext.create(
+                    material.name,
+                    element,
+                    vector_size,
+                    _quadrature_order_for_material_element(
+                        material,
+                        element,
+                        quadrature_order,
+                        isoparametric_case,
+                    ),
+                    isoparametric_case,
+                    _quadrature_order_for_material_element(
+                        material,
+                        element,
+                        quadrature_order,
+                        affine_case,
+                    ),
+                    affine_case,
+                )
+            )
+        return cls(
+            material,
+            tuple(elements),
+            vector_size,
+            quadrature_order,
+            tuple(contexts),
         )
-        return cls(material, tuple(elements), vector_size, quadrature_order, contexts)
 
 
 def _normalize_quadrature_setting(setting):
@@ -405,18 +447,33 @@ def _normalize_quadrature_setting(setting):
     )
 
 
-def _quadrature_order_for_material_element(material, element, explicit_order):
+def _quadrature_order_for_material_element(material, element, explicit_order, integration_case=None):
     if explicit_order is not None:
         return explicit_order
-    integration_case = _integration_case_for_material_element(material, element)
+    integration_case = (
+        _integration_case_for_material_element(material, element)
+        if integration_case is None
+        else str(integration_case)
+    )
     cell_element_type = _cell_element_type(element)
     element_label = _element_label(element)
+    fallback = None
     for setting in getattr(material, "quadrature_settings", ()):
-        if setting.integration_case and setting.integration_case != integration_case:
-            continue
         if setting.element_type in (cell_element_type, element_label):
-            return setting.order
-    return None
+            if setting.integration_case == integration_case:
+                return setting.order
+            if not setting.integration_case:
+                fallback = setting.order
+    return fallback
+
+
+def _affine_integration_case_for_material_element(material, element):
+    integration_case = _integration_case_for_material_element(material, element)
+    if integration_case == "isoparametric_mixed":
+        return "affine_mixed"
+    if integration_case == "energy":
+        return "affine_energy"
+    return integration_case
 
 
 def _integration_case_for_material_element(material, element):
@@ -1442,6 +1499,7 @@ __all__ = [
     "sfem_field_n_shape",
     "sfem_fem_policy",
     "sfem_mesh_reference_data",
+    "sfem_normalize_integration_case",
     "sfem_reference_data",
     "sfem_shape_data_for_element_at_cell_rule",
     "sfem_simplex_grad_ref_name",

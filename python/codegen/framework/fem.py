@@ -428,9 +428,33 @@ def _sfem_cell_name(element_type):
     raise ValueError("unsupported element type '%s'" % element_type)
 
 
+def sfem_normalize_integration_case(integration_case="standard"):
+    integration_case = str(integration_case)
+    aliases = {
+        "": "",
+        "isoparametric_energy": "energy",
+        "curved_energy": "energy",
+        "isoparametric_value_residual": "value_residual",
+        "affine_value_residual": "value_residual",
+        "isoparametric_value_linear_residual": "value_linear_residual",
+        "affine_value_linear_residual": "value_linear_residual",
+        "isoparametric_standard": "standard",
+        "affine_standard": "standard",
+    }
+    return aliases.get(integration_case, integration_case)
+
+
 def sfem_default_quadrature_order(element_type, integration_case="standard"):
     element_type = str(element_type).upper()
-    integration_case = str(integration_case)
+    integration_case = sfem_normalize_integration_case(integration_case)
+    if integration_case == "affine_energy":
+        integration_case = "standard"
+    if integration_case == "affine_mixed":
+        if element_type in ("TRI6", "TET10"):
+            return 2
+        if element_type == "HEX27":
+            return 3
+        integration_case = "standard"
     if integration_case == "isoparametric_mixed":
         if element_type in ("TRI6", "TET10", "HEX27"):
             return 4

@@ -471,6 +471,7 @@ def generate_coupled_residual_sfem_files(
     vector_size=16,
     quadrature_order=None,
     specialization=None,
+    affine_specialization=None,
     residual_coeffs=None,
     action_coeffs=None,
     local_prefix=None,
@@ -486,8 +487,14 @@ def generate_coupled_residual_sfem_files(
             vector_size,
             quadrature_order,
         )
+    if affine_specialization is None:
+        affine_specialization = specialization
     if system.dim != specialization.dim:
         raise ValueError("residual system dimension does not match element dimension")
+    if affine_specialization.dim != specialization.dim:
+        raise ValueError("affine and isoparametric residual specializations must have the same dimension")
+    if affine_specialization.n_shape != specialization.n_shape:
+        raise ValueError("affine and isoparametric residual specializations must have the same shape count")
     if residual_coeffs is None:
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
@@ -513,6 +520,7 @@ def generate_coupled_residual_sfem_files(
         element_prefix,
         local_prefix,
         specialization,
+        affine_specialization,
         local_name,
     )
     diagnostics_name = "kernel_diagnostics.hpp"
@@ -1577,7 +1585,14 @@ def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependen
     return lines
 
 
-def _operator_source(system, prefix, local_prefix, specialization, local_name):
+def _operator_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    affine_specialization,
+    local_name,
+):
     rule = specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
@@ -1731,6 +1746,7 @@ def _operator_source(system, prefix, local_prefix, specialization, local_name):
                 system,
                 prefix,
                 local_prefix,
+                affine_specialization,
                 specialization,
                 form,
                 dependencies,
@@ -2426,16 +2442,17 @@ def _mesh_operator_source(
     system,
     prefix,
     local_prefix,
-    specialization,
+    affine_specialization,
+    isoparametric_specialization,
     form,
     dependencies,
 ):
-    rule = specialization.quadrature_rule
+    rule = affine_specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    vector_size = specialization.vector_size
+    vector_size = affine_specialization.vector_size
     shape_order = (
         tensor_product_cartesian_shape_order(dim, n_shape)
         if rule.is_tensor_product
@@ -2703,7 +2720,7 @@ def _mesh_operator_source(
             system,
             prefix,
             local_prefix,
-            specialization,
+            isoparametric_specialization,
             form,
             dependencies,
         )
