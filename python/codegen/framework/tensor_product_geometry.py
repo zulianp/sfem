@@ -158,6 +158,8 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
     indent="        ",
     gradient_name="coordinate_grad_ref",
     stream_array_name="block_coordinate_streams",
+    shape_name="shape_1d",
+    grad_name="grad_1d",
     adjugate_target,
     determinant_target,
 ):
@@ -167,8 +169,8 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
             % evaluator_indent,
             "%stensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>("
             % evaluator_indent,
-            "%s        nelems, shape_1d, grad_1d, %s,"
-            % (evaluator_indent, streams),
+            "%s        nelems, %s, %s, %s,"
+            % (evaluator_indent, shape_name, grad_name, streams),
             "%s        coordinate_value, %s);" % (evaluator_indent, gradient),
         ]
 
@@ -194,6 +196,8 @@ def tensor_product_coordinate_gradient_lines(
     indent="        ",
     gradient_name="coordinate_grad_ref",
     stream_array_name="block_coordinate_streams",
+    shape_name="shape_1d",
+    grad_name="grad_1d",
 ):
     lines = [
         "%sconst scalar_t *const %s[DIM * N_SHAPE] = {%s};"
@@ -206,8 +210,8 @@ def tensor_product_coordinate_gradient_lines(
             [
                 "%stensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>("
                 % (indent, dim),
-                "%s        nelems, shape_1d, grad_1d, %s, %d,"
-                % (indent, stream_array_name, component),
+                "%s        nelems, %s, %s, %s, %d,"
+                % (indent, shape_name, grad_name, stream_array_name, component),
                 "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"
                 % (indent, gradient_name, component),
             ]
@@ -258,6 +262,8 @@ def tensor_product_gradient_isoparametric_geometry_lines(
     indent="        ",
     gradient_name="coordinate_grad_ref",
     stream_array_name="block_coordinate_streams",
+    shape_name="shape_1d",
+    grad_name="grad_1d",
     adjugate_target,
     determinant_target,
 ):
@@ -284,6 +290,8 @@ def tensor_product_gradient_isoparametric_geometry_lines(
         indent=indent,
         gradient_name=gradient_name,
         stream_array_name=stream_array_name,
+        shape_name=shape_name,
+        grad_name=grad_name,
     )
     lines.extend(
         [

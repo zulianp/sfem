@@ -308,6 +308,10 @@ def _static_reference_array_line(scalar_type, name, values):
     )
 
 
+def _mesh_reference_name(geometry_mode, name):
+    return "%s_%s" % (geometry_mode, name)
+
+
 def _typed_static_reference_data_lines(data, name):
     lines = []
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
@@ -1807,8 +1811,9 @@ def _mixed_operator_source(
         "namespace codegen {",
         "",
     ]
-    lines.extend(_mixed_reference_data_lines(prefix, rule, system, field_element_types))
-    lines.extend(_mixed_reference_access_lines(prefix, system, rule, field_element_types))
+    reference_stage = "isoparametric"
+    lines.extend(_mixed_reference_data_lines(prefix, reference_stage, rule, system, field_element_types))
+    lines.extend(_mixed_reference_access_lines(prefix, reference_stage, system, rule, field_element_types))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     form_data = (
         (
@@ -1838,6 +1843,7 @@ def _mixed_operator_source(
                 local_prefix,
                 element,
                 rule,
+                reference_stage,
                 cell_specialization.vector_size,
                 field_element_types,
                 form,
@@ -1848,7 +1854,7 @@ def _mixed_operator_source(
     return "\n".join(lines)
 
 
-def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
+def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types):
     if cell_rule.is_tensor_product:
         data = (
             SfemReferenceData("q_weight_1d", cell_rule.tensor_product_weights_1d),
@@ -1877,28 +1883,30 @@ def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
             )
     return _typed_static_reference_data_lines(
         data,
-        lambda reference_name, suffix: "%s_%s_%s" % (prefix, reference_name, suffix),
+        lambda reference_name, suffix: "%s_%s_%s_%s"
+        % (prefix, reference_stage, reference_name, suffix),
     )
 
 
-def _mixed_reference_access_lines(prefix, system, cell_rule, field_element_types):
+def _mixed_reference_access_lines(prefix, reference_stage, system, cell_rule, field_element_types):
+    reference_struct = "%s_%s_reference_data" % (prefix, reference_stage)
     lines = [
         "",
         "template <typename scalar_t>",
-        "struct %s_reference_data;" % prefix,
+        "struct %s;" % reference_struct,
     ]
     for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
         lines.extend(
             [
                 "",
                 "template <>",
-                "struct %s_reference_data<%s> {" % (prefix, scalar_type),
+                "struct %s<%s> {" % (reference_struct, scalar_type),
             ]
         )
         if cell_rule.is_tensor_product:
             lines.append(
-                "    static const %s *q_weight_1d() { return %s_q_weight_1d_%s; }"
-                % (scalar_type, prefix, suffix)
+                "    static const %s *q_weight_1d() { return %s_%s_q_weight_1d_%s; }"
+                % (scalar_type, prefix, reference_stage, suffix)
             )
             for element_type in _mixed_tensor_reference_element_types(
                 cell_rule,
@@ -1907,21 +1915,23 @@ def _mixed_reference_access_lines(prefix, system, cell_rule, field_element_types
             ):
                 reference_prefix = _tensor_reference_prefix(element_type)
                 lines.append(
-                    "    static const %s *%s_shape_1d() { return %s_%s_shape_1d_%s; }"
+                    "    static const %s *%s_shape_1d() { return %s_%s_%s_shape_1d_%s; }"
                     % (
                         scalar_type,
                         reference_prefix,
                         prefix,
+                        reference_stage,
                         reference_prefix,
                         suffix,
                     )
                 )
                 lines.append(
-                    "    static const %s *%s_grad_1d() { return %s_%s_grad_1d_%s; }"
+                    "    static const %s *%s_grad_1d() { return %s_%s_%s_grad_1d_%s; }"
                     % (
                         scalar_type,
                         reference_prefix,
                         prefix,
+                        reference_stage,
                         reference_prefix,
                         suffix,
                     )
@@ -1929,8 +1939,8 @@ def _mixed_reference_access_lines(prefix, system, cell_rule, field_element_types
             lines.append("};")
             continue
         lines.append(
-            "    static const %s *q_weight() { return %s_q_weight_%s; }"
-            % (scalar_type, prefix, suffix)
+            "    static const %s *q_weight() { return %s_%s_q_weight_%s; }"
+            % (scalar_type, prefix, reference_stage, suffix)
         )
         for element_type in _mixed_simplex_reference_element_types(
             cell_rule,
@@ -1939,17 +1949,18 @@ def _mixed_reference_access_lines(prefix, system, cell_rule, field_element_types
         ):
             reference_prefix = _simplex_reference_prefix(element_type)
             lines.append(
-                "    static const %s *%s_shape() { return %s_%s_shape_%s; }"
-                % (scalar_type, reference_prefix, prefix, reference_prefix, suffix)
+                "    static const %s *%s_shape() { return %s_%s_%s_shape_%s; }"
+                % (scalar_type, reference_prefix, prefix, reference_stage, reference_prefix, suffix)
             )
             for d in range(system.dim):
                 lines.append(
-                    "    static const %s *%s_grad_ref_%d() { return %s_%s_%s_%s; }"
+                    "    static const %s *%s_grad_ref_%d() { return %s_%s_%s_%s_%s; }"
                     % (
                         scalar_type,
                         reference_prefix,
                         d,
                         prefix,
+                        reference_stage,
                         reference_prefix,
                         sfem_simplex_grad_ref_name("grad_ref", d),
                         suffix,
@@ -1997,23 +2008,23 @@ def _simplex_reference_prefix(element_type):
     return str(element_type).lower()
 
 
-def _mixed_tensor_cell_reference_alias_lines(prefix, cell_rule):
-    reference_data = "%s_reference_data<scalar_t>" % prefix
+def _mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule):
+    reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     reference_prefix = _tensor_reference_prefix(cell_rule.element_type)
     return [
-        "    const scalar_t *const shape_1d = sfem::codegen::%s::%s_shape_1d();"
-        % (reference_data, reference_prefix),
-        "    const scalar_t *const grad_1d = sfem::codegen::%s::%s_grad_1d();"
-        % (reference_data, reference_prefix),
+        "    const scalar_t *const %s_shape_1d = sfem::codegen::%s::%s_shape_1d();"
+        % (reference_stage, reference_data, reference_prefix),
+        "    const scalar_t *const %s_grad_1d = sfem::codegen::%s::%s_grad_1d();"
+        % (reference_stage, reference_data, reference_prefix),
     ]
 
 
-def _mixed_simplex_cell_reference_alias_lines(prefix, cell_rule):
-    reference_data = "%s_reference_data<scalar_t>" % prefix
+def _mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule):
+    reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     reference_prefix = _simplex_reference_prefix(cell_rule.element_type)
     return [
-        "    const scalar_t *const cell_grad_ref_%d = sfem::codegen::%s::%s_grad_ref_%d();"
-        % (d, reference_data, reference_prefix, d)
+        "    const scalar_t *const %s_cell_grad_ref_%d = sfem::codegen::%s::%s_grad_ref_%d();"
+        % (reference_stage, d, reference_data, reference_prefix, d)
         for d in range(cell_rule.dim)
     ]
 
@@ -2024,6 +2035,7 @@ def _mixed_isoparametric_function(
     local_prefix,
     element,
     cell_rule,
+    reference_stage,
     vector_size,
     field_element_types,
     form,
@@ -2066,11 +2078,11 @@ def _mixed_isoparametric_function(
             "    (void)nnodes;",
         ]
     )
-    reference_data = "%s_reference_data<scalar_t>" % prefix
+    reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     if cell_rule.is_tensor_product:
-        lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, cell_rule))
+        lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     else:
-        lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, cell_rule))
+        lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     lines.extend(
         [
             "#pragma omp parallel for schedule(static)",
@@ -2154,6 +2166,8 @@ def _mixed_isoparametric_function(
                 determinant_target=lambda index: (
                     "block_determinant[%s]" % index
                 ),
+                shape_name="%s_shape_1d" % reference_stage,
+                grad_name="%s_grad_1d" % reference_stage,
             )
         )
     else:
@@ -2168,9 +2182,10 @@ def _mixed_isoparametric_function(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * cell_grad_ref_%d[q * CELL_N_SHAPE + %d]"
+                    "block_coordinates[%d][lane] * %s_cell_grad_ref_%d[q * CELL_N_SHAPE + %d]"
                     % (
                         shape * dim + i,
+                        reference_stage,
                         j,
                         shape,
                     )
@@ -2526,7 +2541,7 @@ def _mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_data_lines(rule))
+    lines.extend(_mesh_reference_data_lines(rule, "affine"))
     lines.extend(
         [
             "",
@@ -2624,17 +2639,21 @@ def _mesh_operator_source(
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     if rule.is_tensor_product:
-        call_args.append("shape_1d")
+        call_args.append(_mesh_reference_name("affine", "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append("grad_1d")
-        call_args.append("q_weight_1d")
+            call_args.append(_mesh_reference_name("affine", "grad_1d"))
+        call_args.append(_mesh_reference_name("affine", "q_weight_1d"))
     else:
-        call_args.append("shape")
+        call_args.append(_mesh_reference_name("affine", "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
-                sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+                _mesh_reference_name(
+                    "affine",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
             )
-        call_args.append("q_weight")
+        call_args.append(_mesh_reference_name("affine", "q_weight"))
     if dependencies.current:
         call_args.append("block_current_streams")
     if dependencies.previous:
@@ -2876,7 +2895,7 @@ def _isoparametric_mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_data_lines(rule))
+    lines.extend(_mesh_reference_data_lines(rule, "isoparametric"))
     lines.extend(
         [
             "",
@@ -2967,6 +2986,8 @@ def _isoparametric_mesh_operator_source(
                 determinant_target=lambda index: (
                     "block_determinant[%s]" % index
                 ),
+                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
             )
         )
     else:
@@ -2984,7 +3005,10 @@ def _isoparametric_mesh_operator_source(
                     "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
                     % (
                         shape * dim + i,
-                        sfem_simplex_grad_ref_name("grad_ref", j),
+                        _mesh_reference_name(
+                            "isoparametric",
+                            sfem_simplex_grad_ref_name("grad_ref", j),
+                        ),
                         shape,
                     )
                     for shape in range(n_shape)
@@ -3036,17 +3060,21 @@ def _isoparametric_mesh_operator_source(
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     if rule.is_tensor_product:
-        call_args.append("shape_1d")
+        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append("grad_1d")
-        call_args.append("q_weight_1d")
+            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
     else:
-        call_args.append("shape")
+        call_args.append(_mesh_reference_name("isoparametric", "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
-                sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim)
+                _mesh_reference_name(
+                    "isoparametric",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
             )
-        call_args.append("q_weight")
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
     if dependencies.current:
         call_args.append("block_current_streams")
     if dependencies.previous:
@@ -3137,11 +3165,11 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
     )
 
 
-def _mesh_reference_data_lines(rule):
+def _mesh_reference_data_lines(rule, geometry_mode):
     return [
         "    %s" % _static_reference_array_line(
             "scalar_t",
-            reference.name,
+            _mesh_reference_name(geometry_mode, reference.name),
             reference.values,
         )
         for reference in sfem_mesh_reference_data(rule)

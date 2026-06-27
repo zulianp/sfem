@@ -2524,18 +2524,23 @@ def _tensor_product_1d_factor(axis, node_axis, derivative_axis):
     return "%s[%s * N_SHAPE_1D + %d]" % (table_name, qp_name, node_axis)
 
 
-def _tensor_product_dynamic_reference_gradient_expr(dim, derivative_axis):
+def _tensor_product_dynamic_reference_gradient_expr(
+    dim,
+    derivative_axis,
+    shape_name="shape_1d",
+    grad_name="grad_1d",
+):
     factors = []
     for axis in range(dim):
         qp_name = ("qx", "qy", "qz")[axis]
-        shape_name = ("sx", "sy", "sz")[axis]
-        table_name = "grad_1d" if axis == derivative_axis else "shape_1d"
-        factors.append("%s[%s * N_SHAPE_1D + %s]" % (table_name, qp_name, shape_name))
+        node_axis_name = ("sx", "sy", "sz")[axis]
+        table_name = grad_name if axis == derivative_axis else shape_name
+        factors.append("%s[%s * N_SHAPE_1D + %s]" % (table_name, qp_name, node_axis_name))
     return " * ".join(factors)
 
 
-def _tensor_product_quadrature_weight_expr(dim):
-    factors = ["q_weight_1d[%s]" % name for name in ("qx", "qy", "qz")[:dim]]
+def _tensor_product_quadrature_weight_expr(dim, weight_name="q_weight_1d"):
+    factors = ["%s[%s]" % (weight_name, name) for name in ("qx", "qy", "qz")[:dim]]
     return " * ".join(factors)
 
 
@@ -2560,6 +2565,7 @@ def _sfem_soa_isoparametric_geometry_lines(
     use_reference_gradient_vectors,
     reference_inputs,
     q_major=False,
+    reference_prefix="",
 ):
     lines = ["#pragma omp simd", "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"]
     for row in range(dim):
@@ -2579,6 +2585,7 @@ def _sfem_soa_isoparametric_geometry_lines(
                     use_tensor_product_reference,
                     use_reference_gradient_vectors,
                     reference_inputs,
+                    reference_prefix,
                 ),
             )
         )
@@ -2601,13 +2608,23 @@ def _sfem_soa_isoparametric_reference_gradient_expr(
     use_tensor_product_reference,
     use_reference_gradient_vectors,
     reference_inputs,
+    reference_prefix="",
 ):
     if use_tensor_product_reference:
-        return _tensor_product_dynamic_reference_gradient_expr(dim, component)
+        return _tensor_product_dynamic_reference_gradient_expr(
+            dim,
+            component,
+            "%sshape_1d" % reference_prefix,
+            "%sgrad_1d" % reference_prefix,
+        )
     if use_reference_gradient_vectors:
-        return "%s[q * N_SHAPE + shape]" % _sfem_reference_gradient_vector_name(component)
+        return "%s%s[q * N_SHAPE + shape]" % (
+            reference_prefix,
+            _sfem_reference_gradient_vector_name(component),
+        )
     if len(reference_inputs) == 1 and reference_inputs[0].name == "grad_ref":
-        return "%s[(q * N_SHAPE + shape) * %d + %d]" % (
+        return "%s%s[(q * N_SHAPE + shape) * %d + %d]" % (
+            reference_prefix,
             reference_inputs[0].name,
             dim,
             component,
@@ -3335,6 +3352,11 @@ def _sfem_soa_mesh_operator_function(
                 "    const geometry_t *const SFEM_RESTRICT %s = points[%d];"
                 % (_component_name(d), d)
             )
+    reference_prefix = "%s_" % geometry_mode
+    tensor_shape_name = "%sshape_1d" % reference_prefix
+    tensor_grad_name = "%sgrad_1d" % reference_prefix
+    tensor_weight_name = "%sq_weight_1d" % reference_prefix
+    scalar_weight_name = "%sq_weight" % reference_prefix
     lines.extend(
         _sfem_soa_mesh_reference_alias_lines(
             prefix,
@@ -3342,6 +3364,7 @@ def _sfem_soa_mesh_operator_function(
             reference_inputs,
             use_tensor_product_reference,
             use_reference_gradient_vectors,
+            geometry_mode,
         )
     )
     if use_tensor_product_reference:
@@ -3483,7 +3506,7 @@ def _sfem_soa_mesh_operator_function(
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
             lines.append(
                 "            const scalar_t tensor_q_weight = %s;"
-                % _tensor_product_quadrature_weight_expr(dim)
+                % _tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
             )
 
     if (
@@ -3510,6 +3533,8 @@ def _sfem_soa_mesh_operator_function(
                 determinant_target=lambda index: (
                     "block_jacobian_determinant0[%s]" % index
                 ),
+                shape_name=tensor_shape_name,
+                grad_name=tensor_grad_name,
             )
         )
     elif geometry_mode == "isoparametric" and form.weak_form is not None:
@@ -3524,7 +3549,8 @@ def _sfem_soa_mesh_operator_function(
                 use_tensor_product_reference,
                 use_reference_gradient_vectors,
                 reference_inputs,
-                form.weak_form is not None,
+                q_major=form.weak_form is not None,
+                reference_prefix=reference_prefix,
             )
         )
         lines.append("        }")
@@ -3538,6 +3564,7 @@ def _sfem_soa_mesh_operator_function(
                 use_reference_gradient_vectors,
                 reference_inputs,
                 False,
+                reference_prefix=reference_prefix,
             )
         )
 
@@ -3559,18 +3586,21 @@ def _sfem_soa_mesh_operator_function(
             for stream in _soa_array_stream_names(array_input)
         )
     if use_tensor_product_reference:
-        call_args.extend(("shape_1d", "grad_1d"))
+        call_args.extend((tensor_shape_name, tensor_grad_name))
     elif use_reference_gradient_vectors:
-        call_args.extend(_sfem_reference_gradient_vector_name(component) for component in range(dim))
+        call_args.extend(
+            "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
+            for component in range(dim)
+        )
     else:
-        call_args.extend(array_input.name for array_input in reference_inputs)
+        call_args.extend("%s%s" % (reference_prefix, array_input.name) for array_input in reference_inputs)
     if form.weak_form is not None:
-        call_args.append("q_weight_1d" if use_tensor_product_reference else "q_weight")
+        call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
         call_args.extend(("mu", "lmbda"))
     elif use_tensor_product_reference:
         call_args.extend(("tensor_q_weight", "mu", "lmbda"))
     else:
-        call_args.extend(("q_weight[q]", "mu", "lmbda"))
+        call_args.extend(("%s[q]" % scalar_weight_name, "mu", "lmbda"))
     if use_stream_arrays:
         call_args.append("block_u_streams")
         if form.has_direction:
@@ -4167,8 +4197,10 @@ def _sfem_soa_mesh_reference_alias_lines(
     reference_inputs,
     use_tensor_product_reference,
     use_reference_gradient_vectors,
+    geometry_mode,
 ):
     lines = []
+    reference_prefix = "%s_" % geometry_mode
     if use_tensor_product_reference:
         tensor_data = (
             ("shape_1d", quadrature_rule.tensor_product_shape_values_1d),
@@ -4178,12 +4210,19 @@ def _sfem_soa_mesh_reference_alias_lines(
         for name, values in tensor_data:
             lines.append(
                 "    static const scalar_t %s[%d] = {%s};"
-                % (name, len(values), _cpp_scalar_initializer_list(values, "scalar_t"))
+                % (
+                    "%s%s" % (reference_prefix, name),
+                    len(values),
+                    _cpp_scalar_initializer_list(values, "scalar_t"),
+                )
             )
         return lines
     if use_reference_gradient_vectors:
         for component in range(quadrature_rule.dim):
-            name = _sfem_reference_gradient_vector_name(component)
+            name = "%s%s" % (
+                reference_prefix,
+                _sfem_reference_gradient_vector_name(component),
+            )
             values = _sfem_reference_gradient_component_values(
                 quadrature_rule,
                 component,
@@ -4193,8 +4232,9 @@ def _sfem_soa_mesh_reference_alias_lines(
                 % (name, len(values), _cpp_scalar_initializer_list(values, "scalar_t"))
             )
         lines.append(
-            "    static const scalar_t q_weight[%d] = {%s};"
+            "    static const scalar_t %sq_weight[%d] = {%s};"
             % (
+                reference_prefix,
                 len(quadrature_rule.weights),
                 _cpp_scalar_initializer_list(quadrature_rule.weights, "scalar_t"),
             )
@@ -4206,14 +4246,15 @@ def _sfem_soa_mesh_reference_alias_lines(
         lines.append(
             "    static const scalar_t %s[%d] = {%s};"
             % (
-                array_input.name,
+                "%s%s" % (reference_prefix, array_input.name),
                 len(quadrature_rule.reference_gradients),
                 _cpp_scalar_initializer_list(quadrature_rule.reference_gradients, "scalar_t"),
             )
         )
     lines.append(
-        "    static const scalar_t q_weight[%d] = {%s};"
+        "    static const scalar_t %sq_weight[%d] = {%s};"
         % (
+            reference_prefix,
             len(quadrature_rule.weights),
             _cpp_scalar_initializer_list(quadrature_rule.weights, "scalar_t"),
         )
