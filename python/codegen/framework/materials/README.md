@@ -26,6 +26,9 @@ PYTHONPATH=python python -m codegen.framework.materials.neohookean_ogden \
 
 PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
     --out-dir /tmp/two_phase_flow --element HEX8 --compile
+
+PYTHONPATH=python python -m codegen.framework.generate_stokes_files \
+    --out-dir /tmp/stokes --element TRI6_TRI3 --compile
 ```
 
 `poro_hyperelasticity` is a mixed formulation and defaults to Taylor-Hood

@@ -66,6 +66,7 @@ from codegen.framework import (
     GeometryMode,
     GeometryPlan,
     GeometryPlanNode,
+    KernelCoupling,
     KernelPlan,
     KernelEmission,
     KernelScope,
@@ -86,9 +87,6 @@ from codegen.framework import (
     VELOCITY,
     current_geometric_dimension,
     energy_form_pipeline,
-    generate_coupled_residual_sfem_files,
-    generate_mixed_residual_sfem_files,
-    generate_sfem_soa_cpp_files_for_element,
     geometry_plans_for_fem_policy,
     geometric_dimension_context,
     matrix_inner,
@@ -151,9 +149,11 @@ from codegen.framework.fem import (
     sfem_taylor_hood_element_types,
     sfem_tensor_hex_shape_index,
 )
+from codegen.framework.openmp_backend import OpenMPSoABackend
 
 
 DEFAULT_VECTOR_SIZE = 16
+OPENMP_SOA_BACKEND = OpenMPSoABackend()
 
 
 @dataclass(frozen=True)
@@ -646,6 +646,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             diagnostic_graph,
             evaluated.diagnostics,
         ),
+        coupling=KernelCoupling.SINGLE_FIELD,
         material_name=material_name,
         unit_name=evaluated.name,
     )
@@ -679,6 +680,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         blocks=blocks,
         block_kernels=block_kernels,
         scope=KernelScope.MONOLITHIC,
+        coupling=_kernel_coupling_for_collection(evaluated.form_evaluation),
         target=KernelTarget.OPENMP,
         material_name=material_name,
         unit_name=evaluated.name,
@@ -736,6 +738,7 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
             ),
             blocks=(block,),
             scope=KernelScope.BLOCK,
+            coupling=KernelCoupling.BLOCK,
             block=block,
             emission=KernelEmission.COVERED_BY_PARENT,
             target=KernelTarget.OPENMP,
@@ -744,6 +747,12 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
         )
         for block in blocks
     )
+
+
+def _kernel_coupling_for_collection(collection):
+    if len(tuple(collection.fields)) > 1:
+        return KernelCoupling.COMPLETE_SYSTEM
+    return KernelCoupling.SINGLE_FIELD
 
 
 def _block_unit_name(unit_name, block):
@@ -766,7 +775,7 @@ def _emit_energy_soa(unit, context):
     local_kernel = _local_kernel_plan(unit, context)
     mesh_kernel = _mesh_kernel_plan(unit, context, context.element_type)
     files = list(
-        generate_sfem_soa_cpp_files_for_element(
+        OPENMP_SOA_BACKEND.emit_energy(
             payload.kernel_forms,
             prefix=mesh_kernel.name,
             local_prefix=local_kernel.name,
@@ -813,7 +822,7 @@ def _emit_residual_soa(unit, context):
     )
     mesh_kernel = _mesh_kernel_plan(unit, context)
     if context.is_mixed_order:
-        return generate_mixed_residual_sfem_files(
+        return tuple(OPENMP_SOA_BACKEND.emit_mixed_residual(
             system,
             prefix=_unit_generated_prefix(unit),
             compatible_element=context.compatible_element,
@@ -826,10 +835,11 @@ def _emit_residual_soa(unit, context):
                 context,
             ),
             local_prefix=local_kernel.name,
+            local_name=local_kernel.header,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
-        )
-    return generate_coupled_residual_sfem_files(
+        ))
+    return tuple(OPENMP_SOA_BACKEND.emit_residual(
         system,
         prefix=_unit_generated_prefix(unit),
         element_type=context.element_type,
@@ -842,7 +852,7 @@ def _emit_residual_soa(unit, context):
         local_name=local_kernel.header,
         operator_prefix=mesh_kernel.name,
         operator_name=mesh_kernel.source,
-    )
+    ))
 
 
 def _local_kernel_plan(unit, context, suffix=""):
@@ -1266,6 +1276,7 @@ __all__ = [
     "GeometryMode",
     "GeometryPlan",
     "GeometryPlanNode",
+    "KernelCoupling",
     "KernelPlan",
     "KernelEmission",
     "KernelScope",
@@ -1276,6 +1287,8 @@ __all__ = [
     "MeshKernelPlan",
     "MeshPhase",
     "MeshPhasePlan",
+    "OpenMPSoABackend",
+    "OPENMP_SOA_BACKEND",
     "current_geometric_dimension",
     "geometric_dimension_context",
     "HyperelasticQualifier",
