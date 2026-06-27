@@ -261,6 +261,29 @@ def _mixed_reference_call_args(cell_rule, dependencies, reference_data):
     return args
 
 
+def _static_reference_array_line(scalar_type, name, values):
+    return "static const %s %s[%d] = {%s};" % (
+        scalar_type,
+        name,
+        len(values),
+        _cpp_scalar_initializer_list(values, scalar_type),
+    )
+
+
+def _typed_static_reference_data_lines(data, name):
+    lines = []
+    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
+        for reference in data:
+            lines.append(
+                _static_reference_array_line(
+                    scalar_type,
+                    name(reference.name, suffix),
+                    reference.values,
+                )
+            )
+    return lines
+
+
 def _mixed_mesh_dependency_params(system, dependencies):
     params = []
     for group in _dependency_stream_groups(dependencies, mesh=True):
@@ -1737,21 +1760,10 @@ def _mixed_reference_data_lines(prefix, cell_rule, system, field_element_types):
                 cell_rule,
                 field.name,
             )
-    lines = []
-    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        for reference in data:
-            lines.append(
-                "static const %s %s_%s_%s[%d] = {%s};"
-                % (
-                    scalar_type,
-                    prefix,
-                    reference.name,
-                    suffix,
-                    len(reference.values),
-                    _cpp_scalar_initializer_list(reference.values, scalar_type),
-                )
-            )
-    return lines
+    return _typed_static_reference_data_lines(
+        data,
+        lambda reference_name, suffix: "%s_%s_%s" % (prefix, reference_name, suffix),
+    )
 
 
 def _mixed_reference_access_lines(prefix, system, cell_rule):
@@ -2924,11 +2936,10 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
 
 def _mesh_reference_data_lines(rule):
     return [
-        "    static const scalar_t %s[%d] = {%s};"
-        % (
+        "    %s" % _static_reference_array_line(
+            "scalar_t",
             reference.name,
-            len(reference.values),
-            _cpp_scalar_initializer_list(reference.values, "scalar_t"),
+            reference.values,
         )
         for reference in sfem_mesh_reference_data(rule)
     ]
@@ -2936,19 +2947,8 @@ def _mesh_reference_data_lines(rule):
 
 def _reference_data_lines(prefix, rule):
     element = rule.element_type.lower()
-    lines = []
-    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        for reference in sfem_reference_data(rule):
-            lines.append(
-                "static const %s %s_%s_%s_%s[%d] = {%s};"
-                % (
-                    scalar_type,
-                    prefix,
-                    element,
-                    reference.name,
-                    suffix,
-                    len(reference.values),
-                    _cpp_scalar_initializer_list(reference.values, scalar_type),
-                )
-            )
-    return lines
+    return _typed_static_reference_data_lines(
+        sfem_reference_data(rule),
+        lambda reference_name, suffix: "%s_%s_%s_%s"
+        % (prefix, element, reference_name, suffix),
+    )

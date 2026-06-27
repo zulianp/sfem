@@ -6,6 +6,14 @@ import sympy as sp
 from .symbolic import ExpressionRole, KernelExpressions
 
 
+def _dataclass_value_tuple(instance):
+    return tuple(getattr(instance, field.name) for field in fields(instance))
+
+
+def _dataclass_value_dict(instance):
+    return {field.name: getattr(instance, field.name) for field in fields(instance)}
+
+
 @dataclass(frozen=True)
 class TwoPhaseFlowParameters:
     porosity: sp.Symbol
@@ -48,10 +56,10 @@ class TwoPhaseFlowParameters:
         return cls(*sp.symbols(" ".join("%s%s" % (prefix, name) for name in names)))
 
     def as_tuple(self) -> Tuple[sp.Symbol, ...]:
-        return tuple(getattr(self, field.name) for field in fields(self))
+        return _dataclass_value_tuple(self)
 
     def as_dict(self):
-        return {field.name: getattr(self, field.name) for field in fields(self)}
+        return _dataclass_value_dict(self)
 
     def validate(self, values: Mapping):
         resolved = {
@@ -101,10 +109,10 @@ class TwoPhaseFlowConstitutiveState:
     co2_mobility: sp.Expr
 
     def as_tuple(self):
-        return tuple(getattr(self, field.name) for field in fields(self))
+        return _dataclass_value_tuple(self)
 
     def as_dict(self):
-        return {field.name: getattr(self, field.name) for field in fields(self)}
+        return _dataclass_value_dict(self)
 
 
 @dataclass(frozen=True)

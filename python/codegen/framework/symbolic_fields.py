@@ -159,9 +159,7 @@ class SymbolicField:
         return self._symbols[_flat_index(self.shape, index)]
 
     def as_array(self):
-        if self.is_scalar:
-            return self._symbols[0]
-        return sp.ImmutableDenseNDimArray(self._symbols, self.shape)
+        return _symbols_as_array(self._symbols, self.shape)
 
     @property
     def value(self):
@@ -322,9 +320,7 @@ class SymbolicArgument:
         return self._symbols[_flat_index(self.shape, index)]
 
     def as_array(self):
-        if self.is_scalar:
-            return self._symbols[0]
-        return sp.ImmutableDenseNDimArray(self._symbols, self.shape)
+        return _symbols_as_array(self._symbols, self.shape)
 
     def as_matrix(self):
         if self.rank == 1:
@@ -524,6 +520,12 @@ def _component_symbols(name, shape):
         sp.Symbol(name if not shape else "%s[%d]" % (name, ordinal))
         for ordinal, _ in enumerate(_field_component_indices(shape))
     )
+
+
+def _symbols_as_array(symbols, shape):
+    if not shape:
+        return symbols[0]
+    return sp.ImmutableDenseNDimArray(symbols, shape)
 
 
 def _field_component_indices(shape):

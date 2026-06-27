@@ -56,6 +56,35 @@ class PipelineStage(Enum):
     CODE_GENERATION = "code_generation"
 
 
+class FormCollectionMixin:
+    @property
+    def stage(self):
+        return PipelineStage.FORM_EVALUATION
+
+    def form(self, order):
+        order = FormOrder(order)
+        for form in self.forms:
+            if form.order is order:
+                return form
+        raise ValueError("form order %s was not evaluated" % order.name)
+
+    def standard_form(self, name):
+        name = StandardFormName(name)
+        for form in self.forms:
+            if form.standard_form is name:
+                return form
+        raise ValueError("standard form %s was not evaluated" % name.value)
+
+    def standard_forms(self):
+        return {form.standard_name: form for form in self.forms}
+
+    def expressions(self):
+        expressions = KernelExpressions()
+        for form in self.forms:
+            form.add_to(expressions)
+        return expressions
+
+
 @dataclass(frozen=True)
 class UnifiedForm:
     kind: FormKind
@@ -77,40 +106,13 @@ class UnifiedForm:
 
 
 @dataclass(frozen=True)
-class FormEvaluation:
+class FormEvaluation(FormCollectionMixin):
     kind: FormKind
     forms: tuple
 
-    @property
-    def stage(self):
-        return PipelineStage.FORM_EVALUATION
-
-    def form(self, order):
-        order = FormOrder(order)
-        for form in self.forms:
-            if form.order is order:
-                return form
-        raise ValueError("form order %s was not evaluated" % order.name)
-
-    def standard_form(self, name):
-        name = StandardFormName(name)
-        for form in self.forms:
-            if form.standard_form is name:
-                return form
-        raise ValueError("standard form %s was not evaluated" % name.value)
-
-    def standard_forms(self):
-        return {form.standard_name: form for form in self.forms}
-
-    def expressions(self):
-        expressions = KernelExpressions()
-        for form in self.forms:
-            form.add_to(expressions)
-        return expressions
-
 
 @dataclass(frozen=True)
-class FormCollection:
+class FormCollection(FormCollectionMixin):
     equation_name: str
     kind: FormKind
     fields: tuple
@@ -123,33 +125,6 @@ class FormCollection:
     blocks: tuple = ()
     source: object = None
     metadata: tuple = ()
-
-    @property
-    def stage(self):
-        return PipelineStage.FORM_EVALUATION
-
-    def form(self, order):
-        order = FormOrder(order)
-        for form in self.forms:
-            if form.order is order:
-                return form
-        raise ValueError("form order %s was not evaluated" % order.name)
-
-    def standard_form(self, name):
-        name = StandardFormName(name)
-        for form in self.forms:
-            if form.standard_form is name:
-                return form
-        raise ValueError("standard form %s was not evaluated" % name.value)
-
-    def standard_forms(self):
-        return {form.standard_name: form for form in self.forms}
-
-    def expressions(self):
-        expressions = KernelExpressions()
-        for form in self.forms:
-            form.add_to(expressions)
-        return expressions
 
     def form_metadata(self, order):
         order = FormOrder(order)

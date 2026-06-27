@@ -2,23 +2,21 @@
 import argparse
 import os
 import re
-import sys
+from _script_common import (
+    bootstrap_python_path,
+    generated_output_dir,
+    print_generation_result,
+)
 
 
-PYTHON_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, PYTHON_DIR)
+bootstrap_python_path(__file__, 2)
 
 from codegen.framework.materials.stokes import material  # noqa: E402
 from sfem import gen  # noqa: E402
 
 
 def _default_out_dir():
-    return os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "../../../frontend/ops/generated/stokes",
-        )
-    )
+    return generated_output_dir(__file__, "stokes", 3)
 
 
 def _operator_dim(path, contents):
@@ -140,16 +138,7 @@ def main(argv=None):
     )
     validate_m6_3(result)
 
-    print("Generated Stokes kernels:")
-    for path in result.sources:
-        print("  %s" % path)
-    if result.objects:
-        print("Compiled:")
-        for path in result.objects:
-            print("  %s" % path)
-    if result.plan_dump:
-        print("Plan:")
-        print("  %s" % result.plan_dump)
+    print_generation_result(result, "Generated Stokes kernels:")
     print("M6.3 validation: monolithic complete-system Stokes kernels")
     return result
 
