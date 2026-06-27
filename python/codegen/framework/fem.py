@@ -790,6 +790,24 @@ def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
     )
 
 
+def sfem_simplex_field_reference_data(element_type, cell_rule, prefix):
+    element_type = str(element_type).upper()
+    if cell_rule.is_tensor_product:
+        raise ValueError("cell rule must be simplex")
+    shape, gradients = sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule)
+    n_shape = len(shape) // cell_rule.n_qp
+    return (
+        (SfemReferenceData("%s_shape" % prefix, shape),)
+        + sfem_split_reference_gradient_data(
+            "%s_grad_ref" % prefix,
+            gradients,
+            cell_rule.n_qp,
+            n_shape,
+            cell_rule.dim,
+        )
+    )
+
+
 def sfem_field_n_shape(element_type, quadrature_order=None):
     return sfem_element_quadrature_rule(element_type, quadrature_order).n_shape
 
