@@ -1605,7 +1605,6 @@ def _operator_source(
         "namespace codegen {",
         "",
     ]
-    lines.extend(_reference_data_lines(prefix, rule))
     lines.extend(
         quadrature_reference_struct_lines(
             prefix,
@@ -1685,36 +1684,36 @@ def _operator_source(
             if rule.is_tensor_product:
                 call_args.append(
                     quadrature_reference_accessor(
-                        prefix, "element", "shape_1d", scalar_type
+                        prefix, "isoparametric", "shape_1d", scalar_type
                     )
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.append(
                         quadrature_reference_accessor(
-                            prefix, "element", "grad_1d", scalar_type
+                            prefix, "isoparametric", "grad_1d", scalar_type
                         )
                     )
                 call_args.append(
                     quadrature_reference_accessor(
-                        prefix, "element", "q_weight_1d", scalar_type
+                        prefix, "isoparametric", "q_weight_1d", scalar_type
                     )
                 )
             else:
                 call_args.append(
-                    quadrature_reference_accessor(prefix, "element", "shape", scalar_type)
+                    quadrature_reference_accessor(prefix, "isoparametric", "shape", scalar_type)
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.extend(
                         quadrature_reference_accessor(
                             prefix,
-                            "element",
+                            "isoparametric",
                             sfem_simplex_grad_ref_name("grad_ref", d),
                             scalar_type,
                         )
                         for d in range(dim)
                     )
                 call_args.append(
-                    quadrature_reference_accessor(prefix, "element", "q_weight", scalar_type)
+                    quadrature_reference_accessor(prefix, "isoparametric", "q_weight", scalar_type)
                 )
             if dependencies.current:
                 call_args.append("current")
@@ -3089,10 +3088,3 @@ def _mesh_reference_alias_lines(prefix, rule, geometry_mode):
         for reference in sfem_mesh_reference_data(rule)
     ]
 
-
-def _reference_data_lines(prefix, rule):
-    return quadrature_reference_struct_lines(
-        prefix,
-        "element",
-        sfem_reference_data(rule),
-    )
