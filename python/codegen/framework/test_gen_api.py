@@ -684,7 +684,11 @@ class GenApiTest(unittest.TestCase):
             "generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_impl"
         )
         self.assertIn("static constexpr int N_QP = 3;", contents[affine:isoparametric])
+        self.assertIn("static const scalar_t affine_grad_ref_x", contents[affine:isoparametric])
+        self.assertIn("static const scalar_t affine_q_weight", contents[affine:isoparametric])
         self.assertIn("static constexpr int N_QP = 6;", contents[isoparametric:])
+        self.assertIn("static const scalar_t isoparametric_grad_ref_x", contents[isoparametric:])
+        self.assertIn("static const scalar_t isoparametric_q_weight", contents[isoparametric:])
 
     def test_low_level_specialization_accepts_integration_case(self):
         standard = gen.sfem_soa_element_specialization("HEX27").quadrature_rule
@@ -1378,17 +1382,18 @@ class GenApiTest(unittest.TestCase):
             )
             with open(operator) as input_file:
                 contents = input_file.read()
-            self.assertIn("generated_stokes_hex27_shape_1d_f64", contents)
-            self.assertIn("generated_stokes_hex27_grad_1d_f64", contents)
-            self.assertIn("generated_stokes_hex8_shape_1d_f64", contents)
-            self.assertIn("generated_stokes_hex8_grad_1d_f64", contents)
+            self.assertIn("generated_stokes_isoparametric_hex27_shape_1d_f64", contents)
+            self.assertIn("generated_stokes_isoparametric_hex27_grad_1d_f64", contents)
+            self.assertIn("generated_stokes_isoparametric_hex8_shape_1d_f64", contents)
+            self.assertIn("generated_stokes_isoparametric_hex8_grad_1d_f64", contents)
             self.assertIn(
-                "field_shape_1d[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex8_shape_1d()}",
+                "field_shape_1d[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
                 contents,
             )
+            self.assertNotIn("generated_stokes_reference_data", contents)
             self.assertNotIn("generated_stokes_cell_grad_ref", contents)
             self.assertNotIn("generated_stokes_u0_shape_", contents)
             self.assertNotIn("generated_stokes_u1_shape_", contents)
@@ -1425,38 +1430,39 @@ class GenApiTest(unittest.TestCase):
             ) as input_file:
                 tet_local = input_file.read()
 
-            self.assertIn("generated_stokes_tri6_shape_f64", tri)
-            self.assertIn("generated_stokes_tri6_grad_ref_x_f64", tri)
-            self.assertIn("generated_stokes_tri3_shape_f64", tri)
-            self.assertIn("generated_stokes_tri3_grad_ref_y_f64", tri)
+            self.assertIn("generated_stokes_isoparametric_tri6_shape_f64", tri)
+            self.assertIn("generated_stokes_isoparametric_tri6_grad_ref_x_f64", tri)
+            self.assertIn("generated_stokes_isoparametric_tri3_shape_f64", tri)
+            self.assertIn("generated_stokes_isoparametric_tri3_grad_ref_y_f64", tri)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tri3_shape()}",
+                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri3_shape()}",
                 tri,
             )
             self.assertIn(
-                "cell_grad_ref_0 = sfem::codegen::generated_stokes_reference_data<scalar_t>::tri6_grad_ref_0()",
+                "isoparametric_cell_grad_ref_0 = sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_grad_ref_0()",
                 tri,
             )
 
-            self.assertIn("generated_stokes_tet10_shape_f64", tet)
-            self.assertIn("generated_stokes_tet10_grad_ref_z_f64", tet)
-            self.assertIn("generated_stokes_tet4_shape_f64", tet)
-            self.assertIn("generated_stokes_tet4_grad_ref_z_f64", tet)
+            self.assertIn("generated_stokes_isoparametric_tet10_shape_f64", tet)
+            self.assertIn("generated_stokes_isoparametric_tet10_grad_ref_z_f64", tet)
+            self.assertIn("generated_stokes_isoparametric_tet4_shape_f64", tet)
+            self.assertIn("generated_stokes_isoparametric_tet4_grad_ref_z_f64", tet)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_reference_data<scalar_t>::tet4_shape()}",
+                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet4_shape()}",
                 tet,
             )
             self.assertIn(
-                "cell_grad_ref_2 = sfem::codegen::generated_stokes_reference_data<scalar_t>::tet10_grad_ref_2()",
+                "isoparametric_cell_grad_ref_2 = sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_grad_ref_2()",
                 tet,
             )
 
             for contents in (tri, tet):
+                self.assertNotIn("generated_stokes_reference_data", contents)
                 self.assertNotIn("generated_stokes_cell_grad_ref", contents)
                 self.assertNotIn("generated_stokes_u0_shape_", contents)
                 self.assertNotIn("generated_stokes_u1_shape_", contents)
