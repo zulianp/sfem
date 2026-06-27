@@ -22,10 +22,13 @@ from .fem import (
     sfem_tensor_product_field_reference_data,
     SfemReferenceData,
 )
+from .quadrature_codegen import (
+    quadrature_reference_accessor,
+    quadrature_reference_struct_lines,
+)
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
-    _cpp_scalar_initializer_list,
     _sfem_ccode,
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
@@ -265,16 +268,19 @@ def _mixed_reference_pointer_lines(
         grad_refs = []
         for field in system.fields:
             for d in range(dim):
+                reference_prefix = _simplex_reference_prefix(
+                    field_element_types.get(field.name, cell_rule.element_type)
+                    if field_element_types
+                    else cell_rule.element_type
+                )
                 grad_refs.append(
-                    "sfem::codegen::%s::%s_grad_ref_%d()"
+                    "sfem::codegen::%s::%s()"
                     % (
                         reference_data,
-                        _simplex_reference_prefix(
-                            field_element_types.get(field.name, cell_rule.element_type)
-                            if field_element_types
-                            else cell_rule.element_type
+                        sfem_simplex_grad_ref_name(
+                            "%s_grad_ref" % reference_prefix,
+                            d,
                         ),
-                        d,
                     )
                 )
         lines.append(
@@ -299,31 +305,8 @@ def _mixed_reference_call_args(cell_rule, dependencies, reference_data):
     return args
 
 
-def _static_reference_array_line(scalar_type, name, values):
-    return "static const %s %s[%d] = {%s};" % (
-        scalar_type,
-        name,
-        len(values),
-        _cpp_scalar_initializer_list(values, scalar_type),
-    )
-
-
 def _mesh_reference_name(geometry_mode, name):
     return "%s_%s" % (geometry_mode, name)
-
-
-def _typed_static_reference_data_lines(data, name):
-    lines = []
-    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        for reference in data:
-            lines.append(
-                _static_reference_array_line(
-                    scalar_type,
-                    name(reference.name, suffix),
-                    reference.values,
-                )
-            )
-    return lines
 
 
 def _mixed_mesh_dependency_params(system, dependencies):
@@ -1623,6 +1606,20 @@ def _operator_source(
         "",
     ]
     lines.extend(_reference_data_lines(prefix, rule))
+    lines.extend(
+        quadrature_reference_struct_lines(
+            prefix,
+            "affine",
+            sfem_mesh_reference_data(affine_specialization.quadrature_rule),
+        )
+    )
+    lines.extend(
+        quadrature_reference_struct_lines(
+            prefix,
+            "isoparametric",
+            sfem_mesh_reference_data(rule),
+        )
+    )
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
     lines.append("")
@@ -1643,7 +1640,6 @@ def _operator_source(
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in (("double", ""), ("float", "_float")):
-            reference_suffix = "f64" if scalar_type == "double" else "f32"
             params = [
                 "const ptrdiff_t nelems",
                 "const ptrdiff_t geometry_stride",
@@ -1688,37 +1684,37 @@ def _operator_source(
                 call_args.append("adjugate")
             if rule.is_tensor_product:
                 call_args.append(
-                    "sfem::codegen::%s_%s_shape_1d_%s"
-                    % (prefix, element, reference_suffix)
+                    quadrature_reference_accessor(
+                        prefix, "element", "shape_1d", scalar_type
+                    )
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.append(
-                        "sfem::codegen::%s_%s_grad_1d_%s"
-                        % (prefix, element, reference_suffix)
+                        quadrature_reference_accessor(
+                            prefix, "element", "grad_1d", scalar_type
+                        )
                     )
                 call_args.append(
-                    "sfem::codegen::%s_%s_q_weight_1d_%s"
-                    % (prefix, element, reference_suffix)
+                    quadrature_reference_accessor(
+                        prefix, "element", "q_weight_1d", scalar_type
+                    )
                 )
             else:
                 call_args.append(
-                    "sfem::codegen::%s_%s_shape_%s"
-                    % (prefix, element, reference_suffix)
+                    quadrature_reference_accessor(prefix, "element", "shape", scalar_type)
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.extend(
-                        "sfem::codegen::%s_%s_%s_%s"
-                        % (
+                        quadrature_reference_accessor(
                             prefix,
-                            element,
+                            "element",
                             sfem_simplex_grad_ref_name("grad_ref", d),
-                            reference_suffix,
+                            scalar_type,
                         )
                         for d in range(dim)
                     )
                 call_args.append(
-                    "sfem::codegen::%s_%s_q_weight_%s"
-                    % (prefix, element, reference_suffix)
+                    quadrature_reference_accessor(prefix, "element", "q_weight", scalar_type)
                 )
             if dependencies.current:
                 call_args.append("current")
@@ -1813,7 +1809,6 @@ def _mixed_operator_source(
     ]
     reference_stage = "isoparametric"
     lines.extend(_mixed_reference_data_lines(prefix, reference_stage, rule, system, field_element_types))
-    lines.extend(_mixed_reference_access_lines(prefix, reference_stage, system, rule, field_element_types))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     form_data = (
         (
@@ -1881,93 +1876,7 @@ def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, fiel
                 cell_rule,
                 _simplex_reference_prefix(element_type),
             )
-    return _typed_static_reference_data_lines(
-        data,
-        lambda reference_name, suffix: "%s_%s_%s_%s"
-        % (prefix, reference_stage, reference_name, suffix),
-    )
-
-
-def _mixed_reference_access_lines(prefix, reference_stage, system, cell_rule, field_element_types):
-    reference_struct = "%s_%s_reference_data" % (prefix, reference_stage)
-    lines = [
-        "",
-        "template <typename scalar_t>",
-        "struct %s;" % reference_struct,
-    ]
-    for scalar_type, suffix in (("double", "f64"), ("float", "f32")):
-        lines.extend(
-            [
-                "",
-                "template <>",
-                "struct %s<%s> {" % (reference_struct, scalar_type),
-            ]
-        )
-        if cell_rule.is_tensor_product:
-            lines.append(
-                "    static const %s *q_weight_1d() { return %s_%s_q_weight_1d_%s; }"
-                % (scalar_type, prefix, reference_stage, suffix)
-            )
-            for element_type in _mixed_tensor_reference_element_types(
-                cell_rule,
-                system,
-                field_element_types,
-            ):
-                reference_prefix = _tensor_reference_prefix(element_type)
-                lines.append(
-                    "    static const %s *%s_shape_1d() { return %s_%s_%s_shape_1d_%s; }"
-                    % (
-                        scalar_type,
-                        reference_prefix,
-                        prefix,
-                        reference_stage,
-                        reference_prefix,
-                        suffix,
-                    )
-                )
-                lines.append(
-                    "    static const %s *%s_grad_1d() { return %s_%s_%s_grad_1d_%s; }"
-                    % (
-                        scalar_type,
-                        reference_prefix,
-                        prefix,
-                        reference_stage,
-                        reference_prefix,
-                        suffix,
-                    )
-                )
-            lines.append("};")
-            continue
-        lines.append(
-            "    static const %s *q_weight() { return %s_%s_q_weight_%s; }"
-            % (scalar_type, prefix, reference_stage, suffix)
-        )
-        for element_type in _mixed_simplex_reference_element_types(
-            cell_rule,
-            system,
-            field_element_types,
-        ):
-            reference_prefix = _simplex_reference_prefix(element_type)
-            lines.append(
-                "    static const %s *%s_shape() { return %s_%s_%s_shape_%s; }"
-                % (scalar_type, reference_prefix, prefix, reference_stage, reference_prefix, suffix)
-            )
-            for d in range(system.dim):
-                lines.append(
-                    "    static const %s *%s_grad_ref_%d() { return %s_%s_%s_%s_%s; }"
-                    % (
-                        scalar_type,
-                        reference_prefix,
-                        d,
-                        prefix,
-                        reference_stage,
-                        reference_prefix,
-                        sfem_simplex_grad_ref_name("grad_ref", d),
-                        suffix,
-                    )
-                )
-        lines.append("};")
-    return lines
+    return quadrature_reference_struct_lines(prefix, reference_stage, data)
 
 
 def _mixed_tensor_reference_element_types(cell_rule, system, field_element_types):
@@ -2023,8 +1932,13 @@ def _mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule
     reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     reference_prefix = _simplex_reference_prefix(cell_rule.element_type)
     return [
-        "    const scalar_t *const %s_cell_grad_ref_%d = sfem::codegen::%s::%s_grad_ref_%d();"
-        % (reference_stage, d, reference_data, reference_prefix, d)
+        "    const scalar_t *const %s_cell_grad_ref_%d = sfem::codegen::%s::%s();"
+        % (
+            reference_stage,
+            d,
+            reference_data,
+            sfem_simplex_grad_ref_name("%s_grad_ref" % reference_prefix, d),
+        )
         for d in range(cell_rule.dim)
     ]
 
@@ -2541,7 +2455,7 @@ def _mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_data_lines(rule, "affine"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "affine"))
     lines.extend(
         [
             "",
@@ -2895,7 +2809,7 @@ def _isoparametric_mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_data_lines(rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
     lines.extend(
         [
             "",
@@ -3165,21 +3079,20 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
     )
 
 
-def _mesh_reference_data_lines(rule, geometry_mode):
+def _mesh_reference_alias_lines(prefix, rule, geometry_mode):
     return [
-        "    %s" % _static_reference_array_line(
-            "scalar_t",
+        "    const scalar_t *const %s = %s;"
+        % (
             _mesh_reference_name(geometry_mode, reference.name),
-            reference.values,
+            quadrature_reference_accessor(prefix, geometry_mode, reference.name),
         )
         for reference in sfem_mesh_reference_data(rule)
     ]
 
 
 def _reference_data_lines(prefix, rule):
-    element = rule.element_type.lower()
-    return _typed_static_reference_data_lines(
+    return quadrature_reference_struct_lines(
+        prefix,
+        "element",
         sfem_reference_data(rule),
-        lambda reference_name, suffix: "%s_%s_%s_%s"
-        % (prefix, element, reference_name, suffix),
     )
