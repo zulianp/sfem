@@ -852,6 +852,32 @@ class GenApiTest(unittest.TestCase):
     def test_codegen_stage_uses_shared_openmp_soa_backend(self):
         self.assertIsInstance(gen.OPENMP_SOA_BACKEND, gen.OpenMPSoABackend)
 
+    def test_openmp_backend_consumes_kernel_phase_plan(self):
+        user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
+        plan = gen.SpecializedFormManipulationStage(
+            user_input,
+            gen._evaluate_forms(user_input),
+        ).run()
+        unit = plan.units[0]
+        context = user_input.element_contexts[0]
+        invalid_unit = gen.CodeGenerationUnit(
+            name=unit.name,
+            kind=unit.kind,
+            form_collection=unit.form_collection,
+            dim=unit.dim,
+            mesh_phase_plans=(
+                gen.MeshPhasePlan(gen.MeshPhase.GEOMETRY),
+                gen.MeshPhasePlan(gen.MeshPhase.LOCAL_CALL),
+            ),
+            target=unit.target,
+            payload=unit.payload,
+            coupling=unit.coupling,
+            material_name=unit.material_name,
+            unit_name=unit.unit_name,
+        )
+        with self.assertRaisesRegex(ValueError, "mesh phase plan"):
+            gen.OPENMP_SOA_BACKEND.emit(invalid_unit, context)
+
     def test_specialized_form_manipulation_returns_generation_plan(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         energy_plan = gen.SpecializedFormManipulationStage(

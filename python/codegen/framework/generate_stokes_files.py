@@ -2,11 +2,18 @@
 import argparse
 import os
 import re
-from _script_common import (
-    bootstrap_python_path,
-    generated_output_dir,
-    print_generation_result,
-)
+try:
+    from ._script_common import (
+        bootstrap_python_path,
+        generated_output_dir,
+        print_generation_result,
+    )
+except ImportError:
+    from _script_common import (
+        bootstrap_python_path,
+        generated_output_dir,
+        print_generation_result,
+    )
 
 
 bootstrap_python_path(__file__, 2)

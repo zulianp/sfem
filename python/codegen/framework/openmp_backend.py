@@ -1,7 +1,13 @@
 from dataclasses import dataclass
 
+from .forms import FormOrder
+from .generation_plan import (
+    KernelTarget,
+    MeshKernelPlan,
+    MeshPhase,
+    LocalPhase,
+)
 from .symbolic import (
-    GeneratedKernelFile,
     generate_sfem_soa_cpp_files_for_element,
 )
 from .residual_codegen import (
@@ -21,6 +27,74 @@ class OpenMPSoAEmission:
 @dataclass(frozen=True)
 class OpenMPSoABackend:
     """Single OpenMP/SoA backend boundary for planned code-generation units."""
+
+    def emit(self, unit, context):
+        unit.validate_for_context(context)
+        kind = _kind_value(unit.kind)
+        if kind == "energy_soa":
+            return self._emit_energy_plan(unit, context)
+        if kind == "residual_soa":
+            return self._emit_residual_plan(unit, context)
+        raise ValueError("unsupported OpenMP SoA kernel kind '%s'" % kind)
+
+    def _emit_energy_plan(self, unit, context):
+        self._validate_energy_plan(unit)
+        payload = unit.payload
+        prefix = _generated_prefix(unit)
+        local_kernel = unit.local_kernel_plan(context, prefix)
+        mesh_kernel = MeshKernelPlan(prefix, context.element_type)
+        return self.emit_energy(
+            payload.kernel_forms,
+            prefix=mesh_kernel.name,
+            local_prefix=local_kernel.name,
+            specialization=context.specialization,
+        )
+
+    def _emit_residual_plan(self, unit, context):
+        self._validate_residual_plan(unit)
+        collection = unit.form_collection
+        system = collection.source
+        residual_coeffs = collection.form_metadata(FormOrder.ONE).coefficients
+        action_coeffs = collection.form_metadata(FormOrder.TWO).coefficients
+        prefix = _generated_prefix(unit)
+        local_kernel = unit.local_kernel_plan(
+            context,
+            prefix,
+            "_mixed" if context.is_mixed_order else "",
+        )
+        mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        if context.is_mixed_order:
+            return self.emit_mixed_residual(
+                system,
+                prefix=prefix,
+                compatible_element=context.compatible_element,
+                vector_size=context.specialization.vector_size,
+                quadrature_order=context.specialization.quadrature_rule.order,
+                residual_coeffs=residual_coeffs,
+                action_coeffs=action_coeffs,
+                field_element_types=_field_element_types_for_context(
+                    collection.fields,
+                    context,
+                ),
+                local_prefix=local_kernel.name,
+                local_name=local_kernel.header,
+                operator_prefix=mesh_kernel.name,
+                operator_name=mesh_kernel.source,
+            )
+        return self.emit_residual(
+            system,
+            prefix=prefix,
+            element_type=context.element_type,
+            vector_size=context.specialization.vector_size,
+            quadrature_order=context.specialization.quadrature_rule.order,
+            specialization=context.specialization,
+            residual_coeffs=residual_coeffs,
+            action_coeffs=action_coeffs,
+            local_prefix=local_kernel.name,
+            local_name=local_kernel.header,
+            operator_prefix=mesh_kernel.name,
+            operator_name=mesh_kernel.source,
+        )
 
     def emit_energy(
         self,
@@ -145,3 +219,91 @@ class OpenMPSoABackend:
                     "OpenMP SoA operator '%s' does not include '%s'"
                     % (operator.path, local_name)
                 )
+
+    @staticmethod
+    def _validate_energy_plan(unit):
+        _require_openmp(unit)
+        _require_mesh_phases(
+            unit,
+            (
+                MeshPhase.GEOMETRY,
+                MeshPhase.LOCAL_CALL,
+                MeshPhase.SCATTER,
+            ),
+        )
+
+    @staticmethod
+    def _validate_residual_plan(unit):
+        _require_openmp(unit)
+        _require_mesh_phases(
+            unit,
+            (
+                MeshPhase.GATHER,
+                MeshPhase.GEOMETRY,
+                MeshPhase.LOCAL_CALL,
+                MeshPhase.SCATTER,
+            ),
+        )
+        for block in unit.blocks:
+            _require_local_phases(
+                block,
+                (
+                    LocalPhase.EVALUATE_TRIAL,
+                    LocalPhase.TRANSFORM_REFERENCE,
+                    LocalPhase.EVALUATE_MATERIAL,
+                    LocalPhase.CONTRACT_TEST,
+                ),
+            )
+
+
+def _kind_value(kind):
+    return getattr(kind, "value", str(kind))
+
+
+def _generated_prefix(unit):
+    return "generated_%s" % unit.name
+
+
+def _require_openmp(unit):
+    if unit.target is not KernelTarget.OPENMP:
+        raise ValueError(
+            "OpenMP SoA backend cannot emit target '%s'"
+            % getattr(unit.target, "value", unit.target)
+        )
+
+
+def _require_mesh_phases(unit, expected):
+    actual = tuple(phase.phase for phase in unit.mesh_phase_plans)
+    if actual != tuple(expected):
+        raise ValueError(
+            "kernel '%s' mesh phase plan %s does not match OpenMP SoA contract %s"
+            % (
+                unit.name,
+                tuple(phase.value for phase in actual),
+                tuple(phase.value for phase in expected),
+            )
+        )
+
+
+def _require_local_phases(block, expected):
+    actual = tuple(phase.phase for phase in block.local_phase_plans)
+    if actual != tuple(expected):
+        raise ValueError(
+            "block '%s' local phase plan %s does not match OpenMP SoA contract %s"
+            % (
+                block.name,
+                tuple(phase.value for phase in actual),
+                tuple(phase.value for phase in expected),
+            )
+        )
+
+
+def _field_element_types_for_context(equation_fields, context):
+    ret = {}
+    for field, element_type in context.fem_policy.field_element_types_for(equation_fields):
+        if field.components == 1:
+            ret[field.name] = element_type
+        else:
+            for component in range(field.components):
+                ret["%s%d" % (field.name, component)] = element_type
+    return ret

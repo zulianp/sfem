@@ -7,7 +7,10 @@ FRAMEWORK_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if FRAMEWORK_DIR not in sys.path:
     sys.path.insert(0, FRAMEWORK_DIR)
 
-from _script_common import bootstrap_python_path, generated_output_dir  # noqa: E402
+try:
+    from .._script_common import bootstrap_python_path, generated_output_dir  # noqa: E402
+except ImportError:
+    from _script_common import bootstrap_python_path, generated_output_dir  # noqa: E402
 
 
 bootstrap_python_path(__file__, 3)

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-from _script_common import bootstrap_python_path, generated_output_dir
+try:
+    from ._script_common import bootstrap_python_path, generated_output_dir
+except ImportError:
+    from _script_common import bootstrap_python_path, generated_output_dir
 
 
 bootstrap_python_path(__file__, 2)
