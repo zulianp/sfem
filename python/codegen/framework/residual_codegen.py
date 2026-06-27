@@ -72,6 +72,235 @@ class ResidualCodegenDependencies:
         return self.uses_reference_gradients
 
 
+@dataclass(frozen=True)
+class MixedFieldLayout:
+    fields: tuple
+    shape_counts: tuple
+    offsets: tuple
+    total_streams: int
+
+    @classmethod
+    def create(cls, system, cell_rule, field_element_types):
+        shape_counts = tuple(
+            _field_n_shape(field, cell_rule, field_element_types)
+            for field in system.fields
+        )
+        offsets = []
+        offset = 0
+        for n_shape in shape_counts:
+            offsets.append(offset)
+            offset += n_shape
+        return cls(tuple(system.fields), shape_counts, tuple(offsets), offset)
+
+    def n_shape(self, field_index):
+        return self.shape_counts[field_index]
+
+    def offset(self, field_index):
+        return self.offsets[field_index]
+
+    def stream_index(self, field_index, local_shape):
+        return self.offsets[field_index] + local_shape
+
+    def n_shape_constant(self, field):
+        return "%s_N_SHAPE" % field.name.upper()
+
+    def n_shape_1d_constant(self, field):
+        return "%s_N_SHAPE_1D" % field.name.upper()
+
+
+@dataclass(frozen=True)
+class DependencyStreamGroup:
+    name: str
+    symbol_suffix: str
+    pointer_suffix: str
+    stride: str
+    uses_value: bool
+    uses_gradient: bool
+
+
+def _dependency_stream_groups(dependencies, *, mesh=False):
+    groups = []
+    if dependencies.current:
+        groups.append(
+            DependencyStreamGroup(
+                "current",
+                "",
+                "_data" if mesh else "",
+                "current_stride",
+                dependencies.current_value,
+                dependencies.current_gradient,
+            )
+        )
+    if dependencies.previous:
+        groups.append(
+            DependencyStreamGroup(
+                "previous",
+                "_old",
+                "_old_data" if mesh else "",
+                "previous_stride",
+                dependencies.previous_value,
+                dependencies.previous_gradient,
+            )
+        )
+    if dependencies.direction:
+        groups.append(
+            DependencyStreamGroup(
+                "direction",
+                "_direction",
+                "_direction_data" if mesh else "",
+                "direction_stride",
+                dependencies.direction_value,
+                dependencies.direction_gradient,
+            )
+        )
+    return tuple(groups)
+
+
+def _indexed_stream_initializer(name, count):
+    return ", ".join("%s[%d]" % (name, i) for i in range(count))
+
+
+def _indexed_stream_range_initializer(name, begin, count):
+    return ", ".join("%s[%d]" % (name, begin + i) for i in range(count))
+
+
+def _field_stream_initializer(layout, field_index, array_name):
+    return ", ".join(
+        "%s[%d]" % (array_name, layout.stream_index(field_index, s))
+        for s in range(layout.n_shape(field_index))
+    )
+
+
+def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies):
+    if cell_rule.is_tensor_product:
+        params = [
+            "const scalar_t *const SFEM_RESTRICT field_shape_1d[%d]" % n_fields
+        ]
+        if dependencies.uses_reference_gradients:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT field_grad_1d[%d]" % n_fields
+            )
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
+        return params
+
+    params = ["const scalar_t *const SFEM_RESTRICT field_shape[%d]" % n_fields]
+    if dependencies.uses_reference_gradients:
+        params.append(
+            "const scalar_t *const SFEM_RESTRICT field_grad_ref[%d]"
+            % (n_fields * dim)
+        )
+    params.append("const scalar_t *const SFEM_RESTRICT q_weight")
+    return params
+
+
+def _mixed_reference_pointer_lines(reference_data, system, cell_rule, dependencies, indent):
+    dim = system.dim
+    lines = []
+    if cell_rule.is_tensor_product:
+        lines.append(
+            "%sconst scalar_t *const field_shape_1d[N_FIELDS] = {%s};"
+            % (
+                indent,
+                ", ".join(
+                    "sfem::codegen::%s::%s_shape_1d()" % (reference_data, field.name)
+                    for field in system.fields
+                ),
+            )
+        )
+        if dependencies.uses_reference_gradients:
+            lines.append(
+                "%sconst scalar_t *const field_grad_1d[N_FIELDS] = {%s};"
+                % (
+                    indent,
+                    ", ".join(
+                        "sfem::codegen::%s::%s_grad_1d()"
+                        % (reference_data, field.name)
+                        for field in system.fields
+                    ),
+                )
+            )
+        return lines
+
+    lines.append(
+        "%sconst scalar_t *const field_shape[N_FIELDS] = {%s};"
+        % (
+            indent,
+            ", ".join(
+                "sfem::codegen::%s::%s_shape()" % (reference_data, field.name)
+                for field in system.fields
+            ),
+        )
+    )
+    if dependencies.uses_reference_gradients:
+        grad_refs = []
+        for field in system.fields:
+            for d in range(dim):
+                grad_refs.append(
+                    "sfem::codegen::%s::%s_grad_ref_%d()"
+                    % (reference_data, field.name, d)
+                )
+        lines.append(
+            "%sconst scalar_t *const field_grad_ref[N_FIELDS * DIM] = {%s};"
+            % (indent, ", ".join(grad_refs))
+        )
+    return lines
+
+
+def _mixed_reference_call_args(cell_rule, dependencies, reference_data):
+    if cell_rule.is_tensor_product:
+        args = ["field_shape_1d"]
+        if dependencies.uses_reference_gradients:
+            args.append("field_grad_1d")
+        args.append("sfem::codegen::%s::q_weight_1d()" % reference_data)
+        return args
+
+    args = ["field_shape"]
+    if dependencies.uses_reference_gradients:
+        args.append("field_grad_ref")
+    args.append("sfem::codegen::%s::q_weight()" % reference_data)
+    return args
+
+
+def _mixed_mesh_dependency_params(system, dependencies):
+    params = []
+    for group in _dependency_stream_groups(dependencies, mesh=True):
+        params.append("const ptrdiff_t %s" % group.stride)
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s%s"
+            % (field.name, group.pointer_suffix)
+            for field in system.fields
+        )
+    return params
+
+
+def _mixed_mesh_dependency_call_args(system, dependencies):
+    args = []
+    for group in _dependency_stream_groups(dependencies, mesh=True):
+        args.append(group.stride)
+        args.extend("%s%s" % (field.name, group.pointer_suffix) for field in system.fields)
+    return args
+
+
+def _mixed_block_stream_pointer_lines(layout, dependencies, indent):
+    lines = []
+    for group in _dependency_stream_groups(dependencies):
+        lines.append(
+            "%sconst scalar_t *const block_%s_streams[N_FIELD_STREAMS] = {%s};"
+            % (
+                indent,
+                group.name,
+                _indexed_stream_initializer(
+                    "block_%s" % group.name, layout.total_streams
+                ),
+            )
+        )
+    lines.append(
+        "%sscalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
+        % (indent, _indexed_stream_initializer("block_output", layout.total_streams))
+    )
+    return lines
+
+
 def weak_residual_coefficients(system, expression, row_field):
     field = system.field(row_field)
     expression = sp.sympify(expression)
@@ -471,26 +700,6 @@ def _mixed_local_header(
     return "\n".join(lines)
 
 
-def _mixed_field_shape_counts(system, cell_rule, field_element_types):
-    return tuple(
-        _field_n_shape(field, cell_rule, field_element_types)
-        for field in system.fields
-    )
-
-
-def _mixed_field_offsets(shape_counts):
-    offsets = []
-    offset = 0
-    for n_shape in shape_counts:
-        offsets.append(offset)
-        offset += n_shape
-    return tuple(offsets)
-
-
-def _mixed_total_field_streams(system, cell_rule, field_element_types):
-    return sum(_mixed_field_shape_counts(system, cell_rule, field_element_types))
-
-
 def _mixed_local_function(
     system,
     function_name,
@@ -502,8 +711,7 @@ def _mixed_local_function(
     rule = specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
-    shape_counts = _mixed_field_shape_counts(system, rule, field_element_types)
-    total_streams = sum(shape_counts)
+    layout = MixedFieldLayout.create(system, rule, field_element_types)
     params = [
         "const ptrdiff_t nelems",
         "const ptrdiff_t geometry_stride",
@@ -513,43 +721,24 @@ def _mixed_local_function(
         params.append(
             "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
-    if rule.is_tensor_product:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT field_shape_1d[%d]" % n_fields
-        )
-        if dependencies.uses_reference_gradients:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT field_grad_1d[%d]"
-                % n_fields
-            )
-        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
-    else:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT field_shape[%d]" % n_fields
-        )
-        if dependencies.uses_reference_gradients:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT field_grad_ref[%d]"
-                % (n_fields * dim)
-            )
-        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
+    params.extend(_mixed_local_reference_params(rule, n_fields, dim, dependencies))
     if dependencies.current:
         params.append(
-            "const scalar_t *const SFEM_RESTRICT current[%d]" % total_streams
+            "const scalar_t *const SFEM_RESTRICT current[%d]" % layout.total_streams
         )
     if dependencies.previous:
         params.append(
-            "const scalar_t *const SFEM_RESTRICT previous[%d]" % total_streams
+            "const scalar_t *const SFEM_RESTRICT previous[%d]" % layout.total_streams
         )
     if dependencies.direction:
         params.append(
-            "const scalar_t *const SFEM_RESTRICT direction[%d]" % total_streams
+            "const scalar_t *const SFEM_RESTRICT direction[%d]" % layout.total_streams
         )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
     params.append(
-        "scalar_t *const SFEM_RESTRICT output[%d]" % total_streams
+        "scalar_t *const SFEM_RESTRICT output[%d]" % layout.total_streams
     )
     lines = [
         "template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>",
@@ -562,7 +751,7 @@ def _mixed_local_function(
             ") {",
             "    static constexpr int DIM = %d;" % dim,
             "    static constexpr int N_FIELDS = %d;" % n_fields,
-            "    static constexpr int N_FIELD_STREAMS = %d;" % total_streams,
+            "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
             "    (void)CELL_N_SHAPE;",
             "    (void)N_FIELD_STREAMS;",
         ]
@@ -570,26 +759,25 @@ def _mixed_local_function(
     lines.extend(
         "    static constexpr int %s_N_SHAPE = %d;"
         % (field.name.upper(), n_shape)
-        for field, n_shape in zip(system.fields, shape_counts)
+        for field, n_shape in zip(system.fields, layout.shape_counts)
     )
     if rule.is_tensor_product:
         lines.extend(
             _mixed_tensor_local_body(
                 system,
-                shape_counts,
+                layout,
                 coefficients,
                 dependencies,
             )
         )
     else:
-        lines.extend(_mixed_simplex_local_body(system, shape_counts, coefficients, dependencies))
+        lines.extend(_mixed_simplex_local_body(system, layout, coefficients, dependencies))
     lines.append("}")
     return lines
 
 
-def _mixed_simplex_local_body(system, shape_counts, coefficients, dependencies):
+def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
-    offsets = _mixed_field_offsets(shape_counts)
     lines = [
         "    for (int q = 0; q < N_QP; ++q) {",
         "#pragma omp simd",
@@ -606,8 +794,7 @@ def _mixed_simplex_local_body(system, shape_counts, coefficients, dependencies):
     lines.extend(
         _mixed_local_field_evaluation_lines(
             system,
-            shape_counts,
-            offsets,
+            layout,
             dependencies,
             "            ",
         )
@@ -622,8 +809,7 @@ def _mixed_simplex_local_body(system, shape_counts, coefficients, dependencies):
         )
     )
     for row, field in enumerate(system.fields):
-        n_shape = shape_counts[row]
-        offset = offsets[row]
+        offset = layout.offset(row)
         lines.append("            for (int test = 0; test < %s_N_SHAPE; ++test) {" % field.name.upper())
         if dependencies.value_coefficients[row]:
             lines.append(
@@ -660,55 +846,45 @@ def _mixed_simplex_local_body(system, shape_counts, coefficients, dependencies):
     return lines
 
 
-def _mixed_tensor_local_body(system, shape_counts, coefficients, dependencies):
+def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
-    offsets = _mixed_field_offsets(shape_counts)
-    groups = []
-    if dependencies.current:
-        groups.append(("current", "", dependencies.current_value, dependencies.current_gradient))
-    if dependencies.previous:
-        groups.append(("previous", "_old", dependencies.previous_value, dependencies.previous_gradient))
-    if dependencies.direction:
-        groups.append(("direction", "_direction", dependencies.direction_value, dependencies.direction_gradient))
+    groups = _dependency_stream_groups(dependencies)
 
     lines = [
         "    static constexpr int N_QP_1D = integer_root(N_QP, DIM);",
         "    static_assert(ipow(N_QP_1D, DIM) == N_QP, \"N_QP must be tensor-product compatible\");",
     ]
     for field_index, field in enumerate(system.fields):
-        shape_name = "%s_N_SHAPE" % field.name.upper()
+        shape_name = layout.n_shape_constant(field)
         lines.extend(
             [
-                "    static constexpr int %s_N_SHAPE_1D = integer_root(%s, DIM);"
-                % (field.name.upper(), shape_name),
-                "    static_assert(ipow(%s_N_SHAPE_1D, DIM) == %s, \"%s must be tensor-product compatible\");"
-                % (field.name.upper(), shape_name, shape_name),
+                "    static constexpr int %s = integer_root(%s, DIM);"
+                % (layout.n_shape_1d_constant(field), shape_name),
+                "    static_assert(ipow(%s, DIM) == %s, \"%s must be tensor-product compatible\");"
+                % (layout.n_shape_1d_constant(field), shape_name, shape_name),
             ]
         )
-        for group, stem, uses_value, uses_gradient in groups:
-            if uses_value:
+        for group in groups:
+            if group.uses_value:
                 lines.append(
                     "    scalar_t %s_%s_value[N_QP * VECTOR_SIZE];"
-                    % (group, field.name)
+                    % (group.name, field.name)
                 )
-            if uses_gradient:
+            if group.uses_gradient:
                 lines.append(
                     "    scalar_t %s_%s_grad_ref[N_QP * DIM * VECTOR_SIZE];"
-                    % (group, field.name)
+                    % (group.name, field.name)
                 )
             lines.append(
                 "    const scalar_t *const %s_%s_streams[%s] = {%s};"
                 % (
-                    group,
+                    group.name,
                     field.name,
                     shape_name,
-                    ", ".join(
-                        "%s[%d]" % (group, offsets[field_index] + s)
-                        for s in range(shape_counts[field_index])
-                    ),
+                    _field_stream_initializer(layout, field_index, group.name),
                 )
             )
-            if uses_gradient:
+            if group.uses_gradient:
                 lines.extend(
                     [
                         "    tensor_evaluate<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
@@ -717,22 +893,22 @@ def _mixed_tensor_local_body(system, shape_counts, coefficients, dependencies):
                         % (
                             field_index,
                             field_index,
-                            group,
+                            group.name,
                             field.name,
-                            group,
+                            group.name,
                             field.name,
-                            group,
+                            group.name,
                             field.name,
                         ),
                     ]
                 )
-            elif uses_value:
+            elif group.uses_value:
                 lines.extend(
                     [
                         "    tensor_evaluate_value<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                         % shape_name,
                         "            nelems, field_shape_1d[%d], %s_%s_streams, %s_%s_value);"
-                        % (field_index, group, field.name, group, field.name),
+                        % (field_index, group.name, field.name, group.name, field.name),
                     ]
                 )
 
@@ -779,20 +955,20 @@ def _mixed_tensor_local_body(system, shape_counts, coefficients, dependencies):
                 % (i, i)
             )
     for field_index, field in enumerate(system.fields):
-        for group, stem, uses_value, uses_gradient in groups:
-            if uses_value:
+        for group in groups:
+            if group.uses_value:
                 lines.append(
                     "            const scalar_t %s%s = %s_%s_value[q * VECTOR_SIZE + lane];"
-                    % (field.name, stem, group, field.name)
+                    % (field.name, group.symbol_suffix, group.name, field.name)
                 )
-            if uses_gradient:
+            if group.uses_gradient:
                 for k in range(dim):
                     lines.append(
                         "            const scalar_t %s%s_grad_%d_ref = %s_%s_grad_ref[(q * DIM + %d) * VECTOR_SIZE + lane];"
-                        % (field.name, stem, k, group, field.name, k)
+                        % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
                 lines.extend(
-                    _physical_gradient_lines(field.name + stem, dim, "            ")
+                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, "            ")
                 )
     lines.extend(
         _coefficient_evaluation_lines(
@@ -826,14 +1002,16 @@ def _mixed_tensor_local_body(system, shape_counts, coefficients, dependencies):
                 )
     lines.extend(["        }", "    }"])
     for row, field in enumerate(system.fields):
-        shape_name = "%s_N_SHAPE" % field.name.upper()
-        offset = offsets[row]
+        shape_name = layout.n_shape_constant(field)
+        offset = layout.offset(row)
         lines.append(
             "    scalar_t *const %s_output_streams[%s] = {%s};"
             % (
                 field.name,
                 shape_name,
-                ", ".join("output[%d]" % (offset + s) for s in range(shape_counts[row])),
+                _indexed_stream_range_initializer(
+                    "output", offset, layout.n_shape(row)
+                ),
             )
         )
         if dependencies.uses_test_gradients:
@@ -857,46 +1035,40 @@ def _mixed_tensor_local_body(system, shape_counts, coefficients, dependencies):
     return lines
 
 
-def _mixed_local_field_evaluation_lines(system, shape_counts, offsets, dependencies, indent):
+def _mixed_local_field_evaluation_lines(system, layout, dependencies, indent):
     dim = system.dim
     lines = []
+    groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
-        n_shape_name = "%s_N_SHAPE" % field.name.upper()
-        offset = offsets[field_index]
-        groups = []
-        if dependencies.current:
-            groups.append(("", "current", dependencies.current_value, dependencies.current_gradient))
-        if dependencies.previous:
-            groups.append(("_old", "previous", dependencies.previous_value, dependencies.previous_gradient))
-        if dependencies.direction:
-            groups.append(("_direction", "direction", dependencies.direction_value, dependencies.direction_gradient))
-        for stem, stream, uses_value, uses_gradient in groups:
-            if uses_value:
-                lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, stem))
-            if uses_gradient:
+        n_shape_name = layout.n_shape_constant(field)
+        offset = layout.offset(field_index)
+        for group in groups:
+            if group.uses_value:
+                lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, group.symbol_suffix))
+            if group.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
-                        % (indent, field.name, stem, d)
+                        % (indent, field.name, group.symbol_suffix, d)
                     )
             lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
             lines.append(
                 "%s    const scalar_t coeff = %s[%d + trial][lane];"
-                % (indent, stream, offset)
+                % (indent, group.name, offset)
             )
-            if uses_value:
+            if group.uses_value:
                 lines.append(
                     "%s    %s%s += coeff * field_shape[%d][q * %s + trial];"
-                    % (indent, field.name, stem, field_index, n_shape_name)
+                    % (indent, field.name, group.symbol_suffix, field_index, n_shape_name)
                 )
-            if uses_gradient:
+            if group.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%s    %s%s_grad_%d_ref += coeff * field_grad_ref[%d * DIM + %d][q * %s + trial];"
                         % (
                             indent,
                             field.name,
-                            stem,
+                            group.symbol_suffix,
                             d,
                             field_index,
                             d,
@@ -904,9 +1076,9 @@ def _mixed_local_field_evaluation_lines(system, shape_counts, offsets, dependenc
                         )
                     )
             lines.append("%s}" % indent)
-            if uses_gradient:
+            if group.uses_gradient:
                 lines.extend(
-                    _physical_gradient_lines(field.name + stem, dim, indent)
+                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, indent)
                 )
     return lines
 
@@ -1178,96 +1350,48 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
         raise AssertionError("tensor aliases are emitted separately")
     dim = system.dim
     lines = []
+    groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
-        groups = []
-        if dependencies.current:
-            groups.append(
-                (
-                    "",
-                    "current",
-                    dependencies.current_value,
-                    dependencies.current_gradient,
+        for group in groups:
+            if group.uses_value:
+                lines.append(
+                    "%sscalar_t %s%s = scalar_t(0);"
+                    % (indent, field.name, group.symbol_suffix)
                 )
-            )
-        if dependencies.previous:
-            groups.append(
-                (
-                    "_old",
-                    "previous",
-                    dependencies.previous_value,
-                    dependencies.previous_gradient,
-                )
-            )
-        for stem, stream, uses_value, uses_gradient in groups:
-            if uses_value:
-                lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, stem))
-            if uses_gradient:
+            if group.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%sscalar_t %s%s_grad_%d_ref = scalar_t(0);"
-                        % (indent, field.name, stem, d)
+                        % (indent, field.name, group.symbol_suffix, d)
                     )
             lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
             lines.append(
                 "%s    const scalar_t coeff = %s[trial * N_FIELDS + %d][lane];"
-                % (indent, stream, field_index)
+                % (indent, group.name, field_index)
             )
-            if uses_value:
+            if group.uses_value:
                 lines.append(
                     "%s    %s%s += coeff * shape[q * N_SHAPE + trial];"
-                    % (indent, field.name, stem)
+                    % (indent, field.name, group.symbol_suffix)
                 )
-            if uses_gradient:
+            if group.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%s    %s%s_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
                         % (
                             indent,
                             field.name,
-                            stem,
+                            group.symbol_suffix,
                             d,
                             sfem_simplex_grad_ref_name("grad_ref", d),
                         )
                     )
             lines.append("%s}" % indent)
-            if uses_gradient:
+            if group.uses_gradient:
                 lines.extend(
-                    _physical_gradient_lines(field.name + stem, dim, indent)
-                )
-        if dependencies.direction:
-            if dependencies.direction_value:
-                lines.append("%sscalar_t %s_direction = scalar_t(0);" % (indent, field.name))
-            if dependencies.direction_gradient:
-                for d in range(dim):
-                    lines.append(
-                        "%sscalar_t %s_direction_grad_%d_ref = scalar_t(0);"
-                        % (indent, field.name, d)
+                    _physical_gradient_lines(
+                        field.name + group.symbol_suffix, dim, indent
                     )
-            lines.append("%sfor (int trial = 0; trial < N_SHAPE; ++trial) {" % indent)
-            lines.append(
-                "%s    const scalar_t coeff = direction[trial * N_FIELDS + %d][lane];"
-                % (indent, field_index)
-            )
-            if dependencies.direction_value:
-                lines.append(
-                    "%s    %s_direction += coeff * shape[q * N_SHAPE + trial];"
-                    % (indent, field.name)
-                )
-            if dependencies.direction_gradient:
-                for d in range(dim):
-                    lines.append(
-                        "%s    %s_direction_grad_%d_ref += coeff * %s[q * N_SHAPE + trial];"
-                        % (
-                            indent,
-                            field.name,
-                            d,
-                            sfem_simplex_grad_ref_name("grad_ref", d),
-                        )
-                    )
-            lines.append("%s}" % indent)
-            if dependencies.direction_gradient:
-                lines.extend(
-                    _physical_gradient_lines(field.name + "_direction", dim, indent)
                 )
     return lines
 
@@ -1289,56 +1413,30 @@ def _physical_gradient_lines(stem, dim, indent):
 def _tensor_field_alias_lines(system, dependencies):
     dim = system.dim
     lines = []
+    groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
-        groups = []
-        if dependencies.current:
-            groups.append(
-                (
-                    "",
-                    "current",
-                    dependencies.current_value,
-                    dependencies.current_gradient,
-                )
-            )
-        if dependencies.previous:
-            groups.append(
-                (
-                    "_old",
-                    "previous",
-                    dependencies.previous_value,
-                    dependencies.previous_gradient,
-                )
-            )
-        for stem, array, uses_value, uses_gradient in groups:
-            if uses_value:
+        for group in groups:
+            if group.uses_value:
                 lines.append(
                     "            const scalar_t %s%s = %s_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
-                    % (field.name, stem, array, field_index)
+                    % (field.name, group.symbol_suffix, group.name, field_index)
                 )
-            if uses_gradient:
+            if group.uses_gradient:
                 for k in range(dim):
                     lines.append(
                         "            const scalar_t %s%s_grad_%d_ref = %s_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                        % (field.name, stem, k, array, field_index, k)
-                    )
-                lines.extend(
-                    _physical_gradient_lines(field.name + stem, dim, "            ")
-                )
-        if dependencies.direction:
-            if dependencies.direction_value:
-                lines.append(
-                    "            const scalar_t %s_direction = direction_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
-                    % (field.name, field_index)
-                )
-            if dependencies.direction_gradient:
-                for k in range(dim):
-                    lines.append(
-                        "            const scalar_t %s_direction_grad_%d_ref = direction_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                        % (field.name, k, field_index, k)
+                        % (
+                            field.name,
+                            group.symbol_suffix,
+                            k,
+                            group.name,
+                            field_index,
+                            k,
+                        )
                     )
                 lines.extend(
                     _physical_gradient_lines(
-                        field.name + "_direction", dim, "            "
+                        field.name + group.symbol_suffix, dim, "            "
                     )
                 )
     return lines
@@ -1721,9 +1819,7 @@ def _mixed_isoparametric_function(
     dependencies,
 ):
     dim = system.dim
-    shape_counts = _mixed_field_shape_counts(system, cell_rule, field_element_types)
-    offsets = _mixed_field_offsets(shape_counts)
-    total_streams = sum(shape_counts)
+    layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
@@ -1731,15 +1827,7 @@ def _mixed_isoparametric_function(
         "const geom_t *const *const SFEM_RESTRICT points",
     ]
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    if dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend("const scalar_t *const SFEM_RESTRICT %s_data" % field.name for field in system.fields)
-    if dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend("const scalar_t *const SFEM_RESTRICT %s_old_data" % field.name for field in system.fields)
-    if dependencies.direction:
-        params.append("const ptrdiff_t direction_stride")
-        params.extend("const scalar_t *const SFEM_RESTRICT %s_direction_data" % field.name for field in system.fields)
+    params.extend(_mixed_mesh_dependency_params(system, dependencies))
     params.append("const ptrdiff_t out_stride")
     params.extend("scalar_t *const SFEM_RESTRICT %s_out" % field.name for field in system.fields)
     impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
@@ -1761,7 +1849,7 @@ def _mixed_isoparametric_function(
             "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
             "    static constexpr int N_SHAPE = CELL_N_SHAPE;",
             "    static constexpr int N_FIELDS = %d;" % len(system.fields),
-            "    static constexpr int N_FIELD_STREAMS = %d;" % total_streams,
+            "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
             "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
             "    (void)nnodes;",
         ]
@@ -1814,23 +1902,20 @@ def _mixed_isoparametric_function(
                 % (shape * dim + d, d, node)
             )
     for field_index, field in enumerate(system.fields):
-        for local_shape in range(shape_counts[field_index]):
-            stream = offsets[field_index] + local_shape
+        for local_shape in range(layout.n_shape(field_index)):
+            stream = layout.stream_index(field_index, local_shape)
             node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
-            if dependencies.current:
+            for group in _dependency_stream_groups(dependencies, mesh=True):
                 lines.append(
-                    "            block_current[%d][lane] = %s_data[%s * current_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.previous:
-                lines.append(
-                    "            block_previous[%d][lane] = %s_old_data[%s * previous_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.direction:
-                lines.append(
-                    "            block_direction[%d][lane] = %s_direction_data[%s * direction_stride];"
-                    % (stream, field.name, node)
+                    "            block_%s[%d][lane] = %s%s[%s * %s];"
+                    % (
+                        group.name,
+                        stream,
+                        field.name,
+                        group.pointer_suffix,
+                        node,
+                        group.stride,
+                    )
                 )
             lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.append("        }")
@@ -1885,87 +1970,31 @@ def _mixed_isoparametric_function(
         lines.extend(["            }", "        }"])
     reference_data = "%s_reference_data<scalar_t>" % prefix
     lines.extend([""])
-    if cell_rule.is_tensor_product:
-        lines.append(
-            "        const scalar_t *const field_shape_1d[N_FIELDS] = {%s};"
-            % ", ".join(
-                "sfem::codegen::%s::%s_shape_1d()" % (reference_data, field.name)
-                for field in system.fields
-            )
+    lines.extend(
+        _mixed_reference_pointer_lines(
+            reference_data,
+            system,
+            cell_rule,
+            dependencies,
+            "        ",
         )
-        if dependencies.uses_reference_gradients:
-            lines.append(
-                "        const scalar_t *const field_grad_1d[N_FIELDS] = {%s};"
-                % ", ".join(
-                    "sfem::codegen::%s::%s_grad_1d()" % (reference_data, field.name)
-                    for field in system.fields
-                )
-            )
-    else:
-        lines.append(
-            "        const scalar_t *const field_shape[N_FIELDS] = {%s};"
-            % ", ".join(
-                "sfem::codegen::%s::%s_shape()" % (reference_data, field.name)
-                for field in system.fields
-            )
-        )
-        if dependencies.uses_reference_gradients:
-            grad_refs = []
-            for field in system.fields:
-                for d in range(dim):
-                    grad_refs.append(
-                        "sfem::codegen::%s::%s_grad_ref_%d()"
-                        % (reference_data, field.name, d)
-                    )
-            lines.append(
-                "        const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {%s};"
-                % ", ".join(grad_refs)
-            )
+    )
     lines.append(
         "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
         % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
     )
-    if dependencies.current:
-        lines.append(
-            "        const scalar_t *const block_current_streams[N_FIELD_STREAMS] = {%s};"
-            % ", ".join("block_current[%d]" % i for i in range(total_streams))
-        )
-    if dependencies.previous:
-        lines.append(
-            "        const scalar_t *const block_previous_streams[N_FIELD_STREAMS] = {%s};"
-            % ", ".join("block_previous[%d]" % i for i in range(total_streams))
-        )
-    if dependencies.direction:
-        lines.append(
-            "        const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {%s};"
-            % ", ".join("block_direction[%d]" % i for i in range(total_streams))
-        )
-    lines.append(
-        "        scalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
-        % ", ".join("block_output[%d]" % i for i in range(total_streams))
-    )
+    lines.extend(_mixed_block_stream_pointer_lines(layout, dependencies, "        "))
     call_args = [
         "nelems",
         "VECTOR_SIZE",
         "block_determinant",
         "block_adjugate",
     ]
-    if cell_rule.is_tensor_product:
-        call_args.append("field_shape_1d")
-        if dependencies.uses_reference_gradients:
-            call_args.append("field_grad_1d")
-        call_args.append("sfem::codegen::%s::q_weight_1d()" % reference_data)
-    else:
-        call_args.append("field_shape")
-        if dependencies.uses_reference_gradients:
-            call_args.append("field_grad_ref")
-        call_args.append("sfem::codegen::%s::q_weight()" % reference_data)
-    if dependencies.current:
-        call_args.append("block_current_streams")
-    if dependencies.previous:
-        call_args.append("block_previous_streams")
-    if dependencies.direction:
-        call_args.append("block_direction_streams")
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data))
+    call_args.extend(
+        "block_%s_streams" % group.name
+        for group in _dependency_stream_groups(dependencies)
+    )
     call_args.extend(map(str, dependencies.parameters))
     call_args.append("block_output_streams")
     lines.extend(
@@ -1978,8 +2007,8 @@ def _mixed_isoparametric_function(
         ]
     )
     for field_index, field in enumerate(system.fields):
-        for local_shape in range(shape_counts[field_index]):
-            stream = offsets[field_index] + local_shape
+        for local_shape in range(layout.n_shape(field_index)):
+            stream = layout.stream_index(field_index, local_shape)
             lines.extend(
                 [
                     "#pragma omp atomic update",
@@ -2007,15 +2036,7 @@ def _mixed_isoparametric_function(
             lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
         call_args = ["nelements", "nnodes", "elements", "points"]
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend("%s_data" % field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old_data" % field.name for field in system.fields)
-        if dependencies.direction:
-            call_args.append("direction_stride")
-            call_args.extend("%s_direction_data" % field.name for field in system.fields)
+        call_args.extend(_mixed_mesh_dependency_call_args(system, dependencies))
         call_args.append("out_stride")
         call_args.extend("%s_out" % field.name for field in system.fields)
         lines.extend(
@@ -2027,103 +2048,6 @@ def _mixed_isoparametric_function(
                 "",
             ]
         )
-    return lines
-
-
-def _mixed_geometry_lines(prefix, cell_rule, dim):
-    lines = []
-    for i in range(dim):
-        for j in range(dim):
-            terms = [
-                "points[%d][ev[%d]] * %s_%s_f64[q * CELL_N_SHAPE + %d]"
-                % (
-                    i,
-                    shape,
-                    prefix,
-                    sfem_simplex_grad_ref_name("cell_grad_ref", j),
-                    shape,
-                )
-                for shape in range(cell_rule.n_shape)
-            ]
-            lines.append(
-                "            const scalar_t J%d%d = %s;"
-                % (i, j, " + ".join(terms))
-            )
-    if dim == 2:
-        lines.extend(
-            [
-                "            const scalar_t det = J00 * J11 - J01 * J10;",
-                "            const scalar_t adj0 = J11;",
-                "            const scalar_t adj1 = -J01;",
-                "            const scalar_t adj2 = -J10;",
-                "            const scalar_t adj3 = J00;",
-            ]
-        )
-    elif dim == 3:
-        lines.extend(
-            [
-                "            const scalar_t adj0 = J11 * J22 - J12 * J21;",
-                "            const scalar_t adj1 = J02 * J21 - J01 * J22;",
-                "            const scalar_t adj2 = J01 * J12 - J02 * J11;",
-                "            const scalar_t adj3 = J12 * J20 - J10 * J22;",
-                "            const scalar_t adj4 = J00 * J22 - J02 * J20;",
-                "            const scalar_t adj5 = J02 * J10 - J00 * J12;",
-                "            const scalar_t adj6 = J10 * J21 - J11 * J20;",
-                "            const scalar_t adj7 = J01 * J20 - J00 * J21;",
-                "            const scalar_t adj8 = J00 * J11 - J01 * J10;",
-                "            const scalar_t det = J00 * adj0 + J01 * adj3 + J02 * adj6;",
-            ]
-        )
-    else:
-        raise ValueError("mixed residual codegen supports dimensions 2 and 3")
-    return lines
-
-
-def _mixed_field_eval_lines(prefix, system, cell_rule, field_element_types, dependencies):
-    dim = system.dim
-    lines = []
-    groups = []
-    if dependencies.current:
-        groups.append(("", "_data", "current_stride"))
-    if dependencies.previous:
-        groups.append(("_old", "_old_data", "previous_stride"))
-    if dependencies.direction:
-        groups.append(("_direction", "_direction_data", "direction_stride"))
-    for field in system.fields:
-        n_shape = _field_n_shape(field, cell_rule, field_element_types)
-        for suffix, pointer_suffix, stride in groups:
-            value_terms = [
-                "%s%s[ev[%d] * %s] * %s_%s_shape_f64[q * %d + %d]"
-                % (field.name, pointer_suffix, s, stride, prefix, field.name, n_shape, s)
-                for s in range(n_shape)
-            ]
-            lines.append(
-                "            const scalar_t %s%s = %s;"
-                % (field.name, suffix, " + ".join(value_terms))
-            )
-            for k in range(dim):
-                grad_terms = [
-                    "%s%s[ev[%d] * %s] * %s_%s_%s_f64[q * %d + %d]"
-                    % (
-                        field.name,
-                        pointer_suffix,
-                        s,
-                        stride,
-                        prefix,
-                        field.name,
-                        sfem_simplex_grad_ref_name("grad_ref", k),
-                        n_shape,
-                        s,
-                    )
-                    for s in range(n_shape)
-                ]
-                lines.append(
-                    "            const scalar_t %s%s_grad_%d_ref = %s;"
-                    % (field.name, suffix, k, " + ".join(grad_terms))
-                )
-            lines.extend(
-                _physical_gradient_lines(field.name + suffix, dim, "            ")
-            )
     return lines
 
 
