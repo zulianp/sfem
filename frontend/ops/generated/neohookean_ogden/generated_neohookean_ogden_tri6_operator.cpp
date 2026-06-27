@@ -16,9 +16,9 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_tri6_tri6_q_weight[3] = {real_t(0.16666666666666666), real_t(0.16666666666666666), real_t(0.16666666666666666)};
-static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_x[18] = {real_t(-1.666666666666667), real_t(-0.33333333333333337), real_t(0), real_t(2.0000000000000004), real_t(0.66666666666666663), real_t(-0.66666666666666663), real_t(0.33333333333333315), real_t(1.6666666666666665), real_t(0), real_t(-1.9999999999999996), real_t(0.66666666666666663), real_t(-0.66666666666666663), real_t(0.33333333333333304), real_t(-0.33333333333333337), real_t(0), real_t(4.4408920985006262e-16), real_t(2.6666666666666665), real_t(-2.6666666666666665)};
-static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_y[18] = {real_t(-1.666666666666667), real_t(0), real_t(-0.33333333333333337), real_t(-0.66666666666666663), real_t(0.66666666666666663), real_t(2), real_t(0.33333333333333315), real_t(0), real_t(-0.33333333333333337), real_t(-2.6666666666666665), real_t(2.6666666666666665), real_t(2.2204460492503131e-16), real_t(0.33333333333333304), real_t(0), real_t(1.6666666666666665), real_t(-0.66666666666666663), real_t(0.66666666666666663), real_t(-1.9999999999999996)};
+static const real_t generated_neohookean_ogden_tri6_tri6_q_weight[6] = {real_t(0.11169079483900569), real_t(0.11169079483900569), real_t(0.11169079483900569), real_t(0.054975871827660998), real_t(0.054975871827660998), real_t(0.054975871827660998)};
+static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_x[36] = {real_t(0.56758792732771912), real_t(0.78379396366385956), real_t(0), real_t(-1.3513818909915787), real_t(1.7837939636638596), real_t(-1.7837939636638596), real_t(-0.78379396366385956), real_t(-0.56758792732771912), real_t(0), real_t(1.3513818909915787), real_t(1.7837939636638596), real_t(-1.7837939636638596), real_t(-0.78379396366385956), real_t(0.78379396366385956), real_t(0), real_t(5.5511151231257827e-17), real_t(0.43241207267228082), real_t(-0.43241207267228082), real_t(-2.2673902919218341), real_t(-0.63369514596091703), real_t(0), real_t(2.9010854378827511), real_t(0.36630485403908297), real_t(-0.36630485403908297), real_t(0.63369514596091703), real_t(2.2673902919218341), real_t(0), real_t(-2.9010854378827511), real_t(0.36630485403908297), real_t(-0.36630485403908297), real_t(0.63369514596091703), real_t(-0.63369514596091703), real_t(0), real_t(0), real_t(3.2673902919218341), real_t(-3.2673902919218341)};
+static const real_t generated_neohookean_ogden_tri6_tri6_grad_ref_y[36] = {real_t(0.56758792732771912), real_t(0), real_t(0.78379396366385956), real_t(-1.7837939636638596), real_t(1.7837939636638596), real_t(-1.3513818909915787), real_t(-0.78379396366385956), real_t(0), real_t(0.78379396366385956), real_t(-0.43241207267228082), real_t(0.43241207267228082), real_t(0), real_t(-0.78379396366385956), real_t(0), real_t(-0.56758792732771912), real_t(-1.7837939636638596), real_t(1.7837939636638596), real_t(1.3513818909915787), real_t(-2.2673902919218341), real_t(0), real_t(-0.63369514596091703), real_t(-0.36630485403908297), real_t(0.36630485403908297), real_t(2.9010854378827511), real_t(0.63369514596091703), real_t(0), real_t(-0.63369514596091703), real_t(-3.2673902919218341), real_t(3.2673902919218341), real_t(0), real_t(0.63369514596091703), real_t(0), real_t(2.2673902919218341), real_t(-0.36630485403908297), real_t(0.36630485403908297), real_t(-2.9010854378827511)};
 
 } // namespace codegen
 } // namespace sfem
@@ -30,10 +30,10 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_objective_so
     "generated_neohookean_ogden_tri6_tri6_objective_soa",
     "TRI6",
     2,
-    3,
+    6,
     6,
     16,
-    2,
+    4,
     15,
     27,
     1,
@@ -48,8 +48,8 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_objective_so
     8,
     13,
     5,
-    36,
-    3,
+    72,
+    6,
     2,
     12,
     0,
@@ -186,7 +186,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_soa_impl(
         real_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -263,7 +263,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_objective_soa(
         const real_t *const SFEM_RESTRICT uy5,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_objective_soa_impl<real_t, 3, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, value);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_objective_soa_impl<real_t, 6, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, value);
 }
 
 namespace sfem {
@@ -304,7 +304,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
         real_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -442,7 +442,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_objective_isoparametric_soa(
         const real_t *const SFEM_RESTRICT uy5,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_objective_isoparametric_soa_impl<real_t, 3, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, value);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_objective_isoparametric_soa_impl<real_t, 6, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, value);
 }
 
 namespace sfem {
@@ -466,13 +466,13 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_affine_mes
         scalar_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -591,15 +591,15 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_objective_isoparamet
         scalar_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -758,10 +758,10 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_gradient_soa
     "generated_neohookean_ogden_tri6_tri6_gradient_soa",
     "TRI6",
     2,
-    3,
+    6,
     6,
     16,
-    2,
+    4,
     15,
     27,
     1,
@@ -776,8 +776,8 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_gradient_soa
     8,
     13,
     5,
-    36,
-    3,
+    72,
+    6,
     2,
     12,
     0,
@@ -925,7 +925,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_soa_impl(
         real_t *const SFEM_RESTRICT outy5
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -1047,7 +1047,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_gradient_soa(
         real_t *const SFEM_RESTRICT outx5,
         real_t *const SFEM_RESTRICT outy5
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_gradient_soa_impl<real_t, 3, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_gradient_soa_impl<real_t, 6, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
 }
 
 namespace sfem {
@@ -1099,7 +1099,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
         real_t *const SFEM_RESTRICT outy5
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -1282,7 +1282,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_soa(
         real_t *const SFEM_RESTRICT outx5,
         real_t *const SFEM_RESTRICT outy5
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_soa_impl<real_t, 3, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_soa_impl<real_t, 6, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
 }
 
 namespace sfem {
@@ -1308,13 +1308,13 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_affine_mesh
         scalar_t *const SFEM_RESTRICT outy
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1496,15 +1496,15 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_gradient_isoparametr
         scalar_t *const SFEM_RESTRICT outy
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1724,10 +1724,10 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_apply_soa_di
     "generated_neohookean_ogden_tri6_tri6_apply_soa",
     "TRI6",
     2,
-    3,
+    6,
     6,
     16,
-    2,
+    4,
     48,
     95,
     1,
@@ -1742,8 +1742,8 @@ static const KernelDiagnostics generated_neohookean_ogden_tri6_tri6_apply_soa_di
     31,
     26,
     5,
-    36,
-    3,
+    72,
+    6,
     2,
     12,
     12,
@@ -1903,7 +1903,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_soa_impl(
         real_t *const SFEM_RESTRICT outy5
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -2062,7 +2062,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_apply_soa(
         real_t *const SFEM_RESTRICT outx5,
         real_t *const SFEM_RESTRICT outy5
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_apply_soa_impl<real_t, 3, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, hx4, hy4, hx5, hy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_apply_soa_impl<real_t, 6, 6, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, hx4, hy4, hx5, hy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
 }
 
 namespace sfem {
@@ -2126,7 +2126,7 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
         real_t *const SFEM_RESTRICT outy5
 ) {
     static constexpr int DIM = 2;
-    static_assert(N_QP == 3, "N_QP does not match generated geometry streams");
+    static_assert(N_QP == 6, "N_QP does not match generated geometry streams");
     static_assert(N_SHAPE == 6, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
 
@@ -2346,7 +2346,7 @@ extern "C" int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_soa(
         real_t *const SFEM_RESTRICT outx5,
         real_t *const SFEM_RESTRICT outy5
 ) {
-    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_apply_isoparametric_soa_impl<real_t, 3, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, hx4, hy4, hx5, hy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
+    return sfem::codegen::generated_neohookean_ogden_tri6_tri6_apply_isoparametric_soa_impl<real_t, 6, 6, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_x, sfem::codegen::generated_neohookean_ogden_tri6_tri6_grad_ref_y, sfem::codegen::generated_neohookean_ogden_tri6_tri6_q_weight, mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, ux4, uy4, ux5, uy5, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, hx4, hy4, hx5, hy5, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3, outx4, outy4, outx5, outy5);
 }
 
 namespace sfem {
@@ -2375,13 +2375,13 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_affine_mesh_so
         scalar_t *const SFEM_RESTRICT outy
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -2597,15 +2597,15 @@ static SFEM_INLINE int generated_neohookean_ogden_tri6_tri6_apply_isoparametric_
         scalar_t *const SFEM_RESTRICT outy
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 3;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 6;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    static const scalar_t grad_ref_x[18] = {scalar_t(-1.666666666666667), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(2.0000000000000004), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333315), scalar_t(1.6666666666666665), scalar_t(0), scalar_t(-1.9999999999999996), scalar_t(0.66666666666666663), scalar_t(-0.66666666666666663), scalar_t(0.33333333333333304), scalar_t(-0.33333333333333337), scalar_t(0), scalar_t(4.4408920985006262e-16), scalar_t(2.6666666666666665), scalar_t(-2.6666666666666665)};
-    static const scalar_t grad_ref_y[18] = {scalar_t(-1.666666666666667), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(2), scalar_t(0.33333333333333315), scalar_t(0), scalar_t(-0.33333333333333337), scalar_t(-2.6666666666666665), scalar_t(2.6666666666666665), scalar_t(2.2204460492503131e-16), scalar_t(0.33333333333333304), scalar_t(0), scalar_t(1.6666666666666665), scalar_t(-0.66666666666666663), scalar_t(0.66666666666666663), scalar_t(-1.9999999999999996)};
-    static const scalar_t q_weight[3] = {scalar_t(0.16666666666666666), scalar_t(0.16666666666666666), scalar_t(0.16666666666666666)};
+    static const scalar_t grad_ref_x[36] = {scalar_t(0.56758792732771912), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(-1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(-0.56758792732771912), scalar_t(0), scalar_t(1.3513818909915787), scalar_t(1.7837939636638596), scalar_t(-1.7837939636638596), scalar_t(-0.78379396366385956), scalar_t(0.78379396366385956), scalar_t(0), scalar_t(5.5511151231257827e-17), scalar_t(0.43241207267228082), scalar_t(-0.43241207267228082), scalar_t(-2.2673902919218341), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(2.2673902919218341), scalar_t(0), scalar_t(-2.9010854378827511), scalar_t(0.36630485403908297), scalar_t(-0.36630485403908297), scalar_t(0.63369514596091703), scalar_t(-0.63369514596091703), scalar_t(0), scalar_t(0), scalar_t(3.2673902919218341), scalar_t(-3.2673902919218341)};
+    static const scalar_t grad_ref_y[36] = {scalar_t(0.56758792732771912), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(-1.3513818909915787), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(0.78379396366385956), scalar_t(-0.43241207267228082), scalar_t(0.43241207267228082), scalar_t(0), scalar_t(-0.78379396366385956), scalar_t(0), scalar_t(-0.56758792732771912), scalar_t(-1.7837939636638596), scalar_t(1.7837939636638596), scalar_t(1.3513818909915787), scalar_t(-2.2673902919218341), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(2.9010854378827511), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(-0.63369514596091703), scalar_t(-3.2673902919218341), scalar_t(3.2673902919218341), scalar_t(0), scalar_t(0.63369514596091703), scalar_t(0), scalar_t(2.2673902919218341), scalar_t(-0.36630485403908297), scalar_t(0.36630485403908297), scalar_t(-2.9010854378827511)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {

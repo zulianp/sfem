@@ -14,14 +14,14 @@
 namespace sfem {
 namespace codegen {
 
-static const double generated_two_phase_flow_tri3_tri3_shape_f64[3] = {double(0.33333333333333343), double(0.33333333333333331), double(0.33333333333333331)};
-static const double generated_two_phase_flow_tri3_tri3_grad_ref_x_f64[3] = {double(-1), double(1), double(0)};
-static const double generated_two_phase_flow_tri3_tri3_grad_ref_y_f64[3] = {double(-1), double(0), double(1)};
-static const double generated_two_phase_flow_tri3_tri3_q_weight_f64[1] = {double(0.5)};
-static const float generated_two_phase_flow_tri3_tri3_shape_f32[3] = {float(0.33333333333333343), float(0.33333333333333331), float(0.33333333333333331)};
-static const float generated_two_phase_flow_tri3_tri3_grad_ref_x_f32[3] = {float(-1), float(1), float(0)};
-static const float generated_two_phase_flow_tri3_tri3_grad_ref_y_f32[3] = {float(-1), float(0), float(1)};
-static const float generated_two_phase_flow_tri3_tri3_q_weight_f32[1] = {float(0.5)};
+static const double generated_two_phase_flow_tri3_tri3_shape_f64[18] = {double(0.10810301816807022), double(0.44594849091596489), double(0.44594849091596489), double(0.44594849091596489), double(0.10810301816807021), double(0.44594849091596489), double(0.44594849091596489), double(0.44594849091596489), double(0.10810301816807021), double(0.81684757298045851), double(0.091576213509770743), double(0.091576213509770743), double(0.091576213509770743), double(0.81684757298045851), double(0.091576213509770743), double(0.091576213509770743), double(0.091576213509770743), double(0.81684757298045851)};
+static const double generated_two_phase_flow_tri3_tri3_grad_ref_x_f64[18] = {double(-1), double(1), double(0), double(-1), double(1), double(0), double(-1), double(1), double(0), double(-1), double(1), double(0), double(-1), double(1), double(0), double(-1), double(1), double(0)};
+static const double generated_two_phase_flow_tri3_tri3_grad_ref_y_f64[18] = {double(-1), double(0), double(1), double(-1), double(0), double(1), double(-1), double(0), double(1), double(-1), double(0), double(1), double(-1), double(0), double(1), double(-1), double(0), double(1)};
+static const double generated_two_phase_flow_tri3_tri3_q_weight_f64[6] = {double(0.11169079483900569), double(0.11169079483900569), double(0.11169079483900569), double(0.054975871827660998), double(0.054975871827660998), double(0.054975871827660998)};
+static const float generated_two_phase_flow_tri3_tri3_shape_f32[18] = {float(0.10810301816807022), float(0.44594849091596489), float(0.44594849091596489), float(0.44594849091596489), float(0.10810301816807021), float(0.44594849091596489), float(0.44594849091596489), float(0.44594849091596489), float(0.10810301816807021), float(0.81684757298045851), float(0.091576213509770743), float(0.091576213509770743), float(0.091576213509770743), float(0.81684757298045851), float(0.091576213509770743), float(0.091576213509770743), float(0.091576213509770743), float(0.81684757298045851)};
+static const float generated_two_phase_flow_tri3_tri3_grad_ref_x_f32[18] = {float(-1), float(1), float(0), float(-1), float(1), float(0), float(-1), float(1), float(0), float(-1), float(1), float(0), float(-1), float(1), float(0), float(-1), float(1), float(0)};
+static const float generated_two_phase_flow_tri3_tri3_grad_ref_y_f32[18] = {float(-1), float(0), float(1), float(-1), float(0), float(1), float(-1), float(0), float(1), float(-1), float(0), float(1), float(-1), float(0), float(1), float(-1), float(0), float(1)};
+static const float generated_two_phase_flow_tri3_tri3_q_weight_f32[6] = {float(0.11169079483900569), float(0.11169079483900569), float(0.11169079483900569), float(0.054975871827660998), float(0.054975871827660998), float(0.054975871827660998)};
 
 } // namespace codegen
 } // namespace sfem
@@ -33,10 +33,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_residual_element_so
     "generated_two_phase_flow_tri3_residual_element_soa",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     27,
     64,
     9,
@@ -51,8 +51,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_residual_element_so
     15,
     28,
     5,
-    9,
-    1,
+    54,
+    6,
     21,
     12,
     0,
@@ -167,10 +167,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_w_p_w_di
     "generated_two_phase_flow_tri3_jacobian_p_w_p_w",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     19,
     53,
     9,
@@ -185,8 +185,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_w_p_w_di
     16,
     27,
     5,
-    9,
-    1,
+    54,
+    6,
     14,
     6,
     6,
@@ -253,10 +253,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_w_p_c_di
     "generated_two_phase_flow_tri3_jacobian_p_w_p_c",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     13,
     36,
     8,
@@ -271,8 +271,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_w_p_c_di
     11,
     20,
     5,
-    9,
-    1,
+    54,
+    6,
     14,
     6,
     6,
@@ -339,10 +339,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_c_p_w_di
     "generated_two_phase_flow_tri3_jacobian_p_c_p_w",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     11,
     39,
     10,
@@ -357,8 +357,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_c_p_w_di
     9,
     21,
     5,
-    9,
-    1,
+    54,
+    6,
     16,
     6,
     6,
@@ -425,10 +425,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_c_p_c_di
     "generated_two_phase_flow_tri3_jacobian_p_c_p_c",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     20,
     53,
     10,
@@ -443,8 +443,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_p_c_p_c_di
     15,
     28,
     5,
-    9,
-    1,
+    54,
+    6,
     16,
     6,
     6,
@@ -511,10 +511,10 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_action_ele
     "generated_two_phase_flow_tri3_jacobian_action_element_soa",
     "TRI3",
     2,
-    1,
+    6,
     3,
     16,
-    1,
+    4,
     41,
     109,
     14,
@@ -529,8 +529,8 @@ static const KernelDiagnostics generated_two_phase_flow_tri3_jacobian_action_ele
     39,
     29,
     5,
-    9,
-    1,
+    54,
+    6,
     21,
     6,
     6,
@@ -668,7 +668,7 @@ extern "C" int generated_two_phase_flow_tri3_residual_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<double, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -702,7 +702,7 @@ extern "C" int generated_two_phase_flow_tri3_residual_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<float, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_residual_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -751,15 +751,15 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_residual_affine_mesh_soa_im
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 1;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 3;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
-    static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
-    static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
-    static const scalar_t q_weight[1] = {scalar_t(0.5)};
+    static const scalar_t shape[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -954,15 +954,15 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_residual_isoparametric_mesh
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 1;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 3;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
-    static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
-    static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
-    static const scalar_t q_weight[1] = {scalar_t(0.5)};
+    static const scalar_t shape[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1188,7 +1188,7 @@ extern "C" int generated_two_phase_flow_tri3_jacobian_action_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<double, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f64, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1222,7 +1222,7 @@ extern "C" int generated_two_phase_flow_tri3_jacobian_action_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[6]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<float, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_simplex_jacobian_action_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_tri3_tri3_shape_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_x_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_grad_ref_y_f32, sfem::codegen::generated_two_phase_flow_tri3_tri3_q_weight_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1271,15 +1271,15 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_jacobian_action_affine_mesh
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 1;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 3;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
-    static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
-    static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
-    static const scalar_t q_weight[1] = {scalar_t(0.5)};
+    static const scalar_t shape[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1474,15 +1474,15 @@ static SFEM_INLINE int generated_two_phase_flow_tri3_jacobian_action_isoparametr
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 1;
+    static constexpr int N_QP = 6;
     static constexpr int N_SHAPE = 3;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
-    static const scalar_t grad_ref_x[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
-    static const scalar_t grad_ref_y[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
-    static const scalar_t q_weight[1] = {scalar_t(0.5)};
+    static const scalar_t shape[18] = {scalar_t(0.10810301816807022), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.44594849091596489), scalar_t(0.10810301816807021), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.091576213509770743), scalar_t(0.81684757298045851)};
+    static const scalar_t grad_ref_x[18] = {scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const scalar_t grad_ref_y[18] = {scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const scalar_t q_weight[6] = {scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.11169079483900569), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998), scalar_t(0.054975871827660998)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {

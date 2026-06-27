@@ -14,12 +14,12 @@
 namespace sfem {
 namespace codegen {
 
-static const double generated_two_phase_flow_quad4_quad4_shape_1d_f64[4] = {double(0.78867513459481287), double(0.21132486540518708), double(0.21132486540518713), double(0.78867513459481287)};
-static const double generated_two_phase_flow_quad4_quad4_grad_1d_f64[4] = {double(-1), double(1), double(-1), double(1)};
-static const double generated_two_phase_flow_quad4_quad4_q_weight_1d_f64[2] = {double(0.5), double(0.5)};
-static const float generated_two_phase_flow_quad4_quad4_shape_1d_f32[4] = {float(0.78867513459481287), float(0.21132486540518708), float(0.21132486540518713), float(0.78867513459481287)};
-static const float generated_two_phase_flow_quad4_quad4_grad_1d_f32[4] = {float(-1), float(1), float(-1), float(1)};
-static const float generated_two_phase_flow_quad4_quad4_q_weight_1d_f32[2] = {float(0.5), float(0.5)};
+static const double generated_two_phase_flow_quad4_quad4_shape_1d_f64[8] = {double(0.93056815579702623), double(0.069431844202973714), double(0.66999052179242813), double(0.33000947820757187), double(0.33000947820757187), double(0.66999052179242813), double(0.069431844202973769), double(0.93056815579702623)};
+static const double generated_two_phase_flow_quad4_quad4_grad_1d_f64[8] = {double(-1), double(1), double(-1), double(1), double(-1), double(1), double(-1), double(1)};
+static const double generated_two_phase_flow_quad4_quad4_q_weight_1d_f64[4] = {double(0.17392742256872692), double(0.3260725774312731), double(0.3260725774312731), double(0.17392742256872692)};
+static const float generated_two_phase_flow_quad4_quad4_shape_1d_f32[8] = {float(0.93056815579702623), float(0.069431844202973714), float(0.66999052179242813), float(0.33000947820757187), float(0.33000947820757187), float(0.66999052179242813), float(0.069431844202973769), float(0.93056815579702623)};
+static const float generated_two_phase_flow_quad4_quad4_grad_1d_f32[8] = {float(-1), float(1), float(-1), float(1), float(-1), float(1), float(-1), float(1)};
+static const float generated_two_phase_flow_quad4_quad4_q_weight_1d_f32[4] = {float(0.17392742256872692), float(0.3260725774312731), float(0.3260725774312731), float(0.17392742256872692)};
 
 } // namespace codegen
 } // namespace sfem
@@ -31,10 +31,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_residual_element_s
     "generated_two_phase_flow_quad4_residual_element_soa",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     27,
     64,
     9,
@@ -49,8 +49,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_residual_element_s
     15,
     28,
     5,
-    8,
-    2,
+    16,
+    4,
     21,
     16,
     0,
@@ -165,10 +165,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_w_p_w_d
     "generated_two_phase_flow_quad4_jacobian_p_w_p_w",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     19,
     53,
     9,
@@ -183,8 +183,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_w_p_w_d
     16,
     27,
     5,
-    8,
-    2,
+    16,
+    4,
     14,
     8,
     8,
@@ -251,10 +251,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_w_p_c_d
     "generated_two_phase_flow_quad4_jacobian_p_w_p_c",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     13,
     36,
     8,
@@ -269,8 +269,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_w_p_c_d
     11,
     20,
     5,
-    8,
-    2,
+    16,
+    4,
     14,
     8,
     8,
@@ -337,10 +337,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_c_p_w_d
     "generated_two_phase_flow_quad4_jacobian_p_c_p_w",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     11,
     39,
     10,
@@ -355,8 +355,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_c_p_w_d
     9,
     21,
     5,
-    8,
-    2,
+    16,
+    4,
     16,
     8,
     8,
@@ -423,10 +423,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_c_p_c_d
     "generated_two_phase_flow_quad4_jacobian_p_c_p_c",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     20,
     53,
     10,
@@ -441,8 +441,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_p_c_p_c_d
     15,
     28,
     5,
-    8,
-    2,
+    16,
+    4,
     16,
     8,
     8,
@@ -509,10 +509,10 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_action_el
     "generated_two_phase_flow_quad4_jacobian_action_element_soa",
     "QUAD4",
     2,
-    4,
+    16,
     4,
     16,
-    2,
+    4,
     41,
     109,
     14,
@@ -527,8 +527,8 @@ static const KernelDiagnostics generated_two_phase_flow_quad4_jacobian_action_el
     39,
     29,
     5,
-    8,
-    2,
+    16,
+    4,
     21,
     8,
     8,
@@ -666,7 +666,7 @@ extern "C" int generated_two_phase_flow_quad4_residual_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_tensor_product_residual_block<double, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_tensor_product_residual_block<double, 16, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f64, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -700,7 +700,7 @@ extern "C" int generated_two_phase_flow_quad4_residual_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_tensor_product_residual_block<float, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_tensor_product_residual_block<float, 16, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f32, current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -749,14 +749,14 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_residual_affine_mesh_soa_i
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
+    static constexpr int N_QP = 16;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t shape_1d[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+    static const scalar_t grad_1d[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -962,14 +962,14 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_residual_isoparametric_mes
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
+    static constexpr int N_QP = 16;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t shape_1d[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+    static const scalar_t grad_1d[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1215,7 +1215,7 @@ extern "C" int generated_two_phase_flow_quad4_jacobian_action_element_soa(
         const double rho_w0,
         double *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_tensor_product_jacobian_action_block<double, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_tensor_product_jacobian_action_block<double, 16, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f64, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f64, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1249,7 +1249,7 @@ extern "C" int generated_two_phase_flow_quad4_jacobian_action_element_soa_float(
         const float rho_w0,
         float *const SFEM_RESTRICT output[8]
 ) {
-    sfem::codegen::generated_two_phase_flow_d2_tensor_product_jacobian_action_block<float, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+    sfem::codegen::generated_two_phase_flow_d2_tensor_product_jacobian_action_block<float, 16, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::generated_two_phase_flow_quad4_quad4_shape_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_grad_1d_f32, sfem::codegen::generated_two_phase_flow_quad4_quad4_q_weight_1d_f32, current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
 }
 
@@ -1298,14 +1298,14 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_jacobian_action_affine_mes
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
+    static constexpr int N_QP = 16;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t shape_1d[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+    static const scalar_t grad_1d[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1511,14 +1511,14 @@ static SFEM_INLINE int generated_two_phase_flow_quad4_jacobian_action_isoparamet
         scalar_t *const SFEM_RESTRICT p_c_out
 ) {
     static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
+    static constexpr int N_QP = 16;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_FIELDS = 2;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t shape_1d[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-    static const scalar_t grad_1d[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-    static const scalar_t q_weight_1d[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t shape_1d[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+    static const scalar_t grad_1d[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {

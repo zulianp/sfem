@@ -523,6 +523,122 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(len(forms.blocks_for(gen.FormOrder.ONE)), 3)
         self.assertEqual(len(forms.blocks_for(gen.FormOrder.TWO)), 9)
 
+    def test_mixed_isoparametric_taylor_hood_uses_higher_quadrature(self):
+        tri = gen.sfem_fem_policy(stokes.elements[0])
+        tet = gen.sfem_fem_policy(stokes.elements[1])
+        hex27 = gen.sfem_fem_policy(stokes.elements[2])
+
+        self.assertEqual((tri.quadrature_rule.order, tri.quadrature_rule.n_qp), (4, 6))
+        self.assertEqual((tet.quadrature_rule.order, tet.quadrature_rule.n_qp), (4, 11))
+        self.assertEqual((hex27.quadrature_rule.order, hex27.quadrature_rule.n_qp), (4, 64))
+
+        self.assertEqual(
+            gen.sfem_default_quadrature_order("TRI6"),
+            2,
+        )
+        self.assertEqual(
+            gen.sfem_default_quadrature_order("TRI6", "isoparametric_mixed"),
+            4,
+        )
+
+    def test_current_materials_select_case_specific_quadrature(self):
+        def context_orders(material, elements):
+            stage = gen.UserInputStage.create(material, elements, 16, None)
+            return {
+                context.label.upper(): (
+                    context.specialization.quadrature_rule.order,
+                    context.specialization.quadrature_rule.n_qp,
+                )
+                for context in stage.element_contexts
+            }
+
+        neo = context_orders(
+            neohookean_ogden,
+            ("TRI3", "TRI6", "TET4", "TET10", "QUAD4", "HEX8", "HEX27"),
+        )
+        self.assertEqual(neo["TRI3"], (1, 1))
+        self.assertEqual(neo["TET4"], (1, 1))
+        self.assertEqual(neo["QUAD4"], (2, 4))
+        self.assertEqual(neo["HEX8"], (2, 8))
+        self.assertEqual(neo["TRI6"], (4, 6))
+        self.assertEqual(neo["TET10"], (4, 11))
+        self.assertEqual(neo["HEX27"], (4, 64))
+
+        two_phase = context_orders(
+            two_phase_flow,
+            ("TRI3", "TET4", "QUAD4", "HEX8"),
+        )
+        self.assertEqual(two_phase["TRI3"], (4, 6))
+        self.assertEqual(two_phase["TET4"], (4, 11))
+        self.assertEqual(two_phase["QUAD4"], (4, 16))
+        self.assertEqual(two_phase["HEX8"], (4, 64))
+
+        stokes_orders = context_orders(
+            stokes,
+            stokes.elements,
+        )
+        self.assertEqual(stokes_orders["TRI6_TRI3"], (4, 6))
+        self.assertEqual(stokes_orders["TET10_TET4"], (4, 11))
+        self.assertEqual(stokes_orders["HEX27_HEX8"], (4, 64))
+
+        poro_orders = context_orders(
+            poro_hyperelasticity,
+            poro_hyperelasticity.elements,
+        )
+        self.assertEqual(poro_orders, stokes_orders)
+
+    def test_material_quadrature_settings_override_case_defaults(self):
+        material = gen.CodeGenerator(
+            "two_phase_custom_quadrature",
+            two_phase_flow.systems,
+            elements=("TRI3",),
+            quadrature_settings=(("TRI3", "value_residual", 2),),
+        )
+        stage = gen.UserInputStage.create(material, ("TRI3",), 16, None)
+        rule = stage.element_contexts[0].specialization.quadrature_rule
+        self.assertEqual((rule.order, rule.n_qp), (2, 3))
+
+        stage = gen.UserInputStage.create(material, ("TRI3",), 16, 3)
+        rule = stage.element_contexts[0].specialization.quadrature_rule
+        self.assertEqual((rule.order, rule.n_qp), (3, 4))
+
+    def test_low_level_specialization_accepts_integration_case(self):
+        standard = gen.sfem_soa_element_specialization("HEX27").quadrature_rule
+        energy = gen.sfem_soa_element_specialization(
+            "HEX27",
+            integration_case="energy",
+        ).quadrature_rule
+        explicit = gen.sfem_soa_element_specialization(
+            "HEX27",
+            quadrature_order=3,
+            integration_case="energy",
+        ).quadrature_rule
+
+        self.assertEqual((standard.order, standard.n_qp), (3, 27))
+        self.assertEqual((energy.order, energy.n_qp), (4, 64))
+        self.assertEqual((explicit.order, explicit.n_qp), (3, 27))
+
+    def test_linear_value_residual_does_not_use_nonlinear_quadrature(self):
+        builder = gen.EquationSystemBuilder(2)
+        p = builder.scalar_field("p", family="pressure")
+        q = gen.test_function(p)
+        builder.add_residual("mass", p * q, fields=(p,))
+        material = gen.CodeGenerator(
+            "linear_mass",
+            gen.EquationSystems(builder.build()),
+            elements=("TRI3", "QUAD4"),
+        )
+        stage = gen.UserInputStage.create(material, material.elements, 16, None)
+        orders = {
+            context.label.upper(): (
+                context.specialization.quadrature_rule.order,
+                context.specialization.quadrature_rule.n_qp,
+            )
+            for context in stage.element_contexts
+        }
+        self.assertEqual(orders["TRI3"], (2, 3))
+        self.assertEqual(orders["QUAD4"], (2, 4))
+
     def test_fem_policy_describes_basis_quadrature_and_field_compatibility(self):
         element = poro_hyperelasticity.elements[2]
         policy = gen.sfem_fem_policy(element)
@@ -533,7 +649,8 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(policy.family, "tensor_product")
         self.assertEqual(policy.basis.cell, "hexahedron")
         self.assertEqual(policy.basis.degree, 2)
-        self.assertEqual(policy.quadrature_rule.n_qp, 27)
+        self.assertEqual(policy.quadrature_rule.order, 4)
+        self.assertEqual(policy.quadrature_rule.n_qp, 64)
         self.assertEqual(policy.element_for_family("displacement"), "HEX27")
         self.assertEqual(policy.element_for_family("velocity"), "HEX27")
         self.assertEqual(policy.element_for_family("pressure"), "HEX8")
@@ -550,25 +667,30 @@ class GenApiTest(unittest.TestCase):
 
         reference_data = {item.name: item.values for item in gen.sfem_reference_data(policy.quadrature_rule)}
         self.assertEqual(set(reference_data), {"shape_1d", "grad_1d", "q_weight_1d"})
-        self.assertEqual(len(reference_data["shape_1d"]), 9)
-        self.assertEqual(len(reference_data["grad_1d"]), 9)
-        self.assertEqual(len(reference_data["q_weight_1d"]), 3)
+        self.assertEqual(len(reference_data["shape_1d"]), 12)
+        self.assertEqual(len(reference_data["grad_1d"]), 12)
+        self.assertEqual(len(reference_data["q_weight_1d"]), 4)
 
-        mixed_data = {
+        hex27_data = {
             item.name: item.values
-            for item in gen.sfem_mixed_reference_data(
+            for item in gen.sfem_tensor_product_field_reference_data(
+                "HEX27",
                 policy.quadrature_rule,
-                builder.build().fields,
-                mapping,
+                "hex27",
             )
         }
-        self.assertIn("cell_grad_ref_x", mixed_data)
-        self.assertIn("u_shape", mixed_data)
-        self.assertIn("u_grad_ref_x", mixed_data)
-        self.assertIn("p_shape", mixed_data)
-        self.assertIn("p_grad_ref_x", mixed_data)
-        self.assertEqual(len(mixed_data["u_shape"]), 27 * 27)
-        self.assertEqual(len(mixed_data["p_shape"]), 27 * 8)
+        hex8_data = {
+            item.name: item.values
+            for item in gen.sfem_tensor_product_field_reference_data(
+                "HEX8",
+                policy.quadrature_rule,
+                "hex8",
+            )
+        }
+        self.assertEqual(set(hex27_data), {"hex27_shape_1d", "hex27_grad_1d"})
+        self.assertEqual(set(hex8_data), {"hex8_shape_1d", "hex8_grad_1d"})
+        self.assertEqual(len(hex27_data["hex27_shape_1d"]), 12)
+        self.assertEqual(len(hex8_data["hex8_shape_1d"]), 8)
 
         context = gen.ElementGenerationContext.create(
             "poro_hyperelasticity",
@@ -696,14 +818,16 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(displacement_basis.element_type, "HEX27")
         self.assertEqual(displacement_basis.cell_element_type, "HEX27")
         self.assertEqual(displacement_basis.n_shape, 27)
+        self.assertEqual(displacement_basis.n_qp, 64)
+        self.assertEqual(displacement_basis.n_qp_1d, 4)
         self.assertTrue(displacement_basis.uses_sum_factorization)
         self.assertEqual(pressure_basis.role, "field:p")
         self.assertEqual(pressure_basis.element_type, "HEX8")
         self.assertEqual(pressure_basis.cell_element_type, "HEX27")
         self.assertEqual(pressure_basis.n_shape, 8)
-        self.assertEqual(pressure_basis.n_qp, 27)
+        self.assertEqual(pressure_basis.n_qp, 64)
         self.assertEqual(pressure_basis.n_shape_1d, 2)
-        self.assertEqual(pressure_basis.n_qp_1d, 3)
+        self.assertEqual(pressure_basis.n_qp_1d, 4)
         self.assertEqual(pressure_basis.scatter_n_shape, 8)
         self.assertTrue(pressure_basis.uses_sum_factorization)
         self.assertEqual(
@@ -732,9 +856,9 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(pressure_basis.cell_element_type, "TRI6")
         self.assertEqual(pressure_basis.family, gen.BasisFamily.SIMPLEX)
         self.assertEqual(pressure_basis.n_shape, 3)
-        self.assertEqual(pressure_basis.n_qp, 3)
-        self.assertEqual(pressure_basis.reference_shape_size, 3 * 3)
-        self.assertEqual(pressure_basis.reference_gradient_size, 3 * 3 * 2)
+        self.assertEqual(pressure_basis.n_qp, 6)
+        self.assertEqual(pressure_basis.reference_shape_size, 6 * 3)
+        self.assertEqual(pressure_basis.reference_gradient_size, 6 * 3 * 2)
 
     def test_shared_tensor_product_geometry_emitters_cover_residual_and_hyperelastic_paths(self):
         coordinate_streams = tensor_product_ordered_coordinate_streams(
