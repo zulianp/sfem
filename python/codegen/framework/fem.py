@@ -766,6 +766,23 @@ def sfem_mixed_reference_data(cell_rule, fields, field_element_types):
     return data
 
 
+def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
+    element_type = str(element_type).upper()
+    if not cell_rule.is_tensor_product:
+        raise ValueError("cell rule must be tensor-product")
+    points, _ = _sfem_unit_interval_gauss_rule(cell_rule.order)
+    if element_type in ("QUAD4", "HEX8"):
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
+    elif element_type == "HEX27":
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q2_1d_shapes(points)
+    else:
+        raise ValueError("unsupported tensor-product field element '%s'" % element_type)
+    return (
+        SfemReferenceData("%s_shape_1d" % prefix, shape_values_1d),
+        SfemReferenceData("%s_grad_1d" % prefix, shape_gradients_1d),
+    )
+
+
 def sfem_field_n_shape(element_type, quadrature_order=None):
     return sfem_element_quadrature_rule(element_type, quadrature_order).n_shape
 

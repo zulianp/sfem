@@ -135,6 +135,7 @@ from .generation_plan import (
     DataStreamRole,
     GenerationPlan,
     GeometryPlan,
+    KernelCoupling,
     KernelPlan,
     KernelEmission,
     KernelScope,
@@ -146,6 +147,7 @@ from .generation_plan import (
     MeshPhase,
     MeshPhasePlan,
 )
+from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
     GeometryInputLayout,
@@ -305,6 +307,7 @@ __all__ = [
     "DataStreamRole",
     "GenerationPlan",
     "GeometryPlan",
+    "KernelCoupling",
     "KernelPlan",
     "KernelEmission",
     "KernelScope",
@@ -315,6 +318,8 @@ __all__ = [
     "MeshKernelPlan",
     "MeshPhase",
     "MeshPhasePlan",
+    "OpenMPSoABackend",
+    "OpenMPSoAEmission",
     "TensorProductDataLayout",
     "TensorProductOperation",
     "TensorProductSumFactorizationPlan",

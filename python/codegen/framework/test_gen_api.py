@@ -13,6 +13,7 @@ from .materials.neohookean_ogden import material as neohookean_ogden
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
 from .materials.stokes import material as stokes
 from .materials.two_phase_flow import material as two_phase_flow
+from .generate_stokes_files import validate_m6_3 as validate_stokes_m6_3
 from .tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
@@ -848,6 +849,9 @@ class GenApiTest(unittest.TestCase):
         plan.validate_for_context(context)
         self.assertEqual(plan.emission_kernels_for_context(context), (kernel,))
 
+    def test_codegen_stage_uses_shared_openmp_soa_backend(self):
+        self.assertIsInstance(gen.OPENMP_SOA_BACKEND, gen.OpenMPSoABackend)
+
     def test_specialized_form_manipulation_returns_generation_plan(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         energy_plan = gen.SpecializedFormManipulationStage(
@@ -889,11 +893,14 @@ class GenApiTest(unittest.TestCase):
         self.assertTrue(residual_plan.units[0].mesh_phase_plans[2].is_local_call)
         self.assertTrue(residual_plan.units[0].mesh_phase_plans[3].is_scatter)
         self.assertTrue(residual_plan.units[0].is_monolithic)
+        self.assertTrue(residual_plan.units[0].is_complete_system)
         self.assertEqual(residual_plan.monolithic_kernels, residual_plan.units)
+        self.assertEqual(residual_plan.complete_system_kernels, residual_plan.units)
         self.assertEqual(len(residual_plan.units[0].blocks), 6)
         self.assertEqual(len(residual_plan.units[0].block_kernels), 6)
         self.assertEqual(residual_plan.block_kernels, residual_plan.units[0].block_kernels)
         self.assertTrue(all(kernel.is_block for kernel in residual_plan.block_kernels))
+        self.assertTrue(all(kernel.coupling is gen.KernelCoupling.BLOCK for kernel in residual_plan.block_kernels))
         self.assertEqual(
             tuple(kernel.block.name for kernel in residual_plan.block_kernels),
             (
@@ -1010,7 +1017,9 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(dump["stage"], gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION.value)
         self.assertEqual(parsed["n_monolithic_kernels"], 1)
         self.assertEqual(parsed["n_block_kernels"], 6)
+        self.assertEqual(parsed["n_complete_system_kernels"], 1)
         self.assertEqual(parsed["kernels"][0]["scope"], gen.KernelScope.MONOLITHIC.value)
+        self.assertEqual(parsed["kernels"][0]["coupling"], gen.KernelCoupling.COMPLETE_SYSTEM.value)
         self.assertEqual(parsed["kernels"][0]["mesh_phases"], ["gather", "geometry", "local_call", "scatter"])
         self.assertEqual(
             tuple(block["name"] for block in parsed["kernels"][0]["blocks"]),
@@ -1070,10 +1079,57 @@ class GenApiTest(unittest.TestCase):
             )
             names = {os.path.basename(path) for path in result.sources}
             self.assertIn("generated_stokes_tri6_tri3_operator.cpp", names)
+            self.assertIn("generated_stokes_d2_simplex_mixed_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIsInstance(result.plan, gen.GenerationPlan)
             self.assertEqual(result.plan.units[0].name, "stokes")
+            self.assertTrue(result.plan.units[0].is_complete_system)
+            self.assertEqual(result.plan.complete_system_kernels, result.plan.units)
             self.assertEqual(len(result.plan.units[0].blocks), 12)
+            source = os.path.join(out_dir, "generated_stokes_tri6_tri3_operator.cpp")
+            with open(source) as input_file:
+                contents = input_file.read()
+            self.assertIn('#include "generated_stokes_d2_simplex_mixed_local.hpp"', contents)
+            self.assertIn("generated_stokes_tri6_tri3_residual_isoparametric_mesh_soa", contents)
+            self.assertIn("generated_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa", contents)
+            for field in result.plan.units[0].form_collection.fields:
+                for component in range(int(field.components)):
+                    name = "%s%d" % (field.name, component) if int(field.components) > 1 else field.name
+                    self.assertIn("%s_out" % name, contents)
+            validate_stokes_m6_3(result)
+
+    def test_stokes_validation_handles_multiple_dimensions(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(
+                stokes,
+                out_dir,
+                elements=("TRI6_TRI3", "TET10_TET4"),
+            )
+            validate_stokes_m6_3(result)
+
+    def test_stokes_tensor_product_local_uses_sum_factorization(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                stokes,
+                out_dir,
+                elements=("HEX27_HEX8",),
+                compile=True,
+            )
+            local = os.path.join(
+                out_dir,
+                "generated_stokes_d3_tensor_product_mixed_local.hpp",
+            )
+            with open(local) as input_file:
+                contents = input_file.read()
+            self.assertIn("field_shape_1d", contents)
+            self.assertIn("field_grad_1d", contents)
+            self.assertIn("tensor_evaluate<", contents)
+            self.assertIn("tensor_integrate<", contents)
+            self.assertIn("N_QP_1D", contents)
+            self.assertNotIn("field_shape[", contents)
+            self.assertNotIn("field_grad_ref[", contents)
+            self.assertNotIn("for (int trial", contents)
+            self.assertNotIn("for (int test", contents)
 
     def test_compiles_taylor_hood_stokes_operator(self):
         compiler = shutil.which("c++")

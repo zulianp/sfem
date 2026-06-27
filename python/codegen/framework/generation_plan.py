@@ -50,6 +50,12 @@ class KernelScope(Enum):
     BLOCK = "block"
 
 
+class KernelCoupling(Enum):
+    SINGLE_FIELD = "single_field"
+    COMPLETE_SYSTEM = "complete_system"
+    BLOCK = "block"
+
+
 class KernelEmission(Enum):
     FILES = "files"
     COVERED_BY_PARENT = "covered_by_parent"
@@ -413,6 +419,7 @@ class KernelPlan:
     payload: object = None
     mesh_phase_plans: tuple = ()
     scope: KernelScope = KernelScope.MONOLITHIC
+    coupling: KernelCoupling = KernelCoupling.SINGLE_FIELD
     block: BlockPlan = None
     block_kernels: tuple = ()
     emission: KernelEmission = KernelEmission.FILES
@@ -424,6 +431,7 @@ class KernelPlan:
         streams = tuple(self.streams)
         target = KernelTarget(self.target)
         scope = KernelScope(self.scope)
+        coupling = KernelCoupling(self.coupling)
         emission = KernelEmission(self.emission)
         block_kernels = tuple(self.block_kernels)
         mesh_phase_plans = tuple(self.mesh_phase_plans)
@@ -457,6 +465,10 @@ class KernelPlan:
             raise ValueError("block kernel plans require a block")
         if scope is KernelScope.MONOLITHIC and self.block is not None:
             raise ValueError("monolithic kernel plans cannot select a single block")
+        if scope is KernelScope.BLOCK and coupling is not KernelCoupling.BLOCK:
+            raise ValueError("block kernel plans require BLOCK coupling")
+        if scope is KernelScope.MONOLITHIC and coupling is KernelCoupling.BLOCK:
+            raise ValueError("monolithic kernel plans cannot use BLOCK coupling")
         if scope is KernelScope.MONOLITHIC and emission is KernelEmission.COVERED_BY_PARENT:
             raise ValueError("monolithic kernel plans must own file emission")
         for block in blocks:
@@ -478,6 +490,7 @@ class KernelPlan:
         object.__setattr__(self, "target", target)
         object.__setattr__(self, "mesh_phase_plans", mesh_phase_plans)
         object.__setattr__(self, "scope", scope)
+        object.__setattr__(self, "coupling", coupling)
         object.__setattr__(self, "emission", emission)
         object.__setattr__(self, "block_kernels", block_kernels)
 
@@ -509,6 +522,14 @@ class KernelPlan:
     @property
     def is_block(self):
         return self.scope is KernelScope.BLOCK
+
+    @property
+    def is_complete_system(self):
+        return self.coupling is KernelCoupling.COMPLETE_SYSTEM
+
+    @property
+    def is_single_field(self):
+        return self.coupling is KernelCoupling.SINGLE_FIELD
 
     @property
     def emits_files(self):
@@ -558,6 +579,7 @@ class KernelPlan:
             "dim": self.dim,
             "target": self.target.value,
             "scope": self.scope.value,
+            "coupling": self.coupling.value,
             "emission": self.emission.value,
             "selected_block": None if self.block is None else self.block.name,
             "form_collection": _form_collection_dump(self.form_collection),
@@ -630,12 +652,17 @@ class GenerationPlan:
             for block_kernel in kernel.block_kernels
         )
 
+    @property
+    def complete_system_kernels(self):
+        return tuple(kernel for kernel in self.kernels if kernel.is_complete_system)
+
     def to_dict(self):
         return {
             "stage": self.stage.value,
             "n_kernels": len(self.kernels),
             "n_monolithic_kernels": len(self.monolithic_kernels),
             "n_block_kernels": len(self.block_kernels),
+            "n_complete_system_kernels": len(self.complete_system_kernels),
             "kernels": [kernel.to_dict() for kernel in self.kernels],
         }
 
