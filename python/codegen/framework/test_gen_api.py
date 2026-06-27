@@ -1157,6 +1157,38 @@ class GenApiTest(unittest.TestCase):
             self.assertNotIn("for (int trial", contents)
             self.assertNotIn("for (int test", contents)
 
+    def test_stokes_tensor_product_operator_deduplicates_reference_data(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                stokes,
+                out_dir,
+                elements=("HEX27_HEX8",),
+            )
+            operator = os.path.join(
+                out_dir,
+                "generated_stokes_hex27_hex8_operator.cpp",
+            )
+            with open(operator) as input_file:
+                contents = input_file.read()
+            self.assertIn("generated_stokes_hex27_shape_1d_f64", contents)
+            self.assertIn("generated_stokes_hex27_grad_1d_f64", contents)
+            self.assertIn("generated_stokes_hex8_shape_1d_f64", contents)
+            self.assertIn("generated_stokes_hex8_grad_1d_f64", contents)
+            self.assertIn(
+                "field_shape_1d[N_FIELDS] = {sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::generated_stokes_reference_data<scalar_t>::hex8_shape_1d()}",
+                contents,
+            )
+            self.assertNotIn("generated_stokes_cell_grad_ref", contents)
+            self.assertNotIn("generated_stokes_u0_shape_", contents)
+            self.assertNotIn("generated_stokes_u1_shape_", contents)
+            self.assertNotIn("generated_stokes_u2_shape_", contents)
+            self.assertNotIn("generated_stokes_u0_grad_ref", contents)
+            self.assertNotIn("static const scalar_t shape_1d[", contents)
+            self.assertNotIn("static const scalar_t grad_1d[", contents)
+
     def test_compiles_taylor_hood_stokes_operator(self):
         compiler = shutil.which("c++")
         if compiler is None:
