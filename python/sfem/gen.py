@@ -771,17 +771,7 @@ def _emit_codegen_unit(unit, context):
 
 def _emit_energy_soa(unit, context):
     payload = unit.payload
-    generated_prefix = _unit_generated_prefix(unit)
-    local_kernel = _local_kernel_plan(unit, context)
-    mesh_kernel = _mesh_kernel_plan(unit, context, context.element_type)
-    files = list(
-        OPENMP_SOA_BACKEND.emit_energy(
-            payload.kernel_forms,
-            prefix=mesh_kernel.name,
-            local_prefix=local_kernel.name,
-            specialization=context.specialization,
-        )
-    )
+    files = list(OPENMP_SOA_BACKEND.emit(unit, context))
     if payload.diagnostics:
         report_prefix = "%s_%s" % (
             _unit_report_name(unit),
@@ -811,58 +801,7 @@ def _emit_energy_soa(unit, context):
 
 
 def _emit_residual_soa(unit, context):
-    collection = unit.form_collection
-    system = collection.source
-    residual_coeffs = collection.form_metadata(FormOrder.ONE).coefficients
-    action_coeffs = collection.form_metadata(FormOrder.TWO).coefficients
-    local_kernel = _local_kernel_plan(
-        unit,
-        context,
-        suffix="_mixed" if context.is_mixed_order else "",
-    )
-    mesh_kernel = _mesh_kernel_plan(unit, context)
-    if context.is_mixed_order:
-        return tuple(OPENMP_SOA_BACKEND.emit_mixed_residual(
-            system,
-            prefix=_unit_generated_prefix(unit),
-            compatible_element=context.compatible_element,
-            vector_size=context.specialization.vector_size,
-            quadrature_order=context.specialization.quadrature_rule.order,
-            residual_coeffs=residual_coeffs,
-            action_coeffs=action_coeffs,
-            field_element_types=_field_element_types_for_context(
-                collection.fields,
-                context,
-            ),
-            local_prefix=local_kernel.name,
-            local_name=local_kernel.header,
-            operator_prefix=mesh_kernel.name,
-            operator_name=mesh_kernel.source,
-        ))
-    return tuple(OPENMP_SOA_BACKEND.emit_residual(
-        system,
-        prefix=_unit_generated_prefix(unit),
-        element_type=context.element_type,
-        vector_size=context.specialization.vector_size,
-        quadrature_order=context.specialization.quadrature_rule.order,
-        specialization=context.specialization,
-        residual_coeffs=residual_coeffs,
-        action_coeffs=action_coeffs,
-        local_prefix=local_kernel.name,
-        local_name=local_kernel.header,
-        operator_prefix=mesh_kernel.name,
-        operator_name=mesh_kernel.source,
-    ))
-
-
-def _local_kernel_plan(unit, context, suffix=""):
-    return unit.local_kernel_plan(context, _unit_generated_prefix(unit), suffix)
-
-
-def _mesh_kernel_plan(unit, context, element_label=None):
-    if element_label is None:
-        return unit.mesh_kernel_plan(context, _unit_generated_prefix(unit))
-    return MeshKernelPlan(_unit_generated_prefix(unit), element_label)
+    return tuple(OPENMP_SOA_BACKEND.emit(unit, context))
 
 
 def _material_equations(material, dim):
@@ -1006,17 +945,6 @@ def _evaluate_residual_equation(dim, equation, form_collection=None):
         equation.name,
         form_evaluation,
     )
-
-
-def _field_element_types_for_context(equation_fields, context):
-    ret = {}
-    for field, element_type in context.fem_policy.field_element_types_for(equation_fields):
-        if field.components == 1:
-            ret[field.name] = element_type
-        else:
-            for component in range(field.components):
-                ret["%s%d" % (field.name, component)] = element_type
-    return ret
 
 
 def _unit_generated_prefix(unit):
