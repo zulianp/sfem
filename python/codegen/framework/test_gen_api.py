@@ -540,6 +540,10 @@ class GenApiTest(unittest.TestCase):
             gen.sfem_default_quadrature_order("TRI6", "isoparametric_mixed"),
             4,
         )
+        self.assertEqual(
+            gen.sfem_default_quadrature_order("TRI6", "affine_mixed"),
+            2,
+        )
 
     def test_current_materials_select_case_specific_quadrature(self):
         def context_orders(material, elements):
@@ -548,6 +552,16 @@ class GenApiTest(unittest.TestCase):
                 context.label.upper(): (
                     context.specialization.quadrature_rule.order,
                     context.specialization.quadrature_rule.n_qp,
+                )
+                for context in stage.element_contexts
+            }
+
+        def affine_context_orders(material, elements):
+            stage = gen.UserInputStage.create(material, elements, 16, None)
+            return {
+                context.label.upper(): (
+                    context.affine_specialization.quadrature_rule.order,
+                    context.affine_specialization.quadrature_rule.n_qp,
                 )
                 for context in stage.element_contexts
             }
@@ -564,6 +578,18 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(neo["TET10"], (4, 11))
         self.assertEqual(neo["HEX27"], (4, 64))
 
+        neo_affine = affine_context_orders(
+            neohookean_ogden,
+            ("TRI3", "TRI6", "TET4", "TET10", "QUAD4", "HEX8", "HEX27"),
+        )
+        self.assertEqual(neo_affine["TRI3"], (1, 1))
+        self.assertEqual(neo_affine["TET4"], (1, 1))
+        self.assertEqual(neo_affine["QUAD4"], (2, 4))
+        self.assertEqual(neo_affine["HEX8"], (2, 8))
+        self.assertEqual(neo_affine["TRI6"], (2, 3))
+        self.assertEqual(neo_affine["TET10"], (2, 4))
+        self.assertEqual(neo_affine["HEX27"], (3, 27))
+
         two_phase = context_orders(
             two_phase_flow,
             ("TRI3", "TET4", "QUAD4", "HEX8"),
@@ -573,6 +599,12 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(two_phase["QUAD4"], (4, 16))
         self.assertEqual(two_phase["HEX8"], (4, 64))
 
+        two_phase_affine = affine_context_orders(
+            two_phase_flow,
+            ("TRI3", "TET4", "QUAD4", "HEX8"),
+        )
+        self.assertEqual(two_phase_affine, two_phase)
+
         stokes_orders = context_orders(
             stokes,
             stokes.elements,
@@ -581,11 +613,25 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(stokes_orders["TET10_TET4"], (4, 11))
         self.assertEqual(stokes_orders["HEX27_HEX8"], (4, 64))
 
+        stokes_affine = affine_context_orders(
+            stokes,
+            stokes.elements,
+        )
+        self.assertEqual(stokes_affine["TRI6_TRI3"], (2, 3))
+        self.assertEqual(stokes_affine["TET10_TET4"], (2, 4))
+        self.assertEqual(stokes_affine["HEX27_HEX8"], (3, 27))
+
         poro_orders = context_orders(
             poro_hyperelasticity,
             poro_hyperelasticity.elements,
         )
         self.assertEqual(poro_orders, stokes_orders)
+
+        poro_affine = affine_context_orders(
+            poro_hyperelasticity,
+            poro_hyperelasticity.elements,
+        )
+        self.assertEqual(poro_affine, stokes_affine)
 
     def test_material_quadrature_settings_override_case_defaults(self):
         material = gen.CodeGenerator(
@@ -601,6 +647,44 @@ class GenApiTest(unittest.TestCase):
         stage = gen.UserInputStage.create(material, ("TRI3",), 16, 3)
         rule = stage.element_contexts[0].specialization.quadrature_rule
         self.assertEqual((rule.order, rule.n_qp), (3, 4))
+
+    def test_material_quadrature_settings_can_target_affine_and_isoparametric_cases(self):
+        material = gen.CodeGenerator(
+            "neo_custom_quadrature",
+            neohookean_ogden.systems,
+            elements=("TRI6",),
+            quadrature_settings=(
+                ("TRI6", "isoparametric_energy", 4),
+                ("TRI6", "affine_energy", 3),
+            ),
+        )
+        stage = gen.UserInputStage.create(material, ("TRI6",), 16, None)
+        context = stage.element_contexts[0]
+
+        isoparametric_rule = context.specialization.quadrature_rule
+        affine_rule = context.affine_specialization.quadrature_rule
+        self.assertEqual((isoparametric_rule.order, isoparametric_rule.n_qp), (4, 6))
+        self.assertEqual((affine_rule.order, affine_rule.n_qp), (3, 4))
+
+    def test_hyperelastic_affine_and_isoparametric_mesh_use_separate_quadrature(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("TRI6",),
+            )
+            source = os.path.join(out_dir, "generated_neohookean_ogden_tri6_operator.cpp")
+            with open(source, encoding="utf-8") as stream:
+                contents = stream.read()
+
+        affine = contents.index(
+            "generated_neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_impl"
+        )
+        isoparametric = contents.index(
+            "generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_impl"
+        )
+        self.assertIn("static constexpr int N_QP = 3;", contents[affine:isoparametric])
+        self.assertIn("static constexpr int N_QP = 6;", contents[isoparametric:])
 
     def test_low_level_specialization_accepts_integration_case(self):
         standard = gen.sfem_soa_element_specialization("HEX27").quadrature_rule

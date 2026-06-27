@@ -1488,6 +1488,7 @@ def generate_sfem_soa_cpp_files(
     element_type=None,
     quadrature_order=None,
     quadrature_rule=None,
+    affine_quadrature_rule=None,
     local_prefix=None,
 ):
     forms = tuple(forms)
@@ -1497,6 +1498,13 @@ def generate_sfem_soa_cpp_files(
         dim = quadrature_rule.dim
         n_nodes = quadrature_rule.n_shape
         n_qp = quadrature_rule.n_qp
+    if affine_quadrature_rule is None:
+        affine_quadrature_rule = quadrature_rule
+    if affine_quadrature_rule is not None:
+        if affine_quadrature_rule.dim != dim:
+            raise ValueError("affine and isoparametric quadrature rules must have the same dimension")
+        if affine_quadrature_rule.n_shape != n_nodes:
+            raise ValueError("affine and isoparametric quadrature rules must have the same shape count")
     n_qp = int(n_qp)
     array_inputs = tuple(
         array_inputs
@@ -1573,6 +1581,7 @@ def generate_sfem_soa_cpp_files(
                 diagnostics_name,
                 array_inputs,
                 quadrature_rule,
+                affine_quadrature_rule,
                 use_shared_weak_local,
             ),
         ),
@@ -1584,6 +1593,7 @@ def generate_sfem_soa_cpp_files_for_element(
     *,
     prefix,
     specialization,
+    affine_specialization=None,
     array_inputs=None,
     local_prefix=None,
 ):
@@ -1591,6 +1601,12 @@ def generate_sfem_soa_cpp_files_for_element(
         specialization = SfemSoAElementSpecialization(specialization)
     if not isinstance(specialization, SfemSoAElementSpecialization):
         raise TypeError("specialization must be an SfemSoAElementSpecialization")
+    if affine_specialization is None:
+        affine_specialization = specialization
+    if isinstance(affine_specialization, SfemElementQuadratureRule):
+        affine_specialization = SfemSoAElementSpecialization(affine_specialization)
+    if not isinstance(affine_specialization, SfemSoAElementSpecialization):
+        raise TypeError("affine_specialization must be an SfemSoAElementSpecialization")
     array_inputs = (
         specialization.adjugate_geometry_inputs()
         if array_inputs is None
@@ -1605,6 +1621,7 @@ def generate_sfem_soa_cpp_files_for_element(
         vector_size=specialization.vector_size,
         array_inputs=array_inputs,
         quadrature_rule=specialization.quadrature_rule,
+        affine_quadrature_rule=affine_specialization.quadrature_rule,
         local_prefix=local_prefix,
     )
 
@@ -2645,6 +2662,7 @@ def _sfem_soa_operator_source(
     diagnostics_name,
     array_inputs,
     quadrature_rule,
+    affine_quadrature_rule,
     use_shared_weak_local=False,
 ):
     lines = [
@@ -2716,6 +2734,11 @@ def _sfem_soa_operator_source(
                 )
             )
         if quadrature_rule is not None and _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
+            affine_rule = (
+                affine_quadrature_rule
+                if affine_quadrature_rule is not None
+                else quadrature_rule
+            )
             lines.append("")
             lines.extend(
                 _sfem_soa_mesh_operator_function(
@@ -2723,11 +2746,11 @@ def _sfem_soa_operator_source(
                     prefix,
                     dim,
                     n_nodes,
-                    n_qp,
+                    affine_rule.n_qp,
                     vector_size,
                     local_prefix,
                     array_inputs,
-                    quadrature_rule,
+                    affine_rule,
                     use_shared_weak_local,
                     geometry_mode="affine",
                 )

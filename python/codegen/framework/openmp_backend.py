@@ -48,6 +48,7 @@ class OpenMPSoABackend:
             prefix=mesh_kernel.name,
             local_prefix=local_kernel.name,
             specialization=context.specialization,
+            affine_specialization=context.affine_specialization,
         )
 
     def _emit_residual_plan(self, unit, context):
@@ -88,6 +89,7 @@ class OpenMPSoABackend:
             vector_size=context.specialization.vector_size,
             quadrature_order=context.specialization.quadrature_rule.order,
             specialization=context.specialization,
+            affine_specialization=context.affine_specialization,
             residual_coeffs=residual_coeffs,
             action_coeffs=action_coeffs,
             local_prefix=local_kernel.name,
@@ -103,6 +105,7 @@ class OpenMPSoABackend:
         prefix,
         local_prefix,
         specialization,
+        affine_specialization=None,
     ):
         files = tuple(
             generate_sfem_soa_cpp_files_for_element(
@@ -110,6 +113,7 @@ class OpenMPSoABackend:
                 prefix=prefix,
                 local_prefix=local_prefix,
                 specialization=specialization,
+                affine_specialization=affine_specialization,
             )
         )
         self._validate_common_source_contract(files, local_prefix)
@@ -124,6 +128,7 @@ class OpenMPSoABackend:
         vector_size,
         quadrature_order,
         specialization,
+        affine_specialization,
         residual_coeffs,
         action_coeffs,
         local_prefix,
@@ -139,6 +144,7 @@ class OpenMPSoABackend:
                 vector_size=vector_size,
                 quadrature_order=quadrature_order,
                 specialization=specialization,
+                affine_specialization=affine_specialization,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 local_prefix=local_prefix,
