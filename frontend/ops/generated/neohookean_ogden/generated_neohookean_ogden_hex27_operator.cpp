@@ -16,9 +16,54 @@
 namespace sfem {
 namespace codegen {
 
-static const real_t generated_neohookean_ogden_hex27_hex27_shape_1d[12] = {real_t(0.80134602936993082), real_t(0.25844425285419081), real_t(-0.059790282224121687), real_t(0.22778407679095203), real_t(0.88441289000295209), real_t(-0.11219696679390417), real_t(-0.11219696679390401), real_t(0.88441289000295198), real_t(0.22778407679095214), real_t(-0.05979028222412186), real_t(0.25844425285419081), real_t(0.80134602936993082)};
-static const real_t generated_neohookean_ogden_hex27_hex27_grad_1d[12] = {real_t(-2.7222726231881049), real_t(3.4445452463762103), real_t(-0.72227262318810515), real_t(-1.6799620871697125), real_t(1.359924174339425), real_t(0.32003791283028749), real_t(-0.32003791283028749), real_t(-1.359924174339425), real_t(1.6799620871697125), real_t(0.72227262318810492), real_t(-3.4445452463762098), real_t(2.7222726231881049)};
-static const real_t generated_neohookean_ogden_hex27_hex27_q_weight_1d[4] = {real_t(0.17392742256872692), real_t(0.3260725774312731), real_t(0.3260725774312731), real_t(0.17392742256872692)};
+
+template <typename scalar_t>
+struct generated_neohookean_ogden_hex27_element_reference_data {
+    static const scalar_t *shape_1d() {
+        static const scalar_t data[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
+        return data;
+    }
+    static const scalar_t *grad_1d() {
+        static const scalar_t data[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
+        return data;
+    }
+    static const scalar_t *q_weight_1d() {
+        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+        return data;
+    }
+};
+
+template <typename scalar_t>
+struct generated_neohookean_ogden_hex27_affine_reference_data {
+    static const scalar_t *shape_1d() {
+        static const scalar_t data[9] = {scalar_t(0.68729833462074175), scalar_t(0.39999999999999997), scalar_t(-0.087298334620741685), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(-0.087298334620741658), scalar_t(0.39999999999999991), scalar_t(0.68729833462074175)};
+        return data;
+    }
+    static const scalar_t *grad_1d() {
+        static const scalar_t data[9] = {scalar_t(-2.5491933384829668), scalar_t(3.0983866769659336), scalar_t(-0.54919333848296681), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0.54919333848296681), scalar_t(-3.0983866769659336), scalar_t(2.5491933384829668)};
+        return data;
+    }
+    static const scalar_t *q_weight_1d() {
+        static const scalar_t data[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+        return data;
+    }
+};
+
+template <typename scalar_t>
+struct generated_neohookean_ogden_hex27_isoparametric_reference_data {
+    static const scalar_t *shape_1d() {
+        static const scalar_t data[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
+        return data;
+    }
+    static const scalar_t *grad_1d() {
+        static const scalar_t data[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
+        return data;
+    }
+    static const scalar_t *q_weight_1d() {
+        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+        return data;
+    }
+};
 
 } // namespace codegen
 } // namespace sfem
@@ -551,7 +596,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_objective_soa(
         const real_t *const SFEM_RESTRICT uz26,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_objective_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, value);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_objective_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, value);
 }
 
 namespace sfem {
@@ -1301,7 +1346,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_objective_isoparametric_so
         const real_t *const SFEM_RESTRICT uz26,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_objective_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, value);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_objective_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, value);
 }
 
 namespace sfem {
@@ -1335,9 +1380,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_objective_affine_m
     static constexpr int N_SHAPE = 27;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t affine_shape_1d[9] = {scalar_t(0.68729833462074175), scalar_t(0.39999999999999997), scalar_t(-0.087298334620741685), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(-0.087298334620741658), scalar_t(0.39999999999999991), scalar_t(0.68729833462074175)};
-    static const scalar_t affine_grad_1d[9] = {scalar_t(-2.5491933384829668), scalar_t(3.0983866769659336), scalar_t(-0.54919333848296681), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0.54919333848296681), scalar_t(-3.0983866769659336), scalar_t(2.5491933384829668)};
-    static const scalar_t affine_q_weight_1d[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 3;
     static constexpr int N_SHAPE_1D = 3;
 
@@ -1637,9 +1682,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_objective_isoparam
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    static const scalar_t isoparametric_shape_1d[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
-    static const scalar_t isoparametric_grad_1d[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
-    static const scalar_t isoparametric_q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 4;
     static constexpr int N_SHAPE_1D = 3;
 
@@ -3038,7 +3083,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_gradient_soa(
         real_t *const SFEM_RESTRICT outy26,
         real_t *const SFEM_RESTRICT outz26
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_gradient_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_gradient_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
 }
 
 namespace sfem {
@@ -4189,7 +4234,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_gradient_isoparametric_soa
         real_t *const SFEM_RESTRICT outy26,
         real_t *const SFEM_RESTRICT outz26
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_gradient_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_gradient_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
 }
 
 namespace sfem {
@@ -4226,9 +4271,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_gradient_affine_me
     static constexpr int N_SHAPE = 27;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t affine_shape_1d[9] = {scalar_t(0.68729833462074175), scalar_t(0.39999999999999997), scalar_t(-0.087298334620741685), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(-0.087298334620741658), scalar_t(0.39999999999999991), scalar_t(0.68729833462074175)};
-    static const scalar_t affine_grad_1d[9] = {scalar_t(-2.5491933384829668), scalar_t(3.0983866769659336), scalar_t(-0.54919333848296681), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0.54919333848296681), scalar_t(-3.0983866769659336), scalar_t(2.5491933384829668)};
-    static const scalar_t affine_q_weight_1d[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 3;
     static constexpr int N_SHAPE_1D = 3;
 
@@ -4939,9 +4984,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_gradient_isoparame
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    static const scalar_t isoparametric_shape_1d[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
-    static const scalar_t isoparametric_grad_1d[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
-    static const scalar_t isoparametric_q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 4;
     static constexpr int N_SHAPE_1D = 3;
 
@@ -7073,7 +7118,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_apply_soa(
         real_t *const SFEM_RESTRICT outy26,
         real_t *const SFEM_RESTRICT outz26
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_apply_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, hx10, hy10, hz10, hx11, hy11, hz11, hx12, hy12, hz12, hx13, hy13, hz13, hx14, hy14, hz14, hx15, hy15, hz15, hx16, hy16, hz16, hx17, hy17, hz17, hx18, hy18, hz18, hx19, hy19, hz19, hx20, hy20, hz20, hx21, hy21, hz21, hx22, hy22, hz22, hx23, hy23, hz23, hx24, hy24, hz24, hx25, hy25, hz25, hx26, hy26, hz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_apply_soa_impl<real_t, 64, 27, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, hx10, hy10, hz10, hx11, hy11, hz11, hx12, hy12, hz12, hx13, hy13, hz13, hx14, hy14, hz14, hx15, hy15, hz15, hx16, hy16, hz16, hx17, hy17, hz17, hx18, hy18, hz18, hx19, hy19, hz19, hx20, hy20, hz20, hx21, hy21, hz21, hx22, hy22, hz22, hx23, hy23, hz23, hx24, hy24, hz24, hx25, hy25, hz25, hx26, hy26, hz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
 }
 
 namespace sfem {
@@ -8549,7 +8594,7 @@ extern "C" int generated_neohookean_ogden_hex27_hex27_apply_isoparametric_soa(
         real_t *const SFEM_RESTRICT outy26,
         real_t *const SFEM_RESTRICT outz26
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_apply_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_hex27_shape_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_grad_1d, sfem::codegen::generated_neohookean_ogden_hex27_hex27_q_weight_1d, mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, hx10, hy10, hz10, hx11, hy11, hz11, hx12, hy12, hz12, hx13, hy13, hz13, hx14, hy14, hz14, hx15, hy15, hz15, hx16, hy16, hz16, hx17, hy17, hz17, hx18, hy18, hz18, hx19, hy19, hz19, hx20, hy20, hz20, hx21, hy21, hz21, hx22, hy22, hz22, hx23, hy23, hz23, hx24, hy24, hz24, hx25, hy25, hz25, hx26, hy26, hz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
+    return sfem::codegen::generated_neohookean_ogden_hex27_hex27_apply_isoparametric_soa_impl<real_t, 64, 27, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, x10, y10, z10, x11, y11, z11, x12, y12, z12, x13, y13, z13, x14, y14, z14, x15, y15, z15, x16, y16, z16, x17, y17, z17, x18, y18, z18, x19, y19, z19, x20, y20, z20, x21, y21, z21, x22, y22, z22, x23, y23, z23, x24, y24, z24, x25, y25, z25, x26, y26, z26, sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex27_element_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, ux10, uy10, uz10, ux11, uy11, uz11, ux12, uy12, uz12, ux13, uy13, uz13, ux14, uy14, uz14, ux15, uy15, uz15, ux16, uy16, uz16, ux17, uy17, uz17, ux18, uy18, uz18, ux19, uy19, uz19, ux20, uy20, uz20, ux21, uy21, uz21, ux22, uy22, uz22, ux23, uy23, uz23, ux24, uy24, uz24, ux25, uy25, uz25, ux26, uy26, uz26, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, hx10, hy10, hz10, hx11, hy11, hz11, hx12, hy12, hz12, hx13, hy13, hz13, hx14, hy14, hz14, hx15, hy15, hz15, hx16, hy16, hz16, hx17, hy17, hz17, hx18, hy18, hz18, hx19, hy19, hz19, hx20, hy20, hz20, hx21, hy21, hz21, hx22, hy22, hz22, hx23, hy23, hz23, hx24, hy24, hz24, hx25, hy25, hz25, hx26, hy26, hz26, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9, outx10, outy10, outz10, outx11, outy11, outz11, outx12, outy12, outz12, outx13, outy13, outz13, outx14, outy14, outz14, outx15, outy15, outz15, outx16, outy16, outz16, outx17, outy17, outz17, outx18, outy18, outz18, outx19, outy19, outz19, outx20, outy20, outz20, outx21, outy21, outz21, outx22, outy22, outz22, outx23, outy23, outz23, outx24, outy24, outz24, outx25, outy25, outz25, outx26, outy26, outz26);
 }
 
 namespace sfem {
@@ -8590,9 +8635,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_apply_affine_mesh_
     static constexpr int N_SHAPE = 27;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    static const scalar_t affine_shape_1d[9] = {scalar_t(0.68729833462074175), scalar_t(0.39999999999999997), scalar_t(-0.087298334620741685), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(-0.087298334620741658), scalar_t(0.39999999999999991), scalar_t(0.68729833462074175)};
-    static const scalar_t affine_grad_1d[9] = {scalar_t(-2.5491933384829668), scalar_t(3.0983866769659336), scalar_t(-0.54919333848296681), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0.54919333848296681), scalar_t(-3.0983866769659336), scalar_t(2.5491933384829668)};
-    static const scalar_t affine_q_weight_1d[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 3;
     static constexpr int N_SHAPE_1D = 3;
 
@@ -9478,9 +9523,9 @@ static SFEM_INLINE int generated_neohookean_ogden_hex27_hex27_apply_isoparametri
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    static const scalar_t isoparametric_shape_1d[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
-    static const scalar_t isoparametric_grad_1d[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
-    static const scalar_t isoparametric_q_weight_1d[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 4;
     static constexpr int N_SHAPE_1D = 3;
 

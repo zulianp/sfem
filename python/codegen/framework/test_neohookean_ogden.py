@@ -715,9 +715,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = source_by_path["generated_quad4_tensor_product_operator.cpp"]
         local_source = source_by_path["generated_quad4_tensor_product_local.hpp"]
 
-        self.assertIn("generated_quad4_tensor_product_quad4_shape_1d", operator_source)
-        self.assertIn("generated_quad4_tensor_product_quad4_grad_1d", operator_source)
-        self.assertIn("generated_quad4_tensor_product_quad4_q_weight_1d", operator_source)
+        self.assertIn("struct generated_quad4_tensor_product_element_reference_data", operator_source)
+        self.assertIn("generated_quad4_tensor_product_element_reference_data<real_t>::shape_1d()", operator_source)
+        self.assertIn("generated_quad4_tensor_product_element_reference_data<real_t>::grad_1d()", operator_source)
+        self.assertIn("generated_quad4_tensor_product_element_reference_data<real_t>::q_weight_1d()", operator_source)
         self.assertNotIn("generated_quad4_tensor_product_quad4_grad_ref", operator_source)
         self.assertNotIn("generated_quad4_tensor_product_quad4_q_weight[", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
@@ -811,9 +812,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = source_by_path["generated_hex8_tensor_product_operator.cpp"]
         local_source = source_by_path["generated_hex8_tensor_product_local.hpp"]
 
-        self.assertIn("generated_hex8_tensor_product_hex8_shape_1d", operator_source)
-        self.assertIn("generated_hex8_tensor_product_hex8_grad_1d", operator_source)
-        self.assertIn("generated_hex8_tensor_product_hex8_q_weight_1d", operator_source)
+        self.assertIn("struct generated_hex8_tensor_product_element_reference_data", operator_source)
+        self.assertIn("generated_hex8_tensor_product_element_reference_data<real_t>::shape_1d()", operator_source)
+        self.assertIn("generated_hex8_tensor_product_element_reference_data<real_t>::grad_1d()", operator_source)
+        self.assertIn("generated_hex8_tensor_product_element_reference_data<real_t>::q_weight_1d()", operator_source)
         self.assertNotIn("generated_hex8_tensor_product_hex8_grad_ref", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
@@ -900,8 +902,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("scalar_t grad_ref", local_source)
         self.assertNotIn("grad_ref[shape", local_source)
         self.assertNotIn("grad_ref_data", local_source)
-        self.assertIn("generated_weak_neohookean_tri3_grad_ref_x", operator_source)
-        self.assertIn("generated_weak_neohookean_tri3_grad_ref_y", operator_source)
+        self.assertIn("struct generated_weak_neohookean_element_reference_data", operator_source)
+        self.assertIn("generated_weak_neohookean_element_reference_data<real_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_weak_neohookean_element_reference_data<real_t>::grad_ref_y()", operator_source)
         self.assertIn(
             "grad_u_ref0 += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
@@ -1099,9 +1102,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
         operator_source = source_by_path["generated_hex27_weak_neohookean_operator.cpp"]
 
-        self.assertIn("generated_hex27_weak_neohookean_hex27_shape_1d", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_grad_1d", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_q_weight_1d", operator_source)
+        self.assertIn("struct generated_hex27_weak_neohookean_element_reference_data", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_element_reference_data<real_t>::shape_1d()", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_element_reference_data<real_t>::grad_1d()", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_element_reference_data<real_t>::q_weight_1d()", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl<real_t, 27, 27, 8>", operator_source)
         self.assertIn("static constexpr int N_QP_1D = 3;", local_source)
         self.assertIn("static constexpr int N_SHAPE_1D = 3;", local_source)
@@ -1393,7 +1397,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("grad_1d", mesh_impl_signature)
         self.assertNotIn("q_weight_1d", mesh_impl_signature)
         self.assertIn(
-            "static const scalar_t shape_1d[4]",
+            "struct generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data",
+            operator_source,
+        )
+        self.assertIn(
+            "generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data<scalar_t>::shape_1d()",
+            operator_source,
+        )
+        self.assertIn(
+            "static const scalar_t data[4] = {scalar_t(",
             operator_source,
         )
         isoparametric_mesh_source = operator_source.split(
@@ -1910,9 +1922,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn('#include "kernel_math.hpp"', local_source)
         self.assertIn("static SFEM_INLINE T pow_2", math_source)
         self.assertIn("static SFEM_INLINE T pow_m2", math_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_x", operator_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_y", operator_source)
-        self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
+        self.assertIn("struct generated_neohookean_ogden_element_reference_data", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::grad_ref_y()", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::q_weight()", operator_source)
         self.assertIn('#include "kernel_diagnostics.hpp"', operator_source)
         self.assertNotIn("struct SfemKernelDiagnostics", operator_source)
         self.assertIn("#ifndef SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP", diagnostics_source)
@@ -1966,9 +1979,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("accumulator_t", operator_source)
         self.assertNotIn("accumulator_t", local_source)
         self.assertNotIn("typedef double scalar_t;", local_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_x", operator_source)
-        self.assertIn("generated_neohookean_ogden_tri3_grad_ref_y", operator_source)
-        self.assertIn("generated_neohookean_ogden_tri3_q_weight", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::grad_ref_y()", operator_source)
+        self.assertIn("generated_neohookean_ogden_element_reference_data<real_t>::q_weight()", operator_source)
         self.assertIn("static_assert(N_QP == 1", operator_source)
         self.assertIn("static_assert(N_SHAPE == 3", operator_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", operator_source)
