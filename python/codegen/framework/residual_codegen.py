@@ -1830,6 +1830,18 @@ def _mixed_operator_source(
     lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types))
     lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
+    lines.extend(
+        _mixed_residual_diagnostics_lines(
+            system,
+            prefix,
+            element,
+            cell_specialization,
+            field_element_types,
+            residual_coeffs,
+            action_coeffs,
+        )
+    )
+    lines.append("")
     form_data = (
         (
             "residual",
@@ -1884,6 +1896,14 @@ def _mixed_operator_source(
 
 
 def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types):
+    return quadrature_reference_struct_lines(
+        prefix,
+        reference_stage,
+        _mixed_reference_data(cell_rule, system, field_element_types),
+    )
+
+
+def _mixed_reference_data(cell_rule, system, field_element_types):
     if cell_rule.is_tensor_product:
         data = (
             SfemReferenceData("q_weight_1d", cell_rule.tensor_product_weights_1d),
@@ -1910,7 +1930,7 @@ def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, fiel
                 cell_rule,
                 _simplex_reference_prefix(element_type),
             )
-    return quadrature_reference_struct_lines(prefix, reference_stage, data)
+    return data
 
 
 def _mixed_tensor_reference_element_types(cell_rule, system, field_element_types):
@@ -2500,18 +2520,92 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     return lines
 
 
+def _mixed_residual_diagnostics_lines(
+    system,
+    prefix,
+    element,
+    specialization,
+    field_element_types,
+    residual_coeffs,
+    action_coeffs,
+):
+    diagnostics = (
+        (
+            "%s_%s_residual_element_soa" % (prefix, element),
+            system.build_residual_graph("residual_diagnostics_tmp").cost,
+            _codegen_dependencies(
+                system,
+                residual_coeffs,
+                system.residual_dependencies(),
+            ),
+        ),
+        (
+            "%s_%s_jacobian_action_element_soa" % (prefix, element),
+            system.build_jacobian_action_graph(
+                temporary_prefix="jacobian_action_diagnostics_tmp"
+            ).cost,
+            _codegen_dependencies(
+                system,
+                action_coeffs,
+                system.jacobian_action_dependencies(),
+            ),
+        ),
+    )
+    lines = []
+    for public_name, cost, dependencies in diagnostics:
+        if lines:
+            lines.append("")
+        lines.extend(
+            _mixed_kernel_diagnostics_lines(
+                system,
+                public_name,
+                cost,
+                specialization,
+                field_element_types,
+                dependencies,
+            )
+        )
+    return lines
+
+
+def _mixed_kernel_diagnostics_lines(
+    system,
+    public_name,
+    cost,
+    specialization,
+    field_element_types,
+    dependencies,
+):
+    rule = specialization.quadrature_rule
+    layout = MixedFieldLayout.create(system, rule, field_element_types)
+    return _kernel_diagnostics_lines(
+        system,
+        public_name,
+        cost,
+        specialization,
+        dependencies,
+        field_streams=layout.total_streams,
+        reference_data=_mixed_reference_data(rule, system, field_element_types),
+    )
+
+
 def _kernel_diagnostics_lines(
     system,
     public_name,
     cost,
     specialization,
     dependencies,
+    *,
+    field_streams=None,
+    reference_data=None,
 ):
     rule = specialization.quadrature_rule
     n_fields = len(system.fields)
-    field_streams = n_fields * rule.n_shape
+    if field_streams is None:
+        field_streams = n_fields * rule.n_shape
     geometry_streams = system.dim * system.dim + 1
-    reference_data = sfem_reference_data(rule)
+    if reference_data is None:
+        reference_data = sfem_reference_data(rule)
     reference_scalars = sum(
         len(reference.values)
         for reference in reference_data

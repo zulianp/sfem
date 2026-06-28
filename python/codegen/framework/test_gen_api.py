@@ -1407,6 +1407,22 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", contents)
             self.assertIn("stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa", contents)
             self.assertIn(
+                "stokes_tri6_tri3_residual_element_soa_diagnostics",
+                contents,
+            )
+            self.assertIn(
+                "stokes_tri6_tri3_jacobian_action_element_soa_arithmetic_intensity",
+                contents,
+            )
+            self.assertIn(
+                "stokes_tri6_tri3_residual_affine_mesh_soa_print_rate",
+                contents,
+            )
+            self.assertIn(
+                "stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate",
+                contents,
+            )
+            self.assertIn(
                 "d2/tri6_tri3/stokes_form_2_u_p_tri6_tri3_operator.cpp",
                 names,
             )
