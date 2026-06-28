@@ -1077,7 +1077,7 @@ def _affine_geometry_offsets(dim):
 def _element_dim(element):
     if element in ("TRI3", "TRI6", "QUAD4"):
         return 2
-    if element in ("TET4", "TET10", "HEX8", "HEX27"):
+    if element in ("TET4", "TET10", "HEX8", "HEX27") or str(element).startswith("PROTEUS_HEX"):
         return 3
     raise ValueError("unsupported generated Op element %s" % element)
 

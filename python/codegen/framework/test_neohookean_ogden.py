@@ -608,7 +608,18 @@ def assert_generated_lane_loops_vectorized(
 
 class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
     def test_sfem_element_specialization_api_covers_relevant_elements(self):
-        required = ("TET4", "HEX8", "HEX27", "TET10", "QUAD4", "TRI3", "TRI6")
+        required = (
+            "TET4",
+            "HEX8",
+            "HEX27",
+            "PROTEUS_HEX8",
+            "PROTEUS_HEX27",
+            "PROTEUS_HEX64",
+            "TET10",
+            "QUAD4",
+            "TRI3",
+            "TRI6",
+        )
         self.assertEqual(set(sfem_supported_element_types()), set(required))
 
         specializations = sfem_soa_element_specializations(required, vector_size=16)
@@ -622,6 +633,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "TET10": (3, 10, 4),
             "HEX8": (3, 8, 8),
             "HEX27": (3, 27, 27),
+            "PROTEUS_HEX8": (3, 8, 8),
+            "PROTEUS_HEX27": (3, 27, 27),
+            "PROTEUS_HEX64": (3, 64, 64),
         }
         for element_type, (dim, n_shape, n_qp) in expected_shape.items():
             specialization = by_type[element_type]
@@ -672,6 +686,20 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertEqual(hex27.tensor_product_shape_values_1d[3:6], (0.0, 1.0, 0.0))
         self.assertEqual(hex27.tensor_product_shape_gradients_1d[3:6], (-1.0, 0.0, 1.0))
         self.assertEqual(len(hex27.weights), 27)
+
+        proteus_hex27 = sfem_element_quadrature_rule("PROTEUS_HEX27")
+        self.assertTrue(proteus_hex27.is_tensor_product)
+        self.assertEqual(proteus_hex27.tensor_product_dim, 3)
+        self.assertEqual(proteus_hex27.tensor_product_n_qp_1d, 3)
+        self.assertEqual(proteus_hex27.tensor_product_n_shape_1d, 3)
+        self.assertEqual(len(proteus_hex27.weights), 27)
+
+        proteus_hex64 = sfem_element_quadrature_rule("PROTEUS_HEX64")
+        self.assertTrue(proteus_hex64.is_tensor_product)
+        self.assertEqual(proteus_hex64.tensor_product_dim, 3)
+        self.assertEqual(proteus_hex64.tensor_product_n_qp_1d, 4)
+        self.assertEqual(proteus_hex64.tensor_product_n_shape_1d, 4)
+        self.assertEqual(len(proteus_hex64.weights), 64)
 
     def test_generated_quad4_soa_kernel_uses_tensor_product_reference_data(self):
         compiler = shutil.which("c++")

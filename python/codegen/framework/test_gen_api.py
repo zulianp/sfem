@@ -592,7 +592,18 @@ class GenApiTest(unittest.TestCase):
 
         neo = context_orders(
             neohookean_ogden,
-            ("TRI3", "TRI6", "TET4", "TET10", "QUAD4", "HEX8", "HEX27"),
+            (
+                "TRI3",
+                "TRI6",
+                "TET4",
+                "TET10",
+                "QUAD4",
+                "HEX8",
+                "HEX27",
+                "PROTEUS_HEX8",
+                "PROTEUS_HEX27",
+                "PROTEUS_HEX64",
+            ),
         )
         self.assertEqual(neo["TRI3"], (1, 1))
         self.assertEqual(neo["TET4"], (1, 1))
@@ -601,10 +612,24 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(neo["TRI6"], (4, 6))
         self.assertEqual(neo["TET10"], (4, 11))
         self.assertEqual(neo["HEX27"], (4, 64))
+        self.assertEqual(neo["PROTEUS_HEX8"], (2, 8))
+        self.assertEqual(neo["PROTEUS_HEX27"], (4, 64))
+        self.assertEqual(neo["PROTEUS_HEX64"], (5, 125))
 
         neo_affine = affine_context_orders(
             neohookean_ogden,
-            ("TRI3", "TRI6", "TET4", "TET10", "QUAD4", "HEX8", "HEX27"),
+            (
+                "TRI3",
+                "TRI6",
+                "TET4",
+                "TET10",
+                "QUAD4",
+                "HEX8",
+                "HEX27",
+                "PROTEUS_HEX8",
+                "PROTEUS_HEX27",
+                "PROTEUS_HEX64",
+            ),
         )
         self.assertEqual(neo_affine["TRI3"], (1, 1))
         self.assertEqual(neo_affine["TET4"], (1, 1))
@@ -613,6 +638,9 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(neo_affine["TRI6"], (2, 3))
         self.assertEqual(neo_affine["TET10"], (2, 4))
         self.assertEqual(neo_affine["HEX27"], (3, 27))
+        self.assertEqual(neo_affine["PROTEUS_HEX8"], (2, 8))
+        self.assertEqual(neo_affine["PROTEUS_HEX27"], (3, 27))
+        self.assertEqual(neo_affine["PROTEUS_HEX64"], (4, 64))
 
         two_phase = context_orders(
             two_phase_flow,

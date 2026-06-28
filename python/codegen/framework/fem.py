@@ -3,6 +3,56 @@ import math
 from typing import Optional, Tuple
 
 
+_PROTEUS_HEX_ORDER_BY_TYPE = {
+    "PROTEUS_HEX8": 1,
+    "PROTEUS_HEX27": 2,
+    "PROTEUS_HEX64": 3,
+    "PROTEUS_HEX125": 4,
+    "PROTEUS_HEX216": 5,
+    "PROTEUS_HEX343": 6,
+    "PROTEUS_HEX512": 7,
+    "PROTEUS_HEX729": 8,
+    "PROTEUS_HEX4913": 16,
+}
+
+
+def sfem_proteus_hex_element_types(max_order=None):
+    elements = tuple(_PROTEUS_HEX_ORDER_BY_TYPE)
+    if max_order is None:
+        return elements
+    max_order = int(max_order)
+    return tuple(
+        element
+        for element in elements
+        if _PROTEUS_HEX_ORDER_BY_TYPE[element] <= max_order
+    )
+
+
+def sfem_is_proteus_hex_element(element_type):
+    return str(element_type).upper() in _PROTEUS_HEX_ORDER_BY_TYPE
+
+
+def sfem_is_tensor_product_hex_element(element_type):
+    element_type = str(element_type).upper()
+    return element_type in ("HEX8", "HEX27") or element_type in _PROTEUS_HEX_ORDER_BY_TYPE
+
+
+def sfem_tensor_product_hex_order(element_type):
+    element_type = str(element_type).upper()
+    if element_type == "HEX8":
+        return 1
+    if element_type == "HEX27":
+        return 2
+    try:
+        return _PROTEUS_HEX_ORDER_BY_TYPE[element_type]
+    except KeyError as exc:
+        raise ValueError("unsupported tensor-product hex element '%s'" % element_type) from exc
+
+
+def sfem_tensor_product_hex_uses_cartesian_ordering(element_type):
+    return sfem_is_proteus_hex_element(element_type)
+
+
 @dataclass(frozen=True)
 class SfemSoAArrayInput:
     name: str
@@ -403,7 +453,10 @@ def sfem_fem_policy(
 
 def _sfem_basis_policy(quadrature_rule):
     element_type = quadrature_rule.element_type
-    degree = 2 if element_type in ("TRI6", "TET10", "HEX27") else 1
+    if sfem_is_tensor_product_hex_element(element_type):
+        degree = sfem_tensor_product_hex_order(element_type)
+    else:
+        degree = 2 if element_type in ("TRI6", "TET10") else 1
     return SfemElementBasisPolicy(
         element_type,
         quadrature_rule.dim,
@@ -423,7 +476,7 @@ def _sfem_cell_name(element_type):
         return "tetrahedron"
     if element_type == "QUAD4":
         return "quadrilateral"
-    if element_type in ("HEX8", "HEX27"):
+    if sfem_is_tensor_product_hex_element(element_type):
         return "hexahedron"
     raise ValueError("unsupported element type '%s'" % element_type)
 
@@ -447,32 +500,43 @@ def sfem_normalize_integration_case(integration_case="standard"):
 def sfem_default_quadrature_order(element_type, integration_case="standard"):
     element_type = str(element_type).upper()
     integration_case = sfem_normalize_integration_case(integration_case)
+    hex_order = (
+        sfem_tensor_product_hex_order(element_type)
+        if sfem_is_tensor_product_hex_element(element_type)
+        else 0
+    )
     if integration_case == "affine_energy":
         integration_case = "standard"
     if integration_case == "affine_mixed":
         if element_type in ("TRI6", "TET10"):
             return 2
-        if element_type == "HEX27":
-            return 3
+        if hex_order > 1:
+            return hex_order + 1
         integration_case = "standard"
     if integration_case == "isoparametric_mixed":
-        if element_type in ("TRI6", "TET10", "HEX27"):
+        if element_type in ("TRI6", "TET10"):
             return 4
+        if hex_order > 1:
+            return hex_order + 2
     if integration_case == "value_linear_residual":
         if element_type in ("TRI3", "TET4", "QUAD4", "HEX8"):
             return 2
         if element_type in ("TRI6", "TET10"):
             return 4
-        if element_type == "HEX27":
-            return 3
+        if hex_order > 1:
+            return hex_order + 1
     if integration_case == "value_residual":
         if element_type in ("TRI3", "TET4", "TRI6", "TET10", "QUAD4", "HEX8", "HEX27"):
             return 4
+        if sfem_is_proteus_hex_element(element_type):
+            return hex_order + 2
     if integration_case == "energy":
-        if element_type in ("TRI6", "TET10", "HEX27"):
+        if element_type in ("TRI6", "TET10"):
             return 4
-    if element_type == "HEX27":
-        return 3
+        if hex_order > 1:
+            return hex_order + 2
+    if hex_order > 0:
+        return hex_order + 1
     if element_type in ("QUAD4", "HEX8", "TRI6", "TET10"):
         return 2
     return 1
@@ -563,72 +627,21 @@ def sfem_element_quadrature_rule(element_type, order=None):
             2,
         )
 
-    if element_type == "HEX8":
+    if sfem_is_tensor_product_hex_element(element_type):
+        hex_order = sfem_tensor_product_hex_order(element_type)
         points, weights_1d = _sfem_unit_interval_gauss_rule(order)
-        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
-        gradients = []
-        weights = []
-        for z, wz in zip(points, weights_1d):
-            for y, wy in zip(points, weights_1d):
-                for x, wx in zip(points, weights_1d):
-                    weights.append(wx * wy * wz)
-                    xm = 1.0 - x
-                    ym = 1.0 - y
-                    zm = 1.0 - z
-                    gradients.extend(
-                        (
-                            -ym * zm,
-                            -xm * zm,
-                            -xm * ym,
-                            ym * zm,
-                            -x * zm,
-                            -x * ym,
-                            y * zm,
-                            x * zm,
-                            -x * y,
-                            -y * zm,
-                            xm * zm,
-                            -xm * y,
-                            -ym * z,
-                            -xm * z,
-                            xm * ym,
-                            ym * z,
-                            -x * z,
-                            x * ym,
-                            y * z,
-                            x * z,
-                            x * y,
-                            -y * z,
-                            xm * z,
-                            xm * y,
-                        )
-                    )
-        return SfemElementQuadratureRule(
-            element_type,
-            3,
-            8,
-            weights,
-            gradients,
-            order,
-            shape_values_1d,
-            shape_gradients_1d,
-            weights_1d,
-            3,
-        )
-
-    if element_type == "HEX27":
-        points, weights_1d = _sfem_unit_interval_gauss_rule(order)
-        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q2_1d_shapes(points)
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_1d_shapes(points, hex_order)
         gradients, weights = _sfem_tensor_product_hex_gradients_and_weights(
+            element_type,
             shape_values_1d,
             shape_gradients_1d,
             weights_1d,
-            3,
+            hex_order + 1,
         )
         return SfemElementQuadratureRule(
             element_type,
             3,
-            27,
+            (hex_order + 1) ** 3,
             weights,
             gradients,
             order,
@@ -642,7 +655,18 @@ def sfem_element_quadrature_rule(element_type, order=None):
 
 
 def sfem_supported_element_types():
-    return ("TRI3", "TRI6", "QUAD4", "TET4", "TET10", "HEX8", "HEX27")
+    return (
+        "TRI3",
+        "TRI6",
+        "QUAD4",
+        "TET4",
+        "TET10",
+        "HEX8",
+        "HEX27",
+        "PROTEUS_HEX8",
+        "PROTEUS_HEX27",
+        "PROTEUS_HEX64",
+    )
 
 
 def sfem_taylor_hood_element_types():
@@ -820,10 +844,13 @@ def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
     if not cell_rule.is_tensor_product:
         raise ValueError("cell rule must be tensor-product")
     points, _ = _sfem_unit_interval_gauss_rule(cell_rule.order)
-    if element_type in ("QUAD4", "HEX8"):
+    if element_type == "QUAD4":
         shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
-    elif element_type == "HEX27":
-        shape_values_1d, shape_gradients_1d = _sfem_lagrange_q2_1d_shapes(points)
+    elif sfem_is_tensor_product_hex_element(element_type):
+        shape_values_1d, shape_gradients_1d = _sfem_lagrange_1d_shapes(
+            points,
+            sfem_tensor_product_hex_order(element_type),
+        )
     else:
         raise ValueError("unsupported tensor-product field element '%s'" % element_type)
     return (
@@ -924,9 +951,9 @@ def sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule):
             )
             gradients.extend(_tet10_reference_gradients(x, y, z))
         return tuple(shape), tuple(gradients)
-    if element_type in ("HEX8", "HEX27"):
-        order = 1 if element_type == "HEX8" else 2
-        return _sfem_hex_lagrange_shape_gradients(points, order)
+    if sfem_is_tensor_product_hex_element(element_type):
+        order = sfem_tensor_product_hex_order(element_type)
+        return _sfem_hex_lagrange_shape_gradients(element_type, points, order)
     raise ValueError("unsupported residual field element '%s'" % element_type)
 
 
@@ -947,7 +974,7 @@ def sfem_cell_rule_points(rule):
     if rule.element_type == "TET10":
         points, _ = _sfem_tetrahedron_quadrature_rule(rule.order)
         return points
-    if rule.element_type in ("HEX8", "HEX27"):
+    if sfem_is_tensor_product_hex_element(rule.element_type):
         points, _ = _sfem_unit_interval_gauss_rule(rule.order)
         return tuple((x, y, z) for z in points for y in points for x in points)
     raise ValueError("unsupported cell rule '%s'" % rule.element_type)
@@ -1100,6 +1127,17 @@ def _sfem_unit_interval_gauss_rule(order):
             0.5 * (1.0 + inner),
             0.5 * (1.0 + outer),
         ), (w_outer, w_inner, w_inner, w_outer)
+    if order > 4:
+        try:
+            from numpy.polynomial.legendre import leggauss
+        except ImportError as exc:
+            raise ValueError(
+                "quadrature order %d requires numpy for Gauss-Legendre nodes" % order
+            ) from exc
+        points, weights = leggauss(order)
+        return tuple(0.5 * (float(x) + 1.0) for x in points), tuple(
+            0.5 * float(w) for w in weights
+        )
     raise ValueError("unsupported quadrature order %d" % order)
 
 
@@ -1127,6 +1165,20 @@ def _sfem_lagrange_q2_1d_shapes(points):
     return tuple(shape_values), tuple(shape_gradients)
 
 
+def _sfem_lagrange_1d_shapes(points, order):
+    if order == 1:
+        return _sfem_lagrange_q1_1d_shapes(points)
+    if order == 2:
+        return _sfem_lagrange_q2_1d_shapes(points)
+    shape_values = []
+    shape_gradients = []
+    for x in points:
+        values, gradients = _sfem_lagrange_1d_at(x, order)
+        shape_values.extend(values)
+        shape_gradients.extend(gradients)
+    return tuple(shape_values), tuple(shape_gradients)
+
+
 def _sfem_lagrange_1d_at(x, order):
     if order == 1:
         return (1.0 - x, x), (-1.0, 1.0)
@@ -1140,10 +1192,29 @@ def _sfem_lagrange_1d_at(x, order):
             4.0 - 8.0 * x,
             4.0 * x - 1.0,
         )
-    raise ValueError("unsupported 1D Lagrange order %d" % order)
+    nodes = tuple(i / float(order) for i in range(order + 1))
+    values = []
+    gradients = []
+    for i, xi in enumerate(nodes):
+        value = 1.0
+        for j, xj in enumerate(nodes):
+            if i != j:
+                value *= (x - xj) / (xi - xj)
+        gradient = 0.0
+        for k, xk in enumerate(nodes):
+            if i == k:
+                continue
+            term = 1.0 / (xi - xk)
+            for j, xj in enumerate(nodes):
+                if i != j and j != k:
+                    term *= (x - xj) / (xi - xj)
+            gradient += term
+        values.append(value)
+        gradients.append(gradient)
+    return tuple(values), tuple(gradients)
 
 
-def _sfem_hex_lagrange_shape_gradients(points, order):
+def _sfem_hex_lagrange_shape_gradients(element_type, points, order):
     n = order + 1
     shape = []
     gradients = []
@@ -1156,7 +1227,7 @@ def _sfem_hex_lagrange_shape_gradients(points, order):
         for sz in range(n):
             for sy in range(n):
                 for sx in range(n):
-                    idx = sfem_tensor_hex_shape_index(n, sx, sy, sz)
+                    idx = sfem_tensor_hex_shape_index(element_type, n, sx, sy, sz)
                     vx = values_x[sx]
                     vy = values_y[sy]
                     vz = values_z[sz]
@@ -1173,6 +1244,7 @@ def _sfem_hex_lagrange_shape_gradients(points, order):
 
 
 def _sfem_tensor_product_hex_gradients_and_weights(
+    element_type,
     shape_values_1d,
     shape_gradients_1d,
     weights_1d,
@@ -1196,6 +1268,7 @@ def _sfem_tensor_product_hex_gradients_and_weights(
                             dy = sxv * shape_gradients_1d[qy * n_shape_1d + sy] * szv
                             dz = sxv * syv * shape_gradients_1d[qz * n_shape_1d + sz]
                             shape = sfem_tensor_hex_shape_index(
+                                element_type,
                                 n_shape_1d,
                                 sx,
                                 sy,
@@ -1207,7 +1280,9 @@ def _sfem_tensor_product_hex_gradients_and_weights(
     return tuple(gradients), tuple(weights)
 
 
-def sfem_tensor_hex_shape_index(n_shape_1d, sx, sy, sz):
+def sfem_tensor_hex_shape_index(element_type, n_shape_1d, sx, sy, sz):
+    if sfem_tensor_product_hex_uses_cartesian_ordering(element_type):
+        return sx + n_shape_1d * (sy + n_shape_1d * sz)
     if n_shape_1d == 2:
         return (sx if sy == 0 else (3 if sx == 0 else 2)) + 4 * sz
     if n_shape_1d == 3:

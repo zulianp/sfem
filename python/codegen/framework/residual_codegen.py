@@ -14,12 +14,14 @@ from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
 from .fem import (
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
+    sfem_is_tensor_product_hex_element,
     sfem_mesh_reference_data,
     sfem_reference_data,
     sfem_simplex_grad_ref_name,
     sfem_simplex_field_reference_data,
     sfem_soa_element_specialization,
     sfem_tensor_product_field_reference_data,
+    sfem_tensor_product_hex_uses_cartesian_ordering,
     SfemReferenceData,
 )
 from .quadrature_codegen import (
@@ -2290,6 +2292,9 @@ def _mixed_isoparametric_function(
                     cell_rule.n_shape,
                     tuple(range(dim * cell_rule.n_shape)),
                     lambda stream: "block_coordinates[%d]" % stream,
+                    shape_order=tuple(range(cell_rule.n_shape))
+                    if sfem_tensor_product_hex_uses_cartesian_ordering(cell_rule.element_type)
+                    else None,
                 ),
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
@@ -2416,7 +2421,9 @@ def _field_n_shape(field, cell_rule, field_element_types):
     element_type = field_element_types[field.name]
     return sfem_field_n_shape(
         element_type,
-        cell_rule.order if element_type in ("QUAD4", "HEX8") else None,
+        cell_rule.order
+        if element_type == "QUAD4" or sfem_is_tensor_product_hex_element(element_type)
+        else None,
     )
 
 
@@ -2601,7 +2608,9 @@ def _mesh_operator_source(
     n_qp = rule.n_qp
     vector_size = affine_specialization.vector_size
     shape_order = (
-        tensor_product_cartesian_shape_order(dim, n_shape)
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
         if rule.is_tensor_product
         else tuple(range(n_shape))
     )
@@ -2962,7 +2971,9 @@ def _isoparametric_mesh_operator_source(
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
     shape_order = (
-        tensor_product_cartesian_shape_order(dim, n_shape)
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
         if rule.is_tensor_product
         else tuple(range(n_shape))
     )
@@ -3111,6 +3122,9 @@ def _isoparametric_mesh_operator_source(
                     n_shape,
                     tuple(range(dim * n_shape)),
                     lambda stream: "block_coordinates[%d]" % stream,
+                    shape_order=tuple(range(n_shape))
+                    if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+                    else None,
                 ),
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
