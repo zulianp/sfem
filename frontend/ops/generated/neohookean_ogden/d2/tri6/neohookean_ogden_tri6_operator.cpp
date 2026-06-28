@@ -1,4 +1,5 @@
 #include "../neohookean_ogden_d2_simplex_local.hpp"
+#include "../../geometry_kernels.hpp"
 #include "../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS

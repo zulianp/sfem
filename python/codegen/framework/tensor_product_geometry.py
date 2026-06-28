@@ -55,6 +55,179 @@ def isoparametric_adjugate_lines(
     raise ValueError("isoparametric geometry supports dimensions 1, 2, and 3")
 
 
+def sfem_geometry_kernels_header_source():
+    return "\n".join(
+        [
+            "#ifndef SFEM_CODEGEN_GEOMETRY_KERNELS_HPP",
+            "#define SFEM_CODEGEN_GEOMETRY_KERNELS_HPP",
+            "",
+            "#include <stddef.h>",
+            "",
+            "#ifndef SFEM_INLINE",
+            "#define SFEM_INLINE inline",
+            "#endif",
+            "",
+            "#ifndef SFEM_RESTRICT",
+            "#define SFEM_RESTRICT",
+            "#endif",
+            "",
+            "namespace sfem {",
+            "namespace codegen {",
+            "",
+            "template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>",
+            "struct GeometryJacobianAdjugateDeterminant;",
+            "",
+            "template <typename scalar_t>",
+            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_2(",
+            "        const scalar_t J00,",
+            "        const scalar_t J01,",
+            "        const scalar_t J10,",
+            "        const scalar_t J11,",
+            "        scalar_t *const *const SFEM_RESTRICT adjugate,",
+            "        scalar_t *const SFEM_RESTRICT determinant,",
+            "        const ptrdiff_t offset) {",
+            "    adjugate[0][offset] = J11;",
+            "    adjugate[1][offset] = -J01;",
+            "    adjugate[2][offset] = -J10;",
+            "    adjugate[3][offset] = J00;",
+            "    determinant[offset] = J00 * J11 - J01 * J10;",
+            "}",
+            "",
+            "template <typename scalar_t>",
+            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(",
+            "        const scalar_t J00,",
+            "        const scalar_t J01,",
+            "        const scalar_t J02,",
+            "        const scalar_t J10,",
+            "        const scalar_t J11,",
+            "        const scalar_t J12,",
+            "        const scalar_t J20,",
+            "        const scalar_t J21,",
+            "        const scalar_t J22,",
+            "        scalar_t *const *const SFEM_RESTRICT adjugate,",
+            "        scalar_t *const SFEM_RESTRICT determinant,",
+            "        const ptrdiff_t offset) {",
+            "    adjugate[0][offset] = J11 * J22 - J12 * J21;",
+            "    adjugate[1][offset] = J02 * J21 - J01 * J22;",
+            "    adjugate[2][offset] = J01 * J12 - J02 * J11;",
+            "    adjugate[3][offset] = J12 * J20 - J10 * J22;",
+            "    adjugate[4][offset] = J00 * J22 - J02 * J20;",
+            "    adjugate[5][offset] = J02 * J10 - J00 * J12;",
+            "    adjugate[6][offset] = J10 * J21 - J11 * J20;",
+            "    adjugate[7][offset] = J01 * J20 - J00 * J21;",
+            "    adjugate[8][offset] = J00 * J11 - J01 * J10;",
+            "    determinant[offset] = J00 * (J11 * J22 - J12 * J21)",
+            "            - J01 * (J10 * J22 - J12 * J20)",
+            "            + J02 * (J10 * J21 - J11 * J20);",
+            "}",
+            "",
+            "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
+            "struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {",
+            "    static SFEM_INLINE void eval(",
+            "            const ptrdiff_t nelems,",
+            "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
+            "            scalar_t *const *const SFEM_RESTRICT adjugate,",
+            "            scalar_t *const SFEM_RESTRICT determinant) {",
+            "        for (int q = 0; q < N_QP; ++q) {",
+            "#pragma omp simd",
+            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
+            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];",
+            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane];",
+            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];",
+            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane];",
+            "                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(",
+            "                        J00, J01, J10, J11, adjugate, determinant, offset);",
+            "            }",
+            "        }",
+            "    }",
+            "};",
+            "",
+            "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
+            "struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {",
+            "    static SFEM_INLINE void eval(",
+            "            const ptrdiff_t nelems,",
+            "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
+            "            scalar_t *const *const SFEM_RESTRICT adjugate,",
+            "            scalar_t *const SFEM_RESTRICT determinant) {",
+            "        for (int q = 0; q < N_QP; ++q) {",
+            "#pragma omp simd",
+            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
+            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
+            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
+            "                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
+            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
+            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
+            "                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
+            "                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
+            "                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
+            "                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
+            "                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(",
+            "                        J00, J01, J02, J10, J11, J12, J20, J21, J22,",
+            "                        adjugate, determinant, offset);",
+            "            }",
+            "        }",
+            "    }",
+            "};",
+            "",
+            "template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>",
+            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(",
+            "        const ptrdiff_t nelems,",
+            "        const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
+            "        scalar_t *const *const SFEM_RESTRICT adjugate,",
+            "        scalar_t *const SFEM_RESTRICT determinant) {",
+            "    GeometryJacobianAdjugateDeterminant<scalar_t, DIM, N_QP, VECTOR_SIZE>::eval(",
+            "            nelems, coordinate_grad_ref, adjugate, determinant);",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+            "#endif",
+            "",
+        ]
+    )
+
+
+def isoparametric_adjugate_stream_array_lines(
+    *,
+    dim,
+    indent,
+    stream_array_name,
+    adjugate_streams,
+):
+    return [
+        "%sscalar_t *%s[DIM * DIM] = {%s};"
+        % (indent, stream_array_name, ", ".join(adjugate_streams))
+    ]
+
+
+def isoparametric_adjugate_call_lines(
+    *,
+    dim,
+    indent,
+    index,
+    stream_array_name,
+    determinant_stream,
+):
+    if dim == 2:
+        return [
+            "%sgeometry_jacobian_adjugate_and_determinant_2<scalar_t>(" % indent,
+            "%s        J00, J01, J10, J11, %s, %s, %s);"
+            % (indent, stream_array_name, determinant_stream, index),
+        ]
+    if dim == 3:
+        return [
+            "%sgeometry_jacobian_adjugate_and_determinant_3<scalar_t>(" % indent,
+            "%s        J00, J01, J02, J10, J11, J12, J20, J21, J22,"
+            % indent,
+            "%s        %s, %s, %s);"
+            % (indent, stream_array_name, determinant_stream, index),
+        ]
+    raise ValueError("isoparametric geometry supports dimensions 2 and 3")
+
+
 def coordinate_stream_array_lines(
     coordinate_streams,
     *,
@@ -88,6 +261,8 @@ def tensor_product_isoparametric_geometry_lines(
     indent="        ",
     adjugate_target,
     determinant_target,
+    adjugate_streams=None,
+    determinant_stream=None,
 ):
     if dim not in (2, 3):
         raise ValueError("tensor-product geometry supports dimensions 2 and 3")
@@ -126,31 +301,44 @@ def tensor_product_isoparametric_geometry_lines(
     )
     if not sum_factorization.evaluates_geometry_jacobian:
         raise ValueError("tensor-product geometry requires a Jacobian sum-factorization plan")
-    lines.extend(
-        [
-            "",
-            "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
-            "#pragma omp simd",
-            "%s    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
-        ]
-    )
-    body_indent = indent + "        "
-    for row in range(dim):
-        for col in range(dim):
-            lines.append(
-                "%sconst scalar_t J%d%d = %s[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                % (body_indent, row, col, gradient_name, row, col)
-            )
-    lines.extend(
-        isoparametric_adjugate_lines(
-            dim,
-            body_indent,
-            "q * VECTOR_SIZE + lane",
-            adjugate_target,
-            determinant_target,
+    if adjugate_streams is not None and determinant_stream is not None:
+        lines.extend(
+            [
+                "",
+                "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
+                % (indent, gradient_name, ", ".join(adjugate_streams)),
+                "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
+                % indent,
+                "%s        nelems, %s, %s_adjugate_streams, %s);"
+                % (indent, gradient_name, gradient_name, determinant_stream),
+            ]
         )
-    )
-    lines.extend(["%s    }" % indent, "%s}" % indent])
+    else:
+        lines.extend(
+            [
+                "",
+                "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
+                "#pragma omp simd",
+                "%s    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
+            ]
+        )
+        body_indent = indent + "        "
+        for row in range(dim):
+            for col in range(dim):
+                lines.append(
+                    "%sconst scalar_t J%d%d = %s[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
+                    % (body_indent, row, col, gradient_name, row, col)
+                )
+        lines.extend(
+            isoparametric_adjugate_lines(
+                dim,
+                body_indent,
+                "q * VECTOR_SIZE + lane",
+                adjugate_target,
+                determinant_target,
+            )
+        )
+        lines.extend(["%s    }" % indent, "%s}" % indent])
     return lines
 
 
@@ -197,6 +385,8 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
     grad_name="grad_1d",
     adjugate_target,
     determinant_target,
+    adjugate_streams=None,
+    determinant_stream=None,
 ):
     def evaluator_lines(streams, gradient, evaluator_indent):
         return [
@@ -220,6 +410,8 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
         indent=indent,
         adjugate_target=adjugate_target,
         determinant_target=determinant_target,
+        adjugate_streams=adjugate_streams,
+        determinant_stream=determinant_stream,
     )
 
 
@@ -304,6 +496,8 @@ def tensor_product_gradient_isoparametric_geometry_lines(
     grad_name="grad_1d",
     adjugate_target,
     determinant_target,
+    adjugate_streams=None,
+    determinant_stream=None,
 ):
     n_shape_1d = round(n_shape ** (1.0 / dim))
     if n_shape_1d ** dim != n_shape:
@@ -331,21 +525,34 @@ def tensor_product_gradient_isoparametric_geometry_lines(
         shape_name=shape_name,
         grad_name=grad_name,
     )
-    lines.extend(
-        [
-            "",
-            "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
-        ]
-    )
-    lines.extend(
-        tensor_product_current_q_isoparametric_geometry_lines(
-            dim=dim,
-            gradient_name=gradient_name,
-            indent=indent + "    ",
-            adjugate_target=adjugate_target,
-            determinant_target=determinant_target,
-            output_index="q * VECTOR_SIZE + lane",
+    if adjugate_streams is not None and determinant_stream is not None:
+        lines.extend(
+            [
+                "",
+                "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
+                % (indent, gradient_name, ", ".join(adjugate_streams)),
+                "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
+                % indent,
+                "%s        nelems, %s, %s_adjugate_streams, %s);"
+                % (indent, gradient_name, gradient_name, determinant_stream),
+            ]
         )
-    )
-    lines.append("%s}" % indent)
+    else:
+        lines.extend(
+            [
+                "",
+                "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
+            ]
+        )
+        lines.extend(
+            tensor_product_current_q_isoparametric_geometry_lines(
+                dim=dim,
+                gradient_name=gradient_name,
+                indent=indent + "    ",
+                adjugate_target=adjugate_target,
+                determinant_target=determinant_target,
+                output_index="q * VECTOR_SIZE + lane",
+            )
+        )
+        lines.append("%s}" % indent)
     return lines

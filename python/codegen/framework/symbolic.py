@@ -38,6 +38,9 @@ except ImportError:
 try:
     from .tensor_product_geometry import (
         isoparametric_adjugate_lines,
+        isoparametric_adjugate_call_lines,
+        isoparametric_adjugate_stream_array_lines,
+        sfem_geometry_kernels_header_source,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
         tensor_product_coordinate_gradient_lines,
@@ -48,6 +51,9 @@ try:
 except ImportError:
     from tensor_product_geometry import (
         isoparametric_adjugate_lines,
+        isoparametric_adjugate_call_lines,
+        isoparametric_adjugate_stream_array_lines,
+        sfem_geometry_kernels_header_source,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
         tensor_product_coordinate_gradient_lines,
@@ -1553,6 +1559,7 @@ def generate_sfem_soa_cpp_files(
     local_name = "%s_local.hpp" % local_prefix
     math_name = "kernel_math.hpp"
     tensor_product_name = "tensor_product_kernels.hpp"
+    geometry_name = "geometry_kernels.hpp"
     diagnostics_name = "kernel_diagnostics.hpp"
     operator_name = "%s_operator.cpp" % prefix
     return (
@@ -1563,6 +1570,10 @@ def generate_sfem_soa_cpp_files(
         GeneratedKernelFile(
             tensor_product_name,
             sfem_tensor_product_kernels_header_source(),
+        ),
+        GeneratedKernelFile(
+            geometry_name,
+            sfem_geometry_kernels_header_source(),
         ),
         GeneratedKernelFile(
             diagnostics_name,
@@ -1593,6 +1604,7 @@ def generate_sfem_soa_cpp_files(
                 vector_size,
                 local_prefix,
                 local_name,
+                geometry_name,
                 diagnostics_name,
                 array_inputs,
                 quadrature_rule,
@@ -2600,7 +2612,17 @@ def _sfem_soa_isoparametric_geometry_lines(
     q_major=False,
     reference_prefix="",
 ):
-    lines = ["#pragma omp simd", "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"]
+    stream_array_name = "block_jacobian_adjugate_streams"
+    lines = isoparametric_adjugate_stream_array_lines(
+        dim=dim,
+        indent="            ",
+        stream_array_name=stream_array_name,
+        adjugate_streams=tuple(
+            "block_jacobian_adjugate%d" % component
+            for component in range(dim * dim)
+        ),
+    )
+    lines.extend(["#pragma omp simd", "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
     for row in range(dim):
         for col in range(dim):
             lines.append("                scalar_t J%d%d = scalar_t(0);" % (row, col))
@@ -2630,7 +2652,15 @@ def _sfem_soa_isoparametric_geometry_lines(
             )
     lines.append("                }")
     output_index = "q * VECTOR_SIZE + lane" if q_major else "lane"
-    lines.extend(_sfem_soa_adjugate_assignment_lines(dim, "                ", output_index))
+    lines.extend(
+        isoparametric_adjugate_call_lines(
+            dim=dim,
+            indent="                ",
+            index=output_index,
+            stream_array_name=stream_array_name,
+            determinant_stream="block_jacobian_determinant0",
+        )
+    )
     lines.append("            }")
     return lines
 
@@ -2709,6 +2739,7 @@ def _sfem_soa_operator_source(
     vector_size,
     local_prefix,
     local_name,
+    geometry_name,
     diagnostics_name,
     array_inputs,
     quadrature_rule,
@@ -2717,6 +2748,7 @@ def _sfem_soa_operator_source(
 ):
     lines = [
         '#include "%s"' % local_name,
+        '#include "%s"' % geometry_name,
         '#include "%s"' % diagnostics_name,
         "",
         "#ifndef SFEM_SUCCESS",
@@ -3226,6 +3258,11 @@ def _sfem_soa_operator_function(
                     determinant_target=lambda index: (
                         "block_jacobian_determinant0[%s]" % index
                     ),
+                    adjugate_streams=tuple(
+                        "block_jacobian_adjugate%d" % component
+                        for component in range(dim * dim)
+                    ),
+                    determinant_stream="block_jacobian_determinant0",
                 )
             )
         else:
@@ -3866,6 +3903,11 @@ def _sfem_soa_mesh_operator_function(
                 determinant_target=lambda index: (
                     "block_jacobian_determinant0[%s]" % index
                 ),
+                adjugate_streams=tuple(
+                    "block_jacobian_adjugate%d" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_jacobian_determinant0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )

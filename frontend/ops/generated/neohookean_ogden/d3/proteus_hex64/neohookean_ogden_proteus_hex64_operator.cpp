@@ -1,4 +1,5 @@
 #include "../neohookean_ogden_d3_tensor_product_local.hpp"
+#include "../../geometry_kernels.hpp"
 #include "../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
@@ -427,30 +428,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex64_proteus_hex64_objective_is
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
-            }
-        }
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
         neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
@@ -905,30 +885,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex64_proteus_hex64_gradient_iso
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
-            }
-        }
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
         neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
@@ -1426,30 +1385,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex64_proteus_hex64_apply_isopar
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
-            }
-        }
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
         neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
