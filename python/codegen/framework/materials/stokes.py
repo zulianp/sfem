@@ -50,6 +50,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "stokes",
     systems,
+    op_name="GeneratedStokes",
     parameter_defaults=(("mu", 1.0),),
 )
 
