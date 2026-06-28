@@ -429,43 +429,119 @@ def call_generated_neohookean_kernel(
 ):
     dim = quadrature_rule.dim
     n_shape = quadrature_rule.n_shape
+    n_nodes = n_shape
     pointer_type = ctypes.POINTER(ctypes.c_double)
-    geometry = [c_double_array(stream) for stream in element_geometry_stream_values(quadrature_rule, coords)]
-    coordinates = [c_double_array(stream) for stream in field_stream_values(coords)]
-    u_streams = [c_double_array(stream) for stream in field_stream_values(displacement)]
-    h_streams = [c_double_array(stream) for stream in field_stream_values(direction)] if direction is not None else []
-    outputs = [c_double_array((0.0,)) for _ in range(n_shape * dim)]
+
+    element_index_type = ctypes.c_ssize_t
+    element_arrays = [
+        (element_index_type * 1)(shape)
+        for shape in range(n_shape)
+    ]
+    element_pointer_array_type = ctypes.POINTER(element_index_type) * n_shape
+    element_pointers = element_pointer_array_type(
+        *[ctypes.cast(stream, ctypes.POINTER(element_index_type)) for stream in element_arrays]
+    )
+
+    coordinate_streams = [
+        c_double_array([coords[shape][component] for shape in range(n_shape)])
+        for component in range(dim)
+    ]
+    coordinate_pointer_array_type = pointer_type * dim
+    coordinate_pointers = coordinate_pointer_array_type(
+        *[ctypes.cast(stream, pointer_type) for stream in coordinate_streams]
+    )
+
+    geometry_streams = [
+        c_double_array((stream[0],))
+        for stream in element_geometry_stream_values(quadrature_rule, coords)
+    ]
+    u_streams = [
+        c_double_array([displacement[shape][component] for shape in range(n_shape)])
+        for component in range(dim)
+    ]
+    h_streams = [
+        c_double_array([direction[shape][component] for shape in range(n_shape)])
+        for component in range(dim)
+    ] if direction is not None else []
+    outputs = [c_double_array([0.0 for _ in range(n_nodes)]) for _ in range(dim)]
+
     function = getattr(
         library,
-        "%s_%s_%s_%ssoa"
+        "%s_%s_%s_%s_mesh_soa"
         % (
             prefix,
             element_type.lower(),
             form_name,
-            "isoparametric_" if isoparametric else "",
+            "isoparametric" if isoparametric else "affine",
         ),
     )
     function.restype = ctypes.c_int
-    geometry_or_coordinates = coordinates if isoparametric else geometry
-    pointer_count = len(geometry_or_coordinates) + len(u_streams) + len(h_streams) + len(outputs)
-    function.argtypes = (
-        [ctypes.c_ssize_t]
-        + [pointer_type] * len(geometry_or_coordinates)
-        + [ctypes.c_double, ctypes.c_double]
-        + [pointer_type] * (pointer_count - len(geometry_or_coordinates))
-    )
-    status = function(
-        ctypes.c_ssize_t(1),
-        *geometry_or_coordinates,
-        ctypes.c_double(mu),
-        ctypes.c_double(lmbda),
-        *u_streams,
-        *h_streams,
-        *outputs,
-    )
+    if isoparametric:
+        function.argtypes = (
+            [
+                ctypes.c_ssize_t,
+                ctypes.c_ssize_t,
+                ctypes.POINTER(ctypes.POINTER(element_index_type)),
+                ctypes.POINTER(pointer_type),
+                ctypes.c_double,
+                ctypes.c_double,
+                ctypes.c_ssize_t,
+            ]
+            + [pointer_type] * dim
+            + ([ctypes.c_ssize_t] + [pointer_type] * dim if direction is not None else [])
+            + [ctypes.c_ssize_t]
+            + [pointer_type] * dim
+        )
+        status = function(
+            ctypes.c_ssize_t(1),
+            ctypes.c_ssize_t(n_nodes),
+            element_pointers,
+            coordinate_pointers,
+            ctypes.c_double(mu),
+            ctypes.c_double(lmbda),
+            ctypes.c_ssize_t(1),
+            *u_streams,
+            *([ctypes.c_ssize_t(1), *h_streams] if direction is not None else []),
+            ctypes.c_ssize_t(1),
+            *outputs,
+        )
+    else:
+        function.argtypes = (
+            [
+                ctypes.c_ssize_t,
+                ctypes.c_ssize_t,
+                ctypes.POINTER(ctypes.POINTER(element_index_type)),
+            ]
+            + [pointer_type] * len(geometry_streams)
+            + [
+                ctypes.c_double,
+                ctypes.c_double,
+                ctypes.c_ssize_t,
+            ]
+            + [pointer_type] * dim
+            + ([ctypes.c_ssize_t] + [pointer_type] * dim if direction is not None else [])
+            + [ctypes.c_ssize_t]
+            + [pointer_type] * dim
+        )
+        status = function(
+            ctypes.c_ssize_t(1),
+            ctypes.c_ssize_t(n_nodes),
+            element_pointers,
+            *geometry_streams,
+            ctypes.c_double(mu),
+            ctypes.c_double(lmbda),
+            ctypes.c_ssize_t(1),
+            *u_streams,
+            *([ctypes.c_ssize_t(1), *h_streams] if direction is not None else []),
+            ctypes.c_ssize_t(1),
+            *outputs,
+        )
     if status != 0:
         raise RuntimeError("generated kernel returned status %d" % status)
-    return read_field_stream_values(outputs, dim, n_shape)
+    return tuple(
+        tuple(outputs[component][shape] for component in range(dim))
+        for shape in range(n_shape)
+    )
 
 
 def c_pointer_array(arrays, ctype):
@@ -744,26 +820,28 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         local_source = source_by_path["generated_quad4_tensor_product_local.hpp"]
 
         self.assertIn("struct generated_quad4_tensor_product_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<real_t>::shape_1d()", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<real_t>::grad_1d()", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<real_t>::q_weight_1d()", operator_source)
+        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<scalar_t>::shape_1d()", operator_source)
+        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<scalar_t>::grad_1d()", operator_source)
+        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<scalar_t>::q_weight_1d()", operator_source)
         self.assertNotIn("generated_quad4_tensor_product_quad4_grad_ref", operator_source)
         self.assertNotIn("generated_quad4_tensor_product_quad4_q_weight[", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
-        self.assertIn("const scalar_t *const SFEM_RESTRICT shape_1d", operator_source)
-        self.assertIn("const scalar_t *const SFEM_RESTRICT grad_1d", operator_source)
-        self.assertIn("const scalar_t *const SFEM_RESTRICT q_weight_1d", operator_source)
+        self.assertNotIn("const scalar_t *const SFEM_RESTRICT shape_1d", operator_source)
+        self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_1d", operator_source)
+        self.assertNotIn("const scalar_t *const SFEM_RESTRICT q_weight_1d", operator_source)
         self.assertIn("const int qx = q % N_QP_1D;", operator_source)
         self.assertIn("const int qy = q / N_QP_1D;", operator_source)
         self.assertIn(
-            "const scalar_t tensor_q_weight = q_weight_1d[qx] * q_weight_1d[qy];",
+            "const scalar_t tensor_q_weight = affine_q_weight_1d[qx] * affine_q_weight_1d[qy];",
             operator_source,
         )
         self.assertIn(
-            "return sfem::codegen::generated_quad4_tensor_product_quad4_objective_soa_impl<real_t, 4, 4, 8>",
+            "const scalar_t tensor_q_weight = isoparametric_q_weight_1d[qx] * isoparametric_q_weight_1d[qy];",
             operator_source,
         )
+        self.assertNotIn("generated_quad4_tensor_product_quad4_objective_soa_impl", operator_source)
+        self.assertNotIn('extern "C" int generated_quad4_tensor_product_quad4_objective_soa', operator_source)
         self.assertIn("const scalar_t *const SFEM_RESTRICT shape_1d", local_source)
         self.assertIn("const scalar_t *const SFEM_RESTRICT grad_1d", local_source)
         self.assertNotIn("grad_ref_data", local_source)
@@ -841,9 +919,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         local_source = source_by_path["generated_hex8_tensor_product_local.hpp"]
 
         self.assertIn("struct generated_hex8_tensor_product_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<real_t>::shape_1d()", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<real_t>::grad_1d()", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<real_t>::q_weight_1d()", operator_source)
+        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<scalar_t>::shape_1d()", operator_source)
+        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<scalar_t>::grad_1d()", operator_source)
+        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<scalar_t>::q_weight_1d()", operator_source)
         self.assertNotIn("generated_hex8_tensor_product_hex8_grad_ref", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
@@ -851,13 +929,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const int qy = (q / N_QP_1D) % N_QP_1D;", operator_source)
         self.assertIn("const int qz = q / (N_QP_1D * N_QP_1D);", operator_source)
         self.assertIn(
-            "const scalar_t tensor_q_weight = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];",
+            "const scalar_t tensor_q_weight = affine_q_weight_1d[qx] * affine_q_weight_1d[qy] * affine_q_weight_1d[qz];",
             operator_source,
         )
         self.assertIn(
-            "return sfem::codegen::generated_hex8_tensor_product_hex8_objective_soa_impl<real_t, 8, 8, 8>",
+            "const scalar_t tensor_q_weight = isoparametric_q_weight_1d[qx] * isoparametric_q_weight_1d[qy] * isoparametric_q_weight_1d[qz];",
             operator_source,
         )
+        self.assertNotIn("generated_hex8_tensor_product_hex8_objective_soa_impl", operator_source)
+        self.assertNotIn('extern "C" int generated_hex8_tensor_product_hex8_objective_soa', operator_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
             "grad_ref[23] = shape_1d[qx * N_SHAPE_1D + 0] * shape_1d[qy * N_SHAPE_1D + 1] * grad_1d[qz * N_SHAPE_1D + 1];",
@@ -931,8 +1011,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("grad_ref[shape", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn("struct generated_weak_neohookean_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<real_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<real_t>::grad_ref_y()", operator_source)
+        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<scalar_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<scalar_t>::grad_ref_y()", operator_source)
         self.assertIn(
             "grad_u_ref0 += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
@@ -953,7 +1033,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "weak_out_streams[shape * 2 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape]",
             local_source,
         )
-        self.assertIn("generated_weak_neohookean_tri3_apply_soa_impl<real_t, 1, 3, 8>", operator_source)
+        self.assertNotIn("generated_weak_neohookean_tri3_apply_soa_impl", operator_source)
+        self.assertIn("generated_weak_neohookean_tri3_apply_affine_mesh_soa_impl", operator_source)
+        self.assertIn("generated_weak_neohookean_tri3_apply_isoparametric_mesh_soa_impl", operator_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
@@ -1069,29 +1151,27 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = {
             generated.path: generated.source for generated in generated_files
         }["generated_quad4_iso_objective_operator.cpp"]
-        for marker, terminator in (
-            (
-                "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_soa_impl",
-                'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_soa',
-            ),
-            (
-                "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa_impl",
-                'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa',
-            ),
-        ):
-            section = operator_source.split(marker, 1)[1].split(terminator, 1)[0]
-            self.assertIn(
-                "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
-                section,
-            )
-            self.assertIn(
-                "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
-                section,
-            )
-            self.assertNotIn(
-                "for (int shape = 0; shape < N_SHAPE; ++shape)",
-                section,
-            )
+        self.assertNotIn("generated_quad4_iso_objective_quad4_objective_isoparametric_soa_impl", operator_source)
+        self.assertNotIn('extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_soa', operator_source)
+        section = operator_source.split(
+            "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa_impl",
+            1,
+        )[1].split(
+            'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa',
+            1,
+        )[0]
+        self.assertIn(
+            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+            section,
+        )
+        self.assertIn(
+            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
+            section,
+        )
+        self.assertNotIn(
+            "for (int shape = 0; shape < N_SHAPE; ++shape)",
+            section,
+        )
 
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
         compiler = shutil.which("c++")
@@ -1131,10 +1211,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = source_by_path["generated_hex27_weak_neohookean_operator.cpp"]
 
         self.assertIn("struct generated_hex27_weak_neohookean_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<real_t>::shape_1d()", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<real_t>::grad_1d()", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<real_t>::q_weight_1d()", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl<real_t, 27, 27, 8>", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<scalar_t>::shape_1d()", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<scalar_t>::grad_1d()", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<scalar_t>::q_weight_1d()", operator_source)
+        self.assertNotIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_affine_mesh_soa_impl", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_isoparametric_mesh_soa_impl", operator_source)
         self.assertIn("static constexpr int N_QP_1D = 3;", local_source)
         self.assertIn("static constexpr int N_SHAPE_1D = 3;", local_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
@@ -1193,13 +1275,27 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 "generated_neohookean_ogden_%s_operator.cpp" % element_type.lower()
             ]
             self.assertIn('#include "%s_local.hpp"' % local_prefix, operator_source)
-            self.assertIn(
-                "%s_%s_apply_soa_impl<real_t, %d, %d, 8>"
+            self.assertNotIn(
+                "%s_%s_apply_soa_impl"
                 % (
                     "generated_neohookean_ogden_%s" % element_type.lower(),
                     element_type.lower(),
-                    8 if element_type == "HEX8" else 27,
-                    8 if element_type == "HEX8" else 27,
+                ),
+                operator_source,
+            )
+            self.assertIn(
+                "%s_%s_apply_affine_mesh_soa_impl"
+                % (
+                    "generated_neohookean_ogden_%s" % element_type.lower(),
+                    element_type.lower(),
+                ),
+                operator_source,
+            )
+            self.assertIn(
+                "%s_%s_apply_isoparametric_mesh_soa_impl"
+                % (
+                    "generated_neohookean_ogden_%s" % element_type.lower(),
+                    element_type.lower(),
                 ),
                 operator_source,
             )
@@ -1225,18 +1321,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("scalar_t element_vector[N_SHAPE", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 8", shared_local)
         self.assertNotIn("static_assert(N_SHAPE == 27", shared_local)
+        self.assertNotIn("scalar_t block_ux7[VECTOR_SIZE]", operator_by_element["HEX8"])
+        self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX8"])
+        self.assertIn("const scalar_t *block_u_streams[N_SHAPE * DIM];", operator_by_element["HEX8"])
+        self.assertIn("static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6};", operator_by_element["HEX8"])
+        self.assertNotIn("scalar_t block_ux26[VECTOR_SIZE]", operator_by_element["HEX27"])
+        self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX27"])
+        self.assertIn("const scalar_t *block_u_streams[N_SHAPE * DIM];", operator_by_element["HEX27"])
         self.assertIn(
-            "block_ux0, block_uy0, block_uz0, "
-            "block_ux1, block_uy1, block_uz1, "
-            "block_ux3, block_uy3, block_uz3, "
-            "block_ux2, block_uy2, block_uz2",
-            operator_by_element["HEX8"],
-        )
-        self.assertIn(
-            "block_ux0, block_uy0, block_uz0, "
-            "block_ux8, block_uy8, block_uz8, "
-            "block_ux1, block_uy1, block_uz1, "
-            "block_ux11, block_uy11, block_uz11",
+            "static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6};",
             operator_by_element["HEX27"],
         )
 
@@ -1355,11 +1448,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
         operator_source = source_by_path["%s_operator.cpp" % prefix]
-        self.assertIn(
+        self.assertNotIn(
             'extern "C" int %s_hex8_gradient_isoparametric_soa' % prefix,
             operator_source,
         )
-        self.assertIn("const real_t *const SFEM_RESTRICT x0", operator_source)
+        self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
         self.assertIn("block_coordinate_streams[DIM * N_SHAPE]", operator_source)
         self.assertIn(
             "block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22",
@@ -1946,14 +2039,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         math_source = source_by_path["kernel_math.hpp"]
         diagnostics_source = source_by_path["kernel_diagnostics.hpp"]
 
-        self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", operator_source)
+        self.assertNotIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", operator_source)
+        self.assertIn("template <typename scalar_t>", operator_source)
+        self.assertIn("template <typename scalar_t, typename geometry_t>", operator_source)
         self.assertIn('#include "kernel_math.hpp"', local_source)
         self.assertIn("static SFEM_INLINE T pow_2", math_source)
         self.assertIn("static SFEM_INLINE T pow_m2", math_source)
         self.assertIn("struct generated_neohookean_ogden_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::grad_ref_y()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::q_weight()", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::grad_ref_y()", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::q_weight()", operator_source)
         self.assertIn('#include "kernel_diagnostics.hpp"', operator_source)
         self.assertNotIn("struct SfemKernelDiagnostics", operator_source)
         self.assertIn("#ifndef SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP", diagnostics_source)
@@ -1998,39 +2093,27 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             'extern "C" void generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float_print_rate',
             operator_source,
         )
-        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)
-        self.assertIn('extern "C" int generated_neohookean_ogden_tri3_apply_soa', operator_source)
-        self.assertIn(
-            "return sfem::codegen::generated_neohookean_ogden_tri3_apply_soa_impl<real_t, 1, 3, 8>",
-            operator_source,
-        )
+        self.assertNotIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)
+        self.assertNotIn('extern "C" int generated_neohookean_ogden_tri3_apply_soa', operator_source)
+        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_affine_mesh_soa_impl", operator_source)
+        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_impl", operator_source)
         self.assertNotIn("accumulator_t", operator_source)
         self.assertNotIn("accumulator_t", local_source)
         self.assertNotIn("typedef double scalar_t;", local_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::grad_ref_y()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<real_t>::q_weight()", operator_source)
-        self.assertIn("static_assert(N_QP == 1", operator_source)
-        self.assertIn("static_assert(N_SHAPE == 3", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::grad_ref_x()", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::grad_ref_y()", operator_source)
+        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<scalar_t>::q_weight()", operator_source)
+        self.assertIn("static constexpr int N_QP = 1;", operator_source)
+        self.assertIn("static constexpr int N_SHAPE = 3;", operator_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", operator_source)
         self.assertIn("block_ux0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_adjugate0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_determinant0[VECTOR_SIZE]", operator_source)
         self.assertIn(
-            "block_jacobian_adjugate0[lane] = jacobian_adjugate0[(ptrdiff_t)q * nelements + evbegin + lane];",
+            "block_jacobian_adjugate0[lane]",
             operator_source,
         )
-        apply_wrapper_source = operator_source.split(
-            'extern "C" int generated_neohookean_ogden_tri3_apply_soa',
-            1,
-        )[1]
-        apply_wrapper_source = apply_wrapper_source.split(
-            "return sfem::codegen::generated_neohookean_ogden_tri3_apply_soa_impl",
-            1,
-        )[0]
-        self.assertNotIn("grad_ref", apply_wrapper_source)
-        self.assertNotIn("qw", apply_wrapper_source)
-        self.assertIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
+        self.assertNotIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
         self.assertIn("#pragma omp simd", local_source)
         self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", local_source)
         self.assertIn("generated_neohookean_ogden_apply_block", local_source)

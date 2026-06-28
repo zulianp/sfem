@@ -192,223 +192,6 @@ extern "C" void neohookean_ogden_tri3_tri3_objective_isoparametric_mesh_soa_floa
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_soa_impl(
-        const ptrdiff_t nelements,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT value
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_value[lane] = value[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-
-        neohookean_ogden_d2_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_value);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            value[evbegin + lane] = block_value[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_objective_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const real_t *const SFEM_RESTRICT jacobian_determinant0,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_objective_soa_impl<real_t, 1, 3, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, value);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_isoparametric_soa_impl(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT value
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x0[evbegin + lane];
-            block_y0[lane] = y0[evbegin + lane];
-            block_x1[lane] = x1[evbegin + lane];
-            block_y1[lane] = y1[evbegin + lane];
-            block_x2[lane] = x2[evbegin + lane];
-            block_y2[lane] = y2[evbegin + lane];
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_value[lane] = value[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
-
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
-                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-            }
-        }
-
-        neohookean_ogden_d2_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_value);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            value[evbegin + lane] = block_value[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_objective_isoparametric_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_objective_isoparametric_soa_impl<real_t, 1, 3, 16>(nelements, x0, y0, x1, y1, x2, y2, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, value);
-}
 
 namespace sfem {
 namespace codegen {
@@ -443,33 +226,37 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_affine_mesh_soa_impl
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
         }
+        const scalar_t *const u_components[DIM] = {ux, uy};
 
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                }
+            }
+        }
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_value[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
 
         neohookean_ogden_d2_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, mu, lmbda, block_u_streams, block_value);
 
@@ -555,56 +342,59 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_isoparametric_mesh_s
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_value[VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
         }
+        const geometry_t *const coordinate_components[DIM] = {x, y};
 
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x[ev[lane * N_SHAPE + 0]];
-            block_y0[lane] = y[ev[lane * N_SHAPE + 0]];
-            block_x1[lane] = x[ev[lane * N_SHAPE + 1]];
-            block_y1[lane] = y[ev[lane * N_SHAPE + 1]];
-            block_x2[lane] = x[ev[lane * N_SHAPE + 2]];
-            block_y2[lane] = y[ev[lane * N_SHAPE + 2]];
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                }
+            }
         }
+        const scalar_t *const u_components[DIM] = {ux, uy};
 
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                }
+            }
+        }
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
             block_value[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
 
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
+        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_coordinate_streams[stream] = block_coordinate_data[stream];
+        }
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
@@ -806,275 +596,6 @@ extern "C" void neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa_float
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_soa_impl(
-        const ptrdiff_t nelements,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_outx0[lane] = outx0[evbegin + lane];
-            block_outy0[lane] = outy0[evbegin + lane];
-            block_outx1[lane] = outx1[evbegin + lane];
-            block_outy1[lane] = outy1[evbegin + lane];
-            block_outx2[lane] = outx2[evbegin + lane];
-            block_outy2[lane] = outy2[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        neohookean_ogden_d2_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_out_streams);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            outx0[evbegin + lane] = block_outx0[lane];
-            outy0[evbegin + lane] = block_outy0[lane];
-            outx1[evbegin + lane] = block_outx1[lane];
-            outy1[evbegin + lane] = block_outy1[lane];
-            outx2[evbegin + lane] = block_outx2[lane];
-            outy2[evbegin + lane] = block_outy2[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_gradient_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const real_t *const SFEM_RESTRICT jacobian_determinant0,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_gradient_soa_impl<real_t, 1, 3, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, outx0, outy0, outx1, outy1, outx2, outy2);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_soa_impl(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x0[evbegin + lane];
-            block_y0[lane] = y0[evbegin + lane];
-            block_x1[lane] = x1[evbegin + lane];
-            block_y1[lane] = y1[evbegin + lane];
-            block_x2[lane] = x2[evbegin + lane];
-            block_y2[lane] = y2[evbegin + lane];
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_outx0[lane] = outx0[evbegin + lane];
-            block_outy0[lane] = outy0[evbegin + lane];
-            block_outx1[lane] = outx1[evbegin + lane];
-            block_outy1[lane] = outy1[evbegin + lane];
-            block_outx2[lane] = outx2[evbegin + lane];
-            block_outy2[lane] = outy2[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
-
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
-                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-            }
-        }
-
-        neohookean_ogden_d2_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_out_streams);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            outx0[evbegin + lane] = block_outx0[lane];
-            outy0[evbegin + lane] = block_outy0[lane];
-            outx1[evbegin + lane] = block_outx1[lane];
-            outy1[evbegin + lane] = block_outy1[lane];
-            outx2[evbegin + lane] = block_outx2[lane];
-            outy2[evbegin + lane] = block_outy2[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_gradient_isoparametric_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_gradient_isoparametric_soa_impl<real_t, 1, 3, 16>(nelements, x0, y0, x1, y1, x2, y2, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, outx0, outy0, outx1, outy1, outx2, outy2);
-}
 
 namespace sfem {
 namespace codegen {
@@ -1111,66 +632,56 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_affine_mesh_soa_impl(
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const scalar_t *const u_components[DIM] = {ux, uy};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                }
+            }
+        }
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_out_data[stream][lane] = scalar_t(0);
+            }
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
-            block_outx0[lane] = scalar_t(0);
-            block_outy0[lane] = scalar_t(0);
-            block_outx1[lane] = scalar_t(0);
-            block_outy1[lane] = scalar_t(0);
-            block_outx2[lane] = scalar_t(0);
-            block_outy2[lane] = scalar_t(0);
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
         }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
+        scalar_t *block_out_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_out_streams[stream] = block_out_data[stream];
+        }
 
         neohookean_ogden_d2_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        scalar_t *const out_components[DIM] = {outx, outy};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
 #pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 0] * out_stride] += block_outx0[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 0] * out_stride] += block_outy0[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 1] * out_stride] += block_outx1[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 1] * out_stride] += block_outy1[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 2] * out_stride] += block_outx2[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 2] * out_stride] += block_outy2[lane];
-
+                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                }
+            }
         }
     }
 
@@ -1256,67 +767,65 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_so
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const geometry_t *const coordinate_components[DIM] = {x, y};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                }
+            }
+        }
+        const scalar_t *const u_components[DIM] = {ux, uy};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                }
+            }
+        }
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_out_data[stream][lane] = scalar_t(0);
+            }
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x[ev[lane * N_SHAPE + 0]];
-            block_y0[lane] = y[ev[lane * N_SHAPE + 0]];
-            block_x1[lane] = x[ev[lane * N_SHAPE + 1]];
-            block_y1[lane] = y[ev[lane * N_SHAPE + 1]];
-            block_x2[lane] = x[ev[lane * N_SHAPE + 2]];
-            block_y2[lane] = y[ev[lane * N_SHAPE + 2]];
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+        scalar_t *block_out_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_out_streams[stream] = block_out_data[stream];
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
-            block_outx0[lane] = scalar_t(0);
-            block_outy0[lane] = scalar_t(0);
-            block_outx1[lane] = scalar_t(0);
-            block_outy1[lane] = scalar_t(0);
-            block_outx2[lane] = scalar_t(0);
-            block_outy2[lane] = scalar_t(0);
+        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
@@ -1343,25 +852,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_so
 
         neohookean_ogden_d2_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        scalar_t *const out_components[DIM] = {outx, outy};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
 #pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 0] * out_stride] += block_outx0[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 0] * out_stride] += block_outy0[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 1] * out_stride] += block_outx1[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 1] * out_stride] += block_outy1[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 2] * out_stride] += block_outx2[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 2] * out_stride] += block_outy2[lane];
-
+                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                }
+            }
         }
     }
 
@@ -1538,325 +1038,6 @@ extern "C" void neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_float_pr
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_soa_impl(
-        const ptrdiff_t nelements,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        const real_t *const SFEM_RESTRICT hx0,
-        const real_t *const SFEM_RESTRICT hy0,
-        const real_t *const SFEM_RESTRICT hx1,
-        const real_t *const SFEM_RESTRICT hy1,
-        const real_t *const SFEM_RESTRICT hx2,
-        const real_t *const SFEM_RESTRICT hy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_hx0[VECTOR_SIZE];
-        scalar_t block_hy0[VECTOR_SIZE];
-        scalar_t block_hx1[VECTOR_SIZE];
-        scalar_t block_hy1[VECTOR_SIZE];
-        scalar_t block_hx2[VECTOR_SIZE];
-        scalar_t block_hy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_hx0[lane] = hx0[evbegin + lane];
-            block_hy0[lane] = hy0[evbegin + lane];
-            block_hx1[lane] = hx1[evbegin + lane];
-            block_hy1[lane] = hy1[evbegin + lane];
-            block_hx2[lane] = hx2[evbegin + lane];
-            block_hy2[lane] = hy2[evbegin + lane];
-            block_outx0[lane] = outx0[evbegin + lane];
-            block_outy0[lane] = outy0[evbegin + lane];
-            block_outx1[lane] = outx1[evbegin + lane];
-            block_outy1[lane] = outy1[evbegin + lane];
-            block_outx2[lane] = outx2[evbegin + lane];
-            block_outy2[lane] = outy2[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx2, block_hy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        neohookean_ogden_d2_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            outx0[evbegin + lane] = block_outx0[lane];
-            outy0[evbegin + lane] = block_outy0[lane];
-            outx1[evbegin + lane] = block_outx1[lane];
-            outy1[evbegin + lane] = block_outy1[lane];
-            outx2[evbegin + lane] = block_outx2[lane];
-            outy2[evbegin + lane] = block_outy2[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_apply_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const real_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const real_t *const SFEM_RESTRICT jacobian_determinant0,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        const real_t *const SFEM_RESTRICT hx0,
-        const real_t *const SFEM_RESTRICT hy0,
-        const real_t *const SFEM_RESTRICT hx1,
-        const real_t *const SFEM_RESTRICT hy1,
-        const real_t *const SFEM_RESTRICT hx2,
-        const real_t *const SFEM_RESTRICT hy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_apply_soa_impl<real_t, 1, 3, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, hx0, hy0, hx1, hy1, hx2, hy2, outx0, outy0, outx1, outy1, outx2, outy2);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_soa_impl(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const scalar_t *const SFEM_RESTRICT grad_ref_x,
-        const scalar_t *const SFEM_RESTRICT grad_ref_y,
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
-        const scalar_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        const real_t *const SFEM_RESTRICT hx0,
-        const real_t *const SFEM_RESTRICT hy0,
-        const real_t *const SFEM_RESTRICT hx1,
-        const real_t *const SFEM_RESTRICT hy1,
-        const real_t *const SFEM_RESTRICT hx2,
-        const real_t *const SFEM_RESTRICT hy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    static constexpr int DIM = 2;
-    static_assert(N_QP == 1, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 3, "N_SHAPE does not match generated expression");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_hx0[VECTOR_SIZE];
-        scalar_t block_hy0[VECTOR_SIZE];
-        scalar_t block_hx1[VECTOR_SIZE];
-        scalar_t block_hy1[VECTOR_SIZE];
-        scalar_t block_hx2[VECTOR_SIZE];
-        scalar_t block_hy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x0[evbegin + lane];
-            block_y0[lane] = y0[evbegin + lane];
-            block_x1[lane] = x1[evbegin + lane];
-            block_y1[lane] = y1[evbegin + lane];
-            block_x2[lane] = x2[evbegin + lane];
-            block_y2[lane] = y2[evbegin + lane];
-            block_ux0[lane] = ux0[evbegin + lane];
-            block_uy0[lane] = uy0[evbegin + lane];
-            block_ux1[lane] = ux1[evbegin + lane];
-            block_uy1[lane] = uy1[evbegin + lane];
-            block_ux2[lane] = ux2[evbegin + lane];
-            block_uy2[lane] = uy2[evbegin + lane];
-            block_hx0[lane] = hx0[evbegin + lane];
-            block_hy0[lane] = hy0[evbegin + lane];
-            block_hx1[lane] = hx1[evbegin + lane];
-            block_hy1[lane] = hy1[evbegin + lane];
-            block_hx2[lane] = hx2[evbegin + lane];
-            block_hy2[lane] = hy2[evbegin + lane];
-            block_outx0[lane] = outx0[evbegin + lane];
-            block_outy0[lane] = outy0[evbegin + lane];
-            block_outx1[lane] = outx1[evbegin + lane];
-            block_outy1[lane] = outy1[evbegin + lane];
-            block_outx2[lane] = outx2[evbegin + lane];
-            block_outy2[lane] = outy2[evbegin + lane];
-        }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx2, block_hy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
-
-        for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                scalar_t J00 = scalar_t(0);
-                scalar_t J01 = scalar_t(0);
-                scalar_t J10 = scalar_t(0);
-                scalar_t J11 = scalar_t(0);
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
-                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
-                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
-                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
-                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
-                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
-                }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-            }
-        }
-
-        neohookean_ogden_d2_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, grad_ref_x, grad_ref_y, q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
-
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            outx0[evbegin + lane] = block_outx0[lane];
-            outy0[evbegin + lane] = block_outy0[lane];
-            outx1[evbegin + lane] = block_outx1[lane];
-            outy1[evbegin + lane] = block_outy1[lane];
-            outx2[evbegin + lane] = block_outx2[lane];
-            outy2[evbegin + lane] = block_outy2[lane];
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int neohookean_ogden_tri3_tri3_apply_isoparametric_soa(
-        const ptrdiff_t nelements,
-        const real_t *const SFEM_RESTRICT x0,
-        const real_t *const SFEM_RESTRICT y0,
-        const real_t *const SFEM_RESTRICT x1,
-        const real_t *const SFEM_RESTRICT y1,
-        const real_t *const SFEM_RESTRICT x2,
-        const real_t *const SFEM_RESTRICT y2,
-        const real_t mu,
-        const real_t lmbda,
-        const real_t *const SFEM_RESTRICT ux0,
-        const real_t *const SFEM_RESTRICT uy0,
-        const real_t *const SFEM_RESTRICT ux1,
-        const real_t *const SFEM_RESTRICT uy1,
-        const real_t *const SFEM_RESTRICT ux2,
-        const real_t *const SFEM_RESTRICT uy2,
-        const real_t *const SFEM_RESTRICT hx0,
-        const real_t *const SFEM_RESTRICT hy0,
-        const real_t *const SFEM_RESTRICT hx1,
-        const real_t *const SFEM_RESTRICT hy1,
-        const real_t *const SFEM_RESTRICT hx2,
-        const real_t *const SFEM_RESTRICT hy2,
-        real_t *const SFEM_RESTRICT outx0,
-        real_t *const SFEM_RESTRICT outy0,
-        real_t *const SFEM_RESTRICT outx1,
-        real_t *const SFEM_RESTRICT outy1,
-        real_t *const SFEM_RESTRICT outx2,
-        real_t *const SFEM_RESTRICT outy2
-) {
-    return sfem::codegen::neohookean_ogden_tri3_tri3_apply_isoparametric_soa_impl<real_t, 1, 3, 16>(nelements, x0, y0, x1, y1, x2, y2, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, hx0, hy0, hx1, hy1, hx2, hy2, outx0, outy0, outx1, outy1, outx2, outy2);
-}
 
 namespace sfem {
 namespace codegen {
@@ -1896,79 +1077,63 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa_impl(
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_hx0[VECTOR_SIZE];
-        scalar_t block_hy0[VECTOR_SIZE];
-        scalar_t block_hx1[VECTOR_SIZE];
-        scalar_t block_hy1[VECTOR_SIZE];
-        scalar_t block_hx2[VECTOR_SIZE];
-        scalar_t block_hy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const scalar_t *const u_components[DIM] = {ux, uy};
+        const scalar_t *const h_components[DIM] = {hx, hy};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
+                }
+            }
+        }
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_out_data[stream][lane] = scalar_t(0);
+            }
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_hx0[lane] = hx[ev[lane * N_SHAPE + 0] * h_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_hy0[lane] = hy[ev[lane * N_SHAPE + 0] * h_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_hx1[lane] = hx[ev[lane * N_SHAPE + 1] * h_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_hy1[lane] = hy[ev[lane * N_SHAPE + 1] * h_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_hx2[lane] = hx[ev[lane * N_SHAPE + 2] * h_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
-            block_hy2[lane] = hy[ev[lane * N_SHAPE + 2] * h_stride];
-            block_outx0[lane] = scalar_t(0);
-            block_outy0[lane] = scalar_t(0);
-            block_outx1[lane] = scalar_t(0);
-            block_outy1[lane] = scalar_t(0);
-            block_outx2[lane] = scalar_t(0);
-            block_outy2[lane] = scalar_t(0);
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
         }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx2, block_hy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
+        const scalar_t *block_h_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_h_streams[stream] = block_h_data[stream];
+        }
+        scalar_t *block_out_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_out_streams[stream] = block_out_data[stream];
+        }
 
         neohookean_ogden_d2_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        scalar_t *const out_components[DIM] = {outx, outy};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
 #pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 0] * out_stride] += block_outx0[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 0] * out_stride] += block_outy0[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 1] * out_stride] += block_outx1[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 1] * out_stride] += block_outy1[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 2] * out_stride] += block_outx2[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 2] * out_stride] += block_outy2[lane];
-
+                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                }
+            }
         }
     }
 
@@ -2063,80 +1228,72 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_i
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_x0[VECTOR_SIZE];
-        scalar_t block_y0[VECTOR_SIZE];
-        scalar_t block_x1[VECTOR_SIZE];
-        scalar_t block_y1[VECTOR_SIZE];
-        scalar_t block_x2[VECTOR_SIZE];
-        scalar_t block_y2[VECTOR_SIZE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t block_ux0[VECTOR_SIZE];
-        scalar_t block_uy0[VECTOR_SIZE];
-        scalar_t block_ux1[VECTOR_SIZE];
-        scalar_t block_uy1[VECTOR_SIZE];
-        scalar_t block_ux2[VECTOR_SIZE];
-        scalar_t block_uy2[VECTOR_SIZE];
-        scalar_t block_hx0[VECTOR_SIZE];
-        scalar_t block_hy0[VECTOR_SIZE];
-        scalar_t block_hx1[VECTOR_SIZE];
-        scalar_t block_hy1[VECTOR_SIZE];
-        scalar_t block_hx2[VECTOR_SIZE];
-        scalar_t block_hy2[VECTOR_SIZE];
-        scalar_t block_outx0[VECTOR_SIZE];
-        scalar_t block_outy0[VECTOR_SIZE];
-        scalar_t block_outx1[VECTOR_SIZE];
-        scalar_t block_outy1[VECTOR_SIZE];
-        scalar_t block_outx2[VECTOR_SIZE];
-        scalar_t block_outy2[VECTOR_SIZE];
 
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
 #pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const geometry_t *const coordinate_components[DIM] = {x, y};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                }
+            }
+        }
+        const scalar_t *const u_components[DIM] = {ux, uy};
+        const scalar_t *const h_components[DIM] = {hx, hy};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
+                }
+            }
+        }
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_out_data[stream][lane] = scalar_t(0);
+            }
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_x0[lane] = x[ev[lane * N_SHAPE + 0]];
-            block_y0[lane] = y[ev[lane * N_SHAPE + 0]];
-            block_x1[lane] = x[ev[lane * N_SHAPE + 1]];
-            block_y1[lane] = y[ev[lane * N_SHAPE + 1]];
-            block_x2[lane] = x[ev[lane * N_SHAPE + 2]];
-            block_y2[lane] = y[ev[lane * N_SHAPE + 2]];
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+        const scalar_t *block_h_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_h_streams[stream] = block_h_data[stream];
+        }
+        scalar_t *block_out_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_out_streams[stream] = block_out_data[stream];
         }
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-            block_ux0[lane] = ux[ev[lane * N_SHAPE + 0] * u_stride];
-            block_hx0[lane] = hx[ev[lane * N_SHAPE + 0] * h_stride];
-            block_uy0[lane] = uy[ev[lane * N_SHAPE + 0] * u_stride];
-            block_hy0[lane] = hy[ev[lane * N_SHAPE + 0] * h_stride];
-            block_ux1[lane] = ux[ev[lane * N_SHAPE + 1] * u_stride];
-            block_hx1[lane] = hx[ev[lane * N_SHAPE + 1] * h_stride];
-            block_uy1[lane] = uy[ev[lane * N_SHAPE + 1] * u_stride];
-            block_hy1[lane] = hy[ev[lane * N_SHAPE + 1] * h_stride];
-            block_ux2[lane] = ux[ev[lane * N_SHAPE + 2] * u_stride];
-            block_hx2[lane] = hx[ev[lane * N_SHAPE + 2] * h_stride];
-            block_uy2[lane] = uy[ev[lane * N_SHAPE + 2] * u_stride];
-            block_hy2[lane] = hy[ev[lane * N_SHAPE + 2] * h_stride];
-            block_outx0[lane] = scalar_t(0);
-            block_outy0[lane] = scalar_t(0);
-            block_outx1[lane] = scalar_t(0);
-            block_outy1[lane] = scalar_t(0);
-            block_outx2[lane] = scalar_t(0);
-            block_outy2[lane] = scalar_t(0);
+        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
-
-        const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux2, block_uy2};
-        const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx2, block_hy2};
-        scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx2, block_outy2};
-
-        const scalar_t *const block_coordinate_streams[N_SHAPE * 2] = {block_x0, block_y0, block_x1, block_y1, block_x2, block_y2};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
@@ -2163,25 +1320,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_i
 
         neohookean_ogden_d2_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        scalar_t *const out_components[DIM] = {outx, outy};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
 #pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 0] * out_stride] += block_outx0[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 0] * out_stride] += block_outy0[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 1] * out_stride] += block_outx1[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 1] * out_stride] += block_outy1[lane];
-
-#pragma omp atomic update
-            outx[ev[lane * N_SHAPE + 2] * out_stride] += block_outx2[lane];
-
-#pragma omp atomic update
-            outy[ev[lane * N_SHAPE + 2] * out_stride] += block_outy2[lane];
-
+                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                }
+            }
         }
     }
 
