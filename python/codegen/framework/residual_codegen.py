@@ -80,24 +80,86 @@ class ResidualCodegenDependencies:
 
 
 @dataclass(frozen=True)
+class MixedFieldGroup:
+    name: str
+    components: int
+    field_indices: tuple
+    shape_count: int
+    offset: int
+
+
+@dataclass(frozen=True)
 class MixedFieldLayout:
     fields: tuple
+    groups: tuple
+    field_group_indices: tuple
     shape_counts: tuple
     offsets: tuple
     total_streams: int
 
     @classmethod
     def create(cls, system, cell_rule, field_element_types):
+        fields = tuple(system.fields)
+        group_entries = []
+        group_index_by_name = {}
+        field_group_indices = []
+        for field_index, field in enumerate(fields):
+            group_name = _residual_parent_field_name(field)
+            try:
+                group_index = group_index_by_name[group_name]
+            except KeyError:
+                group_index = len(group_entries)
+                group_index_by_name[group_name] = group_index
+                group_entries.append(
+                    {
+                        "name": group_name,
+                        "components": int(getattr(field, "components", 1)),
+                        "field_indices": [],
+                    }
+                )
+            group_entries[group_index]["field_indices"].append(field_index)
+            field_group_indices.append(group_index)
+
+        group_shape_counts = tuple(
+            _field_n_shape_by_name(entry["name"], cell_rule, field_element_types)
+            for entry in group_entries
+        )
         shape_counts = tuple(
-            _field_n_shape(field, cell_rule, field_element_types)
-            for field in system.fields
+            group_shape_counts[group_index]
+            for group_index in field_group_indices
         )
         offsets = []
         offset = 0
         for n_shape in shape_counts:
             offsets.append(offset)
             offset += n_shape
-        return cls(tuple(system.fields), shape_counts, tuple(offsets), offset)
+        groups = []
+        group_offsets = [None] * len(group_entries)
+        for field_index, group_index in enumerate(field_group_indices):
+            if group_offsets[group_index] is None:
+                group_offsets[group_index] = offsets[field_index]
+        for entry, n_shape, group_offset in zip(group_entries, group_shape_counts, group_offsets):
+            groups.append(
+                MixedFieldGroup(
+                    entry["name"],
+                    entry["components"],
+                    tuple(entry["field_indices"]),
+                    n_shape,
+                    group_offset,
+                )
+            )
+        return cls(
+            fields,
+            tuple(groups),
+            tuple(field_group_indices),
+            shape_counts,
+            tuple(offsets),
+            offset,
+        )
+
+    @property
+    def n_reference_fields(self):
+        return len(self.groups)
 
     def n_shape(self, field_index):
         return self.shape_counts[field_index]
@@ -105,14 +167,23 @@ class MixedFieldLayout:
     def offset(self, field_index):
         return self.offsets[field_index]
 
+    def reference_index(self, field_index):
+        return self.field_group_indices[field_index]
+
+    def group(self, group_index):
+        return self.groups[group_index]
+
+    def group_for_field(self, field_index):
+        return self.groups[self.reference_index(field_index)]
+
     def stream_index(self, field_index, local_shape):
         return self.offsets[field_index] + local_shape
 
     def n_shape_constant(self, field):
-        return "%s_N_SHAPE" % field.name.upper()
+        return "%s_N_SHAPE" % _residual_parent_field_name(field).upper()
 
     def n_shape_1d_constant(self, field):
-        return "%s_N_SHAPE_1D" % field.name.upper()
+        return "%s_N_SHAPE_1D" % _residual_parent_field_name(field).upper()
 
 
 @dataclass(frozen=True)
@@ -209,9 +280,10 @@ def _mixed_reference_pointer_lines(
     field_element_types=None,
 ):
     dim = system.dim
+    field_element_types = {} if field_element_types is None else field_element_types
+    layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
     lines = []
     if cell_rule.is_tensor_product:
-        field_element_types = {} if field_element_types is None else field_element_types
         lines.append(
             "%sconst scalar_t *const field_shape_1d[N_FIELDS] = {%s};"
             % (
@@ -221,10 +293,10 @@ def _mixed_reference_pointer_lines(
                     % (
                         reference_data,
                         _tensor_reference_prefix(
-                            field_element_types.get(field.name, cell_rule.element_type)
+                            _field_element_type(group.name, cell_rule, field_element_types)
                         ),
                     )
-                    for field in system.fields
+                    for group in layout.groups
                 ),
             )
         )
@@ -238,13 +310,10 @@ def _mixed_reference_pointer_lines(
                         % (
                             reference_data,
                             _tensor_reference_prefix(
-                                field_element_types.get(
-                                    field.name,
-                                    cell_rule.element_type,
-                                )
+                                _field_element_type(group.name, cell_rule, field_element_types)
                             ),
                         )
-                        for field in system.fields
+                        for group in layout.groups
                     ),
                 )
             )
@@ -259,23 +328,19 @@ def _mixed_reference_pointer_lines(
                 % (
                     reference_data,
                     _simplex_reference_prefix(
-                        field_element_types.get(field.name, cell_rule.element_type)
-                        if field_element_types
-                        else cell_rule.element_type
+                        _field_element_type(group.name, cell_rule, field_element_types)
                     ),
                 )
-                for field in system.fields
+                for group in layout.groups
             ),
         )
     )
     if dependencies.uses_reference_gradients:
         grad_refs = []
-        for field in system.fields:
+        for group in layout.groups:
             for d in range(dim):
                 reference_prefix = _simplex_reference_prefix(
-                    field_element_types.get(field.name, cell_rule.element_type)
-                    if field_element_types
-                    else cell_rule.element_type
+                    _field_element_type(group.name, cell_rule, field_element_types)
                 )
                 grad_refs.append(
                     "sfem::codegen::%s::%s()"
@@ -313,24 +378,47 @@ def _mesh_reference_name(geometry_mode, name):
     return "%s_%s" % (geometry_mode, name)
 
 
-def _mixed_mesh_dependency_params(system, dependencies):
+def _mixed_mesh_dependency_params(layout, dependencies):
     params = []
     for group in _dependency_stream_groups(dependencies, mesh=True):
         params.append("const ptrdiff_t %s" % group.stride)
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s%s"
-            % (field.name, group.pointer_suffix)
-            for field in system.fields
-        )
+        for field_group in layout.groups:
+            if field_group.components == 1:
+                params.append(
+                    "const scalar_t *const SFEM_RESTRICT %s%s"
+                    % (field_group.name, group.pointer_suffix)
+                )
+            else:
+                params.append(
+                    "const scalar_t *const SFEM_RESTRICT %s%s[%d]"
+                    % (field_group.name, group.pointer_suffix, field_group.components)
+                )
     return params
 
 
-def _mixed_mesh_dependency_call_args(system, dependencies):
+def _mixed_mesh_dependency_call_args(layout, dependencies):
     args = []
     for group in _dependency_stream_groups(dependencies, mesh=True):
         args.append(group.stride)
-        args.extend("%s%s" % (field.name, group.pointer_suffix) for field in system.fields)
+        args.extend(
+            "%s%s" % (field_group.name, group.pointer_suffix)
+            for field_group in layout.groups
+        )
     return args
+
+
+def _mixed_mesh_field_pointer(field, group):
+    name = _residual_parent_field_name(field)
+    if int(getattr(field, "components", 1)) == 1:
+        return "%s%s" % (name, group.pointer_suffix)
+    return "%s%s[%d]" % (name, group.pointer_suffix, int(getattr(field, "component", 0)))
+
+
+def _mixed_mesh_output_pointer(field):
+    name = _residual_parent_field_name(field)
+    if int(getattr(field, "components", 1)) == 1:
+        return "%s_out" % name
+    return "%s_out[%d]" % (name, int(getattr(field, "component", 0)))
 
 
 def _mixed_block_stream_pointer_lines(layout, dependencies, indent):
@@ -565,7 +653,11 @@ def generate_mixed_residual_sfem_files(
         raise ValueError("residual system dimension does not match element dimension")
     field_element_types = dict(field_element_types or ())
     missing_fields = tuple(
-        field.name for field in system.fields if field.name not in field_element_types
+        field_name
+        for field_name in dict.fromkeys(
+            _residual_parent_field_name(field) for field in system.fields
+        )
+        if field_name not in field_element_types
     )
     if missing_fields:
         raise ValueError(
@@ -783,7 +875,6 @@ def _mixed_local_function(
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
-    n_fields = len(system.fields)
     layout = MixedFieldLayout.create(system, rule, field_element_types)
     params = [
         "const ptrdiff_t nelems",
@@ -794,7 +885,7 @@ def _mixed_local_function(
         params.append(
             "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
-    params.extend(_mixed_local_reference_params(rule, n_fields, dim, dependencies))
+    params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies))
     if dependencies.current:
         params.append(
             "const scalar_t *const SFEM_RESTRICT current[%d]" % layout.total_streams
@@ -823,7 +914,7 @@ def _mixed_local_function(
         [
             ") {",
             "    static constexpr int DIM = %d;" % dim,
-            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_FIELDS = %d;" % layout.n_reference_fields,
             "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
             "    (void)CELL_N_SHAPE;",
             "    (void)N_FIELD_STREAMS;",
@@ -831,8 +922,8 @@ def _mixed_local_function(
     )
     lines.extend(
         "    static constexpr int %s_N_SHAPE = %d;"
-        % (field.name.upper(), n_shape)
-        for field, n_shape in zip(system.fields, layout.shape_counts)
+        % (group.name.upper(), group.shape_count)
+        for group in layout.groups
     )
     if rule.is_tensor_product:
         lines.extend(
@@ -885,18 +976,19 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     for row, field in enumerate(system.fields):
         offset = layout.offset(row)
         n_shape_name = layout.n_shape_constant(field)
+        reference_index = layout.reference_index(row)
         for test in range(layout.n_shape(row)):
             if dependencies.value_coefficients[row]:
                 lines.append(
                     "            const scalar_t test_value_%s_%d = field_shape[%d][q * %s + %d];"
-                    % (field.name, test, row, n_shape_name, test)
+                    % (field.name, test, reference_index, n_shape_name, test)
                 )
             for d in range(dim):
                 if not dependencies.gradient_coefficients[row][d]:
                     continue
                 terms = [
                     "field_grad_ref[%d * DIM + %d][q * %s + %d] * adj%d"
-                    % (row, k, n_shape_name, test, k * dim + d)
+                    % (reference_index, k, n_shape_name, test, k * dim + d)
                     for k in range(dim)
                 ]
                 lines.append(
@@ -928,16 +1020,21 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         "    static constexpr int N_QP_1D = integer_root(N_QP, DIM);",
         "    static_assert(ipow(N_QP_1D, DIM) == N_QP, \"N_QP must be tensor-product compatible\");",
     ]
-    for field_index, field in enumerate(system.fields):
-        shape_name = layout.n_shape_constant(field)
+    for group in layout.groups:
+        shape_name = "%s_N_SHAPE" % group.name.upper()
+        shape_1d_name = "%s_N_SHAPE_1D" % group.name.upper()
         lines.extend(
             [
                 "    static constexpr int %s = integer_root(%s, DIM);"
-                % (layout.n_shape_1d_constant(field), shape_name),
+                % (shape_1d_name, shape_name),
                 "    static_assert(ipow(%s, DIM) == %s, \"%s must be tensor-product compatible\");"
-                % (layout.n_shape_1d_constant(field), shape_name, shape_name),
+                % (shape_1d_name, shape_name, shape_name),
             ]
         )
+
+    for field_index, field in enumerate(system.fields):
+        reference_index = layout.reference_index(field_index)
+        shape_name = layout.n_shape_constant(field)
         for group in groups:
             if group.uses_value or group.uses_gradient:
                 lines.append(
@@ -965,8 +1062,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
                         % shape_name,
                         "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_%s_streams, %s_%s_value, %s_%s_grad_ref);"
                         % (
-                            field_index,
-                            field_index,
+                            reference_index,
+                            reference_index,
                             group.name,
                             field.name,
                             group.name,
@@ -982,7 +1079,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
                         "    tensor_evaluate_value<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                         % shape_name,
                         "            nelems, field_shape_1d[%d], %s_%s_streams, %s_%s_value);"
-                        % (field_index, group.name, field.name, group.name, field.name),
+                        % (reference_index, group.name, field.name, group.name, field.name),
                     ]
                 )
 
@@ -1078,6 +1175,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
     for row, field in enumerate(system.fields):
         shape_name = layout.n_shape_constant(field)
         offset = layout.offset(row)
+        reference_index = layout.reference_index(row)
         lines.append(
             "    scalar_t *const %s_output_streams[%s] = {%s};"
             % (
@@ -1094,7 +1192,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
                     "    tensor_integrate<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                     % shape_name,
                     "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s_output_streams);"
-                    % (row, row, field.name, field.name, field.name),
+                    % (reference_index, reference_index, field.name, field.name, field.name),
                 ]
             )
         else:
@@ -1103,7 +1201,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
                     "    tensor_integrate_value<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                     % shape_name,
                     "            nelems, field_shape_1d[%d], %s_value_coeff, %s_output_streams);"
-                    % (row, field.name, field.name),
+                    % (reference_index, field.name, field.name),
                 ]
             )
     return lines
@@ -1123,6 +1221,7 @@ def _mixed_local_field_evaluation_lines(
     for field_index, field in enumerate(system.fields):
         n_shape_name = layout.n_shape_constant(field)
         offset = layout.offset(field_index)
+        reference_index = layout.reference_index(field_index)
         for group in groups:
             if group.uses_value:
                 lines.append("%sscalar_t %s%s = scalar_t(0);" % (indent, field.name, group.symbol_suffix))
@@ -1147,7 +1246,7 @@ def _mixed_local_field_evaluation_lines(
                                 field.name,
                                 group.symbol_suffix,
                                 coeff_name,
-                                field_index,
+                                reference_index,
                                 n_shape_name,
                                 trial,
                             )
@@ -1162,7 +1261,7 @@ def _mixed_local_field_evaluation_lines(
                                     group.symbol_suffix,
                                     d,
                                     coeff_name,
-                                    field_index,
+                                    reference_index,
                                     d,
                                     n_shape_name,
                                     trial,
@@ -1177,7 +1276,7 @@ def _mixed_local_field_evaluation_lines(
                 if group.uses_value:
                     lines.append(
                         "%s    %s%s += coeff * field_shape[%d][q * %s + trial];"
-                        % (indent, field.name, group.symbol_suffix, field_index, n_shape_name)
+                        % (indent, field.name, group.symbol_suffix, reference_index, n_shape_name)
                     )
                 if group.uses_gradient:
                     for d in range(dim):
@@ -1188,7 +1287,7 @@ def _mixed_local_field_evaluation_lines(
                                 field.name,
                                 group.symbol_suffix,
                                 d,
-                                field_index,
+                                reference_index,
                                 d,
                                 n_shape_name,
                             )
@@ -1937,7 +2036,7 @@ def _mixed_tensor_reference_element_types(cell_rule, system, field_element_types
     seen = set()
     element_types = []
     for element_type in (cell_rule.element_type,) + tuple(
-        field_element_types.get(field.name, cell_rule.element_type)
+        _field_element_type(field, cell_rule, field_element_types)
         for field in system.fields
     ):
         element_type = str(element_type).upper()
@@ -1952,7 +2051,7 @@ def _mixed_simplex_reference_element_types(cell_rule, system, field_element_type
     seen = set()
     element_types = []
     for element_type in (cell_rule.element_type,) + tuple(
-        field_element_types.get(field.name, cell_rule.element_type)
+        _field_element_type(field, cell_rule, field_element_types)
         for field in system.fields
     ):
         element_type = str(element_type).upper()
@@ -2023,9 +2122,16 @@ def _mixed_affine_function(
         )
     params.append("const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0")
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    params.extend(_mixed_mesh_dependency_params(system, dependencies))
+    params.extend(_mixed_mesh_dependency_params(layout, dependencies))
     params.append("const ptrdiff_t out_stride")
-    params.extend("scalar_t *const SFEM_RESTRICT %s_out" % field.name for field in system.fields)
+    for field_group in layout.groups:
+        if field_group.components == 1:
+            params.append("scalar_t *const SFEM_RESTRICT %s_out" % field_group.name)
+        else:
+            params.append(
+                "scalar_t *const SFEM_RESTRICT %s_out[%d]"
+                % (field_group.name, field_group.components)
+            )
 
     impl = "%s_%s_%s_affine_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
@@ -2046,7 +2152,7 @@ def _mixed_affine_function(
             "    static constexpr int N_QP = %d;" % cell_rule.n_qp,
             "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
             "    static constexpr int N_SHAPE = CELL_N_SHAPE;",
-            "    static constexpr int N_FIELDS = %d;" % len(system.fields),
+            "    static constexpr int N_FIELDS = %d;" % layout.n_reference_fields,
             "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
             "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
             "    (void)nnodes;",
@@ -2104,12 +2210,11 @@ def _mixed_affine_function(
             node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
             for group in _dependency_stream_groups(dependencies, mesh=True):
                 lines.append(
-                    "            block_%s[%d][lane] = %s%s[%s * %s];"
+                    "            block_%s[%d][lane] = %s[%s * %s];"
                     % (
                         group.name,
                         stream,
-                        field.name,
-                        group.pointer_suffix,
+                        _mixed_mesh_field_pointer(field, group),
                         node,
                         group.stride,
                     )
@@ -2151,8 +2256,8 @@ def _mixed_affine_function(
             lines.extend(
                 [
                     "#pragma omp atomic update",
-                    "            %s_out[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (field.name, local_shape, stream),
+                    "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
+                    % (_mixed_mesh_output_pointer(field), local_shape, stream),
                 ]
             )
     lines.extend(
@@ -2179,9 +2284,9 @@ def _mixed_affine_function(
             call_args.extend("g_jacobian_adjugate%d" % i for i in range(dim * dim))
         call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mixed_mesh_dependency_call_args(system, dependencies))
+        call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
         call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend("%s_out" % group.name for group in layout.groups)
         lines.extend(
             [
                 ") {",
@@ -2216,9 +2321,16 @@ def _mixed_isoparametric_function(
         "const geom_t *const *const SFEM_RESTRICT points",
     ]
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    params.extend(_mixed_mesh_dependency_params(system, dependencies))
+    params.extend(_mixed_mesh_dependency_params(layout, dependencies))
     params.append("const ptrdiff_t out_stride")
-    params.extend("scalar_t *const SFEM_RESTRICT %s_out" % field.name for field in system.fields)
+    for field_group in layout.groups:
+        if field_group.components == 1:
+            params.append("scalar_t *const SFEM_RESTRICT %s_out" % field_group.name)
+        else:
+            params.append(
+                "scalar_t *const SFEM_RESTRICT %s_out[%d]"
+                % (field_group.name, field_group.components)
+            )
     impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -2237,7 +2349,7 @@ def _mixed_isoparametric_function(
             "    static constexpr int N_QP = %d;" % cell_rule.n_qp,
             "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
             "    static constexpr int N_SHAPE = CELL_N_SHAPE;",
-            "    static constexpr int N_FIELDS = %d;" % len(system.fields),
+            "    static constexpr int N_FIELDS = %d;" % layout.n_reference_fields,
             "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
             "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
             "    (void)nnodes;",
@@ -2299,12 +2411,11 @@ def _mixed_isoparametric_function(
             node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
             for group in _dependency_stream_groups(dependencies, mesh=True):
                 lines.append(
-                    "            block_%s[%d][lane] = %s%s[%s * %s];"
+                    "            block_%s[%d][lane] = %s[%s * %s];"
                     % (
                         group.name,
                         stream,
-                        field.name,
-                        group.pointer_suffix,
+                        _mixed_mesh_field_pointer(field, group),
                         node,
                         group.stride,
                     )
@@ -2420,8 +2531,8 @@ def _mixed_isoparametric_function(
             lines.extend(
                 [
                     "#pragma omp atomic update",
-                    "            %s_out[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (field.name, local_shape, stream),
+                    "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
+                    % (_mixed_mesh_output_pointer(field), local_shape, stream),
                 ]
             )
     lines.extend(
@@ -2444,9 +2555,9 @@ def _mixed_isoparametric_function(
             lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
         call_args = ["nelements", "nnodes", "elements", "points"]
         call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mixed_mesh_dependency_call_args(system, dependencies))
+        call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
         call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend("%s_out" % group.name for group in layout.groups)
         lines.extend(
             [
                 ") {",
@@ -2460,13 +2571,30 @@ def _mixed_isoparametric_function(
 
 
 def _field_n_shape(field, cell_rule, field_element_types):
-    element_type = field_element_types[field.name]
+    return _field_n_shape_by_name(
+        _residual_parent_field_name(field),
+        cell_rule,
+        field_element_types,
+    )
+
+
+def _field_n_shape_by_name(field_name, cell_rule, field_element_types):
+    element_type = _field_element_type(field_name, cell_rule, field_element_types)
     return sfem_field_n_shape(
         element_type,
         cell_rule.order
         if element_type == "QUAD4" or sfem_is_tensor_product_hex_element(element_type)
         else None,
     )
+
+
+def _field_element_type(field_or_name, cell_rule, field_element_types):
+    field_name = _residual_parent_field_name(field_or_name)
+    return str(field_element_types.get(field_name, cell_rule.element_type)).upper()
+
+
+def _residual_parent_field_name(field_or_name):
+    return str(getattr(field_or_name, "field_name", field_or_name))
 
 
 def _residual_diagnostics_lines(system, prefix, specialization):

@@ -79,7 +79,7 @@ class OpenMPSoABackend:
                 residual_coeffs=model.residual_coeffs,
                 action_coeffs=model.action_coeffs,
                 field_element_types={
-                    field.name: model.element_type for field in model.system.fields
+                    field.field_name: model.element_type for field in model.system.fields
                 },
                 local_prefix=local_kernel.name,
                 local_name=local_kernel.header,
@@ -335,11 +335,7 @@ def _require_local_phases(block, expected):
 def _field_element_types_for_context(equation_fields, context):
     ret = {}
     for field, element_type in context.fem_policy.field_element_types_for(equation_fields):
-        if field.components == 1:
-            ret[field.name] = element_type
-        else:
-            for component in range(field.components):
-                ret["%s%d" % (field.name, component)] = element_type
+        ret[field.name] = element_type
     return ret
 
 
@@ -389,8 +385,13 @@ def _diagonal_block_model(unit, collection, context):
     system = CoupledResidualSystem(collection.source.dim)
     if collection.source.parameters:
         system.add_parameters(*collection.source.parameters)
-    for component_name in _component_field_names(field):
-        lowered = system.add_field(component_name)
+    for component, component_name in enumerate(_component_field_names(field)):
+        lowered = system.add_field(
+            component_name,
+            field_name=field.name,
+            component=component,
+            components=field.components,
+        )
         system.add_residual(lowered, sp.S.Zero)
     block = collection.block(FormOrder.TWO, unit.block.row_field, unit.block.column_field)
     return _DiagonalBlockModel(

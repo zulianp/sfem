@@ -37,20 +37,11 @@ def _operator_dim(path, contents):
 
 
 def _unit_output_fields(unit):
-    return tuple(
-        ("%s%d" % (field.name, component)) if int(field.components) > 1 else field.name
-        for field in unit.form_collection.fields
-        for component in range(int(field.components))
-    )
+    return tuple(field.name for field in unit.form_collection.fields)
 
 
 def _field_output_fields(unit, field_name):
-    return tuple(
-        ("%s%d" % (field.name, component)) if int(field.components) > 1 else field.name
-        for field in unit.form_collection.fields
-        if field.name == field_name
-        for component in range(int(field.components))
-    )
+    return tuple(field.name for field in unit.form_collection.fields if field.name == field_name)
 
 
 def _operator_output_fields(plan, operator_dim, basename):
