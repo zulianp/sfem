@@ -13,12 +13,16 @@ from .materials.neohookean_ogden import material as neohookean_ogden
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
 from .materials.stokes import material as stokes
 from .materials.two_phase_flow import material as two_phase_flow
-from .generate_stokes_files import validate_m6_3 as validate_stokes_m6_3
+from .generate_stokes_files import validate_m6_4 as validate_stokes_m6_4
 from .tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
     tensor_product_ordered_coordinate_streams,
 )
+
+
+def _relative_sources(result, out_dir):
+    return {os.path.relpath(path, out_dir) for path in result.sources}
 
 
 class GenApiTest(unittest.TestCase):
@@ -417,14 +421,14 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI3",),
             )
-            names = {os.path.basename(path) for path in result.sources}
+            names = _relative_sources(result, out_dir)
             self.assertIn(
-                "generated_neohookean_ogden_tri3_operator.cpp",
+                "d2/tri3/neohookean_ogden_tri3_operator.cpp",
                 names,
             )
-            self.assertIn("generated_neohookean_ogden_d2_simplex_local.hpp", names)
+            self.assertIn("d2/neohookean_ogden_d2_simplex_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
-            self.assertIn("sfem_GeneratedNeoHookeanOgden.cpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden.cpp", names)
             wrapper = os.path.join(
                 out_dir,
                 "op",
@@ -440,9 +444,10 @@ class GenApiTest(unittest.TestCase):
             with open(header, encoding="utf-8") as stream:
                 self.assertIn("public Op", stream.read())
             self.assertIn(
-                "generated_neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
                 source,
             )
+            self.assertNotIn("generated_neohookean_ogden", source)
 
     def test_material_runner_writes_generation_plan_dump(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -474,16 +479,16 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI3",),
             )
-            names = {os.path.basename(path) for path in result.sources}
+            names = _relative_sources(result, out_dir)
             self.assertIn(
-                "generated_two_phase_flow_tri3_operator.cpp",
+                "d2/tri3/two_phase_flow_tri3_operator.cpp",
                 names,
             )
             self.assertIn(
-                "generated_two_phase_flow_d2_simplex_local.hpp",
+                "d2/two_phase_flow_d2_simplex_local.hpp",
                 names,
             )
-            self.assertIn("sfem_GeneratedTwoPhaseFlow.cpp", names)
+            self.assertIn("op/sfem_GeneratedTwoPhaseFlow.cpp", names)
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow.cpp")
             with open(wrapper, encoding="utf-8") as stream:
                 source = stream.read()
@@ -491,6 +496,9 @@ class GenApiTest(unittest.TestCase):
                 source.index('parameters.require_real_value("C_ka1")'),
                 source.index('parameters.require_real_value("porosity")'),
             )
+            self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
+            self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos", source)
+            self.assertNotIn("generated_two_phase_flow", source)
             self.assertNotIn('parameters.require_real_value("K_" + std::to_string(i))', source)
 
     def test_poro_hyperelastic_material_uses_taylor_hood_elements(self):
@@ -520,8 +528,24 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(tuple(field.components for field in system.fields), (2, 1))
         self.assertEqual(tuple(field.family for field in system.fields), ("velocity", "pressure"))
         forms = system.form_collection("")
-        self.assertEqual(len(forms.blocks_for(gen.FormOrder.ONE)), 3)
-        self.assertEqual(len(forms.blocks_for(gen.FormOrder.TWO)), 9)
+        self.assertEqual(
+            tuple(block.row_field for block in forms.blocks_for(gen.FormOrder.ONE)),
+            ("u", "p"),
+        )
+        self.assertEqual(
+            tuple(
+                (block.row_field, block.column_field)
+                for block in forms.blocks_for(gen.FormOrder.TWO)
+            ),
+            (("u", "u"), ("u", "p"), ("p", "u")),
+        )
+        self.assertNotIn(
+            ("p", "p"),
+            tuple(
+                (block.row_field, block.column_field)
+                for block in forms.blocks_for(gen.FormOrder.TWO)
+            ),
+        )
 
     def test_mixed_isoparametric_taylor_hood_uses_higher_quadrature(self):
         tri = gen.sfem_fem_policy(stokes.elements[0])
@@ -673,28 +697,33 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI6",),
             )
-            source = os.path.join(out_dir, "generated_neohookean_ogden_tri6_operator.cpp")
+            source = os.path.join(
+                out_dir,
+                "d2",
+                "tri6",
+                "neohookean_ogden_tri6_operator.cpp",
+            )
             with open(source, encoding="utf-8") as stream:
                 contents = stream.read()
 
         affine = contents.index(
-            "generated_neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_impl"
+            "neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_impl"
         )
         isoparametric = contents.index(
-            "generated_neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_impl"
+            "neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_impl"
         )
         self.assertIn("static constexpr int N_QP = 3;", contents[affine:isoparametric])
         self.assertIn("const scalar_t *const affine_grad_ref_x", contents[affine:isoparametric])
         self.assertIn("const scalar_t *const affine_q_weight", contents[affine:isoparametric])
         self.assertIn(
-            "generated_neohookean_ogden_tri6_affine_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tri6_affine_reference_data<scalar_t>::grad_ref_x()",
             contents[affine:isoparametric],
         )
         self.assertIn("static constexpr int N_QP = 6;", contents[isoparametric:])
         self.assertIn("const scalar_t *const isoparametric_grad_ref_x", contents[isoparametric:])
         self.assertIn("const scalar_t *const isoparametric_q_weight", contents[isoparametric:])
         self.assertIn(
-            "generated_neohookean_ogden_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x()",
             contents[isoparametric:],
         )
 
@@ -1173,9 +1202,12 @@ class GenApiTest(unittest.TestCase):
         )
         self.assertEqual(
             tuple(kernel.emission for kernel in residual_plan.block_kernels),
-            (gen.KernelEmission.COVERED_BY_PARENT,) * len(residual_plan.block_kernels),
+            (gen.KernelEmission.FILES,) * len(residual_plan.block_kernels),
         )
-        self.assertEqual(residual_plan.emission_kernels_for_context(residual_input.element_contexts[0]), residual_plan.units)
+        self.assertEqual(
+            residual_plan.emission_kernels_for_context(residual_input.element_contexts[0]),
+            residual_plan.units + residual_plan.block_kernels,
+        )
 
     def test_generation_plan_validation_rejects_unsupported_combinations(self):
         context = gen.ElementGenerationContext.create("test_material", "TRI3", 16, None)
@@ -1306,13 +1338,13 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI6",),
             )
-            names = {os.path.basename(path) for path in result.sources}
+            names = _relative_sources(result, out_dir)
             self.assertIn(
-                "generated_poro_hyperelasticity_solid_tri6_operator.cpp",
+                "d2/tri6/poro_hyperelasticity_solid_tri6_operator.cpp",
                 names,
             )
             self.assertIn(
-                "generated_poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
+                "d2/tri6_tri3/poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
                 names,
             )
 
@@ -1323,26 +1355,54 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI6_TRI3",),
             )
-            names = {os.path.basename(path) for path in result.sources}
-            self.assertIn("generated_stokes_tri6_tri3_operator.cpp", names)
-            self.assertIn("generated_stokes_d2_simplex_mixed_local.hpp", names)
+            names = _relative_sources(result, out_dir)
+            self.assertIn("d2/tri6_tri3/stokes_tri6_tri3_operator.cpp", names)
+            self.assertIn("d2/stokes_d2_simplex_mixed_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIsInstance(result.plan, gen.GenerationPlan)
             self.assertEqual(result.plan.units[0].name, "stokes")
             self.assertTrue(result.plan.units[0].is_complete_system)
             self.assertEqual(result.plan.complete_system_kernels, result.plan.units)
-            self.assertEqual(len(result.plan.units[0].blocks), 12)
-            source = os.path.join(out_dir, "generated_stokes_tri6_tri3_operator.cpp")
+            self.assertEqual(
+                tuple(block.name for block in result.plan.units[0].blocks),
+                ("form_1_u", "form_1_p", "form_2_u_u", "form_2_u_p", "form_2_p_u"),
+            )
+            source = os.path.join(
+                out_dir,
+                "d2",
+                "tri6_tri3",
+                "stokes_tri6_tri3_operator.cpp",
+            )
             with open(source) as input_file:
                 contents = input_file.read()
-            self.assertIn('#include "generated_stokes_d2_simplex_mixed_local.hpp"', contents)
-            self.assertIn("generated_stokes_tri6_tri3_residual_isoparametric_mesh_soa", contents)
-            self.assertIn("generated_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa", contents)
+            self.assertIn('#include "../stokes_d2_simplex_mixed_local.hpp"', contents)
+            self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", contents)
+            self.assertIn("stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa", contents)
+            self.assertIn(
+                "d2/tri6_tri3/stokes_form_2_u_p_tri6_tri3_operator.cpp",
+                names,
+            )
+            self.assertIn(
+                "d2/tri6/stokes_form_2_u_u_tri6_operator.cpp",
+                names,
+            )
+            self.assertNotIn(
+                "d2/tri6_tri3/stokes_form_2_u0_p_tri6_tri3_operator.cpp",
+                names,
+            )
+            self.assertNotIn(
+                "d2/tri6_tri3/stokes_form_2_u_u_tri6_tri3_operator.cpp",
+                names,
+            )
+            self.assertNotIn(
+                "d2/tri6_tri3/stokes_form_2_p_p_tri6_tri3_operator.cpp",
+                names,
+            )
             for field in result.plan.units[0].form_collection.fields:
                 for component in range(int(field.components)):
                     name = "%s%d" % (field.name, component) if int(field.components) > 1 else field.name
                     self.assertIn("%s_out" % name, contents)
-            validate_stokes_m6_3(result)
+            validate_stokes_m6_4(result)
 
     def test_stokes_validation_handles_multiple_dimensions(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -1351,7 +1411,7 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TRI6_TRI3", "TET10_TET4"),
             )
-            validate_stokes_m6_3(result)
+            validate_stokes_m6_4(result)
 
     def test_stokes_tensor_product_local_uses_sum_factorization(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -1363,7 +1423,8 @@ class GenApiTest(unittest.TestCase):
             )
             local = os.path.join(
                 out_dir,
-                "generated_stokes_d3_tensor_product_mixed_local.hpp",
+                "d3",
+                "stokes_d3_tensor_product_mixed_local.hpp",
             )
             with open(local) as input_file:
                 contents = input_file.read()
@@ -1386,11 +1447,13 @@ class GenApiTest(unittest.TestCase):
             )
             operator = os.path.join(
                 out_dir,
-                "generated_stokes_hex27_hex8_operator.cpp",
+                "d3",
+                "hex27_hex8",
+                "stokes_hex27_hex8_operator.cpp",
             )
             with open(operator) as input_file:
                 contents = input_file.read()
-            self.assertIn("struct generated_stokes_isoparametric_reference_data", contents)
+            self.assertIn("struct stokes_isoparametric_reference_data", contents)
             self.assertIn("static const scalar_t *hex27_shape_1d()", contents)
             self.assertIn("static const scalar_t *hex27_grad_1d()", contents)
             self.assertIn("static const scalar_t *hex8_shape_1d()", contents)
@@ -1398,18 +1461,18 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("static const scalar_t data[", contents)
             self.assertIn("scalar_t(", contents)
             self.assertIn(
-                "field_shape_1d[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
+                "field_shape_1d[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
                 contents,
             )
-            self.assertNotIn("generated_stokes_reference_data", contents)
-            self.assertNotIn("generated_stokes_cell_grad_ref", contents)
-            self.assertNotIn("generated_stokes_u0_shape_", contents)
-            self.assertNotIn("generated_stokes_u1_shape_", contents)
-            self.assertNotIn("generated_stokes_u2_shape_", contents)
-            self.assertNotIn("generated_stokes_u0_grad_ref", contents)
+            self.assertNotIn("stokes_reference_data", contents)
+            self.assertNotIn("stokes_cell_grad_ref", contents)
+            self.assertNotIn("stokes_u0_shape_", contents)
+            self.assertNotIn("stokes_u1_shape_", contents)
+            self.assertNotIn("stokes_u2_shape_", contents)
+            self.assertNotIn("stokes_u0_grad_ref", contents)
             self.assertNotIn("static const scalar_t shape_1d[", contents)
             self.assertNotIn("static const scalar_t grad_1d[", contents)
 
@@ -1422,26 +1485,38 @@ class GenApiTest(unittest.TestCase):
             )
             tri_source = os.path.join(
                 out_dir,
-                "generated_stokes_tri6_tri3_operator.cpp",
+                "d2",
+                "tri6_tri3",
+                "stokes_tri6_tri3_operator.cpp",
             )
             tet_source = os.path.join(
                 out_dir,
-                "generated_stokes_tet10_tet4_operator.cpp",
+                "d3",
+                "tet10_tet4",
+                "stokes_tet10_tet4_operator.cpp",
             )
             with open(tri_source) as input_file:
                 tri = input_file.read()
             with open(tet_source) as input_file:
                 tet = input_file.read()
             with open(
-                os.path.join(out_dir, "generated_stokes_d2_simplex_mixed_local.hpp")
+                os.path.join(
+                    out_dir,
+                    "d2",
+                    "stokes_d2_simplex_mixed_local.hpp",
+                )
             ) as input_file:
                 tri_local = input_file.read()
             with open(
-                os.path.join(out_dir, "generated_stokes_d3_simplex_mixed_local.hpp")
+                os.path.join(
+                    out_dir,
+                    "d3",
+                    "stokes_d3_simplex_mixed_local.hpp",
+                )
             ) as input_file:
                 tet_local = input_file.read()
 
-            self.assertIn("struct generated_stokes_isoparametric_reference_data", tri)
+            self.assertIn("struct stokes_isoparametric_reference_data", tri)
             self.assertIn("static const scalar_t *tri6_shape()", tri)
             self.assertIn("static const scalar_t *tri6_grad_ref_x()", tri)
             self.assertIn("static const scalar_t *tri3_shape()", tri)
@@ -1449,17 +1524,17 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("static const scalar_t data[", tri)
             self.assertIn("scalar_t(", tri)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri3_shape()}",
+                "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri3_shape()}",
                 tri,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_0 = sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tri6_grad_ref_x()",
+                "isoparametric_cell_grad_ref_0 = sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_grad_ref_x()",
                 tri,
             )
 
-            self.assertIn("struct generated_stokes_isoparametric_reference_data", tet)
+            self.assertIn("struct stokes_isoparametric_reference_data", tet)
             self.assertIn("static const scalar_t *tet10_shape()", tet)
             self.assertIn("static const scalar_t *tet10_grad_ref_z()", tet)
             self.assertIn("static const scalar_t *tet4_shape()", tet)
@@ -1467,26 +1542,26 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("static const scalar_t data[", tet)
             self.assertIn("scalar_t(", tet)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet4_shape()}",
+                "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet4_shape()}",
                 tet,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_2 = sfem::codegen::generated_stokes_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z()",
+                "isoparametric_cell_grad_ref_2 = sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z()",
                 tet,
             )
 
             for contents in (tri, tet):
-                self.assertNotIn("generated_stokes_reference_data", contents)
-                self.assertNotIn("generated_stokes_cell_grad_ref", contents)
-                self.assertNotIn("generated_stokes_u0_shape_", contents)
-                self.assertNotIn("generated_stokes_u1_shape_", contents)
-                self.assertNotIn("generated_stokes_u2_shape_", contents)
-                self.assertNotIn("generated_stokes_u0_grad_ref", contents)
-                self.assertNotIn("generated_stokes_u1_grad_ref", contents)
-                self.assertNotIn("generated_stokes_u2_grad_ref", contents)
+                self.assertNotIn("stokes_reference_data", contents)
+                self.assertNotIn("stokes_cell_grad_ref", contents)
+                self.assertNotIn("stokes_u0_shape_", contents)
+                self.assertNotIn("stokes_u1_shape_", contents)
+                self.assertNotIn("stokes_u2_shape_", contents)
+                self.assertNotIn("stokes_u0_grad_ref", contents)
+                self.assertNotIn("stokes_u1_grad_ref", contents)
+                self.assertNotIn("stokes_u2_grad_ref", contents)
             for contents in (tri_local, tet_local):
                 self.assertNotIn("for (int trial", contents)
                 self.assertNotIn("for (int test", contents)
@@ -1503,7 +1578,9 @@ class GenApiTest(unittest.TestCase):
             )
             source = os.path.join(
                 out_dir,
-                "generated_stokes_tri6_tri3_operator.cpp",
+                "d2",
+                "tri6_tri3",
+                "stokes_tri6_tri3_operator.cpp",
             )
             subprocess.run(
                 [
@@ -1534,7 +1611,9 @@ class GenApiTest(unittest.TestCase):
             )
             source = os.path.join(
                 out_dir,
-                "generated_poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
+                "d2",
+                "tri6_tri3",
+                "poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
             )
             subprocess.run(
                 [

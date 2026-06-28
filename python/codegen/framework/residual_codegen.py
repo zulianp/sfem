@@ -405,6 +405,9 @@ def _codegen_dependencies(system, coefficients, dependencies):
         free_symbols.update(sp.sympify(coefficient.value).free_symbols)
         for expression in coefficient.gradient:
             free_symbols.update(sp.sympify(expression).free_symbols)
+    candidate_parameters = tuple(
+        dict.fromkeys(tuple(dependencies.parameters) + tuple(system.parameters))
+    )
     current_value = any(field.value in free_symbols for field in system.fields)
     current_gradient = any(
         free_symbols.intersection(field.gradient) for field in system.fields
@@ -427,7 +430,7 @@ def _codegen_dependencies(system, coefficients, dependencies):
         previous=previous_value or previous_gradient,
         direction=direction_value or direction_gradient,
         parameters=tuple(
-            parameter for parameter in dependencies.parameters if parameter in free_symbols
+            parameter for parameter in candidate_parameters if parameter in free_symbols
         ),
         current_value=current_value,
         current_gradient=current_gradient,
@@ -509,6 +512,8 @@ def generate_coupled_residual_sfem_files(
         specialization,
         affine_specialization,
         local_name,
+        residual_coeffs,
+        action_coeffs,
     )
     diagnostics_name = "kernel_diagnostics.hpp"
     return (
@@ -922,7 +927,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
             ]
         )
         for group in groups:
-            if group.uses_value:
+            if group.uses_value or group.uses_gradient:
                 lines.append(
                     "    scalar_t %s_%s_value[N_QP * VECTOR_SIZE];"
                     % (group.name, field.name)
@@ -1579,6 +1584,8 @@ def _operator_source(
     specialization,
     affine_specialization,
     local_name,
+    residual_coeffs,
+    action_coeffs,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1625,12 +1632,12 @@ def _operator_source(
     form_dependencies = {
         "residual": _codegen_dependencies(
             system,
-            coupled_residual_weak_coefficients(system, False),
+            residual_coeffs,
             system.residual_dependencies(),
         ),
         "jacobian_action": _codegen_dependencies(
             system,
-            coupled_residual_weak_coefficients(system, True),
+            action_coeffs,
             system.jacobian_action_dependencies(),
         ),
     }
@@ -2341,8 +2348,9 @@ def _mixed_isoparametric_function(
         "nelems",
         "VECTOR_SIZE",
         "block_determinant",
-        "block_adjugate",
     ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data))
     call_args.extend(
         "block_%s_streams" % group.name

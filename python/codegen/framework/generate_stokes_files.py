@@ -44,7 +44,35 @@ def _unit_output_fields(unit):
     )
 
 
-def validate_m6_3(result):
+def _field_output_fields(unit, field_name):
+    return tuple(
+        ("%s%d" % (field.name, component)) if int(field.components) > 1 else field.name
+        for field in unit.form_collection.fields
+        if field.name == field_name
+        for component in range(int(field.components))
+    )
+
+
+def _operator_output_fields(plan, operator_dim, basename):
+    for unit in plan.units:
+        if int(unit.dim) != operator_dim:
+            continue
+        for block_kernel in unit.block_kernels:
+            prefix = "%s_" % block_kernel.name
+            if not basename.startswith(prefix):
+                continue
+            if (
+                block_kernel.block.form_order is gen.FormOrder.TWO
+                and block_kernel.block.row_field == block_kernel.block.column_field
+            ):
+                return _field_output_fields(unit, block_kernel.block.row_field)
+            return _unit_output_fields(unit)
+        if basename.startswith("%s_" % unit.name):
+            return _unit_output_fields(unit)
+    return ()
+
+
+def validate_m6_4(result):
     plan = result.plan
     if plan is None:
         raise RuntimeError("Stokes generation did not return a generation plan")
@@ -61,8 +89,19 @@ def validate_m6_3(result):
         for block_kernel in unit.block_kernels:
             if not block_kernel.is_block:
                 raise RuntimeError("Stokes block kernel '%s' does not use BLOCK scope" % block_kernel.name)
-            if block_kernel.emission is not gen.KernelEmission.COVERED_BY_PARENT:
-                raise RuntimeError("Stokes block kernel '%s' emits files separately" % block_kernel.name)
+            if block_kernel.emission is not gen.KernelEmission.FILES:
+                raise RuntimeError("Stokes block kernel '%s' does not emit files" % block_kernel.name)
+            if not block_kernel.block:
+                raise RuntimeError("Stokes block kernel '%s' does not select a block" % block_kernel.name)
+            if block_kernel.block.name not in block_kernel.name:
+                raise RuntimeError(
+                    "Stokes block kernel '%s' does not follow the selected-block naming convention"
+                    % block_kernel.name
+                )
+
+    for block_kernel in plan.block_kernels:
+        if block_kernel.block.name.endswith("_p_p"):
+            raise RuntimeError("Stokes generated a zero pressure-pressure block kernel")
 
     operator_sources = tuple(path for path in result.sources if path.endswith("_operator.cpp"))
     local_headers = tuple(path for path in result.sources if path.endswith("_local.hpp"))
@@ -71,26 +110,25 @@ def validate_m6_3(result):
     if not local_headers:
         raise RuntimeError("Stokes generation did not produce family-level local kernels")
 
-    local_header_names = tuple(os.path.basename(path) for path in local_headers)
     for path in operator_sources:
+        basename = os.path.basename(path)
         with open(path) as input_file:
             contents = input_file.read()
         operator_dim = _operator_dim(path, contents)
-        field_names = tuple(
-            field_name
-            for unit in plan.units
-            if int(unit.dim) == operator_dim
-            for field_name in _unit_output_fields(unit)
-        )
+        field_names = _operator_output_fields(plan, operator_dim, basename)
         if not field_names:
             raise RuntimeError(
                 "Stokes operator '%s' has no matching plan unit for dimension %d"
-                % (os.path.basename(path), operator_dim)
+                % (basename, operator_dim)
             )
-        if not any('#include "%s"' % header in contents for header in local_header_names):
+        local_header_includes = tuple(
+            os.path.relpath(header, start=os.path.dirname(path)).replace(os.sep, "/")
+            for header in local_headers
+        )
+        if not any('#include "%s"' % header in contents for header in local_header_includes):
             raise RuntimeError(
                 "Stokes operator '%s' does not include a generated local kernel"
-                % os.path.basename(path)
+                % basename
             )
         for token in (
             "_residual_affine_mesh_soa",
@@ -99,12 +137,12 @@ def validate_m6_3(result):
             "_jacobian_action_isoparametric_mesh_soa",
         ):
             if token not in contents:
-                raise RuntimeError("Stokes operator '%s' is missing '%s'" % (os.path.basename(path), token))
+                raise RuntimeError("Stokes operator '%s' is missing '%s'" % (basename, token))
         for field_name in field_names:
             if "%s_out" % field_name not in contents:
                 raise RuntimeError(
                     "Stokes operator '%s' is missing output field '%s'"
-                    % (os.path.basename(path), field_name)
+                    % (basename, field_name)
                 )
 
 
@@ -131,7 +169,7 @@ def main(argv=None):
     parser.add_argument(
         "--no-plan-dump",
         action="store_true",
-        help="Do not write generated_stokes_plan.json.",
+        help="Do not write stokes_plan.json.",
     )
     args = parser.parse_args(argv)
 
@@ -145,10 +183,10 @@ def main(argv=None):
         clean=not args.keep_existing,
         dump_plan=not args.no_plan_dump,
     )
-    validate_m6_3(result)
+    validate_m6_4(result)
 
     print_generation_result(result, "Generated Stokes kernels:")
-    print("M6.3 validation: monolithic complete-system Stokes kernels")
+    print("M6.4 validation: monolithic and nonzero block Stokes kernels")
     return result
 
 

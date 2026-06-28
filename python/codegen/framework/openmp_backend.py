@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import sympy as sp
+
 from .forms import FormOrder
 from .generation_plan import (
     KernelTarget,
@@ -10,7 +12,10 @@ from .generation_plan import (
 from .symbolic import (
     generate_sfem_soa_cpp_files_for_element,
 )
+from .fem import sfem_soa_element_specialization
+from .residual import CoupledResidualSystem
 from .residual_codegen import (
+    WeakResidualCoefficients,
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
 )
@@ -55,9 +60,32 @@ class OpenMPSoABackend:
         self._validate_residual_plan(unit)
         collection = unit.form_collection
         system = collection.source
-        residual_coeffs = collection.form_metadata(FormOrder.ONE).coefficients
-        action_coeffs = collection.form_metadata(FormOrder.TWO).coefficients
+        residual_coeffs = _coefficients_for_unit(unit, collection, FormOrder.ONE)
+        action_coeffs = _coefficients_for_unit(unit, collection, FormOrder.TWO)
         prefix = _generated_prefix(unit)
+        if _is_diagonal_two_form_block(unit) and context.is_mixed_order:
+            model = _diagonal_block_model(unit, collection, context)
+            local_kernel = unit.local_kernel_plan(context, prefix)
+            operator_prefix = "%s_%s" % (prefix, model.element_type.lower())
+            return self.emit_mixed_residual(
+                model.system,
+                prefix=prefix,
+                compatible_element=_CompatibleElementLabel(
+                    model.element_type,
+                    model.element_type,
+                ),
+                vector_size=model.specialization.vector_size,
+                quadrature_order=model.specialization.quadrature_rule.order,
+                residual_coeffs=model.residual_coeffs,
+                action_coeffs=model.action_coeffs,
+                field_element_types={
+                    field.name: model.element_type for field in model.system.fields
+                },
+                local_prefix=local_kernel.name,
+                local_name=local_kernel.header,
+                operator_prefix=operator_prefix,
+                operator_name="%s_operator.cpp" % operator_prefix,
+            )
         local_kernel = unit.local_kernel_plan(
             context,
             prefix,
@@ -267,7 +295,7 @@ def _kind_value(kind):
 
 
 def _generated_prefix(unit):
-    return "generated_%s" % unit.name
+    return unit.name
 
 
 def _require_openmp(unit):
@@ -313,3 +341,119 @@ def _field_element_types_for_context(equation_fields, context):
             for component in range(field.components):
                 ret["%s%d" % (field.name, component)] = element_type
     return ret
+
+
+@dataclass(frozen=True)
+class _DiagonalBlockModel:
+    system: object
+    element_type: str
+    specialization: object
+    affine_specialization: object
+    residual_coeffs: tuple
+    action_coeffs: tuple
+
+
+@dataclass(frozen=True)
+class _CompatibleElementLabel:
+    name: str
+    cell_element_type: str
+
+
+def _is_diagonal_two_form_block(unit):
+    return (
+        unit.is_block
+        and unit.block is not None
+        and unit.block.form_order is FormOrder.TWO
+        and unit.block.column_field
+        and unit.block.row_field == unit.block.column_field
+    )
+
+
+def _diagonal_block_model(unit, collection, context):
+    field = _collection_field(collection, unit.block.row_field)
+    field_element_types = {
+        equation_field.name: element_type
+        for equation_field, element_type in context.fem_policy.field_element_types_for(collection.fields)
+    }
+    element_type = field_element_types[field.name]
+    specialization = sfem_soa_element_specialization(
+        element_type,
+        context.specialization.vector_size,
+        context.specialization.quadrature_rule.order,
+    )
+    affine_specialization = sfem_soa_element_specialization(
+        element_type,
+        context.affine_specialization.vector_size,
+        context.affine_specialization.quadrature_rule.order,
+    )
+    system = CoupledResidualSystem(collection.source.dim)
+    if collection.source.parameters:
+        system.add_parameters(*collection.source.parameters)
+    for component_name in _component_field_names(field):
+        lowered = system.add_field(component_name)
+        system.add_residual(lowered, sp.S.Zero)
+    block = collection.block(FormOrder.TWO, unit.block.row_field, unit.block.column_field)
+    return _DiagonalBlockModel(
+        system,
+        element_type,
+        specialization,
+        affine_specialization,
+        _zero_coefficients(system),
+        block.coefficients,
+    )
+
+
+def _collection_field(collection, name):
+    name = str(name)
+    for field in collection.fields:
+        if field.name == name:
+            return field
+    raise ValueError("field '%s' is not in form collection" % name)
+
+
+def _component_field_names(field):
+    components = int(getattr(field, "components", 1))
+    if components == 1:
+        return (field.name,)
+    return tuple("%s%d" % (field.name, component) for component in range(components))
+
+
+def _coefficients_for_unit(unit, collection, order):
+    order = FormOrder(order)
+    metadata = collection.form_metadata(order)
+    if not unit.is_block:
+        return metadata.coefficients
+    if unit.block.form_order is not order:
+        return _zero_coefficients(collection.source)
+    column = unit.block.column_field or None
+    block = collection.block(order, unit.block.row_field, column)
+    if not block.coefficients:
+        raise ValueError(
+            "block kernel '%s' has no coefficient sets for '%s'"
+            % (unit.name, block.name)
+        )
+    return _selected_row_coefficients(collection.source, block.coefficients)
+
+
+def _zero_coefficients(system):
+    return tuple(
+        WeakResidualCoefficients(
+            field.name,
+            sp.S.Zero,
+            tuple(sp.S.Zero for _ in range(system.dim)),
+        )
+        for field in system.fields
+    )
+
+
+def _selected_row_coefficients(system, coefficients):
+    ret = list(_zero_coefficients(system))
+    by_name = {field.name: index for index, field in enumerate(system.fields)}
+    for coefficient in coefficients:
+        try:
+            ret[by_name[coefficient.row_field]] = coefficient
+        except KeyError:
+            raise ValueError(
+                "row field '%s' is not in residual system" % coefficient.row_field
+            )
+    return tuple(ret)

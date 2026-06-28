@@ -582,7 +582,7 @@ def _build_form_collection(system, equation, orders):
         if FormOrder.ZERO in orders:
             residual_metadata.append(FormMetadata(FormOrder.ZERO))
         if FormOrder.ONE in orders:
-            blocks = _residual_row_blocks(residual_system)
+            blocks = _residual_row_blocks(residual_system, equation.fields)
             residual_metadata.append(
                 FormMetadata(
                     FormOrder.ONE,
@@ -595,7 +595,7 @@ def _build_form_collection(system, equation, orders):
                 )
             )
         if FormOrder.TWO in orders:
-            blocks = _residual_jacobian_blocks(residual_system)
+            blocks = _residual_jacobian_blocks(residual_system, equation.fields)
             residual_metadata.append(
                 FormMetadata(
                     FormOrder.TWO,
@@ -634,47 +634,146 @@ def _build_form_collection(system, equation, orders):
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
-def _residual_row_blocks(residual_system):
+def _residual_row_blocks(residual_system, equation_fields):
     return tuple(
         FormBlock(
             FormOrder.ONE,
             row_field=field.name,
-            expression=residual_system.residual_expression(field),
-            coefficients=(
-                weak_residual_coefficients(
-                    residual_system,
-                    residual_system.residual_expression(field),
-                    field.name,
-                ),
+            expression=_residual_expression_for_equation_field(
+                residual_system,
+                field,
+            ),
+            coefficients=_residual_coefficients_for_equation_field(
+                residual_system,
+                field,
             ),
             dependencies=residual_system.dependencies_for_expressions(
-                (residual_system.residual_expression(field),)
+                _residual_component_expressions_for_equation_field(
+                    residual_system,
+                    field,
+                )
             ),
         )
-        for field in residual_system.fields
+        for field in equation_fields
+        if _has_nonzero_expression(
+            _residual_component_expressions_for_equation_field(residual_system, field)
+        )
     )
 
 
-def _residual_jacobian_blocks(residual_system):
+def _residual_jacobian_blocks(residual_system, equation_fields):
+    component_blocks = {
+        (block.row_field, block.column_field): block.expression
+        for block in residual_system.jacobian_blocks()
+    }
     return tuple(
         FormBlock(
             FormOrder.TWO,
-            row_field=block.row_field,
-            column_field=block.column_field,
-            expression=block.expression,
-            coefficients=(
-                weak_residual_coefficients(
-                    residual_system,
-                    block.expression,
-                    block.row_field,
-                ),
+            row_field=row.name,
+            column_field=column.name,
+            expression=_jacobian_block_expression_for_equation_fields(
+                component_blocks,
+                row,
+                column,
+            ),
+            coefficients=_jacobian_block_coefficients_for_equation_fields(
+                residual_system,
+                component_blocks,
+                row,
+                column,
             ),
             dependencies=residual_system.dependencies_for_expressions(
-                (block.expression,)
+                _jacobian_component_expressions_for_equation_fields(
+                    component_blocks,
+                    row,
+                    column,
+                )
             ),
         )
-        for block in residual_system.jacobian_blocks()
+        for row in equation_fields
+        for column in equation_fields
+        if _has_nonzero_expression(
+            _jacobian_component_expressions_for_equation_fields(
+                component_blocks,
+                row,
+                column,
+            )
+        )
     )
+
+
+def _residual_component_expressions_for_equation_field(residual_system, field):
+    return tuple(
+        residual_system.residual_expression(component_name)
+        for component_name in _residual_component_names(field)
+    )
+
+
+def _residual_expression_for_equation_field(residual_system, field):
+    return sum(
+        _residual_component_expressions_for_equation_field(residual_system, field),
+        sp.S.Zero,
+    )
+
+
+def _residual_coefficients_for_equation_field(residual_system, field):
+    return tuple(
+        weak_residual_coefficients(
+            residual_system,
+            residual_system.residual_expression(component_name),
+            component_name,
+        )
+        for component_name in _residual_component_names(field)
+    )
+
+
+def _jacobian_component_expressions_for_equation_fields(component_blocks, row, column):
+    return tuple(
+        component_blocks[(row_component, column_component)]
+        for row_component in _residual_component_names(row)
+        for column_component in _residual_component_names(column)
+    )
+
+
+def _jacobian_block_expression_for_equation_fields(component_blocks, row, column):
+    return sum(
+        _jacobian_component_expressions_for_equation_fields(component_blocks, row, column),
+        sp.S.Zero,
+    )
+
+
+def _jacobian_block_coefficients_for_equation_fields(residual_system, component_blocks, row, column):
+    column_components = _residual_component_names(column)
+    return tuple(
+        weak_residual_coefficients(
+            residual_system,
+            sum(
+                (
+                    component_blocks[(row_component, column_component)]
+                    for column_component in column_components
+                ),
+                sp.S.Zero,
+            ),
+            row_component,
+        )
+        for row_component in _residual_component_names(row)
+    )
+
+
+def _residual_component_names(field):
+    components = int(getattr(field, "components", 1))
+    if components == 1:
+        return (field.name,)
+    return tuple("%s%d" % (field.name, component) for component in range(components))
+
+
+def _is_zero_expression(expression):
+    expression = sp.sympify(expression)
+    return expression == 0 or expression.is_zero is True
+
+
+def _has_nonzero_expression(expressions):
+    return any(not _is_zero_expression(expression) for expression in expressions)
 
 
 def _equation_qualifiers(equation):
