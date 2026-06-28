@@ -4,7 +4,6 @@ import sympy as sp
 
 from .residual import CoupledResidualSystem
 from .tensor_product_geometry import (
-    isoparametric_adjugate_lines,
     isoparametric_adjugate_call_lines,
     isoparametric_adjugate_stream_array_lines,
     sfem_geometry_kernels_header_source,
