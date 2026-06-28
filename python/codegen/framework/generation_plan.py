@@ -715,6 +715,11 @@ def _validate_block_fields(kernel_name, block, field_names):
             "kernel '%s' block '%s' row field '%s' is not in the form collection"
             % (kernel_name, block.name, block.row_field)
         )
+    if block.column_field and block.column_field not in field_names:
+        raise ValueError(
+            "kernel '%s' block '%s' column field '%s' is not in the form collection"
+            % (kernel_name, block.name, block.column_field)
+        )
 
 
 def _form_field_names(collection):
@@ -724,11 +729,6 @@ def _form_field_names(collection):
         for component in range(int(field.components)):
             names.add("%s%d" % (field.name, component))
     return names
-    if block.column_field and block.column_field not in field_names:
-        raise ValueError(
-            "kernel '%s' block '%s' column field '%s' is not in the form collection"
-            % (kernel_name, block.name, block.column_field)
-        )
 
 
 def _validate_local_phase_sequence(block):

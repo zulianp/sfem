@@ -1,5 +1,5 @@
-#include "generated_neohookean_ogden_d2_tensor_product_local.hpp"
-#include "kernel_diagnostics.hpp"
+#include "../neohookean_ogden_d2_tensor_product_local.hpp"
+#include "../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -18,7 +18,7 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct generated_neohookean_ogden_quad4_affine_reference_data {
+struct neohookean_ogden_quad4_affine_reference_data {
     static const scalar_t *shape_1d() {
         static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
         return data;
@@ -34,7 +34,7 @@ struct generated_neohookean_ogden_quad4_affine_reference_data {
 };
 
 template <typename scalar_t>
-struct generated_neohookean_ogden_quad4_isoparametric_reference_data {
+struct neohookean_ogden_quad4_isoparametric_reference_data {
     static const scalar_t *shape_1d() {
         static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
         return data;
@@ -55,8 +55,8 @@ struct generated_neohookean_ogden_quad4_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data = {
-    "generated_neohookean_ogden_quad4_quad4_objective_soa",
+static const KernelDiagnostics neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data = {
+    "neohookean_ogden_quad4_quad4_objective_soa",
     "QUAD4",
     2,
     4,
@@ -100,86 +100,86 @@ static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_objective_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_quad4_quad4_objective_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_quad4_quad4_objective_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_quad4_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -188,7 +188,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -245,7 +245,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_soa_impl
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
 
-        generated_neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -259,7 +259,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_soa_impl
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_soa(
+extern "C" int neohookean_ogden_quad4_quad4_objective_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -278,14 +278,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_soa(
         const real_t *const SFEM_RESTRICT uy3,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, value);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -390,7 +390,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -404,7 +404,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_soa(
+extern "C" int neohookean_ogden_quad4_quad4_objective_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -426,14 +426,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_so
         const real_t *const SFEM_RESTRICT uy3,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, value);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -454,9 +454,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_m
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const affine_shape_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -497,7 +497,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_m
 
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
 
-        generated_neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -511,7 +511,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_affine_m
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -527,10 +527,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -546,7 +546,7 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
 }
 
 
@@ -554,7 +554,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -573,9 +573,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -665,7 +665,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -679,7 +679,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_objective_isoparam
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -691,10 +691,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_me
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -706,15 +706,15 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_objective_isoparametric_me
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data = {
-    "generated_neohookean_ogden_quad4_quad4_gradient_soa",
+static const KernelDiagnostics neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data = {
+    "neohookean_ogden_quad4_quad4_gradient_soa",
     "QUAD4",
     2,
     4,
@@ -758,86 +758,86 @@ static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_gradient_s
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_quad4_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_quad4_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -846,7 +846,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -925,7 +925,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_soa_impl(
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        generated_neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -946,7 +946,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_soa(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -972,14 +972,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_soa(
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -1106,7 +1106,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1127,7 +1127,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_soa(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -1156,14 +1156,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_soa
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1186,9 +1186,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_me
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const affine_shape_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -1244,7 +1244,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_me
         const scalar_t *const block_u_streams[N_SHAPE * 2] = {block_ux0, block_uy0, block_ux1, block_uy1, block_ux3, block_uy3, block_ux2, block_uy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        generated_neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1280,7 +1280,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_affine_me
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1298,10 +1298,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1319,7 +1319,7 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_f
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
@@ -1327,7 +1327,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1348,9 +1348,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -1455,7 +1455,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -1491,7 +1491,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_gradient_isoparame
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1505,10 +1505,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mes
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1522,15 +1522,15 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mes
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data = {
-    "generated_neohookean_ogden_quad4_quad4_apply_soa",
+static const KernelDiagnostics neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data = {
+    "neohookean_ogden_quad4_quad4_apply_soa",
     "QUAD4",
     2,
     4,
@@ -1574,86 +1574,86 @@ static const KernelDiagnostics generated_neohookean_ogden_quad4_quad4_apply_soa_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_quad4_quad4_apply_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_quad4_quad4_apply_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_quad4_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
+            "neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -1662,7 +1662,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -1766,7 +1766,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_soa_impl(
         const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx3, block_hy3, block_hx2, block_hy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        generated_neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1787,7 +1787,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_soa(
+extern "C" int neohookean_ogden_quad4_quad4_apply_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -1821,14 +1821,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_soa(
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_impl<real_t, 4, 4, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_determinant0, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -1980,7 +1980,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -2001,7 +2001,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_soa(
+extern "C" int neohookean_ogden_quad4_quad4_apply_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -2038,14 +2038,14 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_soa(
         real_t *const SFEM_RESTRICT outx3,
         real_t *const SFEM_RESTRICT outy3
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_isoparametric_soa_impl<real_t, 4, 4, 16>(nelements, x0, y0, x1, y1, x2, y2, x3, y3, sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, ux1, uy1, ux2, uy2, ux3, uy3, hx0, hy0, hx1, hy1, hx2, hy2, hx3, hy3, outx0, outy0, outx1, outy1, outx2, outy2, outx3, outy3);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2071,9 +2071,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const affine_shape_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_affine_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -2146,7 +2146,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_
         const scalar_t *const block_h_streams[N_SHAPE * 2] = {block_hx0, block_hy0, block_hx1, block_hy1, block_hx3, block_hy3, block_hx2, block_hy2};
         scalar_t *const block_out_streams[N_SHAPE * 2] = {block_outx0, block_outy0, block_outx1, block_outy1, block_outx3, block_outy3, block_outx2, block_outy2};
 
-        generated_neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -2182,7 +2182,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2203,10 +2203,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2227,7 +2227,7 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_floa
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 
@@ -2235,7 +2235,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2259,9 +2259,9 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
     static constexpr int N_QP_1D = 2;
     static constexpr int N_SHAPE_1D = 2;
 
@@ -2383,7 +2383,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
             }
         }
 
-        generated_neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -2419,7 +2419,7 @@ static SFEM_INLINE int generated_neohookean_ogden_quad4_quad4_apply_isoparametri
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2436,10 +2436,10 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_s
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2456,6 +2456,6 @@ extern "C" int generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_s
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::generated_neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 

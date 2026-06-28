@@ -1,5 +1,5 @@
-#ifndef GENERATED_NEOHOOKEAN_OGDEN_D2_SIMPLEX_LOCAL_HPP
-#define GENERATED_NEOHOOKEAN_OGDEN_D2_SIMPLEX_LOCAL_HPP
+#ifndef NEOHOOKEAN_OGDEN_D2_SIMPLEX_LOCAL_HPP
+#define NEOHOOKEAN_OGDEN_D2_SIMPLEX_LOCAL_HPP
 
 #include <math.h>
 #include <stddef.h>
@@ -10,8 +10,8 @@
 #endif
 #endif
 
-#include "kernel_math.hpp"
-#include "tensor_product_kernels.hpp"
+#include "../kernel_math.hpp"
+#include "../tensor_product_kernels.hpp"
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
@@ -32,7 +32,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void generated_neohookean_ogden_d2_simplex_objective_block(
+static SFEM_INLINE void neohookean_ogden_d2_simplex_objective_block(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
@@ -84,7 +84,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_simplex_objective_block(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void generated_neohookean_ogden_d2_simplex_gradient_block(
+static SFEM_INLINE void neohookean_ogden_d2_simplex_gradient_block(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
@@ -153,7 +153,7 @@ static SFEM_INLINE void generated_neohookean_ogden_d2_simplex_gradient_block(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void generated_neohookean_ogden_d2_simplex_apply_block(
+static SFEM_INLINE void neohookean_ogden_d2_simplex_apply_block(
         const ptrdiff_t nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,

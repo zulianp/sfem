@@ -1,5 +1,5 @@
-#include "generated_neohookean_ogden_d3_tensor_product_local.hpp"
-#include "kernel_diagnostics.hpp"
+#include "../neohookean_ogden_d3_simplex_local.hpp"
+#include "../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -18,33 +18,49 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct generated_neohookean_ogden_hex8_affine_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+struct neohookean_ogden_tet10_affine_reference_data {
+    static const scalar_t *shape() {
+        static const scalar_t data[40] = {scalar_t(0.099999999999999936), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.32360679774997891), scalar_t(0.076393202250021025), scalar_t(0.32360679774997891), scalar_t(0.32360679774997891), scalar_t(0.076393202250021025), scalar_t(0.076393202250021025), scalar_t(-0.099999999999999978), scalar_t(0.10000000000000007), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.32360679774997886), scalar_t(0.32360679774997897), scalar_t(0.076393202250020983), scalar_t(0.076393202250020983), scalar_t(0.32360679774997897), scalar_t(0.076393202250021025), scalar_t(-0.099999999999999978), scalar_t(-0.099999999999999992), scalar_t(0.10000000000000007), scalar_t(-0.099999999999999992), scalar_t(0.076393202250020983), scalar_t(0.32360679774997897), scalar_t(0.32360679774997886), scalar_t(0.076393202250020983), scalar_t(0.076393202250021025), scalar_t(0.32360679774997897), scalar_t(-0.099999999999999964), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.10000000000000007), scalar_t(0.07639320225002097), scalar_t(0.076393202250021025), scalar_t(0.07639320225002097), scalar_t(0.3236067977499788), scalar_t(0.32360679774997897), scalar_t(0.32360679774997897)};
         return data;
     }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t *grad_ref_x() {
+        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(1.7888543819998319), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(1.3416407864998741), scalar_t(0), scalar_t(0), scalar_t(-1.7888543819998315), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(2.3416407864998741), scalar_t(-2.3416407864998741), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-2.3416407864998741), scalar_t(2.3416407864998741), scalar_t(0)};
         return data;
     }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t *grad_ref_y() {
+        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(1.7888543819998319), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(2.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(1.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(-1.7888543819998315), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(2.3416407864998741)};
+        return data;
+    }
+    static const scalar_t *grad_ref_z() {
+        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(1.7888543819998319), scalar_t(0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(2.3416407864998741), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(2.3416407864998741), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(1.3416407864998741), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(-1.7888543819998315), scalar_t(0.55278640450004202), scalar_t(0.55278640450004202)};
+        return data;
+    }
+    static const scalar_t *q_weight() {
+        static const scalar_t data[4] = {scalar_t(0.041666666666666664), scalar_t(0.041666666666666664), scalar_t(0.041666666666666664), scalar_t(0.041666666666666664)};
         return data;
     }
 };
 
 template <typename scalar_t>
-struct generated_neohookean_ogden_hex8_isoparametric_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
+struct neohookean_ogden_tet10_isoparametric_reference_data {
+    static const scalar_t *shape() {
+        static const scalar_t data[110] = {scalar_t(-0.125), scalar_t(-0.125), scalar_t(-0.125), scalar_t(-0.125), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.44897959183673491), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.22448979591836737), scalar_t(0.020408163265306121), scalar_t(0.22448979591836737), scalar_t(0.22448979591836737), scalar_t(0.020408163265306121), scalar_t(0.020408163265306121), scalar_t(-0.061224489795918387), scalar_t(0.44897959183673464), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.22448979591836743), scalar_t(0.22448979591836732), scalar_t(0.020408163265306128), scalar_t(0.020408163265306128), scalar_t(0.22448979591836732), scalar_t(0.020408163265306121), scalar_t(-0.061224489795918401), scalar_t(-0.061224489795918366), scalar_t(0.44897959183673464), scalar_t(-0.061224489795918366), scalar_t(0.020408163265306135), scalar_t(0.22448979591836732), scalar_t(0.22448979591836751), scalar_t(0.020408163265306135), scalar_t(0.020408163265306121), scalar_t(0.22448979591836732), scalar_t(-0.061224489795918421), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.44897959183673464), scalar_t(0.020408163265306145), scalar_t(0.020408163265306121), scalar_t(0.020408163265306145), scalar_t(0.2244897959183676), scalar_t(0.22448979591836732), scalar_t(0.22448979591836732), scalar_t(-0.080357142857142821), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(0.16071428571428564), scalar_t(0.63809286661931275), scalar_t(0.16071428571428564), scalar_t(0.040478561952115862), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(0.1607142857142857), scalar_t(0.16071428571428573), scalar_t(0.040478561952115875), scalar_t(0.1607142857142857), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(0.040478561952115875), scalar_t(0.16071428571428573), scalar_t(0.1607142857142857), scalar_t(0.1607142857142857), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142863), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573)};
         return data;
     }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const scalar_t *grad_ref_x() {
+        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-2.1428571428571428), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(2.8571428571428572), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571397), scalar_t(2.1428571428571428), scalar_t(0), scalar_t(0), scalar_t(-2.8571428571428568), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571397), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(-3.1428571428571428), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571441), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-3.1428571428571428), scalar_t(3.1428571428571428), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-1.1952286093343947), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-1.1952286093343938), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(-0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.59761430466719689), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(1.1952286093343933), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.59761430466719645), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(1.1952286093343933), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0)};
         return data;
     }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[2] = {scalar_t(0.5), scalar_t(0.5)};
+    static const scalar_t *grad_ref_y() {
+        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-2.1428571428571428), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(2.8571428571428572), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(3.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(2.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(-2.8571428571428568), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571441), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(-1.1952286093343947), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(-1.1952286093343938), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(1.1952286093343933), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719645), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(1.1952286093343933), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969)};
+        return data;
+    }
+    static const scalar_t *grad_ref_z() {
+        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(1), scalar_t(-2.1428571428571428), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(2.8571428571428572), scalar_t(0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(3.1428571428571428), scalar_t(0.71428571428571441), scalar_t(0), scalar_t(0), scalar_t(2.1428571428571428), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(-2.8571428571428568), scalar_t(0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(-1.1952286093343947), scalar_t(1.5976143046671969), scalar_t(0.40238569533280322), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(-1.1952286093343938), scalar_t(0.40238569533280322), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(1.1952286093343933), scalar_t(1.5976143046671969), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.1952286093343933), scalar_t(0.40238569533280322), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719645), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(0.40238569533280322)};
+        return data;
+    }
+    static const scalar_t *q_weight() {
+        static const scalar_t data[11] = {scalar_t(-0.013155555555555556), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887)};
         return data;
     }
 };
@@ -55,14 +71,14 @@ struct generated_neohookean_ogden_hex8_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data = {
-    "generated_neohookean_ogden_hex8_hex8_objective_soa",
-    "HEX8",
+static const KernelDiagnostics neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data = {
+    "neohookean_ogden_tet10_tet10_objective_soa",
+    "TET10",
     3,
-    8,
-    8,
+    11,
+    10,
     16,
-    2,
+    4,
     43,
     81,
     1,
@@ -77,10 +93,10 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_objective_so
     20,
     23,
     10,
-    8,
+    330,
+    11,
     2,
-    2,
-    24,
+    30,
     0,
     1,
     1,
@@ -100,86 +116,86 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_objective_so
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet10_tet10_objective_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_hex8_hex8_objective_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_tet10_tet10_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -188,7 +204,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -200,9 +216,10 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate7,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate8,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -229,14 +246,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -265,6 +286,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
 
 #pragma omp simd
@@ -293,12 +320,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_value[lane] = value[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
 
-        generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -312,7 +345,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_soa(
+extern "C" int neohookean_ogden_tet10_tet10_objective_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -350,16 +383,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_soa_impl<real_t, 8, 8, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_soa_impl<real_t, 11, 10, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, value);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -385,9 +424,16 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -414,14 +460,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -450,6 +500,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -484,6 +540,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
 
 #pragma omp simd
@@ -512,6 +574,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_x7[lane] = x7[evbegin + lane];
             block_y7[lane] = y7[evbegin + lane];
             block_z7[lane] = z7[evbegin + lane];
+            block_x8[lane] = x8[evbegin + lane];
+            block_y8[lane] = y8[evbegin + lane];
+            block_z8[lane] = z8[evbegin + lane];
+            block_x9[lane] = x9[evbegin + lane];
+            block_y9[lane] = y9[evbegin + lane];
+            block_z9[lane] = z9[evbegin + lane];
             block_ux0[lane] = ux0[evbegin + lane];
             block_uy0[lane] = uy0[evbegin + lane];
             block_uz0[lane] = uz0[evbegin + lane];
@@ -536,35 +604,45 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_value[lane] = value[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -578,7 +656,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -592,7 +670,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_soa(
+extern "C" int neohookean_ogden_tet10_tet10_objective_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -618,6 +696,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_soa(
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
         const real_t mu,
         const real_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -644,16 +728,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_isoparametric_soa_impl<real_t, 8, 8, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_isoparametric_soa_impl<real_t, 11, 10, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, value);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -676,15 +766,14 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
         scalar_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -714,6 +803,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
 
 #pragma omp simd
@@ -726,6 +821,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -754,12 +851,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
             block_ux7[lane] = ux[ev[lane * N_SHAPE + 7] * u_stride];
             block_uy7[lane] = uy[ev[lane * N_SHAPE + 7] * u_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
             block_value[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
 
-        generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -773,7 +876,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_affine_mes
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -795,10 +898,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -820,7 +923,7 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_fl
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
 }
 
 
@@ -828,7 +931,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -842,18 +945,17 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         scalar_t *const SFEM_RESTRICT value
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 11;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -883,6 +985,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -917,6 +1025,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
 
 #pragma omp simd
@@ -929,6 +1043,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -957,6 +1073,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_x7[lane] = x[ev[lane * N_SHAPE + 7]];
             block_y7[lane] = y[ev[lane * N_SHAPE + 7]];
             block_z7[lane] = z[ev[lane * N_SHAPE + 7]];
+            block_x8[lane] = x[ev[lane * N_SHAPE + 8]];
+            block_y8[lane] = y[ev[lane * N_SHAPE + 8]];
+            block_z8[lane] = z[ev[lane * N_SHAPE + 8]];
+            block_x9[lane] = x[ev[lane * N_SHAPE + 9]];
+            block_y9[lane] = y[ev[lane * N_SHAPE + 9]];
+            block_z9[lane] = z[ev[lane * N_SHAPE + 9]];
         }
 
 #pragma omp simd
@@ -985,35 +1107,45 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             block_ux7[lane] = ux[ev[lane * N_SHAPE + 7] * u_stride];
             block_uy7[lane] = uy[ev[lane * N_SHAPE + 7] * u_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
             block_value[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = isoparametric_grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = isoparametric_grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -1027,7 +1159,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1041,7 +1173,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_objective_isoparamet
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1054,10 +1186,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1070,21 +1202,21 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data = {
-    "generated_neohookean_ogden_hex8_hex8_gradient_soa",
-    "HEX8",
+static const KernelDiagnostics neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data = {
+    "neohookean_ogden_tet10_tet10_gradient_soa",
+    "TET10",
     3,
-    8,
-    8,
+    11,
+    10,
     16,
-    2,
+    4,
     43,
     81,
     1,
@@ -1099,14 +1231,14 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_gradient_soa
     20,
     23,
     10,
-    8,
+    330,
+    11,
     2,
-    2,
-    24,
+    30,
     0,
-    24,
-    24,
-    24,
+    30,
+    30,
+    30,
     1.0,
     1.0,
     8.0,
@@ -1122,86 +1254,86 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_gradient_soa
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet10_tet10_gradient_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_hex8_hex8_gradient_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_tet10_tet10_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -1210,7 +1342,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_gradient_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -1222,9 +1354,10 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate7,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate8,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -1251,6 +1384,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -1274,14 +1413,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1310,6 +1453,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -1334,6 +1483,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1361,6 +1516,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_outx0[lane] = outx0[evbegin + lane];
             block_outy0[lane] = outy0[evbegin + lane];
             block_outz0[lane] = outz0[evbegin + lane];
@@ -1385,12 +1546,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
             block_outx7[lane] = outx7[evbegin + lane];
             block_outy7[lane] = outy7[evbegin + lane];
             block_outz7[lane] = outz7[evbegin + lane];
+            block_outx8[lane] = outx8[evbegin + lane];
+            block_outy8[lane] = outy8[evbegin + lane];
+            block_outz8[lane] = outz8[evbegin + lane];
+            block_outx9[lane] = outx9[evbegin + lane];
+            block_outy9[lane] = outy9[evbegin + lane];
+            block_outz9[lane] = outz9[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1418,6 +1585,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
             outx7[evbegin + lane] = block_outx7[lane];
             outy7[evbegin + lane] = block_outy7[lane];
             outz7[evbegin + lane] = block_outz7[lane];
+            outx8[evbegin + lane] = block_outx8[lane];
+            outy8[evbegin + lane] = block_outy8[lane];
+            outz8[evbegin + lane] = block_outz8[lane];
+            outx9[evbegin + lane] = block_outx9[lane];
+            outy9[evbegin + lane] = block_outy9[lane];
+            outz9[evbegin + lane] = block_outz9[lane];
         }
     }
 
@@ -1427,7 +1600,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_soa(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -1465,6 +1638,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -1488,16 +1667,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_soa(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_soa_impl<real_t, 8, 8, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_soa_impl<real_t, 11, 10, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_gradient_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -1523,9 +1708,16 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -1552,6 +1744,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -1575,14 +1773,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1611,6 +1813,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -1645,6 +1853,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -1669,6 +1883,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1696,6 +1916,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_x7[lane] = x7[evbegin + lane];
             block_y7[lane] = y7[evbegin + lane];
             block_z7[lane] = z7[evbegin + lane];
+            block_x8[lane] = x8[evbegin + lane];
+            block_y8[lane] = y8[evbegin + lane];
+            block_z8[lane] = z8[evbegin + lane];
+            block_x9[lane] = x9[evbegin + lane];
+            block_y9[lane] = y9[evbegin + lane];
+            block_z9[lane] = z9[evbegin + lane];
             block_ux0[lane] = ux0[evbegin + lane];
             block_uy0[lane] = uy0[evbegin + lane];
             block_uz0[lane] = uz0[evbegin + lane];
@@ -1720,6 +1946,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_outx0[lane] = outx0[evbegin + lane];
             block_outy0[lane] = outy0[evbegin + lane];
             block_outz0[lane] = outz0[evbegin + lane];
@@ -1744,35 +1976,45 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_outx7[lane] = outx7[evbegin + lane];
             block_outy7[lane] = outy7[evbegin + lane];
             block_outz7[lane] = outz7[evbegin + lane];
+            block_outx8[lane] = outx8[evbegin + lane];
+            block_outy8[lane] = outy8[evbegin + lane];
+            block_outz8[lane] = outz8[evbegin + lane];
+            block_outx9[lane] = outx9[evbegin + lane];
+            block_outy9[lane] = outy9[evbegin + lane];
+            block_outz9[lane] = outz9[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -1786,7 +2028,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -1814,6 +2056,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             outx7[evbegin + lane] = block_outx7[lane];
             outy7[evbegin + lane] = block_outy7[lane];
             outz7[evbegin + lane] = block_outz7[lane];
+            outx8[evbegin + lane] = block_outx8[lane];
+            outy8[evbegin + lane] = block_outy8[lane];
+            outz8[evbegin + lane] = block_outz8[lane];
+            outx9[evbegin + lane] = block_outx9[lane];
+            outy9[evbegin + lane] = block_outy9[lane];
+            outz9[evbegin + lane] = block_outz9[lane];
         }
     }
 
@@ -1823,7 +2071,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -1849,6 +2097,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa(
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
         const real_t mu,
         const real_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -1875,6 +2129,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -1898,16 +2158,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_soa_impl<real_t, 8, 8, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_isoparametric_soa_impl<real_t, 11, 10, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1933,15 +2199,14 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
         scalar_t *const SFEM_RESTRICT outz
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -1971,6 +2236,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -1995,6 +2266,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -2006,6 +2283,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -2034,6 +2313,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
             block_ux7[lane] = ux[ev[lane * N_SHAPE + 7] * u_stride];
             block_uy7[lane] = uy[ev[lane * N_SHAPE + 7] * u_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
             block_outx0[lane] = scalar_t(0);
             block_outy0[lane] = scalar_t(0);
             block_outz0[lane] = scalar_t(0);
@@ -2058,12 +2343,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
             block_outx7[lane] = scalar_t(0);
             block_outy7[lane] = scalar_t(0);
             block_outz7[lane] = scalar_t(0);
+            block_outx8[lane] = scalar_t(0);
+            block_outy8[lane] = scalar_t(0);
+            block_outz8[lane] = scalar_t(0);
+            block_outx9[lane] = scalar_t(0);
+            block_outy9[lane] = scalar_t(0);
+            block_outz9[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -2138,6 +2429,24 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
 #pragma omp atomic update
             outz[ev[lane * N_SHAPE + 7] * out_stride] += block_outz7[lane];
 
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 8] * out_stride] += block_outx8[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 8] * out_stride] += block_outy8[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 8] * out_stride] += block_outz8[lane];
+
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 9] * out_stride] += block_outx9[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 9] * out_stride] += block_outy9[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 9] * out_stride] += block_outz9[lane];
+
         }
     }
 
@@ -2147,7 +2456,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2172,10 +2481,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2200,7 +2509,7 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_flo
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 
@@ -2208,7 +2517,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2225,18 +2534,17 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t *const SFEM_RESTRICT outz
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 11;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -2266,6 +2574,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -2300,6 +2614,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -2324,6 +2644,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -2335,6 +2661,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -2363,6 +2691,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_x7[lane] = x[ev[lane * N_SHAPE + 7]];
             block_y7[lane] = y[ev[lane * N_SHAPE + 7]];
             block_z7[lane] = z[ev[lane * N_SHAPE + 7]];
+            block_x8[lane] = x[ev[lane * N_SHAPE + 8]];
+            block_y8[lane] = y[ev[lane * N_SHAPE + 8]];
+            block_z8[lane] = z[ev[lane * N_SHAPE + 8]];
+            block_x9[lane] = x[ev[lane * N_SHAPE + 9]];
+            block_y9[lane] = y[ev[lane * N_SHAPE + 9]];
+            block_z9[lane] = z[ev[lane * N_SHAPE + 9]];
         }
 
 #pragma omp simd
@@ -2391,6 +2725,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_ux7[lane] = ux[ev[lane * N_SHAPE + 7] * u_stride];
             block_uy7[lane] = uy[ev[lane * N_SHAPE + 7] * u_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
             block_outx0[lane] = scalar_t(0);
             block_outy0[lane] = scalar_t(0);
             block_outz0[lane] = scalar_t(0);
@@ -2415,35 +2755,45 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             block_outx7[lane] = scalar_t(0);
             block_outy7[lane] = scalar_t(0);
             block_outz7[lane] = scalar_t(0);
+            block_outx8[lane] = scalar_t(0);
+            block_outy8[lane] = scalar_t(0);
+            block_outz8[lane] = scalar_t(0);
+            block_outx9[lane] = scalar_t(0);
+            block_outy9[lane] = scalar_t(0);
+            block_outz9[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = isoparametric_grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = isoparametric_grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -2457,7 +2807,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -2532,6 +2882,24 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
 #pragma omp atomic update
             outz[ev[lane * N_SHAPE + 7] * out_stride] += block_outz7[lane];
 
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 8] * out_stride] += block_outx8[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 8] * out_stride] += block_outy8[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 8] * out_stride] += block_outz8[lane];
+
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 9] * out_stride] += block_outx9[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 9] * out_stride] += block_outy9[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 9] * out_stride] += block_outz9[lane];
+
         }
     }
 
@@ -2541,7 +2909,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_gradient_isoparametr
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2557,10 +2925,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2576,21 +2944,21 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data = {
-    "generated_neohookean_ogden_hex8_hex8_apply_soa",
-    "HEX8",
+static const KernelDiagnostics neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data = {
+    "neohookean_ogden_tet10_tet10_apply_soa",
+    "TET10",
     3,
-    8,
-    8,
+    11,
+    10,
     16,
-    2,
+    4,
     216,
     404,
     1,
@@ -2605,14 +2973,14 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_apply_soa_di
     117,
     103,
     10,
-    8,
+    330,
+    11,
     2,
-    2,
-    24,
-    24,
-    24,
-    24,
-    24,
+    30,
+    30,
+    30,
+    30,
+    30,
     1.0,
     1.0,
     8.0,
@@ -2628,86 +2996,86 @@ static const KernelDiagnostics generated_neohookean_ogden_hex8_hex8_apply_soa_di
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics(void) {
-    return &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet10_tet10_apply_soa_diagnostics(void) {
+    return &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data;
 }
 
-extern "C" double generated_neohookean_ogden_hex8_hex8_apply_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_tet10_tet10_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_affine_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_diagnostics_data,
+            "neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_float",
+            &sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
             sizeof(float), sizeof(float), sizeof(float));
 }
@@ -2716,7 +3084,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_apply_soa_impl(
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -2728,9 +3096,10 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate7,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate8,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -2757,6 +3126,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         const real_t *const SFEM_RESTRICT hx0,
         const real_t *const SFEM_RESTRICT hy0,
         const real_t *const SFEM_RESTRICT hz0,
@@ -2781,6 +3156,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         const real_t *const SFEM_RESTRICT hx7,
         const real_t *const SFEM_RESTRICT hy7,
         const real_t *const SFEM_RESTRICT hz7,
+        const real_t *const SFEM_RESTRICT hx8,
+        const real_t *const SFEM_RESTRICT hy8,
+        const real_t *const SFEM_RESTRICT hz8,
+        const real_t *const SFEM_RESTRICT hx9,
+        const real_t *const SFEM_RESTRICT hy9,
+        const real_t *const SFEM_RESTRICT hz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -2804,14 +3185,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -2840,6 +3225,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_hx0[VECTOR_SIZE];
         scalar_t block_hy0[VECTOR_SIZE];
         scalar_t block_hz0[VECTOR_SIZE];
@@ -2864,6 +3255,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         scalar_t block_hx7[VECTOR_SIZE];
         scalar_t block_hy7[VECTOR_SIZE];
         scalar_t block_hz7[VECTOR_SIZE];
+        scalar_t block_hx8[VECTOR_SIZE];
+        scalar_t block_hy8[VECTOR_SIZE];
+        scalar_t block_hz8[VECTOR_SIZE];
+        scalar_t block_hx9[VECTOR_SIZE];
+        scalar_t block_hy9[VECTOR_SIZE];
+        scalar_t block_hz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -2888,6 +3285,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -2915,6 +3318,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_hx0[lane] = hx0[evbegin + lane];
             block_hy0[lane] = hy0[evbegin + lane];
             block_hz0[lane] = hz0[evbegin + lane];
@@ -2939,6 +3348,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
             block_hx7[lane] = hx7[evbegin + lane];
             block_hy7[lane] = hy7[evbegin + lane];
             block_hz7[lane] = hz7[evbegin + lane];
+            block_hx8[lane] = hx8[evbegin + lane];
+            block_hy8[lane] = hy8[evbegin + lane];
+            block_hz8[lane] = hz8[evbegin + lane];
+            block_hx9[lane] = hx9[evbegin + lane];
+            block_hy9[lane] = hy9[evbegin + lane];
+            block_hz9[lane] = hz9[evbegin + lane];
             block_outx0[lane] = outx0[evbegin + lane];
             block_outy0[lane] = outy0[evbegin + lane];
             block_outz0[lane] = outz0[evbegin + lane];
@@ -2963,13 +3378,19 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
             block_outx7[lane] = outx7[evbegin + lane];
             block_outy7[lane] = outy7[evbegin + lane];
             block_outz7[lane] = outz7[evbegin + lane];
+            block_outx8[lane] = outx8[evbegin + lane];
+            block_outy8[lane] = outy8[evbegin + lane];
+            block_outz8[lane] = outz8[evbegin + lane];
+            block_outx9[lane] = outx9[evbegin + lane];
+            block_outy9[lane] = outy9[evbegin + lane];
+            block_outz9[lane] = outz9[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7, block_hx8, block_hy8, block_hz8, block_hx9, block_hy9, block_hz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, nelements, jacobian_adjugate0 + evbegin, jacobian_adjugate1 + evbegin, jacobian_adjugate2 + evbegin, jacobian_adjugate3 + evbegin, jacobian_adjugate4 + evbegin, jacobian_adjugate5 + evbegin, jacobian_adjugate6 + evbegin, jacobian_adjugate7 + evbegin, jacobian_adjugate8 + evbegin, jacobian_determinant0 + evbegin, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -2997,6 +3418,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
             outx7[evbegin + lane] = block_outx7[lane];
             outy7[evbegin + lane] = block_outy7[lane];
             outz7[evbegin + lane] = block_outz7[lane];
+            outx8[evbegin + lane] = block_outx8[lane];
+            outy8[evbegin + lane] = block_outy8[lane];
+            outz8[evbegin + lane] = block_outz8[lane];
+            outx9[evbegin + lane] = block_outx9[lane];
+            outy9[evbegin + lane] = block_outy9[lane];
+            outz9[evbegin + lane] = block_outz9[lane];
         }
     }
 
@@ -3006,7 +3433,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_soa(
+extern "C" int neohookean_ogden_tet10_tet10_apply_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT jacobian_adjugate0,
         const real_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -3044,6 +3471,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         const real_t *const SFEM_RESTRICT hx0,
         const real_t *const SFEM_RESTRICT hy0,
         const real_t *const SFEM_RESTRICT hz0,
@@ -3068,6 +3501,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_soa(
         const real_t *const SFEM_RESTRICT hx7,
         const real_t *const SFEM_RESTRICT hy7,
         const real_t *const SFEM_RESTRICT hz7,
+        const real_t *const SFEM_RESTRICT hx8,
+        const real_t *const SFEM_RESTRICT hy8,
+        const real_t *const SFEM_RESTRICT hz8,
+        const real_t *const SFEM_RESTRICT hx9,
+        const real_t *const SFEM_RESTRICT hy9,
+        const real_t *const SFEM_RESTRICT hz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -3091,16 +3530,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_soa(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_soa_impl<real_t, 8, 8, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_soa_impl<real_t, 11, 10, 16>(nelements, jacobian_adjugate0, jacobian_adjugate1, jacobian_adjugate2, jacobian_adjugate3, jacobian_adjugate4, jacobian_adjugate5, jacobian_adjugate6, jacobian_adjugate7, jacobian_adjugate8, jacobian_determinant0, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_apply_isoparametric_soa_impl(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -3126,9 +3571,16 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
+        const scalar_t *const SFEM_RESTRICT grad_ref_x,
+        const scalar_t *const SFEM_RESTRICT grad_ref_y,
+        const scalar_t *const SFEM_RESTRICT grad_ref_z,
+        const scalar_t *const SFEM_RESTRICT q_weight,
         const scalar_t mu,
         const scalar_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -3155,6 +3607,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         const real_t *const SFEM_RESTRICT hx0,
         const real_t *const SFEM_RESTRICT hy0,
         const real_t *const SFEM_RESTRICT hz0,
@@ -3179,6 +3637,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         const real_t *const SFEM_RESTRICT hx7,
         const real_t *const SFEM_RESTRICT hy7,
         const real_t *const SFEM_RESTRICT hz7,
+        const real_t *const SFEM_RESTRICT hx8,
+        const real_t *const SFEM_RESTRICT hy8,
+        const real_t *const SFEM_RESTRICT hz8,
+        const real_t *const SFEM_RESTRICT hx9,
+        const real_t *const SFEM_RESTRICT hy9,
+        const real_t *const SFEM_RESTRICT hz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -3202,14 +3666,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
     static constexpr int DIM = 3;
-    static_assert(N_QP == 8, "N_QP does not match generated geometry streams");
-    static_assert(N_SHAPE == 8, "N_SHAPE does not match generated expression");
+    static_assert(N_QP == 11, "N_QP does not match generated geometry streams");
+    static_assert(N_SHAPE == 10, "N_SHAPE does not match generated expression");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -3238,6 +3706,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -3272,6 +3746,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_hx0[VECTOR_SIZE];
         scalar_t block_hy0[VECTOR_SIZE];
         scalar_t block_hz0[VECTOR_SIZE];
@@ -3296,6 +3776,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_hx7[VECTOR_SIZE];
         scalar_t block_hy7[VECTOR_SIZE];
         scalar_t block_hz7[VECTOR_SIZE];
+        scalar_t block_hx8[VECTOR_SIZE];
+        scalar_t block_hy8[VECTOR_SIZE];
+        scalar_t block_hz8[VECTOR_SIZE];
+        scalar_t block_hx9[VECTOR_SIZE];
+        scalar_t block_hy9[VECTOR_SIZE];
+        scalar_t block_hz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -3320,6 +3806,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -3347,6 +3839,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_x7[lane] = x7[evbegin + lane];
             block_y7[lane] = y7[evbegin + lane];
             block_z7[lane] = z7[evbegin + lane];
+            block_x8[lane] = x8[evbegin + lane];
+            block_y8[lane] = y8[evbegin + lane];
+            block_z8[lane] = z8[evbegin + lane];
+            block_x9[lane] = x9[evbegin + lane];
+            block_y9[lane] = y9[evbegin + lane];
+            block_z9[lane] = z9[evbegin + lane];
             block_ux0[lane] = ux0[evbegin + lane];
             block_uy0[lane] = uy0[evbegin + lane];
             block_uz0[lane] = uz0[evbegin + lane];
@@ -3371,6 +3869,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_ux7[lane] = ux7[evbegin + lane];
             block_uy7[lane] = uy7[evbegin + lane];
             block_uz7[lane] = uz7[evbegin + lane];
+            block_ux8[lane] = ux8[evbegin + lane];
+            block_uy8[lane] = uy8[evbegin + lane];
+            block_uz8[lane] = uz8[evbegin + lane];
+            block_ux9[lane] = ux9[evbegin + lane];
+            block_uy9[lane] = uy9[evbegin + lane];
+            block_uz9[lane] = uz9[evbegin + lane];
             block_hx0[lane] = hx0[evbegin + lane];
             block_hy0[lane] = hy0[evbegin + lane];
             block_hz0[lane] = hz0[evbegin + lane];
@@ -3395,6 +3899,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_hx7[lane] = hx7[evbegin + lane];
             block_hy7[lane] = hy7[evbegin + lane];
             block_hz7[lane] = hz7[evbegin + lane];
+            block_hx8[lane] = hx8[evbegin + lane];
+            block_hy8[lane] = hy8[evbegin + lane];
+            block_hz8[lane] = hz8[evbegin + lane];
+            block_hx9[lane] = hx9[evbegin + lane];
+            block_hy9[lane] = hy9[evbegin + lane];
+            block_hz9[lane] = hz9[evbegin + lane];
             block_outx0[lane] = outx0[evbegin + lane];
             block_outy0[lane] = outy0[evbegin + lane];
             block_outz0[lane] = outz0[evbegin + lane];
@@ -3419,36 +3929,46 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_outx7[lane] = outx7[evbegin + lane];
             block_outy7[lane] = outy7[evbegin + lane];
             block_outz7[lane] = outz7[evbegin + lane];
+            block_outx8[lane] = outx8[evbegin + lane];
+            block_outy8[lane] = outy8[evbegin + lane];
+            block_outz8[lane] = outz8[evbegin + lane];
+            block_outx9[lane] = outx9[evbegin + lane];
+            block_outy9[lane] = outy9[evbegin + lane];
+            block_outz9[lane] = outz9[evbegin + lane];
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7, block_hx8, block_hy8, block_hz8, block_hx9, block_hy9, block_hz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, shape_1d, grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -3462,7 +3982,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, shape_1d, grad_1d, q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, grad_ref_x, grad_ref_y, grad_ref_z, q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -3490,6 +4010,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             outx7[evbegin + lane] = block_outx7[lane];
             outy7[evbegin + lane] = block_outy7[lane];
             outz7[evbegin + lane] = block_outz7[lane];
+            outx8[evbegin + lane] = block_outx8[lane];
+            outy8[evbegin + lane] = block_outy8[lane];
+            outz8[evbegin + lane] = block_outz8[lane];
+            outx9[evbegin + lane] = block_outx9[lane];
+            outy9[evbegin + lane] = block_outy9[lane];
+            outz9[evbegin + lane] = block_outz9[lane];
         }
     }
 
@@ -3499,7 +4025,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa(
+extern "C" int neohookean_ogden_tet10_tet10_apply_isoparametric_soa(
         const ptrdiff_t nelements,
         const real_t *const SFEM_RESTRICT x0,
         const real_t *const SFEM_RESTRICT y0,
@@ -3525,6 +4051,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa(
         const real_t *const SFEM_RESTRICT x7,
         const real_t *const SFEM_RESTRICT y7,
         const real_t *const SFEM_RESTRICT z7,
+        const real_t *const SFEM_RESTRICT x8,
+        const real_t *const SFEM_RESTRICT y8,
+        const real_t *const SFEM_RESTRICT z8,
+        const real_t *const SFEM_RESTRICT x9,
+        const real_t *const SFEM_RESTRICT y9,
+        const real_t *const SFEM_RESTRICT z9,
         const real_t mu,
         const real_t lmbda,
         const real_t *const SFEM_RESTRICT ux0,
@@ -3551,6 +4083,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa(
         const real_t *const SFEM_RESTRICT ux7,
         const real_t *const SFEM_RESTRICT uy7,
         const real_t *const SFEM_RESTRICT uz7,
+        const real_t *const SFEM_RESTRICT ux8,
+        const real_t *const SFEM_RESTRICT uy8,
+        const real_t *const SFEM_RESTRICT uz8,
+        const real_t *const SFEM_RESTRICT ux9,
+        const real_t *const SFEM_RESTRICT uy9,
+        const real_t *const SFEM_RESTRICT uz9,
         const real_t *const SFEM_RESTRICT hx0,
         const real_t *const SFEM_RESTRICT hy0,
         const real_t *const SFEM_RESTRICT hz0,
@@ -3575,6 +4113,12 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa(
         const real_t *const SFEM_RESTRICT hx7,
         const real_t *const SFEM_RESTRICT hy7,
         const real_t *const SFEM_RESTRICT hz7,
+        const real_t *const SFEM_RESTRICT hx8,
+        const real_t *const SFEM_RESTRICT hy8,
+        const real_t *const SFEM_RESTRICT hz8,
+        const real_t *const SFEM_RESTRICT hx9,
+        const real_t *const SFEM_RESTRICT hy9,
+        const real_t *const SFEM_RESTRICT hz9,
         real_t *const SFEM_RESTRICT outx0,
         real_t *const SFEM_RESTRICT outy0,
         real_t *const SFEM_RESTRICT outz0,
@@ -3598,16 +4142,22 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa(
         real_t *const SFEM_RESTRICT outz6,
         real_t *const SFEM_RESTRICT outx7,
         real_t *const SFEM_RESTRICT outy7,
-        real_t *const SFEM_RESTRICT outz7
+        real_t *const SFEM_RESTRICT outz7,
+        real_t *const SFEM_RESTRICT outx8,
+        real_t *const SFEM_RESTRICT outy8,
+        real_t *const SFEM_RESTRICT outz8,
+        real_t *const SFEM_RESTRICT outx9,
+        real_t *const SFEM_RESTRICT outy9,
+        real_t *const SFEM_RESTRICT outz9
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_isoparametric_soa_impl<real_t, 8, 8, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::shape_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::grad_1d(), sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<real_t>::q_weight_1d(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_isoparametric_soa_impl<real_t, 11, 10, 16>(nelements, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, x5, y5, z5, x6, y6, z6, x7, y7, z7, x8, y8, z8, x9, y9, z9, sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::grad_ref_z(), sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<real_t>::q_weight(), mu, lmbda, ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ux3, uy3, uz3, ux4, uy4, uz4, ux5, uy5, uz5, ux6, uy6, uz6, ux7, uy7, uz7, ux8, uy8, uz8, ux9, uy9, uz9, hx0, hy0, hz0, hx1, hy1, hz1, hx2, hy2, hz2, hx3, hy3, hz3, hx4, hy4, hz4, hx5, hy5, hz5, hx6, hy6, hz6, hx7, hy7, hz7, hx8, hy8, hz8, hx9, hy9, hz9, outx0, outy0, outz0, outx1, outy1, outz1, outx2, outy2, outz2, outx3, outy3, outz3, outx4, outy4, outz4, outx5, outy5, outz5, outx6, outy6, outz6, outx7, outy7, outz7, outx8, outy8, outz8, outx9, outy9, outz9);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3637,15 +4187,14 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
         scalar_t *const SFEM_RESTRICT outz
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -3675,6 +4224,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_hx0[VECTOR_SIZE];
         scalar_t block_hy0[VECTOR_SIZE];
         scalar_t block_hz0[VECTOR_SIZE];
@@ -3699,6 +4254,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
         scalar_t block_hx7[VECTOR_SIZE];
         scalar_t block_hy7[VECTOR_SIZE];
         scalar_t block_hz7[VECTOR_SIZE];
+        scalar_t block_hx8[VECTOR_SIZE];
+        scalar_t block_hy8[VECTOR_SIZE];
+        scalar_t block_hz8[VECTOR_SIZE];
+        scalar_t block_hx9[VECTOR_SIZE];
+        scalar_t block_hy9[VECTOR_SIZE];
+        scalar_t block_hz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -3723,6 +4284,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -3734,6 +4301,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -3786,6 +4355,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
             block_hy7[lane] = hy[ev[lane * N_SHAPE + 7] * h_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
             block_hz7[lane] = hz[ev[lane * N_SHAPE + 7] * h_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hx8[lane] = hx[ev[lane * N_SHAPE + 8] * h_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hy8[lane] = hy[ev[lane * N_SHAPE + 8] * h_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hz8[lane] = hz[ev[lane * N_SHAPE + 8] * h_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hx9[lane] = hx[ev[lane * N_SHAPE + 9] * h_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hy9[lane] = hy[ev[lane * N_SHAPE + 9] * h_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hz9[lane] = hz[ev[lane * N_SHAPE + 9] * h_stride];
             block_outx0[lane] = scalar_t(0);
             block_outy0[lane] = scalar_t(0);
             block_outz0[lane] = scalar_t(0);
@@ -3810,13 +4391,19 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
             block_outx7[lane] = scalar_t(0);
             block_outy7[lane] = scalar_t(0);
             block_outz7[lane] = scalar_t(0);
+            block_outx8[lane] = scalar_t(0);
+            block_outy8[lane] = scalar_t(0);
+            block_outz8[lane] = scalar_t(0);
+            block_outx9[lane] = scalar_t(0);
+            block_outy9[lane] = scalar_t(0);
+            block_outz9[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7, block_hx8, block_hy8, block_hz8, block_hx9, block_hy9, block_hz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -3891,6 +4478,24 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
 #pragma omp atomic update
             outz[ev[lane * N_SHAPE + 7] * out_stride] += block_outz7[lane];
 
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 8] * out_stride] += block_outx8[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 8] * out_stride] += block_outy8[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 8] * out_stride] += block_outz8[lane];
+
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 9] * out_stride] += block_outx9[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 9] * out_stride] += block_outy9[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 9] * out_stride] += block_outz9[lane];
+
         }
     }
 
@@ -3900,7 +4505,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_so
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3929,10 +4534,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3961,7 +4566,7 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 
@@ -3969,7 +4574,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3990,18 +4595,17 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t *const SFEM_RESTRICT outz
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_QP = 8;
-    static constexpr int N_SHAPE = 8;
+    static constexpr int N_QP = 11;
+    static constexpr int N_SHAPE = 10;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
     const geometry_t *const SFEM_RESTRICT x = points[0];
     const geometry_t *const SFEM_RESTRICT y = points[1];
     const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::generated_neohookean_ogden_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE_1D = 2;
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -4031,6 +4635,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_x7[VECTOR_SIZE];
         scalar_t block_y7[VECTOR_SIZE];
         scalar_t block_z7[VECTOR_SIZE];
+        scalar_t block_x8[VECTOR_SIZE];
+        scalar_t block_y8[VECTOR_SIZE];
+        scalar_t block_z8[VECTOR_SIZE];
+        scalar_t block_x9[VECTOR_SIZE];
+        scalar_t block_y9[VECTOR_SIZE];
+        scalar_t block_z9[VECTOR_SIZE];
         scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
@@ -4065,6 +4675,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_ux7[VECTOR_SIZE];
         scalar_t block_uy7[VECTOR_SIZE];
         scalar_t block_uz7[VECTOR_SIZE];
+        scalar_t block_ux8[VECTOR_SIZE];
+        scalar_t block_uy8[VECTOR_SIZE];
+        scalar_t block_uz8[VECTOR_SIZE];
+        scalar_t block_ux9[VECTOR_SIZE];
+        scalar_t block_uy9[VECTOR_SIZE];
+        scalar_t block_uz9[VECTOR_SIZE];
         scalar_t block_hx0[VECTOR_SIZE];
         scalar_t block_hy0[VECTOR_SIZE];
         scalar_t block_hz0[VECTOR_SIZE];
@@ -4089,6 +4705,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_hx7[VECTOR_SIZE];
         scalar_t block_hy7[VECTOR_SIZE];
         scalar_t block_hz7[VECTOR_SIZE];
+        scalar_t block_hx8[VECTOR_SIZE];
+        scalar_t block_hy8[VECTOR_SIZE];
+        scalar_t block_hz8[VECTOR_SIZE];
+        scalar_t block_hx9[VECTOR_SIZE];
+        scalar_t block_hy9[VECTOR_SIZE];
+        scalar_t block_hz9[VECTOR_SIZE];
         scalar_t block_outx0[VECTOR_SIZE];
         scalar_t block_outy0[VECTOR_SIZE];
         scalar_t block_outz0[VECTOR_SIZE];
@@ -4113,6 +4735,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
         scalar_t block_outx7[VECTOR_SIZE];
         scalar_t block_outy7[VECTOR_SIZE];
         scalar_t block_outz7[VECTOR_SIZE];
+        scalar_t block_outx8[VECTOR_SIZE];
+        scalar_t block_outy8[VECTOR_SIZE];
+        scalar_t block_outz8[VECTOR_SIZE];
+        scalar_t block_outx9[VECTOR_SIZE];
+        scalar_t block_outy9[VECTOR_SIZE];
+        scalar_t block_outz9[VECTOR_SIZE];
 
 #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
@@ -4124,6 +4752,8 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             ev[lane * N_SHAPE + 5] = elements[5][evbegin + lane];
             ev[lane * N_SHAPE + 6] = elements[6][evbegin + lane];
             ev[lane * N_SHAPE + 7] = elements[7][evbegin + lane];
+            ev[lane * N_SHAPE + 8] = elements[8][evbegin + lane];
+            ev[lane * N_SHAPE + 9] = elements[9][evbegin + lane];
         }
 
 #pragma omp simd
@@ -4152,6 +4782,12 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_x7[lane] = x[ev[lane * N_SHAPE + 7]];
             block_y7[lane] = y[ev[lane * N_SHAPE + 7]];
             block_z7[lane] = z[ev[lane * N_SHAPE + 7]];
+            block_x8[lane] = x[ev[lane * N_SHAPE + 8]];
+            block_y8[lane] = y[ev[lane * N_SHAPE + 8]];
+            block_z8[lane] = z[ev[lane * N_SHAPE + 8]];
+            block_x9[lane] = x[ev[lane * N_SHAPE + 9]];
+            block_y9[lane] = y[ev[lane * N_SHAPE + 9]];
+            block_z9[lane] = z[ev[lane * N_SHAPE + 9]];
         }
 
 #pragma omp simd
@@ -4204,6 +4840,18 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_hy7[lane] = hy[ev[lane * N_SHAPE + 7] * h_stride];
             block_uz7[lane] = uz[ev[lane * N_SHAPE + 7] * u_stride];
             block_hz7[lane] = hz[ev[lane * N_SHAPE + 7] * h_stride];
+            block_ux8[lane] = ux[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hx8[lane] = hx[ev[lane * N_SHAPE + 8] * h_stride];
+            block_uy8[lane] = uy[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hy8[lane] = hy[ev[lane * N_SHAPE + 8] * h_stride];
+            block_uz8[lane] = uz[ev[lane * N_SHAPE + 8] * u_stride];
+            block_hz8[lane] = hz[ev[lane * N_SHAPE + 8] * h_stride];
+            block_ux9[lane] = ux[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hx9[lane] = hx[ev[lane * N_SHAPE + 9] * h_stride];
+            block_uy9[lane] = uy[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hy9[lane] = hy[ev[lane * N_SHAPE + 9] * h_stride];
+            block_uz9[lane] = uz[ev[lane * N_SHAPE + 9] * u_stride];
+            block_hz9[lane] = hz[ev[lane * N_SHAPE + 9] * h_stride];
             block_outx0[lane] = scalar_t(0);
             block_outy0[lane] = scalar_t(0);
             block_outz0[lane] = scalar_t(0);
@@ -4228,36 +4876,46 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             block_outx7[lane] = scalar_t(0);
             block_outy7[lane] = scalar_t(0);
             block_outz7[lane] = scalar_t(0);
+            block_outx8[lane] = scalar_t(0);
+            block_outy8[lane] = scalar_t(0);
+            block_outz8[lane] = scalar_t(0);
+            block_outx9[lane] = scalar_t(0);
+            block_outy9[lane] = scalar_t(0);
+            block_outz9[lane] = scalar_t(0);
         }
 
-        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux3, block_uy3, block_uz3, block_ux2, block_uy2, block_uz2, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux7, block_uy7, block_uz7, block_ux6, block_uy6, block_uz6};
-        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx3, block_hy3, block_hz3, block_hx2, block_hy2, block_hz2, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx7, block_hy7, block_hz7, block_hx6, block_hy6, block_hz6};
-        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx3, block_outy3, block_outz3, block_outx2, block_outy2, block_outz2, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx7, block_outy7, block_outz7, block_outx6, block_outy6, block_outz6};
+        const scalar_t *const block_u_streams[N_SHAPE * 3] = {block_ux0, block_uy0, block_uz0, block_ux1, block_uy1, block_uz1, block_ux2, block_uy2, block_uz2, block_ux3, block_uy3, block_uz3, block_ux4, block_uy4, block_uz4, block_ux5, block_uy5, block_uz5, block_ux6, block_uy6, block_uz6, block_ux7, block_uy7, block_uz7, block_ux8, block_uy8, block_uz8, block_ux9, block_uy9, block_uz9};
+        const scalar_t *const block_h_streams[N_SHAPE * 3] = {block_hx0, block_hy0, block_hz0, block_hx1, block_hy1, block_hz1, block_hx2, block_hy2, block_hz2, block_hx3, block_hy3, block_hz3, block_hx4, block_hy4, block_hz4, block_hx5, block_hy5, block_hz5, block_hx6, block_hy6, block_hz6, block_hx7, block_hy7, block_hz7, block_hx8, block_hy8, block_hz8, block_hx9, block_hy9, block_hz9};
+        scalar_t *const block_out_streams[N_SHAPE * 3] = {block_outx0, block_outy0, block_outz0, block_outx1, block_outy1, block_outz1, block_outx2, block_outy2, block_outz2, block_outx3, block_outy3, block_outz3, block_outx4, block_outy4, block_outz4, block_outx5, block_outy5, block_outz5, block_outx6, block_outy6, block_outz6, block_outx7, block_outy7, block_outz7, block_outx8, block_outy8, block_outz8, block_outx9, block_outy9, block_outz9};
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x3, block_y3, block_z3, block_x2, block_y2, block_z2, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x7, block_y7, block_z7, block_x6, block_y6, block_z6};
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        const scalar_t *const block_coordinate_streams[N_SHAPE * 3] = {block_x0, block_y0, block_z0, block_x1, block_y1, block_z1, block_x2, block_y2, block_z2, block_x3, block_y3, block_z3, block_x4, block_y4, block_z4, block_x5, block_y5, block_z5, block_x6, block_y6, block_z6, block_x7, block_y7, block_z7, block_x8, block_y8, block_z8, block_x9, block_y9, block_z9};
 
         for (int q = 0; q < N_QP; ++q) {
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J02 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                scalar_t J12 = scalar_t(0);
+                scalar_t J20 = scalar_t(0);
+                scalar_t J21 = scalar_t(0);
+                scalar_t J22 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = isoparametric_grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
+                    const scalar_t g2 = isoparametric_grad_ref_z[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 3 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 3 + 0][lane] * g1;
+                    J02 += block_coordinate_streams[shape * 3 + 0][lane] * g2;
+                    J10 += block_coordinate_streams[shape * 3 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 3 + 1][lane] * g1;
+                    J12 += block_coordinate_streams[shape * 3 + 1][lane] * g2;
+                    J20 += block_coordinate_streams[shape * 3 + 2][lane] * g0;
+                    J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
+                    J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
+                }
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
                 block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
                 block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
@@ -4271,7 +4929,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
             }
         }
 
-        generated_neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
 #pragma omp atomic update
@@ -4346,6 +5004,24 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
 #pragma omp atomic update
             outz[ev[lane * N_SHAPE + 7] * out_stride] += block_outz7[lane];
 
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 8] * out_stride] += block_outx8[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 8] * out_stride] += block_outy8[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 8] * out_stride] += block_outz8[lane];
+
+#pragma omp atomic update
+            outx[ev[lane * N_SHAPE + 9] * out_stride] += block_outx9[lane];
+
+#pragma omp atomic update
+            outy[ev[lane * N_SHAPE + 9] * out_stride] += block_outy9[lane];
+
+#pragma omp atomic update
+            outz[ev[lane * N_SHAPE + 9] * out_stride] += block_outz9[lane];
+
         }
     }
 
@@ -4355,7 +5031,7 @@ static SFEM_INLINE int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4375,10 +5051,10 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4398,6 +5074,6 @@ extern "C" int generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::generated_neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 

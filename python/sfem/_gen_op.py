@@ -69,7 +69,7 @@ def _hyperelastic_op(material, elements):
     objective_cases = []
     for element in elements:
         dim = _element_dim(element)
-        stem = "generated_%s_%s_%s" % (
+        stem = "%s_%s_%s" % (
             material.name,
             element.lower(),
             element.lower(),
@@ -237,18 +237,24 @@ namespace sfem {
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         auto mesh = impl_->space->mesh_ptr();
+        const bool needs_affine_geometry =
+                impl_->objective_uses_affine ||
+                impl_->gradient_uses_affine ||
+                impl_->apply_uses_affine;
         for (auto &entry : impl_->domains->domains()) {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
                     std::max(impl_->element_capacity, entry.second.block->n_elements());
-            const smesh::block_idx_t block_id =
-                    block_id_for_domain(*mesh, *entry.second.block);
-            auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                    mesh, smesh::MEMORY_SPACE_HOST, block_id);
-            if (!jacobian) {
-                return SFEM_FAILURE;
+            if (needs_affine_geometry) {
+                const smesh::block_idx_t block_id =
+                        block_id_for_domain(*mesh, *entry.second.block);
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
             }
-            entry.second.user_data = std::static_pointer_cast<void>(jacobian);
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
         return SFEM_SUCCESS;
@@ -466,7 +472,7 @@ def _residual_op(material, elements):
             dependencies_by_dim[dim] = dependencies
             parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in system.parameters)
         residual_dependencies, action_dependencies = dependencies
-        stem = "generated_%s_%s" % (material.name, element.lower())
+        stem = "%s_%s" % (material.name, element.lower())
         residual_pointer_params = []
         if residual_dependencies.current:
             residual_pointer_params.append("const real_t *")

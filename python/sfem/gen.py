@@ -324,7 +324,7 @@ class ElementGenerationContext:
 
     @property
     def generated_prefix(self):
-        return "generated_%s" % self.material_name
+        return self.material_name
 
     @property
     def element_prefix(self):
@@ -628,7 +628,14 @@ class CodeGenerationStage:
         outputs = {}
         for context in self.user_input.element_contexts:
             for unit in self.codegen_plan.emission_kernels_for_context(context):
-                _merge_files(outputs, _emit_codegen_unit(unit, context))
+                _merge_files(
+                    outputs,
+                    _layout_codegen_files(
+                        unit,
+                        context,
+                        _emit_codegen_unit(unit, context),
+                    ),
+                )
         return outputs
 
 
@@ -739,11 +746,11 @@ def run(material, default_out_dir, argv=None):
 
 def _write_plan_dump(plan, out_dir, material_name, plan_out=None):
     if plan_out is None:
-        path = os.path.join(out_dir, "generated_%s_plan.json" % material_name)
+        path = os.path.join(out_dir, "%s_plan.json" % material_name)
     else:
         path = os.fspath(plan_out)
         if os.path.isdir(path):
-            path = os.path.join(path, "generated_%s_plan.json" % material_name)
+            path = os.path.join(path, "%s_plan.json" % material_name)
         elif not os.path.isabs(path):
             path = os.path.abspath(path)
     directory = os.path.dirname(path)
@@ -952,7 +959,7 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
             scope=KernelScope.BLOCK,
             coupling=KernelCoupling.BLOCK,
             block=block,
-            emission=KernelEmission.COVERED_BY_PARENT,
+            emission=KernelEmission.FILES,
             target=KernelTarget.OPENMP,
             material_name=material_name,
             unit_name=_block_unit_name(evaluated.name, block),
@@ -1014,6 +1021,120 @@ def _emit_energy_soa(unit, context):
 
 def _emit_residual_soa(unit, context):
     return tuple(OPENMP_SOA_BACKEND.emit(unit, context))
+
+
+def _layout_codegen_files(unit, context, files):
+    local_headers = tuple(
+        generated.path
+        for generated in files
+        if generated.path.endswith("_local.hpp")
+    )
+    return tuple(
+        GeneratedKernelFile(
+            _layout_codegen_path(unit, context, generated.path),
+            _layout_codegen_source(
+                unit,
+                context,
+                generated.path,
+                generated.source,
+                local_headers,
+            ),
+        )
+        for generated in files
+    )
+
+
+def _layout_codegen_path(unit, context, filename):
+    directory = _codegen_file_directory(unit, context, filename)
+    if not directory:
+        return filename
+    return os.path.join(directory, filename)
+
+
+def _layout_codegen_source(unit, context, filename, source, local_headers):
+    directory = _codegen_file_directory(unit, context, filename)
+    replacements = {}
+    for header in _CODEGEN_COMMON_HEADERS:
+        replacements[header] = _relative_codegen_include(directory, header)
+    for local in local_headers:
+        replacements[local] = _relative_codegen_include(
+            directory,
+            os.path.join(_codegen_dimension_directory(context), local),
+        )
+
+    relocated = source
+    for header, relative in replacements.items():
+        if header != relative:
+            relocated = relocated.replace(
+                '#include "%s"' % header,
+                '#include "%s"' % relative,
+            )
+    return relocated
+
+
+def _codegen_file_directory(unit, context, filename):
+    if filename in _CODEGEN_COMMON_HEADERS:
+        return ""
+    if filename.endswith("_local.hpp"):
+        return _codegen_dimension_directory(context)
+    return _codegen_output_directory(unit, context)
+
+
+def _codegen_dimension_directory(context):
+    return "d%d" % int(context.specialization.dim)
+
+
+def _codegen_output_directory(unit, context):
+    return os.path.join(
+        _codegen_dimension_directory(context),
+        _codegen_output_element_label(unit, context),
+    )
+
+
+_CODEGEN_COMMON_HEADERS = frozenset(
+    (
+        "kernel_math.hpp",
+        "kernel_diagnostics.hpp",
+        "tensor_product_kernels.hpp",
+    )
+)
+
+
+def _relative_codegen_include(directory, target):
+    if not directory:
+        return target.replace(os.sep, "/")
+    return os.path.relpath(target, start=directory).replace(os.sep, "/")
+
+
+def _codegen_output_element_label(unit, context):
+    if (
+        unit.is_block
+        and unit.block is not None
+        and unit.block.form_order is FormOrder.TWO
+        and unit.block.column_field
+        and unit.block.row_field == unit.block.column_field
+    ):
+        return _field_element_label(unit.form_collection.fields, unit.block.row_field, context)
+    field_labels = _unit_field_element_labels(unit, context)
+    if len(field_labels) == 1:
+        return field_labels[0]
+    return context.label.lower()
+
+
+def _unit_field_element_labels(unit, context):
+    labels = []
+    for field, element_type in context.fem_policy.field_element_types_for(unit.form_collection.fields):
+        label = str(element_type).lower()
+        if label not in labels:
+            labels.append(label)
+    return tuple(labels)
+
+
+def _field_element_label(fields, field_name, context):
+    for field, element_type in context.fem_policy.field_element_types_for(fields):
+        if field.name == field_name:
+            return str(element_type).lower()
+    raise ValueError("field '%s' is not available in element context" % field_name)
 
 
 def _material_equations(material, dim):
@@ -1161,7 +1282,7 @@ def _evaluate_residual_equation(dim, equation, form_collection=None):
 
 def _unit_generated_prefix(unit):
     name = _unit_output_name(unit)
-    return "generated_%s" % name
+    return name
 
 
 def _unit_output_name(unit):
@@ -1321,6 +1442,9 @@ def _clean_outputs(out_dir, name):
         "generated_%s*.hpp" % name,
         "generated_%s*.cpp" % name,
         "generated_%s*.o" % name,
+        "%s*.hpp" % name,
+        "%s*.cpp" % name,
+        "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
         "kernel_math.hpp",
@@ -1329,6 +1453,25 @@ def _clean_outputs(out_dir, name):
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):
+            os.remove(path)
+    nested_patterns = (
+        "generated_%s*.hpp" % name,
+        "generated_%s*.cpp" % name,
+        "generated_%s*.o" % name,
+        "%s*.hpp" % name,
+        "%s*.cpp" % name,
+        "%s*.o" % name,
+        "%s_*_summary.md" % name,
+        "%s_*_reduced_outputs.txt" % name,
+        "kernel_math.hpp",
+        "kernel_diagnostics.hpp",
+        "tensor_product_kernels.hpp",
+    )
+    for pattern in nested_patterns:
+        for path in glob.glob(os.path.join(out_dir, "d*", pattern)):
+            os.remove(path)
+    for pattern in nested_patterns:
+        for path in glob.glob(os.path.join(out_dir, "d*", "*", pattern)):
             os.remove(path)
 
 
