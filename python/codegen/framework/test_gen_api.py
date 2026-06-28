@@ -1422,6 +1422,10 @@ class GenApiTest(unittest.TestCase):
                 "stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate",
                 contents,
             )
+            self.assertIn("scalar_t *const SFEM_RESTRICT u_out[2]", contents)
+            self.assertNotIn("u0_out", contents)
+            self.assertNotIn("u1_out", contents)
+            self.assertIn("static constexpr int N_FIELDS = 2;", contents)
             self.assertIn(
                 "d2/tri6_tri3/stokes_form_2_u_p_tri6_tri3_operator.cpp",
                 names,
@@ -1443,9 +1447,7 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
             for field in result.plan.units[0].form_collection.fields:
-                for component in range(int(field.components)):
-                    name = "%s%d" % (field.name, component) if int(field.components) > 1 else field.name
-                    self.assertIn("%s_out" % name, contents)
+                self.assertIn("%s_out" % field.name, contents)
             validate_stokes_m6_4(result)
 
     def test_stokes_validation_handles_multiple_dimensions(self):
@@ -1506,11 +1508,14 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("scalar_t(", contents)
             self.assertIn(
                 "field_shape_1d[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
                 contents,
             )
+            self.assertIn("static constexpr int N_FIELDS = 2;", contents)
+            self.assertIn("scalar_t *const SFEM_RESTRICT u_out[3]", contents)
+            self.assertNotIn("u0_out", contents)
+            self.assertNotIn("u1_out", contents)
+            self.assertNotIn("u2_out", contents)
             self.assertNotIn("stokes_reference_data", contents)
             self.assertNotIn("stokes_cell_grad_ref", contents)
             self.assertNotIn("stokes_u0_shape_", contents)
@@ -1569,7 +1574,6 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("scalar_t(", tri)
             self.assertIn(
                 "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri3_shape()}",
                 tri,
             )
@@ -1587,8 +1591,6 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("scalar_t(", tet)
             self.assertIn(
                 "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet4_shape()}",
                 tet,
             )

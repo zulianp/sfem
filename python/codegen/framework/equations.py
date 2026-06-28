@@ -893,7 +893,12 @@ def _lower_residual_fields(system, fields, dim):
     substitutions = {}
     for field in fields:
         if isinstance(field, ScalarField):
-            lowered = system.add_field(field.name)
+            lowered = system.add_field(
+                field.name,
+                field_name=field.name,
+                component=0,
+                components=1,
+            )
             residual_fields.append(lowered)
             _map_scalar_field_symbols(substitutions, field, lowered)
         elif isinstance(field, VectorField):
@@ -901,7 +906,12 @@ def _lower_residual_fields(system, fields, dim):
             trials = trial_function(field)
             previous = trial_function(field, name="%s_old" % field.name)
             for component in range(field.dim):
-                lowered = system.add_field("%s%d" % (field.name, component))
+                lowered = system.add_field(
+                    "%s%d" % (field.name, component),
+                    field_name=field.name,
+                    component=component,
+                    components=field.dim,
+                )
                 residual_fields.append(lowered)
                 _map_vector_component_symbols(
                     substitutions,

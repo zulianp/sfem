@@ -16,6 +16,9 @@ from .symbolic import (
 class ResidualField:
     name: str
     dim: int
+    field_name: str
+    component: int
+    components: int
     value: sp.Symbol
     gradient: Tuple[sp.Symbol, ...]
     previous_value: Optional[sp.Symbol]
@@ -95,15 +98,27 @@ class CoupledResidualSystem:
     def parameters(self):
         return tuple(self._parameters)
 
-    def add_field(self, name, previous=True):
+    def add_field(self, name, previous=True, *, field_name=None, component=0, components=1):
         name = str(name)
+        field_name = name if field_name is None else str(field_name)
+        component = int(component)
+        components = int(components)
         if not name or not name.isidentifier():
             raise ValueError("field name must be a valid identifier")
+        if not field_name or not field_name.isidentifier():
+            raise ValueError("field group name must be a valid identifier")
+        if components <= 0:
+            raise ValueError("field component count must be positive")
+        if component < 0 or component >= components:
+            raise ValueError("field component index is out of range")
         if name in self._field_by_name:
             raise ValueError("field '%s' is already registered" % name)
         field = ResidualField(
             name=name,
             dim=self.dim,
+            field_name=field_name,
+            component=component,
+            components=components,
             value=sp.Symbol(name),
             gradient=_symbols("%s_grad" % name, self.dim),
             previous_value=sp.Symbol("%s_old" % name) if previous else None,
