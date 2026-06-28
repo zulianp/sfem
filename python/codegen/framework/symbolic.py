@@ -18,6 +18,7 @@ try:
         sfem_soa_element_specializations,
         sfem_soa_reference_input,
         sfem_supported_element_types,
+        sfem_tensor_product_hex_uses_cartesian_ordering,
     )
 except ImportError:
     from fem import (
@@ -31,6 +32,7 @@ except ImportError:
         sfem_soa_element_specializations,
         sfem_soa_reference_input,
         sfem_supported_element_types,
+        sfem_tensor_product_hex_uses_cartesian_ordering,
     )
 
 try:
@@ -1728,7 +1730,7 @@ def _sfem_soa_block_function(
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     stream_shape_order = (
-        tensor_product_cartesian_shape_order(dim, n_nodes)
+        _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
         else tuple(range(n_nodes))
     )
@@ -2444,12 +2446,26 @@ def _tensor_product_q_index_lines(dim, indent):
     raise ValueError("tensor-product reference generation requires dim 2 or 3")
 
 
+def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
+    if (
+        quadrature_rule is not None
+        and sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
+    ):
+        return tuple(range(n_nodes))
+    return tensor_product_cartesian_shape_order(dim, n_nodes)
+
+
 def _tensor_product_node_coords(quadrature_rule):
     dim = quadrature_rule.dim
     n_shape_1d = quadrature_rule.tensor_product_n_shape_1d
+    cartesian_hex = (
+        dim == 3
+        and n_shape_1d == 2
+        and sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
+    )
     if n_shape_1d == 2 and dim == 2:
         return ((0, 0), (1, 0), (1, 1), (0, 1))
-    if n_shape_1d == 2 and dim == 3:
+    if n_shape_1d == 2 and dim == 3 and not cartesian_hex:
         return (
             (0, 0, 0),
             (1, 0, 0),
@@ -2484,7 +2500,11 @@ def _tensor_product_shape_index_lines(quadrature_rule, indent):
             "%sconst int sx = ((shape + 1) >> 1) & 1;" % indent,
             "%sconst int sy = shape >> 1;" % indent,
         )
-    if n_shape_1d == 2 and dim == 3:
+    if (
+        n_shape_1d == 2
+        and dim == 3
+        and not sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
+    ):
         return (
             "%sconst int sx = ((shape + 1) >> 1) & 1;" % indent,
             "%sconst int sy = (shape >> 1) & 1;" % indent,
@@ -2855,7 +2875,7 @@ def _sfem_soa_operator_function(
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     stream_shape_order = (
-        tensor_product_cartesian_shape_order(dim, n_nodes)
+        _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
         else tuple(range(n_nodes))
     )
@@ -3066,6 +3086,7 @@ def _sfem_soa_operator_function(
                         n_nodes,
                         _coordinate_stream_names(dim, n_nodes),
                         lambda stream: "block_%s" % stream,
+                        shape_order=stream_shape_order,
                     ),
                     adjugate_target=lambda component, index: (
                         "block_jacobian_adjugate%d[%s]" % (component, index)
@@ -3085,6 +3106,7 @@ def _sfem_soa_operator_function(
                         n_nodes,
                         _coordinate_stream_names(dim, n_nodes),
                         lambda stream: "block_%s" % stream,
+                        shape_order=stream_shape_order,
                     ),
                 )
             )
@@ -3300,7 +3322,7 @@ def _sfem_soa_mesh_operator_function(
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     stream_shape_order = (
-        tensor_product_cartesian_shape_order(dim, n_nodes)
+        _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
         else tuple(range(n_nodes))
     )
@@ -3553,6 +3575,7 @@ def _sfem_soa_mesh_operator_function(
                     n_nodes,
                     _coordinate_stream_names(dim, n_nodes),
                     lambda stream: "block_%s" % stream,
+                    shape_order=stream_shape_order,
                 ),
                 adjugate_target=lambda component, index: (
                     "block_jacobian_adjugate%d[%s]" % (component, index)

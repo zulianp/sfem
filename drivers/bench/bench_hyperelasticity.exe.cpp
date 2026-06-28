@@ -83,6 +83,9 @@ namespace {
             case smesh::TET10:
             case smesh::HEX8:
             case smesh::HEX27:
+            case smesh::PROTEUS_HEX8:
+            case smesh::PROTEUS_HEX27:
+            case smesh::PROTEUS_HEX64:
                 return true;
             default:
                 return false;
