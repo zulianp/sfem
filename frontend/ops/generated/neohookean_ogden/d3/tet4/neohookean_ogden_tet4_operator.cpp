@@ -433,6 +433,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_isoparametric_mesh_s
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -458,16 +459,9 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_isoparametric_mesh_s
                     J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
                     J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
+                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                        J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 
@@ -913,6 +907,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_gradient_isoparametric_mesh_so
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -938,16 +933,9 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_gradient_isoparametric_mesh_so
                     J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
                     J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
+                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                        J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 
@@ -1436,6 +1424,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_apply_isoparametric_mesh_soa_i
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -1461,16 +1450,9 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_apply_isoparametric_mesh_soa_i
                     J21 += block_coordinate_streams[shape * 3 + 2][lane] * g1;
                     J22 += block_coordinate_streams[shape * 3 + 2][lane] * g2;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = J02 * J21 - J01 * J22;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = J01 * J12 - J02 * J11;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J12 * J20 - J10 * J22;
-                block_jacobian_adjugate4[q * VECTOR_SIZE + lane] = J00 * J22 - J02 * J20;
-                block_jacobian_adjugate5[q * VECTOR_SIZE + lane] = J02 * J10 - J00 * J12;
-                block_jacobian_adjugate6[q * VECTOR_SIZE + lane] = J10 * J21 - J11 * J20;
-                block_jacobian_adjugate7[q * VECTOR_SIZE + lane] = J01 * J20 - J00 * J21;
-                block_jacobian_adjugate8[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
+                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                        J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 

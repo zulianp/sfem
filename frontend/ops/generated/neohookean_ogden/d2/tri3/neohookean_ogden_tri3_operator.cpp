@@ -398,6 +398,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_isoparametric_mesh_s
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -412,11 +413,8 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_isoparametric_mesh_s
                     J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
                     J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
+                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 
@@ -829,6 +827,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_so
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -843,11 +842,8 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_so
                     J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
                     J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
+                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 
@@ -1297,6 +1293,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_i
         }
 
         for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
 #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t J00 = scalar_t(0);
@@ -1311,11 +1308,8 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_i
                     J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
                     J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
                 }
-                block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = J11;
-                block_jacobian_adjugate1[q * VECTOR_SIZE + lane] = -J01;
-                block_jacobian_adjugate2[q * VECTOR_SIZE + lane] = -J10;
-                block_jacobian_adjugate3[q * VECTOR_SIZE + lane] = J00;
-                block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * J11 - J01 * J10;
+                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
             }
         }
 
