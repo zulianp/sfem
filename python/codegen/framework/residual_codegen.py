@@ -71,6 +71,10 @@ class ResidualCodegenDependencies:
         return any(any(row) for row in self.gradient_coefficients)
 
     @property
+    def uses_test_coefficients(self):
+        return any(self.value_coefficients) or self.uses_test_gradients
+
+    @property
     def uses_reference_gradients(self):
         return self.uses_trial_gradients or self.uses_test_gradients
 
@@ -1015,6 +1019,8 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
 def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
+    uses_determinant = any(dependencies.value_coefficients)
+    uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
 
     lines = [
         "    static constexpr int N_QP_1D = integer_root(N_QP, DIM);",
@@ -1031,6 +1037,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
                 % (shape_1d_name, shape_name, shape_name),
             ]
         )
+    if not dependencies.uses_test_coefficients:
+        return lines
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -1113,12 +1121,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         )
     lines.extend(
         [
-            "#pragma omp simd",
             "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-            "            const scalar_t det = determinant[geometry_offset];",
         ]
     )
+    if uses_geometry_offset:
+        lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
+    if uses_determinant:
+        lines.append("            const scalar_t det = determinant[geometry_offset];")
     if dependencies.uses_adjugate:
         for i in range(dim * dim):
             lines.append(
@@ -1447,7 +1456,11 @@ def _simplex_local_body(system, coefficients, dependencies):
 def _tensor_local_body(system, prefix, coefficients, dependencies):
     dim = system.dim
     n_fields = len(system.fields)
+    uses_determinant = any(dependencies.value_coefficients)
+    uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
     lines = []
+    if not dependencies.uses_test_coefficients:
+        return lines
     for group, enabled in (
         ("current", dependencies.current),
         ("previous", dependencies.previous),
@@ -1511,10 +1524,12 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
         [
             "#pragma omp simd",
             "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-            "            const scalar_t det = determinant[geometry_offset];",
         ]
     )
+    if uses_geometry_offset:
+        lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
+    if uses_determinant:
+        lines.append("            const scalar_t det = determinant[geometry_offset];")
     if dependencies.uses_adjugate:
         for i in range(dim * dim):
             lines.append(
@@ -2158,6 +2173,18 @@ def _mixed_affine_function(
             "    (void)nnodes;",
         ]
     )
+    if not dependencies.uses_test_coefficients:
+        lines.extend(
+            [
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+        return lines
     lines.extend(
         _mixed_reference_pointer_lines(
             reference_data,
@@ -2200,7 +2227,6 @@ def _mixed_affine_function(
         [
             "        }",
             "",
-            "#pragma omp simd",
             "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
         ]
     )
@@ -2355,6 +2381,18 @@ def _mixed_isoparametric_function(
             "    (void)nnodes;",
         ]
     )
+    if not dependencies.uses_test_coefficients:
+        lines.extend(
+            [
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+        return lines
     reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     if cell_rule.is_tensor_product:
         lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
@@ -2394,7 +2432,6 @@ def _mixed_isoparametric_function(
         [
             "        }",
             "",
-            "#pragma omp simd",
             "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
         ]
     )
@@ -2961,7 +2998,7 @@ def _mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["        }", "", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
     for shape in range(n_shape):
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
@@ -3322,7 +3359,7 @@ def _isoparametric_mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["        }", "", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
     for shape in range(n_shape):
         node = "ev[lane * N_SHAPE + %d]" % shape
         for d in range(dim):

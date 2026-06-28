@@ -429,6 +429,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("d2/neohookean_ogden_d2_simplex_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden.cpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp", names)
             wrapper = os.path.join(
                 out_dir,
                 "op",
@@ -448,6 +449,21 @@ class GenApiTest(unittest.TestCase):
                 source,
             )
             self.assertNotIn("generated_neohookean_ogden", source)
+            c_abi = os.path.join(
+                out_dir,
+                "op",
+                "sfem_GeneratedNeoHookeanOgden_c_abi.hpp",
+            )
+            with open(c_abi, encoding="utf-8") as stream:
+                declarations = stream.read()
+            self.assertIn(
+                "extern \"C\" int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa",
+                declarations,
+            )
 
     def test_material_runner_writes_generation_plan_dump(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -489,6 +505,7 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
             self.assertIn("op/sfem_GeneratedTwoPhaseFlow.cpp", names)
+            self.assertIn("op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp", names)
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow.cpp")
             with open(wrapper, encoding="utf-8") as stream:
                 source = stream.read()
@@ -496,10 +513,28 @@ class GenApiTest(unittest.TestCase):
                 source.index('parameters.require_real_value("C_ka1")'),
                 source.index('parameters.require_real_value("porosity")'),
             )
-            self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
-            self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos", source)
+            self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_soa", source)
+            self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_soa", source)
+            self.assertNotIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
+            self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 2;", source)
+            self.assertIn("p_w_data = state + 0", source)
             self.assertNotIn("generated_two_phase_flow", source)
             self.assertNotIn('parameters.require_real_value("K_" + std::to_string(i))', source)
+            c_abi = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow_c_abi.hpp")
+            with open(c_abi, encoding="utf-8") as stream:
+                declarations = stream.read()
+            self.assertIn(
+                "extern \"C\" int two_phase_flow_tri3_residual_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_tri3_jacobian_p_w_p_c_diagnostics",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos",
+                declarations,
+            )
 
     def test_poro_hyperelastic_material_uses_taylor_hood_elements(self):
         names = tuple(element.name for element in poro_hyperelasticity.elements)
@@ -1376,6 +1411,42 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
 
+    def test_poro_tensor_zero_block_does_not_force_empty_lane_loop(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                poro_hyperelasticity,
+                out_dir,
+                elements=("HEX27_HEX8",),
+            )
+            local = os.path.join(
+                out_dir,
+                "d3",
+                "poro_hyperelasticity_poro_form_1_p_d3_tensor_product_mixed_local.hpp",
+            )
+            with open(local, encoding="utf-8") as input_file:
+                contents = input_file.read()
+            start = contents.index(
+                "poro_hyperelasticity_poro_form_1_p_d3_tensor_product_mixed_jacobian_action_block"
+            )
+            end = contents.index("} // namespace codegen", start)
+            block = contents[start:end]
+            self.assertNotIn("const scalar_t det = determinant[geometry_offset];", block)
+            self.assertNotIn("for (int q = 0; q < N_QP; ++q)", block)
+            self.assertNotIn("#pragma omp simd", block)
+            mesh = os.path.join(
+                out_dir,
+                "d3",
+                "hex27_hex8",
+                "poro_hyperelasticity_poro_form_1_p_hex27_hex8_operator.cpp",
+            )
+            with open(mesh, encoding="utf-8") as input_file:
+                mesh_contents = input_file.read()
+            self.assertNotIn(
+                "#pragma omp simd\n        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {\n"
+                "            block_current[0][lane] =",
+                mesh_contents,
+            )
+
     def test_generates_taylor_hood_stokes_material(self):
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(
@@ -1387,6 +1458,9 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("d2/tri6_tri3/stokes_tri6_tri3_operator.cpp", names)
             self.assertIn("d2/stokes_d2_simplex_mixed_local.hpp", names)
             self.assertIn("kernel_diagnostics.hpp", names)
+            self.assertIn("op/sfem_GeneratedStokes.cpp", names)
+            self.assertIn("op/sfem_GeneratedStokes.hpp", names)
+            self.assertIn("op/sfem_GeneratedStokes_c_abi.hpp", names)
             self.assertIsInstance(result.plan, gen.GenerationPlan)
             self.assertEqual(result.plan.units[0].name, "stokes")
             self.assertTrue(result.plan.units[0].is_complete_system)
@@ -1426,6 +1500,25 @@ class GenApiTest(unittest.TestCase):
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)
             self.assertIn("static constexpr int N_FIELDS = 2;", contents)
+            wrapper = os.path.join(out_dir, "op", "sfem_GeneratedStokes.cpp")
+            with open(wrapper, encoding="utf-8") as input_file:
+                wrapper_contents = input_file.read()
+            self.assertIn("class GeneratedStokes::Impl", wrapper_contents)
+            self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", wrapper_contents)
+            self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 3;", wrapper_contents)
+            self.assertIn("const real_t *const SFEM_RESTRICT u_data[2]", wrapper_contents)
+            self.assertIn("real_t *const SFEM_RESTRICT u_out[2]", wrapper_contents)
+            c_abi = os.path.join(out_dir, "op", "sfem_GeneratedStokes_c_abi.hpp")
+            with open(c_abi, encoding="utf-8") as input_file:
+                declarations = input_file.read()
+            self.assertIn(
+                "extern \"C\" int stokes_tri6_tri3_residual_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa",
+                declarations,
+            )
             self.assertIn(
                 "d2/tri6_tri3/stokes_form_2_u_p_tri6_tri3_operator.cpp",
                 names,

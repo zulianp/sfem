@@ -1,12 +1,19 @@
-def generate_op_files(material, elements):
+import re
+
+
+def generate_op_files(material, elements, kernel_sources=None):
+    c_abi_header = "sfem_%s_c_abi.hpp" % material.op_name if kernel_sources else None
     if hasattr(material, "energy"):
-        header, source = _hyperelastic_op(material, elements)
+        header, source = _hyperelastic_op(material, elements, c_abi_header)
     else:
-        header, source = _residual_op(material, elements)
-    return {
+        header, source = _residual_op(material, elements, c_abi_header)
+    files = {
         "op/sfem_%s.hpp" % material.op_name: header,
         "op/sfem_%s.cpp" % material.op_name: source,
     }
+    if c_abi_header:
+        files["op/%s" % c_abi_header] = _c_abi_header(material, kernel_sources)
+    return files
 
 
 def _header(material, residual):
@@ -60,7 +67,7 @@ namespace sfem {
 """ % {"op": material.op_name, "extra": extra}
 
 
-def _hyperelastic_op(material, elements):
+def _hyperelastic_op(material, elements, c_abi_header=None):
     parameters = tuple(str(name) for name, _ in material.parameter_defaults)
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
@@ -71,8 +78,8 @@ def _hyperelastic_op(material, elements):
         dim = _element_dim(element)
         stem = "%s_%s_%s" % (
             material.name,
-            element.lower(),
-            element.lower(),
+            _element_name(element).lower(),
+            _element_name(element).lower(),
         )
         components = _components(dim)
         declarations.extend(
@@ -163,6 +170,7 @@ def _hyperelastic_op(material, elements):
         )
 
     source = """#include "sfem_%(op)s.hpp"
+%(c_abi_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -174,9 +182,7 @@ def _hyperelastic_op(material, elements):
 #include <cstring>
 #include <memory>
 
-extern "C" {
-%(declarations)s
-}
+%(declaration_block)s
 
 namespace sfem {
     namespace {
@@ -442,6 +448,12 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": material.op_name,
+        "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        "declaration_block": (
+            ""
+            if c_abi_header
+            else 'extern "C" {\n%s\n}' % "\n".join(declarations)
+        ),
         "declarations": "\n".join(declarations),
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
@@ -452,13 +464,15 @@ namespace sfem {
     return _header(material, False), source
 
 
-def _residual_op(material, elements):
+def _residual_op(material, elements, c_abi_header=None):
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
     residual_cases = []
     action_cases = []
     dependencies_by_dim = {}
     parameter_names_by_dim = {}
+    fields_by_dim = {}
+    block_size_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
@@ -471,8 +485,10 @@ def _residual_op(material, elements):
             )
             dependencies_by_dim[dim] = dependencies
             parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in system.parameters)
+            fields_by_dim[dim] = tuple(collection.fields)
+            block_size_by_dim[dim] = sum(int(field.components) for field in collection.fields)
         residual_dependencies, action_dependencies = dependencies
-        stem = "%s_%s" % (material.name, element.lower())
+        stem = "%s_%s" % (material.name, _element_name(element).lower())
         residual_pointer_params = []
         if residual_dependencies.current:
             residual_pointer_params.append("const real_t *")
@@ -499,34 +515,121 @@ def _residual_op(material, elements):
         )
         common = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), points, parameters"
+            "domain.block->elements()->data(), points"
         )
         residual_args = [common]
+        residual_args.extend(
+            "storage[%d]" % index
+            for index, _ in enumerate(parameter_names_by_dim[dim])
+        )
+        residual_setup = []
         if residual_dependencies.current:
-            residual_args.append("state")
+            residual_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "state",
+                    "data",
+                    "const real_t",
+                )
+            )
+            residual_args.append("FIELD_STRIDE")
+            residual_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+            )
         if residual_dependencies.previous:
-            residual_args.append("previous")
-        residual_args.append("out")
+            residual_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "previous",
+                    "old_data",
+                    "const real_t",
+                )
+            )
+            residual_args.append("FIELD_STRIDE")
+            residual_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+            )
+        residual_setup.extend(
+            _residual_soa_view_declarations(
+                fields_by_dim[dim],
+                "out",
+                "out",
+                "real_t",
+            )
+        )
+        residual_args.append("FIELD_STRIDE")
+        residual_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
         residual_cases.append(
-            _case(
+            _residual_soa_case(
                 element,
-                "%s_residual_isoparametric_mesh_aos" % stem,
+                "%s_residual_isoparametric_mesh_soa" % stem,
                 ", ".join(residual_args),
+                block_size_by_dim[dim],
+                residual_setup,
             )
         )
         action_args = [common]
+        action_args.extend(
+            "storage[%d]" % index
+            for index, _ in enumerate(parameter_names_by_dim[dim])
+        )
+        action_setup = []
         if action_dependencies.current:
-            action_args.append("current")
+            action_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "current",
+                    "data",
+                    "const real_t",
+                )
+            )
+            action_args.append("FIELD_STRIDE")
+            action_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+            )
         if action_dependencies.previous:
-            action_args.append("previous")
+            action_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "previous",
+                    "old_data",
+                    "const real_t",
+                )
+            )
+            action_args.append("FIELD_STRIDE")
+            action_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+            )
         if action_dependencies.direction:
-            action_args.append("direction")
-        action_args.append("out")
+            action_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "direction",
+                    "direction_data",
+                    "const real_t",
+                )
+            )
+            action_args.append("FIELD_STRIDE")
+            action_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+            )
+        action_setup.extend(
+            _residual_soa_view_declarations(
+                fields_by_dim[dim],
+                "out",
+                "out",
+                "real_t",
+            )
+        )
+        action_args.append("FIELD_STRIDE")
+        action_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
         action_cases.append(
-            _case(
+            _residual_soa_case(
                 element,
-                "%s_jacobian_action_isoparametric_mesh_aos" % stem,
+                "%s_jacobian_action_isoparametric_mesh_soa" % stem,
                 ", ".join(action_args),
+                block_size_by_dim[dim],
+                action_setup,
             )
         )
 
@@ -543,6 +646,7 @@ def _residual_op(material, elements):
     max_parameters = max(len(names) for names in parameter_names_by_dim.values())
     parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
     source = """#include "sfem_%(op)s.hpp"
+%(c_abi_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -551,9 +655,7 @@ def _residual_op(material, elements):
 
 #include <cstring>
 
-extern "C" {
-%(declarations)s
-}
+%(declaration_block)s
 
 namespace sfem {
     namespace {
@@ -577,6 +679,10 @@ namespace sfem {
             int index = 0;
 %(parameter_lines)s
         }
+
+        ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+        }
     }  // namespace
 
     class %(op)s::Impl {
@@ -591,8 +697,11 @@ namespace sfem {
     };
 
     std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        if (space->block_size() != %(nfields)d) {
-            SFEM_ERROR("%(op)s requires block_size=%(nfields)d\\n");
+        const ptrdiff_t expected_block_size =
+                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        if (space->block_size() != expected_block_size) {
+            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
             return nullptr;
         }
         auto op = std::make_unique<%(op)s>(space);
@@ -636,7 +745,6 @@ namespace sfem {
             parameter_array(*domain.parameters,
                             mesh->spatial_dimension(),
                             storage);
-            const real_t *const parameters = storage;
 %(gradient_previous_alias)s
             switch (domain.element_type) {
 %(residual_cases)s
@@ -660,7 +768,6 @@ namespace sfem {
             parameter_array(*domain.parameters,
                             mesh->spatial_dimension(),
                             storage);
-            const real_t *const parameters = storage;
 %(apply_previous_alias)s
             switch (domain.element_type) {
 %(action_cases)s
@@ -751,12 +858,18 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": material.op_name,
-        "nfields": 2,
+        "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        "declaration_block": (
+            ""
+            if c_abi_header
+            else 'extern "C" {\n%s\n}' % "\n".join(declarations)
+        ),
         "declarations": "\n".join(declarations),
         "max_parameters": max_parameters,
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
+        "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
         "gradient_previous_check": (
@@ -852,6 +965,131 @@ def _residual_parameter_array_lines(parameter_names_by_dim):
         ]
     )
     return "\n".join(lines)
+
+
+def _residual_block_size_lines(block_size_by_dim):
+    lines = ["            switch (dim) {"]
+    for dim in sorted(block_size_by_dim):
+        lines.append("                case %d: return %d;" % (dim, block_size_by_dim[dim]))
+    lines.extend(
+        [
+            "                default:",
+            '                    SFEM_ERROR("unsupported spatial dimension %d for generated residual block size\\n", dim);',
+            "                    return 0;",
+            "            }",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
+    lines = []
+    offset = 0
+    for field in fields:
+        components = int(field.components)
+        name = _safe_identifier("%s_%s" % (field.name, suffix))
+        if components == 1:
+            lines.append(
+                "                    %s *const SFEM_RESTRICT %s = %s + %d;"
+                % (scalar_type, name, base, offset)
+            )
+        else:
+            entries = ", ".join("%s + %d" % (base, offset + component) for component in range(components))
+            lines.append(
+                "                    %s *const SFEM_RESTRICT %s[%d] = {%s};"
+                % (scalar_type, name, components, entries)
+            )
+        offset += components
+    return lines
+
+
+def _residual_soa_field_argument_names(fields, suffix):
+    return tuple(
+        _safe_identifier("%s_%s" % (field.name, suffix))
+        for field in fields
+    )
+
+
+def _residual_soa_case(element, function, arguments, field_stride, setup_lines):
+    return """                case smesh::%(element)s: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
+%(setup)s
+                    return %(function)s(%(arguments)s);
+                }""" % {
+        "element": _mesh_element_name(element),
+        "function": function,
+        "arguments": arguments,
+        "field_stride": field_stride,
+        "setup": "\n".join(setup_lines),
+    }
+
+
+def _safe_identifier(name):
+    return re.sub(r"[^0-9A-Za-z_]", "_", str(name))
+
+
+def _c_abi_header(material, kernel_sources):
+    declarations = _extract_c_abi_declarations(kernel_sources)
+    body = "\n\n".join(declarations)
+    if body:
+        body += "\n"
+    return """#pragma once
+
+#include <cstddef>
+
+#if defined(__has_include)
+#if __has_include("sfem_base.hpp")
+#include "sfem_base.hpp"
+#define SFEM_CODEGEN_OP_HAS_SFEM_BASE
+#endif
+#endif
+
+#ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
+typedef ptrdiff_t idx_t;
+typedef double real_t;
+typedef double geom_t;
+#endif
+
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+
+#include "../kernel_diagnostics.hpp"
+
+%(body)s""" % {
+        "body": body,
+    }
+
+
+def _extract_c_abi_declarations(kernel_sources):
+    declarations = {}
+    for path, source in sorted(kernel_sources.items()):
+        if not path.endswith((".cpp", ".hpp")) or path.startswith("op/"):
+            continue
+        offset = 0
+        while True:
+            start = source.find('extern "C"', offset)
+            if start < 0:
+                break
+            brace = source.find("{", start)
+            semicolon = source.find(";", start)
+            if semicolon >= 0 and (brace < 0 or semicolon < brace):
+                declaration = source[start:semicolon + 1]
+                offset = semicolon + 1
+            elif brace >= 0:
+                declaration = source[start:brace].rstrip() + ";"
+                offset = brace + 1
+            else:
+                break
+            name = _c_abi_function_name(declaration)
+            if name and name not in declarations:
+                declarations[name] = declaration
+    return tuple(declarations[name] for name in sorted(declarations))
+
+
+def _c_abi_function_name(declaration):
+    match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", declaration)
+    return match.group(1) if match else None
 
 
 def _hyperelastic_declarations(stem, dim, parameters):
@@ -1075,12 +1313,20 @@ def _affine_geometry_offsets(dim):
 
 
 def _element_dim(element):
-    if element in ("TRI3", "TRI6", "QUAD4"):
+    name = _element_name(element)
+    if name in ("TRI3", "TRI6", "QUAD4") or name.startswith(("TRI6_", "QUAD4_")):
         return 2
-    if element in ("TET4", "TET10", "HEX8", "HEX27") or str(element).startswith("PROTEUS_HEX"):
+    if (
+        name in ("TET4", "TET10", "HEX8", "HEX27")
+        or name.startswith(("TET10_", "HEX27_", "PROTEUS_HEX"))
+    ):
         return 3
     raise ValueError("unsupported generated Op element %s" % element)
 
 
 def _mesh_element_name(element):
-    return element
+    return getattr(element, "cell_element_type", _element_name(element))
+
+
+def _element_name(element):
+    return getattr(element, "name", str(element).upper())

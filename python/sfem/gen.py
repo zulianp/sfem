@@ -683,7 +683,7 @@ def generate(
     files = CodeGenerationStage(user_input, codegen_plan).run()
 
     if material.op_name:
-        files.update(_generate_op_wrapper_files(material, selected, user_input))
+        files.update(_generate_op_wrapper_files(material, selected, user_input, files))
 
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
@@ -1148,7 +1148,7 @@ def _material_equations(material, dim):
     return material.systems.for_dim(dim).equations
 
 
-def _generate_op_wrapper_files(material, selected, user_input):
+def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
     if not user_input.element_contexts:
         raise ValueError("generated Op wrapper requires at least one element context")
     representative_dim = user_input.element_contexts[0].specialization.dim
@@ -1166,6 +1166,7 @@ def _generate_op_wrapper_files(material, selected, user_input):
                 material.parameter_defaults,
             ),
             selected,
+            kernel_sources,
         )
     if equation.is_residual:
         systems_by_dim = {
@@ -1188,6 +1189,7 @@ def _generate_op_wrapper_files(material, selected, user_input):
                 form_collections,
             ),
             selected,
+            kernel_sources,
         )
     raise TypeError("unsupported unified equation form %s" % equation.form)
 
@@ -1479,6 +1481,9 @@ def _clean_outputs(out_dir, name):
             os.remove(path)
     for pattern in nested_patterns:
         for path in glob.glob(os.path.join(out_dir, "d*", "*", pattern)):
+            os.remove(path)
+    for pattern in ("sfem_*.hpp", "sfem_*.cpp", "sfem_*.o"):
+        for path in glob.glob(os.path.join(out_dir, "op", pattern)):
             os.remove(path)
 
 
