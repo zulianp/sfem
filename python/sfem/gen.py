@@ -1100,6 +1100,7 @@ _CODEGEN_COMMON_HEADERS = frozenset(
         "kernel_math.hpp",
         "kernel_diagnostics.hpp",
         "tensor_product_kernels.hpp",
+        "geometry_kernels.hpp",
     )
 )
 
@@ -1454,6 +1455,7 @@ def _clean_outputs(out_dir, name):
         "kernel_math.hpp",
         "kernel_diagnostics.hpp",
         "tensor_product_kernels.hpp",
+        "geometry_kernels.hpp",
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):
@@ -1470,6 +1472,7 @@ def _clean_outputs(out_dir, name):
         "kernel_math.hpp",
         "kernel_diagnostics.hpp",
         "tensor_product_kernels.hpp",
+        "geometry_kernels.hpp",
     )
     for pattern in nested_patterns:
         for path in glob.glob(os.path.join(out_dir, "d*", pattern)):

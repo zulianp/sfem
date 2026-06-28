@@ -1455,6 +1455,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
         self.assertIn("block_coordinate_streams[DIM * N_SHAPE]", operator_source)
         self.assertIn(
+            '#include "geometry_kernels.hpp"',
+            operator_source,
+        )
+        self.assertIn("geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>", operator_source)
+        self.assertNotIn(
             "block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22",
             operator_source,
         )
@@ -1539,6 +1544,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )[0]
         self.assertIn(
             "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+            isoparametric_mesh_source,
+        )
+        self.assertIn(
+            "geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>",
             isoparametric_mesh_source,
         )
         self.assertIn(
@@ -2109,10 +2118,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("block_ux0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_adjugate0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_determinant0[VECTOR_SIZE]", operator_source)
-        self.assertIn(
-            "block_jacobian_adjugate0[lane]",
-            operator_source,
-        )
+        self.assertIn("block_jacobian_adjugate_streams[DIM * DIM]", operator_source)
+        self.assertIn("geometry_jacobian_adjugate_and_determinant_2<scalar_t>", operator_source)
+        self.assertNotIn("block_jacobian_adjugate0[lane] = J11", operator_source)
         self.assertNotIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
         self.assertIn("#pragma omp simd", local_source)
         self.assertIn("template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>", local_source)

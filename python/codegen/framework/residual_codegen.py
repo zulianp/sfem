@@ -5,6 +5,9 @@ import sympy as sp
 from .residual import CoupledResidualSystem
 from .tensor_product_geometry import (
     isoparametric_adjugate_lines,
+    isoparametric_adjugate_call_lines,
+    isoparametric_adjugate_stream_array_lines,
+    sfem_geometry_kernels_header_source,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
     tensor_product_evaluated_isoparametric_geometry_lines,
@@ -525,6 +528,10 @@ def generate_coupled_residual_sfem_files(
             sfem_tensor_product_kernels_header_source(),
         ),
         GeneratedKernelFile(
+            "geometry_kernels.hpp",
+            sfem_geometry_kernels_header_source(),
+        ),
+        GeneratedKernelFile(
             diagnostics_name,
             "\n".join(_sfem_soa_diagnostics_header()),
         ),
@@ -603,6 +610,10 @@ def generate_mixed_residual_sfem_files(
         GeneratedKernelFile(
             "tensor_product_kernels.hpp",
             sfem_tensor_product_kernels_header_source(),
+        ),
+        GeneratedKernelFile(
+            "geometry_kernels.hpp",
+            sfem_geometry_kernels_header_source(),
         ),
         GeneratedKernelFile(
             "kernel_diagnostics.hpp",
@@ -1598,6 +1609,7 @@ def _operator_source(
     element = rule.element_type.lower()
     lines = [
         '#include "%s"' % local_name,
+        '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
         "",
         "#ifndef SFEM_SUCCESS",
@@ -1787,6 +1799,7 @@ def _mixed_operator_source(
     lines = [
         '#include "%s"' % local_name,
         '#include "kernel_math.hpp"',
+        '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
         "",
         "#ifndef SFEM_SUCCESS",
@@ -2302,6 +2315,11 @@ def _mixed_isoparametric_function(
                 determinant_target=lambda index: (
                     "block_determinant[%s]" % index
                 ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
                 shape_name="%s_shape_1d" % reference_stage,
                 grad_name="%s_grad_1d" % reference_stage,
             )
@@ -2310,6 +2328,11 @@ def _mixed_isoparametric_function(
         lines.extend(
             [
                 "",
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
                 "        for (int q = 0; q < N_QP; ++q) {",
                 "#pragma omp simd",
                 "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
@@ -3132,6 +3155,11 @@ def _isoparametric_mesh_operator_source(
                 determinant_target=lambda index: (
                     "block_determinant[%s]" % index
                 ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
                 shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
                 grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
             )
@@ -3140,6 +3168,11 @@ def _isoparametric_mesh_operator_source(
         lines.extend(
             [
                 "",
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
                 "        for (int q = 0; q < N_QP; ++q) {",
                 "#pragma omp simd",
                 "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
@@ -3300,14 +3333,12 @@ def _isoparametric_mesh_operator_source(
 
 
 def _isoparametric_geometry_assignment_lines(dim, indent):
-    return isoparametric_adjugate_lines(
-        dim,
-        indent,
-        "q * VECTOR_SIZE + lane",
-        lambda component, index: (
-            "block_adjugate_data[%d][%s]" % (component, index)
-        ),
-        lambda index: "block_determinant[%s]" % index,
+    return isoparametric_adjugate_call_lines(
+        dim=dim,
+        indent=indent,
+        index="q * VECTOR_SIZE + lane",
+        stream_array_name="block_adjugate_streams",
+        determinant_stream="block_determinant",
     )
 
 
