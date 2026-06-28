@@ -55,6 +55,27 @@ def isoparametric_adjugate_lines(
     raise ValueError("isoparametric geometry supports dimensions 1, 2, and 3")
 
 
+def coordinate_stream_array_lines(
+    coordinate_streams,
+    *,
+    stream_array_name="block_coordinate_streams",
+    indent="        ",
+):
+    if isinstance(coordinate_streams, str):
+        return [
+            "%sconst scalar_t *%s[DIM * N_SHAPE];" % (indent, stream_array_name),
+            "%sfor (int stream = 0; stream < DIM * N_SHAPE; ++stream) {" % indent,
+            "%s    %s[stream] = %s[stream];"
+            % (indent, stream_array_name, coordinate_streams),
+            "%s}" % indent,
+        ]
+
+    return [
+        "%sconst scalar_t *const %s[DIM * N_SHAPE] = {%s};"
+        % (indent, stream_array_name, ", ".join(coordinate_streams))
+    ]
+
+
 def tensor_product_isoparametric_geometry_lines(
     *,
     dim,
@@ -70,7 +91,7 @@ def tensor_product_isoparametric_geometry_lines(
 ):
     if dim not in (2, 3):
         raise ValueError("tensor-product geometry supports dimensions 2 and 3")
-    if len(coordinate_streams) != dim * n_shape:
+    if not isinstance(coordinate_streams, str) and len(coordinate_streams) != dim * n_shape:
         raise ValueError("coordinate stream count must be dim * n_shape")
     n_shape_1d = round(n_shape ** (1.0 / dim))
     if n_shape_1d ** dim != n_shape:
@@ -87,12 +108,15 @@ def tensor_product_isoparametric_geometry_lines(
         n_qp_1d,
     )
 
-    lines = [
-        "%sconst scalar_t *const %s[DIM * N_SHAPE] = {%s};"
-        % (indent, stream_array_name, ", ".join(coordinate_streams)),
+    lines = coordinate_stream_array_lines(
+        coordinate_streams,
+        stream_array_name=stream_array_name,
+        indent=indent,
+    )
+    lines.extend([
         "%sscalar_t %s[DIM * N_QP * DIM * VECTOR_SIZE];"
         % (indent, gradient_name),
-    ]
+    ])
     lines.extend(
         evaluator_lines(
             stream_array_name,
@@ -210,12 +234,15 @@ def tensor_product_coordinate_gradient_lines(
     shape_name="shape_1d",
     grad_name="grad_1d",
 ):
-    lines = [
-        "%sconst scalar_t *const %s[DIM * N_SHAPE] = {%s};"
-        % (indent, stream_array_name, ", ".join(coordinate_streams)),
+    lines = coordinate_stream_array_lines(
+        coordinate_streams,
+        stream_array_name=stream_array_name,
+        indent=indent,
+    )
+    lines.extend([
         "%sscalar_t %s[DIM * N_QP * DIM * VECTOR_SIZE];"
         % (indent, gradient_name),
-    ]
+    ])
     for component in range(dim):
         lines.extend(
             [

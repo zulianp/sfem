@@ -2766,37 +2766,6 @@ def _sfem_soa_operator_source(
             )
         )
         lines.append("")
-        lines.extend(
-            _sfem_soa_operator_function(
-                form,
-                prefix,
-                dim,
-                n_nodes,
-                n_qp,
-                vector_size,
-                local_prefix,
-                array_inputs,
-                quadrature_rule,
-                use_shared_weak_local,
-            )
-        )
-        if _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
-            lines.append("")
-            lines.extend(
-                _sfem_soa_operator_function(
-                    form,
-                    prefix,
-                    dim,
-                    n_nodes,
-                    n_qp,
-                    vector_size,
-                    local_prefix,
-                    array_inputs,
-                    quadrature_rule,
-                    use_shared_weak_local,
-                    isoparametric_geometry=True,
-                )
-            )
         if quadrature_rule is not None and _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
             affine_rule = (
                 affine_quadrature_rule
@@ -2972,8 +2941,19 @@ def _sfem_soa_operator_function(
         ]
     )
 
+    compact_stream_buffers = use_stream_arrays
     block_streams = []
-    if isoparametric_geometry:
+    if compact_stream_buffers:
+        if isoparametric_geometry:
+            lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if form.has_direction:
+            lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if form.name != "objective":
+            lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        else:
+            lines.append("        scalar_t block_value[VECTOR_SIZE];")
+    elif isoparametric_geometry:
         for stream in _coordinate_stream_names(dim, n_nodes):
             block_streams.append(stream)
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
@@ -2983,94 +2963,242 @@ def _sfem_soa_operator_function(
                 block_streams.append(stream)
                 extent = "N_QP * VECTOR_SIZE" if form.weak_form is not None else "VECTOR_SIZE"
                 lines.append("        %s block_%s[%s];" % (array_input.scalar_type, stream, extent))
-    for stream in _field_stream_names("u", dim, n_nodes):
-        block_streams.append(stream)
-        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-    if form.has_direction:
-        for stream in _field_stream_names("h", dim, n_nodes):
+    if not compact_stream_buffers:
+        for stream in _field_stream_names("u", dim, n_nodes):
             block_streams.append(stream)
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-    for stream in _output_stream_names(form, dim, n_nodes):
-        block_streams.append(stream)
-        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+        if form.has_direction:
+            for stream in _field_stream_names("h", dim, n_nodes):
+                block_streams.append(stream)
+                lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+        for stream in _output_stream_names(form, dim, n_nodes):
+            block_streams.append(stream)
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
 
-    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
-    if isoparametric_geometry:
-        for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
-    for stream in _field_stream_names("u", dim, n_nodes):
-        lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
-    if form.has_direction:
-        for stream in _field_stream_names("h", dim, n_nodes):
-            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
-    for stream in _output_stream_names(form, dim, n_nodes):
-        if form.output_mode == "accumulate":
-            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
-        else:
-            lines.append("            block_%s[lane] = scalar_t(0);" % stream)
-    lines.append("        }")
-
-    if use_stream_arrays:
-        lines.append("")
-        lines.append(
-            "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
-            % (
-                dim,
-                ", ".join(
-                    "block_%s" % stream
-                    for stream in streams_in_shape_order(
-                        _field_stream_names("u", dim, n_nodes),
+    if compact_stream_buffers:
+        if isoparametric_geometry:
+            lines.append(
+                "        const scalar_t *const coordinate_stream_inputs[N_SHAPE * DIM] = {%s};"
+                % ", ".join(
+                    stream
+                    for stream in tensor_product_ordered_coordinate_streams(
                         dim,
-                        stream_shape_order,
+                        n_nodes,
+                        _coordinate_stream_names(dim, n_nodes),
+                        shape_order=stream_shape_order,
                     )
-                ),
+                )
             )
+            lines.extend(
+                [
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "#pragma omp simd",
+                    "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                block_coordinate_data[stream][lane] = coordinate_stream_inputs[stream][evbegin + lane];",
+                    "            }",
+                    "        }",
+                ]
+            )
+        lines.append(
+            "        const scalar_t *const u_stream_inputs[N_SHAPE * DIM] = {%s};"
+            % ", ".join(
+                stream
+                for stream in streams_in_shape_order(
+                    _field_stream_names("u", dim, n_nodes),
+                    dim,
+                    stream_shape_order,
+                )
+            )
+        )
+        lines.extend(
+            [
+                "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                "#pragma omp simd",
+                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                block_u_data[stream][lane] = u_stream_inputs[stream][evbegin + lane];",
+                "            }",
+                "        }",
+            ]
         )
         if form.has_direction:
             lines.append(
-                "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
+                "        const scalar_t *const h_stream_inputs[N_SHAPE * DIM] = {%s};"
+                % ", ".join(
+                    stream
+                    for stream in streams_in_shape_order(
+                        _field_stream_names("h", dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
+                )
+            )
+            lines.extend(
+                [
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "#pragma omp simd",
+                    "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                block_h_data[stream][lane] = h_stream_inputs[stream][evbegin + lane];",
+                    "            }",
+                    "        }",
+                ]
+            )
+        if form.name == "objective":
+            if form.output_mode == "accumulate":
+                lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "            block_value[lane] = value[evbegin + lane];", "        }"])
+            else:
+                lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "            block_value[lane] = scalar_t(0);", "        }"])
+        else:
+            lines.append(
+                "        scalar_t *const out_stream_outputs[N_SHAPE * DIM] = {%s};"
+                % ", ".join(
+                    stream
+                    for stream in streams_in_shape_order(
+                        _output_stream_names(form, dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
+                )
+            )
+            if form.output_mode == "accumulate":
+                lines.extend(
+                    [
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "#pragma omp simd",
+                        "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                        "                block_out_data[stream][lane] = out_stream_outputs[stream][evbegin + lane];",
+                        "            }",
+                        "        }",
+                    ]
+                )
+            else:
+                lines.extend(
+                    [
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "#pragma omp simd",
+                        "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                        "                block_out_data[stream][lane] = scalar_t(0);",
+                        "            }",
+                        "        }",
+                    ]
+                )
+    else:
+        lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        if isoparametric_geometry:
+            for stream in _coordinate_stream_names(dim, n_nodes):
+                lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+        for stream in _field_stream_names("u", dim, n_nodes):
+            lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+        if form.has_direction:
+            for stream in _field_stream_names("h", dim, n_nodes):
+                lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+        for stream in _output_stream_names(form, dim, n_nodes):
+            if form.output_mode == "accumulate":
+                lines.append("            block_%s[lane] = %s[evbegin + lane];" % (stream, stream))
+            else:
+                lines.append("            block_%s[lane] = scalar_t(0);" % stream)
+        lines.append("        }")
+
+    if use_stream_arrays:
+        lines.append("")
+        if compact_stream_buffers:
+            lines.extend(
+                [
+                    "        const scalar_t *block_u_streams[N_SHAPE * DIM];",
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "            block_u_streams[stream] = block_u_data[stream];",
+                    "        }",
+                ]
+            )
+        else:
+            lines.append(
+                "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
                 % (
                     dim,
                     ", ".join(
                         "block_%s" % stream
                         for stream in streams_in_shape_order(
-                            _field_stream_names("h", dim, n_nodes),
+                            _field_stream_names("u", dim, n_nodes),
                             dim,
                             stream_shape_order,
                         )
                     ),
                 )
             )
+        if form.has_direction:
+            if compact_stream_buffers:
+                lines.extend(
+                    [
+                        "        const scalar_t *block_h_streams[N_SHAPE * DIM];",
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "            block_h_streams[stream] = block_h_data[stream];",
+                        "        }",
+                    ]
+                )
+            else:
+                lines.append(
+                    "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _field_stream_names("h", dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                    )
+                )
         if form.name == "objective":
             pass
         else:
+            if compact_stream_buffers:
+                lines.extend(
+                    [
+                        "        scalar_t *block_out_streams[N_SHAPE * DIM];",
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "            block_out_streams[stream] = block_out_data[stream];",
+                        "        }",
+                    ]
+                )
+            else:
+                lines.append(
+                    "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _output_stream_names(form, dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                )
+            )
+
+    if isoparametric_geometry and not use_tensor_product_reference:
+        lines.append("")
+        if compact_stream_buffers:
+            lines.extend(
+                [
+                    "        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];",
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "            block_coordinate_streams[stream] = block_coordinate_data[stream];",
+                    "        }",
+                ]
+            )
+        else:
             lines.append(
-                "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
+                "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
                 % (
                     dim,
                     ", ".join(
                         "block_%s" % stream
-                        for stream in streams_in_shape_order(
-                            _output_stream_names(form, dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
+                        for stream in _coordinate_stream_names(dim, n_nodes)
                     ),
+                )
             )
-        )
-
-    if isoparametric_geometry and not use_tensor_product_reference:
-        lines.append("")
-        lines.append(
-            "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
-            % (
-                dim,
-                ", ".join(
-                    "block_%s" % stream
-                    for stream in _coordinate_stream_names(dim, n_nodes)
-                ),
-            )
-        )
 
     if isoparametric_geometry and use_tensor_product_reference:
         lines.append("")
@@ -3081,12 +3209,16 @@ def _sfem_soa_operator_function(
                     n_shape=n_nodes,
                     n_qp=quadrature_rule.n_qp,
                     local_prefix=local_prefix,
-                    coordinate_streams=tensor_product_ordered_coordinate_streams(
-                        dim,
-                        n_nodes,
-                        _coordinate_stream_names(dim, n_nodes),
-                        lambda stream: "block_%s" % stream,
-                        shape_order=stream_shape_order,
+                    coordinate_streams=(
+                        "block_coordinate_data"
+                        if compact_stream_buffers
+                        else tensor_product_ordered_coordinate_streams(
+                            dim,
+                            n_nodes,
+                            _coordinate_stream_names(dim, n_nodes),
+                            lambda stream: "block_%s" % stream,
+                            shape_order=stream_shape_order,
+                        )
                     ),
                     adjugate_target=lambda component, index: (
                         "block_jacobian_adjugate%d[%s]" % (component, index)
@@ -3101,12 +3233,16 @@ def _sfem_soa_operator_function(
                 tensor_product_coordinate_gradient_lines(
                     dim=dim,
                     local_prefix=local_prefix,
-                    coordinate_streams=tensor_product_ordered_coordinate_streams(
-                        dim,
-                        n_nodes,
-                        _coordinate_stream_names(dim, n_nodes),
-                        lambda stream: "block_%s" % stream,
-                        shape_order=stream_shape_order,
+                    coordinate_streams=(
+                        "block_coordinate_data"
+                        if compact_stream_buffers
+                        else tensor_product_ordered_coordinate_streams(
+                            dim,
+                            n_nodes,
+                            _coordinate_stream_names(dim, n_nodes),
+                            lambda stream: "block_%s" % stream,
+                            shape_order=stream_shape_order,
+                        )
                     ),
                 )
             )
@@ -3234,12 +3370,27 @@ def _sfem_soa_operator_function(
         lines.append("        }")
     lines.append("")
 
-    lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
-    for stream in _output_stream_names(form, dim, n_nodes):
-        lines.append("            %s[evbegin + lane] = block_%s[lane];" % (stream, stream))
+    if compact_stream_buffers:
+        if form.name == "objective":
+            lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "            value[evbegin + lane] = block_value[lane];", "        }"])
+        else:
+            lines.extend(
+                [
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "#pragma omp simd",
+                    "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                out_stream_outputs[stream][evbegin + lane] = block_out_data[stream][lane];",
+                    "            }",
+                    "        }",
+                ]
+            )
+    else:
+        lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        for stream in _output_stream_names(form, dim, n_nodes):
+            lines.append("            %s[evbegin + lane] = block_%s[lane];" % (stream, stream))
+        lines.append("        }")
     lines.extend(
         [
-            "        }",
             "    }",
             "",
             "    return SFEM_SUCCESS;",
@@ -3435,7 +3586,23 @@ def _sfem_soa_mesh_operator_function(
         ]
     )
 
-    if geometry_mode == "isoparametric":
+    compact_stream_buffers = use_stream_arrays
+    if compact_stream_buffers:
+        lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if form.has_direction:
+            lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if form.name != "objective":
+            lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        else:
+            lines.append("        scalar_t block_value[VECTOR_SIZE];")
+        if geometry_mode == "isoparametric":
+            lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if tuple(stream_shape_order) != tuple(range(n_nodes)):
+            lines.append(
+                "        static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {%s};"
+                % ", ".join(str(shape) for shape in stream_shape_order)
+            )
+    elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
     if geometry_mode == "isoparametric":
@@ -3443,111 +3610,223 @@ def _sfem_soa_mesh_operator_function(
             for stream in _soa_array_stream_names(array_input):
                 extent = "N_QP * VECTOR_SIZE" if form.weak_form is not None else "VECTOR_SIZE"
                 lines.append("        scalar_t block_%s[%s];" % (stream, extent))
-    for stream in _field_stream_names("u", dim, n_nodes):
-        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-    if form.has_direction:
-        for stream in _field_stream_names("h", dim, n_nodes):
+    if not compact_stream_buffers:
+        for stream in _field_stream_names("u", dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-    for stream in _output_stream_names(form, dim, n_nodes):
-        lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+        if form.has_direction:
+            for stream in _field_stream_names("h", dim, n_nodes):
+                lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+        for stream in _output_stream_names(form, dim, n_nodes):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
 
-    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
-    for shape in range(n_nodes):
-        lines.append(
-            "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
-            % (shape, shape)
-        )
-    lines.append("        }")
+    lines.extend(
+        [
+            "",
+            "        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {",
+            "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
+            "#pragma omp simd",
+            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];",
+            "            }",
+            "        }",
+        ]
+    )
 
     if geometry_mode == "isoparametric":
+        if compact_stream_buffers:
+            lines.append("        const geometry_t *const coordinate_components[DIM] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
+            lines.extend(
+                [
+                    "",
+                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    "            const int stream_shape = %s;"
+                    % (
+                        "STREAM_SHAPE_ORDER[shape]"
+                        if tuple(stream_shape_order) != tuple(range(n_nodes))
+                        else "shape"
+                    ),
+                    "            for (int d = 0; d < DIM; ++d) {",
+                    "#pragma omp simd",
+                    "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];",
+                    "                }",
+                    "            }",
+                    "        }",
+                ]
+            )
+        else:
+            lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+            for shape in range(n_nodes):
+                for d in range(dim):
+                    stream = "%s%d" % (_component_name(d), shape)
+                    lines.append(
+                        "            block_%s[lane] = %s[ev[lane * N_SHAPE + %d]];"
+                        % (stream, _component_name(d), shape)
+                    )
+            lines.append("        }")
+
+    if compact_stream_buffers:
+        lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
+        if form.has_direction:
+            lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
+        lines.extend(
+            [
+                "",
+                "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "            const int stream_shape = %s;"
+                % (
+                    "STREAM_SHAPE_ORDER[shape]"
+                    if tuple(stream_shape_order) != tuple(range(n_nodes))
+                    else "shape"
+                ),
+                "            for (int d = 0; d < DIM; ++d) {",
+                "#pragma omp simd",
+                "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                    const idx_t node = ev[lane * N_SHAPE + stream_shape];",
+                "                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];",
+            ]
+        )
+        if form.has_direction:
+            lines.append("                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];")
+        lines.extend(
+            [
+                "                }",
+                "            }",
+                "        }",
+            ]
+        )
+        if form.name == "objective":
+            lines.extend(["#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "            block_value[lane] = scalar_t(0);", "        }"])
+        else:
+            lines.extend(
+                [
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "#pragma omp simd",
+                    "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                block_out_data[stream][lane] = scalar_t(0);",
+                    "            }",
+                    "        }",
+                ]
+            )
+    else:
         lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
         for shape in range(n_nodes):
             for d in range(dim):
-                stream = "%s%d" % (_component_name(d), shape)
+                component = _component_name(d)
                 lines.append(
-                    "            block_%s[lane] = %s[ev[lane * N_SHAPE + %d]];"
-                    % (stream, _component_name(d), shape)
-                )
-        lines.append("        }")
-
-    lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
-    for shape in range(n_nodes):
-        for d in range(dim):
-            component = _component_name(d)
-            lines.append(
-                "            block_u%s%d[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride];"
-                % (component, shape, component, shape)
-            )
-            if form.has_direction:
-                lines.append(
-                    "            block_h%s%d[lane] = h%s[ev[lane * N_SHAPE + %d] * h_stride];"
+                    "            block_u%s%d[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride];"
                     % (component, shape, component, shape)
                 )
-    for stream in _output_stream_names(form, dim, n_nodes):
-        lines.append("            block_%s[lane] = scalar_t(0);" % stream)
-    lines.append("        }")
+                if form.has_direction:
+                    lines.append(
+                        "            block_h%s%d[lane] = h%s[ev[lane * N_SHAPE + %d] * h_stride];"
+                        % (component, shape, component, shape)
+                    )
+        for stream in _output_stream_names(form, dim, n_nodes):
+            lines.append("            block_%s[lane] = scalar_t(0);" % stream)
+        lines.append("        }")
 
     if use_stream_arrays:
         lines.append("")
-        lines.append(
-            "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
-            % (
-                dim,
-                ", ".join(
-                    "block_%s" % stream
-                    for stream in streams_in_shape_order(
-                        _field_stream_names("u", dim, n_nodes),
-                        dim,
-                        stream_shape_order,
-                    )
-                ),
+        if compact_stream_buffers:
+            lines.extend(
+                [
+                    "        const scalar_t *block_u_streams[N_SHAPE * DIM];",
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "            block_u_streams[stream] = block_u_data[stream];",
+                    "        }",
+                ]
             )
-        )
+        else:
+            lines.append(
+                "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(
+                        "block_%s" % stream
+                        for stream in streams_in_shape_order(
+                            _field_stream_names("u", dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
+                    ),
+                )
+            )
         if form.has_direction:
-            lines.append(
-                "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        "block_%s" % stream
-                        for stream in streams_in_shape_order(
-                            _field_stream_names("h", dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
-                    ),
+            if compact_stream_buffers:
+                lines.extend(
+                    [
+                        "        const scalar_t *block_h_streams[N_SHAPE * DIM];",
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "            block_h_streams[stream] = block_h_data[stream];",
+                        "        }",
+                    ]
                 )
-            )
+            else:
+                lines.append(
+                    "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _field_stream_names("h", dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                    )
+                )
         if form.name != "objective":
-            lines.append(
-                "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        "block_%s" % stream
-                        for stream in streams_in_shape_order(
-                            _output_stream_names(form, dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
-                    ),
+            if compact_stream_buffers:
+                lines.extend(
+                    [
+                        "        scalar_t *block_out_streams[N_SHAPE * DIM];",
+                        "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                        "            block_out_streams[stream] = block_out_data[stream];",
+                        "        }",
+                    ]
                 )
-            )
+            else:
+                lines.append(
+                    "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _output_stream_names(form, dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                    )
+                )
 
     if geometry_mode == "isoparametric" and not (
         form.weak_form is not None and use_tensor_product_reference
     ):
         lines.append("")
-        lines.append(
-            "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
-            % (
-                dim,
-                ", ".join(
-                    "block_%s" % stream
-                    for stream in _coordinate_stream_names(dim, n_nodes)
-                ),
+        if compact_stream_buffers:
+            lines.extend(
+                [
+                    "        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];",
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "            block_coordinate_streams[stream] = block_coordinate_data[stream];",
+                    "        }",
+                ]
             )
-        )
+        else:
+            lines.append(
+                "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(
+                        "block_%s" % stream
+                        for stream in _coordinate_stream_names(dim, n_nodes)
+                    ),
+                )
+            )
 
     if form.weak_form is None:
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
@@ -3570,12 +3849,16 @@ def _sfem_soa_mesh_operator_function(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=tensor_product_ordered_coordinate_streams(
-                    dim,
-                    n_nodes,
-                    _coordinate_stream_names(dim, n_nodes),
-                    lambda stream: "block_%s" % stream,
-                    shape_order=stream_shape_order,
+                coordinate_streams=(
+                    "block_coordinate_data"
+                    if compact_stream_buffers
+                    else tensor_product_ordered_coordinate_streams(
+                        dim,
+                        n_nodes,
+                        _coordinate_stream_names(dim, n_nodes),
+                        lambda stream: "block_%s" % stream,
+                        shape_order=stream_shape_order,
+                    )
                 ),
                 adjugate_target=lambda component, index: (
                     "block_jacobian_adjugate%d[%s]" % (component, index)
@@ -3681,19 +3964,41 @@ def _sfem_soa_mesh_operator_function(
         lines.append("            value[evbegin + lane] += block_value[lane];")
         lines.append("        }")
     else:
-        lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
-        for shape in range(n_nodes):
-            for d in range(dim):
-                component = _component_name(d)
-                lines.extend(
-                    [
-                        "#pragma omp atomic update",
-                        "            out%s[ev[lane * N_SHAPE + %d] * out_stride] += block_out%s%d[lane];"
-                        % (component, shape, component, shape),
-                        "",
-                    ]
-                )
-        lines.append("        }")
+        if compact_stream_buffers:
+            lines.append("        scalar_t *const out_components[DIM] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(dim)))
+            lines.extend(
+                [
+                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    "            const int stream_shape = %s;"
+                    % (
+                        "STREAM_SHAPE_ORDER[shape]"
+                        if tuple(stream_shape_order) != tuple(range(n_nodes))
+                        else "shape"
+                    ),
+                    "            for (int d = 0; d < DIM; ++d) {",
+                    "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                    "                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;",
+                    "#pragma omp atomic update",
+                    "                    out_components[d][node] += block_out_data[shape * DIM + d][lane];",
+                    "                }",
+                    "            }",
+                    "        }",
+                ]
+            )
+        else:
+            lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+            for shape in range(n_nodes):
+                for d in range(dim):
+                    component = _component_name(d)
+                    lines.extend(
+                        [
+                            "#pragma omp atomic update",
+                            "            out%s[ev[lane * N_SHAPE + %d] * out_stride] += block_out%s%d[lane];"
+                            % (component, shape, component, shape),
+                            "",
+                        ]
+                    )
+            lines.append("        }")
 
     lines.extend(
         [
