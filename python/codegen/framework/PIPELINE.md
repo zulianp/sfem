@@ -220,15 +220,16 @@ For each spatial dimension required by the selected elements:
 
 1. Build symbolic `F`.
 2. Call `system.add_energy(..., variables=(F,))`.
-3. Create `energy_form_pipeline(energy, tuple(F), directions)`.
-4. Evaluate requested orders:
+3. Ask `EquationSystem.form_collection(...)` to lower the equation.
+4. Inside that single lowering step, evaluate requested orders:
    - `objective` -> `FormOrder.ZERO`
    - `gradient` -> `FormOrder.ONE`
    - `apply` -> `FormOrder.TWO`
 
 The result is a dimension-keyed `UnifiedFormEvaluation` containing one unnamed
-`EnergyDimensionEvaluation`. This object contains evaluated forms only;
-it does not generate files.
+`LoweredEquationEvaluation`. The evaluation object carries the lowered
+`FormCollection`; the code-generation stage does not call
+`energy_form_pipeline(...)` directly and does not rebuild symbolic forms.
 
 ### Specialized Form Manipulation
 
@@ -237,7 +238,8 @@ it does not generate files.
 
 For each dimension, it creates a `CodeGenerationUnit` with kind
 `ENERGY_SOA`, the standardized `FormCollection`, and an
-`EnergyCodeGenerationPayload` containing only energy-specific emission state:
+`EnergyCodeGenerationPayload` containing only the remaining energy-specific
+emission state:
 
 - kernel forms
 - diagnostic graph
@@ -247,7 +249,8 @@ For each dimension, it creates a `CodeGenerationUnit` with kind
 
 `CodeGenerationStage` emits the unit with `_emit_codegen_unit(...)`.
 
-For `ENERGY_SOA`, the emitter calls:
+For `ENERGY_SOA`, `_emit_codegen_unit(...)` delegates to `OpenMPSoABackend`,
+which calls:
 
 ```python
 generate_sfem_soa_cpp_files_for_element(...)
@@ -302,14 +305,17 @@ Generation scripts:
 
 ### Form Evaluation
 
-`sfem.gen._evaluate_forms(...)` dispatches to
-the generic equation evaluator through `EquationSystem.form_collection(...)`.
+`sfem.gen._evaluate_forms(...)` dispatches through
+`EquationSystem.form_collection(...)`. This is the lowering boundary: once an
+equation has been lowered, downstream stages use only the resulting
+`FormCollection`.
 
 For each spatial dimension required by the selected elements:
 
 1. Select the explicit `EquationSystem` for that dimension.
 2. Ask the system for a `FormCollection` for each equation.
-3. For energy equations, derive forms from explicit differentiation variables.
+3. For energy equations, derive forms from explicit differentiation variables
+   inside `EquationSystem.form_collection(...)`.
 4. For residual equations, lower the weak form into a `CoupledResidualSystem`
    and store that lowered system as `FormCollection.source`.
 5. Evaluate:
@@ -346,7 +352,8 @@ kernels or assemble into a monolithic operator.
 
 `CodeGenerationStage` emits the unit with `_emit_codegen_unit(...)`.
 
-For `RESIDUAL_SOA`, the emitter calls:
+For `RESIDUAL_SOA`, `_emit_codegen_unit(...)` delegates to `OpenMPSoABackend`,
+which calls:
 
 ```python
 generate_coupled_residual_sfem_files(...)
@@ -440,7 +447,8 @@ The unit name is part of the generated prefix, so filenames do not collide.
 
 ### Unified Code Generation
 
-`CodeGenerationStage` consumes both units through the same loop. For compatible
+`CodeGenerationStage` consumes both units through the same loop and the same
+OpenMP backend dispatch. For compatible
 Taylor-Hood elements the solid unit can use the displacement/cell element, but
 the poro residual unit also needs pressure field shape functions from the lower
 order element.
@@ -462,6 +470,7 @@ After specialized form manipulation, the downstream interface is always:
 - `CodeGenerationPlan`
 - one or more `CodeGenerationUnit` objects
 - one `ElementGenerationContext` per element
+- lowered `FormCollection` objects attached to every unit
 
 The unified code-generation stage is responsible for all generated source
 emission. It is the same stage for NeoHookean, two-phase flow, and mixed
@@ -470,7 +479,7 @@ poro-hyperelasticity.
 Material-specific differences are restricted to:
 
 - user input construction
-- form evaluation
+- the single `EquationSystem.form_collection(...)` lowering step
 - specialized form manipulation into code-generation units
 
 Everything after that belongs to the single code-generation process.

@@ -5,6 +5,14 @@ These examples contain only symbolic material definitions and weak forms. The
 management, diagnostics, compilation, command-line handling, and the generated
 `sfem::Op` wrapper.
 
+The intended path is:
+
+1. user code builds explicit `EquationSystem` objects;
+2. `EquationSystem.form_collection(...)` lowers each energy or residual
+   equation to a `FormCollection`;
+3. the generation plan and OpenMP backend consume only lowered
+   `FormCollection` data.
+
 Each generation produces:
 
 - dimension/family-local kernels;

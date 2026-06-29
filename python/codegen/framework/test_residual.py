@@ -41,6 +41,13 @@ def two_field_diffusion_system(dim=2):
 def _reference_coordinates(element):
     if element == "TRI3":
         return ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    if element == "TET4":
+        return (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+        )
     if element == "HEX8":
         return (
             (0.0, 0.0, 0.0),
@@ -702,7 +709,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("c++ compiler is not available")
 
-        for element in ("TRI3", "HEX8"):
+        for element in ("TRI3", "TET4", "HEX8"):
             rule = sfem_element_quadrature_rule(element)
             system, _, _ = two_field_diffusion_system(rule.dim)
             files = generate_coupled_residual_sfem_files(
