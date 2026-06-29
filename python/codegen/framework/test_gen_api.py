@@ -1877,6 +1877,30 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("const scalar_t coeff1 = -t1;", source)
             self.assertIn("const scalar_t coeff2 = -t2;", source)
             self.assertIn("return sqrt(c0 * c0 + c1 * c1 + c2 * c2);", source)
+            self.assertIn(
+                os.path.join("op", "sfem_GeneratedNeumann.cpp"),
+                names,
+            )
+            with open(
+                os.path.join(out_dir, "op", "sfem_GeneratedNeumann.cpp"),
+                encoding="utf-8",
+            ) as input_file:
+                op_source = input_file.read()
+            self.assertIn("class GeneratedNeumann::Impl", op_source)
+            self.assertIn("void GeneratedNeumann::add_sideset", op_source)
+            self.assertIn(
+                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                op_source,
+            )
+            with open(
+                os.path.join(out_dir, "op", "sfem_GeneratedNeumann_c_abi.hpp"),
+                encoding="utf-8",
+            ) as input_file:
+                c_abi = input_file.read()
+            self.assertIn(
+                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                c_abi,
+            )
 
     def test_generates_ufl_style_coordinate_neumann_boundary_integral(self):
         system = gen.EquationSystemBuilder(2)
@@ -1926,7 +1950,7 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 "d2",
                 "tri3",
-                "neumann_tri3_boundary_operator.cpp",
+                "neumann_general_tri3_boundary_operator.cpp",
             )
             self.assertIn(source_path, result.sources)
             with open(source_path, encoding="utf-8") as input_file:
