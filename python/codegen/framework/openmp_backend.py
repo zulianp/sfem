@@ -51,12 +51,16 @@ class OpenMPSoABackend:
         prefix = _generated_prefix(unit)
         local_kernel = unit.local_kernel_plan(context, prefix)
         mesh_kernel = MeshKernelPlan(prefix, context.element_type)
+        affine_specialization, isoparametric_specialization = _geometry_specializations(
+            unit,
+            context,
+        )
         return self.emit_energy(
             payload.kernel_forms,
             prefix=mesh_kernel.name,
             local_prefix=local_kernel.name,
-            specialization=context.specialization,
-            affine_specialization=context.affine_specialization,
+            specialization=isoparametric_specialization,
+            affine_specialization=affine_specialization,
         )
 
     def _emit_residual_plan(self, unit, context):
@@ -105,13 +109,17 @@ class OpenMPSoABackend:
             "_mixed" if context.is_mixed_order else "",
         )
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        affine_specialization, isoparametric_specialization = _geometry_specializations(
+            unit,
+            context,
+        )
         if context.is_mixed_order:
             return self.emit_mixed_residual(
                 system,
                 prefix=prefix,
                 compatible_element=context.compatible_element,
-                vector_size=context.specialization.vector_size,
-                quadrature_order=context.specialization.quadrature_rule.order,
+                vector_size=isoparametric_specialization.vector_size,
+                quadrature_order=isoparametric_specialization.quadrature_rule.order,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 field_element_types=_field_element_types_for_context(
@@ -127,10 +135,10 @@ class OpenMPSoABackend:
             system,
             prefix=prefix,
             element_type=context.element_type,
-            vector_size=context.specialization.vector_size,
-            quadrature_order=context.specialization.quadrature_rule.order,
-            specialization=context.specialization,
-            affine_specialization=context.affine_specialization,
+            vector_size=isoparametric_specialization.vector_size,
+            quadrature_order=isoparametric_specialization.quadrature_rule.order,
+            specialization=isoparametric_specialization,
+            affine_specialization=affine_specialization,
             residual_coeffs=residual_coeffs,
             action_coeffs=action_coeffs,
             local_prefix=local_kernel.name,
@@ -284,6 +292,7 @@ class OpenMPSoABackend:
     def _validate_energy_plan(unit):
         _require_openmp(unit)
         _require_form_metadata(unit, tuple(form.order for form in unit.form_collection.forms))
+        _require_geometry_modes(unit, ("affine", "isoparametric"))
         for form in unit.form_collection.forms:
             _validate_expression_dependencies(
                 unit.name,
@@ -304,6 +313,7 @@ class OpenMPSoABackend:
     def _validate_residual_plan(unit):
         _require_openmp(unit)
         _require_form_metadata(unit, (FormOrder.ONE, FormOrder.TWO))
+        _require_geometry_modes(unit, ("affine", "isoparametric"))
         _require_mesh_phases(
             unit,
             (
@@ -328,6 +338,7 @@ class OpenMPSoABackend:
     def _validate_boundary_residual_plan(unit):
         _require_openmp(unit)
         _require_form_metadata(unit, (FormOrder.ONE,))
+        _require_geometry_modes(unit, ("affine", "isoparametric"))
         _require_mesh_phases(
             unit,
             (
@@ -364,6 +375,58 @@ def _require_form_metadata(unit, orders):
                 "kernel plan '%s' is missing FormMetadata for %s"
                 % (unit.name, FormOrder(order).name)
             ) from exc
+
+
+def _require_geometry_modes(unit, modes):
+    available = {geometry.mode.value for geometry in _geometry_phase(unit).geometries}
+    missing = tuple(mode for mode in modes if mode not in available)
+    if missing:
+        raise ValueError(
+            "kernel plan '%s' is missing geometry phase modes: %s"
+            % (unit.name, ", ".join(missing))
+        )
+
+
+def _geometry_specializations(unit, context):
+    affine = _geometry_plan_for_mode(unit, "affine")
+    isoparametric = _geometry_plan_for_mode(unit, "isoparametric")
+    _validate_geometry_specialization(unit.name, affine, context.affine_specialization)
+    _validate_geometry_specialization(unit.name, isoparametric, context.specialization)
+    return context.affine_specialization, context.specialization
+
+
+def _validate_geometry_specialization(kernel_name, geometry, specialization):
+    rule = specialization.quadrature_rule
+    if geometry.node.n_shape != rule.n_shape or geometry.node.n_qp != rule.n_qp:
+        raise ValueError(
+            "kernel plan '%s' geometry mode '%s' has (%d shapes, %d qp), "
+            "but specialization has (%d shapes, %d qp)"
+            % (
+                kernel_name,
+                geometry.mode.value,
+                geometry.node.n_shape,
+                geometry.node.n_qp,
+                rule.n_shape,
+                rule.n_qp,
+            )
+        )
+
+
+def _geometry_plan_for_mode(unit, mode):
+    mode = str(mode)
+    for geometry in _geometry_phase(unit).geometries:
+        if geometry.mode.value == mode:
+            return geometry
+    raise ValueError(
+        "kernel plan '%s' has no geometry mode '%s'" % (unit.name, mode)
+    )
+
+
+def _geometry_phase(unit):
+    for phase in unit.mesh_phase_plans:
+        if phase.phase is MeshPhase.GEOMETRY:
+            return phase
+    raise ValueError("kernel plan '%s' has no geometry phase" % unit.name)
 
 
 def _validate_coefficient_dependencies(kernel_name, dependencies, coefficients):

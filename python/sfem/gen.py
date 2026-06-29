@@ -316,7 +316,10 @@ class ElementGenerationContext:
             policy.specialization,
             affine_policy.specialization,
             policy,
-            geometry_plans_for_fem_policy(policy),
+            (
+                affine_geometry_plan(affine_policy),
+                isoparametric_geometry_plan(policy),
+            ),
             basis_plans_for_fem_policy(policy),
             policy.compatible_element,
         )
