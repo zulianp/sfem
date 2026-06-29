@@ -151,6 +151,14 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(gen.inv(F), F.as_matrix().inv())
         self.assertEqual(gen.adjugate(F), F.as_matrix().adjugate())
 
+    def test_spatial_coordinate_is_ufl_style_vector_expression(self):
+        with gen.geometric_dimension_context(3):
+            x = gen.SpatialCoordinate()
+
+        self.assertEqual(tuple(x), (sp.Symbol("x0"), sp.Symbol("x1"), sp.Symbol("x2")))
+        self.assertEqual(gen.value(x), sp.Matrix([sp.Symbol("x0"), sp.Symbol("x1"), sp.Symbol("x2")]))
+        self.assertEqual(x[1], sp.Symbol("x1"))
+
     def test_codegen_qualifiers_and_material_parameters(self):
         mu = gen.material_parameter("mu", default=2.0)
         p = gen.scalar_field("p")
@@ -1868,6 +1876,36 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("const scalar_t coeff1 = -t1;", source)
             self.assertIn("const scalar_t coeff2 = -t2;", source)
             self.assertIn("return sqrt(c0 * c0 + c1 * c1 + c2 * c2);", source)
+
+    def test_generates_ufl_style_coordinate_neumann_boundary_integral(self):
+        system = gen.EquationSystemBuilder(2)
+        V = gen.FunctionSpace(gen.VectorElement("Lagrange", degree=1))
+        with gen.geometric_dimension_context(2):
+            u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+            v = gen.TestFunction(V, name="u_test")
+            x = gen.SpatialCoordinate()
+            traction = sp.Matrix([x[0] * x[0], x[1]])
+            system.add_residual("", -gen.inner(traction, v) * gen.ds, fields=(u,))
+
+        systems = gen.EquationSystems(system.build())
+        material = gen.CodeGenerator("coordinate_neumann", systems, elements=("TRI3",))
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(material, out_dir, elements=("TRI3",))
+            source_path = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "coordinate_neumann_tri3_boundary_operator.cpp",
+            )
+            self.assertIn(source_path, result.sources)
+            with open(source_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+
+        self.assertIn("x0 += scalar_t(points[0][node]) * phi;", source)
+        self.assertIn("x1 += scalar_t(points[1][node]) * phi;", source)
+        self.assertIn("const scalar_t coeff0 = -pow_2(x0);", source)
+        self.assertIn("const scalar_t coeff1 = -x1;", source)
+        self.assertNotIn("const scalar_t x0,", source)
 
 
 if __name__ == "__main__":
