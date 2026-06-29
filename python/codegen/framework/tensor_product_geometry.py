@@ -301,44 +301,18 @@ def tensor_product_isoparametric_geometry_lines(
     )
     if not sum_factorization.evaluates_geometry_jacobian:
         raise ValueError("tensor-product geometry requires a Jacobian sum-factorization plan")
-    if adjugate_streams is not None and determinant_stream is not None:
-        lines.extend(
-            [
-                "",
-                "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
-                % (indent, gradient_name, ", ".join(adjugate_streams)),
-                "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
-                % indent,
-                "%s        nelems, %s, %s_adjugate_streams, %s);"
-                % (indent, gradient_name, gradient_name, determinant_stream),
-            ]
+    lines.extend(
+        tensor_product_adjugate_determinant_lines(
+            dim=dim,
+            gradient_name=gradient_name,
+            indent=indent,
+            adjugate_target=adjugate_target,
+            determinant_target=determinant_target,
+            adjugate_streams=adjugate_streams,
+            determinant_stream=determinant_stream,
+            include_lane_loop=True,
         )
-    else:
-        lines.extend(
-            [
-                "",
-                "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
-                "#pragma omp simd",
-                "%s    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
-            ]
-        )
-        body_indent = indent + "        "
-        for row in range(dim):
-            for col in range(dim):
-                lines.append(
-                    "%sconst scalar_t J%d%d = %s[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                    % (body_indent, row, col, gradient_name, row, col)
-                )
-        lines.extend(
-            isoparametric_adjugate_lines(
-                dim,
-                body_indent,
-                "q * VECTOR_SIZE + lane",
-                adjugate_target,
-                determinant_target,
-            )
-        )
-        lines.extend(["%s    }" % indent, "%s}" % indent])
+    )
     return lines
 
 
@@ -525,25 +499,69 @@ def tensor_product_gradient_isoparametric_geometry_lines(
         shape_name=shape_name,
         grad_name=grad_name,
     )
+    lines.extend(
+        tensor_product_adjugate_determinant_lines(
+            dim=dim,
+            gradient_name=gradient_name,
+            indent=indent,
+            adjugate_target=adjugate_target,
+            determinant_target=determinant_target,
+            adjugate_streams=adjugate_streams,
+            determinant_stream=determinant_stream,
+            include_lane_loop=False,
+        )
+    )
+    return lines
+
+
+def tensor_product_adjugate_determinant_lines(
+    *,
+    dim,
+    gradient_name,
+    indent,
+    adjugate_target,
+    determinant_target,
+    adjugate_streams=None,
+    determinant_stream=None,
+    include_lane_loop,
+):
     if adjugate_streams is not None and determinant_stream is not None:
+        return [
+            "",
+            "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
+            % (indent, gradient_name, ", ".join(adjugate_streams)),
+            "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
+            % indent,
+            "%s        nelems, %s, %s_adjugate_streams, %s);"
+            % (indent, gradient_name, gradient_name, determinant_stream),
+        ]
+
+    lines = ["", "%sfor (int q = 0; q < N_QP; ++q) {" % indent]
+    if include_lane_loop:
         lines.extend(
             [
-                "",
-                "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
-                % (indent, gradient_name, ", ".join(adjugate_streams)),
-                "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
-                % indent,
-                "%s        nelems, %s, %s_adjugate_streams, %s);"
-                % (indent, gradient_name, gradient_name, determinant_stream),
+                "#pragma omp simd",
+                "%s    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
             ]
         )
+        body_indent = indent + "        "
+        for row in range(dim):
+            for col in range(dim):
+                lines.append(
+                    "%sconst scalar_t J%d%d = %s[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
+                    % (body_indent, row, col, gradient_name, row, col)
+                )
+        lines.extend(
+            isoparametric_adjugate_lines(
+                dim,
+                body_indent,
+                "q * VECTOR_SIZE + lane",
+                adjugate_target,
+                determinant_target,
+            )
+        )
+        lines.append("%s    }" % indent)
     else:
-        lines.extend(
-            [
-                "",
-                "%sfor (int q = 0; q < N_QP; ++q) {" % indent,
-            ]
-        )
         lines.extend(
             tensor_product_current_q_isoparametric_geometry_lines(
                 dim=dim,
@@ -554,5 +572,5 @@ def tensor_product_gradient_isoparametric_geometry_lines(
                 output_index="q * VECTOR_SIZE + lane",
             )
         )
-        lines.append("%s}" % indent)
+    lines.append("%s}" % indent)
     return lines

@@ -12,6 +12,7 @@ from .generation_plan import (
 from .symbolic import (
     generate_sfem_soa_cpp_files_for_element,
 )
+from .boundary_codegen import generate_boundary_residual_sfem_files
 from .fem import sfem_soa_element_specialization
 from .residual import CoupledResidualSystem
 from .residual_codegen import (
@@ -40,6 +41,8 @@ class OpenMPSoABackend:
             return self._emit_energy_plan(unit, context)
         if kind == "residual_soa":
             return self._emit_residual_plan(unit, context)
+        if kind == "boundary_residual_soa":
+            return self._emit_boundary_residual_plan(unit, context)
         raise ValueError("unsupported OpenMP SoA kernel kind '%s'" % kind)
 
     def _emit_energy_plan(self, unit, context):
@@ -124,6 +127,19 @@ class OpenMPSoABackend:
             local_name=local_kernel.header,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
+        )
+
+    def _emit_boundary_residual_plan(self, unit, context):
+        self._validate_boundary_residual_plan(unit)
+        mesh_kernel = unit.mesh_kernel_plan(context, _generated_prefix(unit))
+        return OpenMPSoAEmission(
+            tuple(
+                generate_boundary_residual_sfem_files(
+                    unit.form_collection,
+                    prefix=mesh_kernel.name,
+                    element_type=context.element_type,
+                )
+            )
         )
 
     def emit_energy(
@@ -288,6 +304,19 @@ class OpenMPSoABackend:
                     LocalPhase.CONTRACT_TEST,
                 ),
             )
+
+    @staticmethod
+    def _validate_boundary_residual_plan(unit):
+        _require_openmp(unit)
+        _require_mesh_phases(
+            unit,
+            (
+                MeshPhase.GATHER,
+                MeshPhase.GEOMETRY,
+                MeshPhase.LOCAL_CALL,
+                MeshPhase.SCATTER,
+            ),
+        )
 
 
 def _kind_value(kind):

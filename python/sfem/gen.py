@@ -59,6 +59,7 @@ from codegen.framework import (
     TrialFunction,
     TwoPhaseFlowConstitutiveModel,
     FormEvaluation,
+    FormKind,
     FormMetadata,
     FormOrder,
     FormQualifier,
@@ -165,7 +166,6 @@ from codegen.framework.fem import (
     sfem_tensor_hex_shape_index,
 )
 from codegen.framework.openmp_backend import OpenMPSoABackend
-from codegen.framework.boundary_codegen import generate_boundary_residual_sfem_files
 
 
 DEFAULT_VECTOR_SIZE = 16
@@ -547,19 +547,12 @@ def _element_dim(element):
 
 
 @dataclass(frozen=True)
-class EnergyDimensionEvaluation:
+class LoweredEquationEvaluation:
     name: str
     form_evaluation: FormCollection
-    deformation_gradient: object
-    variables: tuple
-    kernels: tuple
-    diagnostics: bool
-
-
-@dataclass(frozen=True)
-class ResidualDimensionEvaluation:
-    name: str
-    form_evaluation: FormCollection
+    data_symbols: object = None
+    kernels: tuple = ()
+    diagnostics: bool = True
 
 
 @dataclass(frozen=True)
@@ -786,7 +779,7 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
     units = []
     for dim_eval in form_evaluation.by_dim.values():
         for evaluated in dim_eval.units:
-            if isinstance(evaluated, EnergyDimensionEvaluation):
+            if evaluated.form_evaluation.kind is FormKind.ENERGY:
                 units.append(
                     _energy_codegen_unit(
                         form_evaluation.material.name,
@@ -794,7 +787,7 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
                         evaluated,
                     )
                 )
-            elif isinstance(evaluated, ResidualDimensionEvaluation):
+            elif evaluated.form_evaluation.kind is FormKind.RESIDUAL:
                 units.append(
                     _residual_codegen_unit(
                         form_evaluation.material.name,
@@ -810,15 +803,15 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
 
 
 def _energy_codegen_unit(material_name, dim, evaluated):
-    if evaluated.deformation_gradient.shape != (dim, dim):
+    if evaluated.data_symbols.shape != (dim, dim):
         raise ValueError(
             "energy code generation currently requires %d x %d explicit variables; "
             "got %d variables for energy unit '%s'"
-            % (dim, dim, len(evaluated.variables), evaluated.name or material_name)
+            % (dim, dim, len(evaluated.form_evaluation.variables), evaluated.name or material_name)
         )
     weak_form = sfem_soa_weak_form(
         evaluated.form_evaluation.form(FormOrder.ZERO).expression,
-        evaluated.deformation_gradient,
+        evaluated.data_symbols,
     )
     kernel_forms = tuple(
         sfem_soa_kernel_form(
@@ -870,32 +863,22 @@ def _energy_codegen_unit(material_name, dim, evaluated):
 
 
 def _residual_codegen_unit(material_name, dim, evaluated):
+    collection = evaluated.form_evaluation
+    blocks = _block_plans_from_form_collection(collection)
     if evaluated.form_evaluation.measure == "ds":
-        blocks = _block_plans_from_form_collection(evaluated.form_evaluation)
         return CodeGenerationUnit(
             name=_unit_output_name_from_parts(material_name, evaluated.name),
             kind=CodeGenerationKind.BOUNDARY_RESIDUAL_SOA,
-            form_collection=evaluated.form_evaluation,
+            form_collection=collection,
             dim=dim,
-            mesh_phases=(
-                MeshPhase.GATHER,
-                MeshPhase.GEOMETRY,
-                MeshPhase.LOCAL_CALL,
-                MeshPhase.SCATTER,
-            ),
-            mesh_phase_plans=(
-                MeshPhasePlan(MeshPhase.GATHER),
-                MeshPhasePlan(MeshPhase.GEOMETRY),
-                MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=blocks),
-                MeshPhasePlan(MeshPhase.SCATTER),
-            ),
+            mesh_phases=_residual_mesh_phases(),
+            mesh_phase_plans=_residual_mesh_phase_plans(blocks),
             blocks=blocks,
             target=KernelTarget.OPENMP,
-            coupling=_kernel_coupling_for_collection(evaluated.form_evaluation),
+            coupling=_kernel_coupling_for_collection(collection),
             material_name=material_name,
             unit_name=evaluated.name,
         )
-    blocks = _block_plans_from_form_collection(evaluated.form_evaluation)
     block_kernels = _block_codegen_units(
         material_name,
         dim,
@@ -905,24 +888,14 @@ def _residual_codegen_unit(material_name, dim, evaluated):
     return CodeGenerationUnit(
         name=_unit_output_name_from_parts(material_name, evaluated.name),
         kind=CodeGenerationKind.RESIDUAL_SOA,
-        form_collection=evaluated.form_evaluation,
+        form_collection=collection,
         dim=dim,
-        mesh_phases=(
-            MeshPhase.GATHER,
-            MeshPhase.GEOMETRY,
-            MeshPhase.LOCAL_CALL,
-            MeshPhase.SCATTER,
-        ),
-        mesh_phase_plans=(
-            MeshPhasePlan(MeshPhase.GATHER),
-            MeshPhasePlan(MeshPhase.GEOMETRY),
-            MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=blocks),
-            MeshPhasePlan(MeshPhase.SCATTER),
-        ),
+        mesh_phases=_residual_mesh_phases(),
+        mesh_phase_plans=_residual_mesh_phase_plans(blocks),
         blocks=blocks,
         block_kernels=block_kernels,
         scope=KernelScope.MONOLITHIC,
-        coupling=_kernel_coupling_for_collection(evaluated.form_evaluation),
+        coupling=_kernel_coupling_for_collection(collection),
         target=KernelTarget.OPENMP,
         material_name=material_name,
         unit_name=evaluated.name,
@@ -956,6 +929,19 @@ def _residual_local_phases():
     return tuple(plan.phase for plan in _residual_local_phase_plans())
 
 
+def _residual_mesh_phase_plans(blocks):
+    return (
+        MeshPhasePlan(MeshPhase.GATHER),
+        MeshPhasePlan(MeshPhase.GEOMETRY),
+        MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=tuple(blocks)),
+        MeshPhasePlan(MeshPhase.SCATTER),
+    )
+
+
+def _residual_mesh_phases():
+    return tuple(plan.phase for plan in _residual_mesh_phase_plans(()))
+
+
 def _block_codegen_units(material_name, dim, evaluated, blocks):
     return tuple(
         CodeGenerationUnit(
@@ -966,18 +952,8 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
             kind=CodeGenerationKind.RESIDUAL_SOA,
             form_collection=evaluated.form_evaluation,
             dim=dim,
-            mesh_phases=(
-                MeshPhase.GATHER,
-                MeshPhase.GEOMETRY,
-                MeshPhase.LOCAL_CALL,
-                MeshPhase.SCATTER,
-            ),
-            mesh_phase_plans=(
-                MeshPhasePlan(MeshPhase.GATHER),
-                MeshPhasePlan(MeshPhase.GEOMETRY),
-                MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=(block,)),
-                MeshPhasePlan(MeshPhase.SCATTER),
-            ),
+            mesh_phases=_residual_mesh_phases(),
+            mesh_phase_plans=_residual_mesh_phase_plans((block,)),
             blocks=(block,),
             scope=KernelScope.BLOCK,
             coupling=KernelCoupling.BLOCK,
@@ -1004,24 +980,25 @@ def _block_unit_name(unit_name, block):
 
 
 def _emit_codegen_unit(unit, context):
-    if unit.kind is CodeGenerationKind.ENERGY_SOA:
-        return _emit_energy_soa(unit, context)
-    if unit.kind is CodeGenerationKind.RESIDUAL_SOA:
-        return _emit_residual_soa(unit, context)
-    if unit.kind is CodeGenerationKind.BOUNDARY_RESIDUAL_SOA:
-        return _emit_boundary_residual_soa(unit, context)
-    raise ValueError("unsupported code generation unit kind %s" % unit.kind)
-
-
-def _emit_energy_soa(unit, context):
-    payload = unit.payload
+    if unit.target is not KernelTarget.OPENMP:
+        raise ValueError("unsupported code generation target %s" % unit.target)
     files = list(OPENMP_SOA_BACKEND.emit(unit, context))
-    if payload.diagnostics:
-        report_prefix = "%s_%s" % (
-            _unit_report_name(unit),
-            context.element_type.lower(),
-        )
-        files.append(
+    files.extend(_diagnostic_files_for_unit(unit, context))
+    return tuple(files)
+
+
+def _diagnostic_files_for_unit(unit, context):
+    if unit.kind is not CodeGenerationKind.ENERGY_SOA:
+        return ()
+    payload = unit.payload
+    if not payload.diagnostics:
+        return ()
+    report_prefix = "%s_%s" % (
+        _unit_report_name(unit),
+        context.element_type.lower(),
+    )
+    return tuple(
+        (
             GeneratedKernelFile(
                 "%s_summary.md" % report_prefix,
                 _summary(
@@ -1029,9 +1006,7 @@ def _emit_energy_soa(unit, context):
                     payload.diagnostic_graph,
                     context.specialization,
                 ),
-            )
-        )
-        files.append(
+            ),
             GeneratedKernelFile(
                 "%s_reduced_outputs.txt" % report_prefix,
                 "\n\n".join(
@@ -1039,21 +1014,7 @@ def _emit_energy_soa(unit, context):
                     for output in payload.diagnostic_graph.reduced_outputs
                 )
                 + "\n",
-            )
-        )
-    return tuple(files)
-
-
-def _emit_residual_soa(unit, context):
-    return tuple(OPENMP_SOA_BACKEND.emit(unit, context))
-
-
-def _emit_boundary_residual_soa(unit, context):
-    return tuple(
-        generate_boundary_residual_sfem_files(
-            unit.form_collection,
-            prefix=unit.mesh_kernel_plan(context, _unit_generated_prefix(unit)).name,
-            element_type=context.element_type,
+            ),
         )
     )
 
@@ -1192,10 +1153,26 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
 
 
 def _evaluate_equation(dim, equation, form_collection):
+    if not isinstance(form_collection, FormCollection):
+        raise TypeError("equation evaluation requires a lowered FormCollection")
     if equation.is_energy:
-        return _evaluate_energy_equation(dim, equation, form_collection)
+        if form_collection.kind is not FormKind.ENERGY:
+            raise TypeError("energy equation requires an energy FormCollection")
+        variables = tuple(form_collection.variables)
+        if not variables:
+            raise ValueError("energy equation '%s' requires explicit variables" % equation.name)
+        data_symbols = _energy_data_symbols(dim, variables)
+        return LoweredEquationEvaluation(
+            equation.name,
+            form_collection,
+            data_symbols=data_symbols,
+            kernels=equation.kernels,
+            diagnostics=equation.diagnostics,
+        )
     if equation.is_residual:
-        return _evaluate_residual_equation(dim, equation, form_collection)
+        if form_collection.kind is not FormKind.RESIDUAL:
+            raise TypeError("residual equation requires a residual FormCollection")
+        return LoweredEquationEvaluation(equation.name, form_collection)
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
@@ -1207,36 +1184,10 @@ def _equation_form_orders(equation):
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
-def _evaluate_energy_equation(dim, equation, form_collection):
-    if not isinstance(form_collection, FormCollection):
-        raise TypeError("energy equation evaluation requires a lowered FormCollection")
-    variables = tuple(form_collection.variables)
-    if not variables:
-        raise ValueError("energy equation '%s' requires explicit variables" % equation.name)
-    data_symbols = _energy_data_symbols(dim, variables)
-    return EnergyDimensionEvaluation(
-        equation.name,
-        form_collection,
-        data_symbols,
-        variables,
-        equation.kernels,
-        equation.diagnostics,
-    )
-
-
 def _energy_data_symbols(dim, variables):
     if len(variables) == dim * dim:
         return sp.Matrix(dim, dim, variables)
     return sp.Matrix(len(variables), 1, variables)
-
-
-def _evaluate_residual_equation(dim, equation, form_collection):
-    if not isinstance(form_collection, FormCollection):
-        raise TypeError("residual equation evaluation requires a lowered FormCollection")
-    return ResidualDimensionEvaluation(
-        equation.name,
-        form_collection,
-    )
 
 
 def _unit_generated_prefix(unit):
@@ -1504,6 +1455,7 @@ __all__ = [
     "FunctionSpace",
     "FormCollection",
     "FormEvaluation",
+    "FormKind",
     "FormMetadata",
     "FormOrder",
     "FormBlock",
