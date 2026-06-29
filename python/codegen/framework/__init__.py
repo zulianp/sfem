@@ -135,6 +135,12 @@ from .forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
+from .boundary_forms import (
+    BoundaryIntegral,
+    Measure,
+    dx,
+    ds,
+)
 from .generation_plan import (
     BlockPlan,
     DataStreamLayout,
@@ -340,6 +346,10 @@ __all__ = [
     "FormCollection",
     "FormPipeline",
     "FormQualifier",
+    "BoundaryIntegral",
+    "Measure",
+    "dx",
+    "ds",
     "PipelineStage",
     "StandardFormName",
     "UnifiedForm",

@@ -117,6 +117,7 @@ class FormCollection(FormCollectionMixin):
     kind: FormKind
     fields: tuple
     forms: tuple
+    measure: str = "dx"
     variables: tuple = ()
     directions: tuple = ()
     coefficients: tuple = ()
@@ -170,6 +171,7 @@ class FormCollection(FormCollectionMixin):
         equation_name,
         evaluation,
         *,
+        measure="dx",
         fields=(),
         variables=(),
         directions=(),
@@ -185,6 +187,7 @@ class FormCollection(FormCollectionMixin):
             evaluation.kind,
             tuple(fields),
             tuple(evaluation.forms),
+            str(measure),
             tuple(variables),
             tuple(directions),
             tuple(coefficients),

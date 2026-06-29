@@ -13,6 +13,7 @@ from .forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
+from .boundary_forms import BoundaryIntegral, integral_integrand, integral_measure
 from .residual import CoupledResidualSystem
 from .residual_codegen import (
     coupled_residual_weak_coefficients,
@@ -83,6 +84,7 @@ class Equation:
     directions: tuple = ()
     kernels: tuple = ()
     diagnostics: bool = True
+    measure: str = "dx"
 
     def __post_init__(self):
         name = str(self.name)
@@ -110,6 +112,7 @@ class Equation:
         object.__setattr__(self, "directions", tuple(self.directions))
         object.__setattr__(self, "kernels", tuple(self.kernels))
         object.__setattr__(self, "diagnostics", bool(self.diagnostics))
+        object.__setattr__(self, "measure", str(self.measure))
 
     @property
     def is_energy(self):
@@ -181,7 +184,11 @@ class EquationSystem:
         directions=(),
         kernels=(),
         diagnostics=True,
+        measure="dx",
     ):
+        detected_measure = integral_measure(define)
+        define = integral_integrand(define)
+        measure = detected_measure if measure == "dx" else measure
         equation = Equation(
             name,
             form,
@@ -191,6 +198,7 @@ class EquationSystem:
             directions=_symbols_from_variables(directions),
             kernels=tuple(kernels),
             diagnostics=diagnostics,
+            measure=measure,
         )
         if equation.name and any(existing.name == equation.name for existing in self._equations):
             raise ValueError("equation '%s' is already registered" % equation.name)
@@ -220,12 +228,16 @@ class EquationSystem:
             diagnostics=diagnostics,
         )
 
-    def add_residual(self, name, define, *, fields=()):
+    def add_residual(self, name, define, *, fields=(), measure="dx"):
+        detected_measure = integral_measure(define)
+        define = integral_integrand(define)
+        measure = detected_measure if measure == "dx" else measure
         return self.equation(
             name,
             EquationForm.RESIDUAL,
             define,
             fields=fields,
+            measure=measure,
         )
 
     def _resolve_equation(self, equation_or_name):
@@ -366,6 +378,7 @@ class EquationSystemBuilder:
         directions=(),
         kernels=(),
         diagnostics=True,
+        measure="dx",
     ):
         return self._system.equation(
             name,
@@ -376,6 +389,7 @@ class EquationSystemBuilder:
             directions=_symbols_from_variables(directions),
             kernels=kernels,
             diagnostics=diagnostics,
+            measure=measure,
         )
 
     def add_energy(
@@ -407,12 +421,18 @@ class EquationSystemBuilder:
         )
 
     def add_residual(self, name, define, *, fields=()):
+        measure = integral_measure(define)
+        define = integral_integrand(define)
         symbolic_fields = tuple(fields)
         return self._system.add_residual(
             name,
             _residual_define(define, symbolic_fields, self.dim),
             fields=self._resolve_fields(fields),
+            measure=measure,
         )
+
+    def add_boundary_residual(self, name, define, *, fields=()):
+        return self.add_residual(name, BoundaryIntegral(define), fields=fields)
 
     def derive_energy_forms(
         self,
@@ -547,6 +567,7 @@ def _build_form_collection(system, equation, orders):
         return FormCollection.from_evaluation(
             equation.name,
             evaluation,
+            measure=equation.measure,
             fields=equation.fields,
             variables=variables,
             directions=directions,
@@ -615,6 +636,7 @@ def _build_form_collection(system, equation, orders):
         return FormCollection.from_evaluation(
             equation.name,
             evaluation,
+            measure=equation.measure,
             fields=equation.fields,
             variables=variables,
             directions=directions,

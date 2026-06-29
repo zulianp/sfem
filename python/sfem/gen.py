@@ -60,6 +60,10 @@ from codegen.framework import (
     FormMetadata,
     FormOrder,
     FormQualifier,
+    BoundaryIntegral,
+    Measure,
+    dx,
+    ds,
     GenerationPlan,
     GeometryEvaluation,
     GeometryInputLayout,
@@ -159,6 +163,7 @@ from codegen.framework.fem import (
     sfem_tensor_hex_shape_index,
 )
 from codegen.framework.openmp_backend import OpenMPSoABackend
+from codegen.framework.boundary_codegen import generate_boundary_residual_sfem_files
 
 
 DEFAULT_VECTOR_SIZE = 16
@@ -596,6 +601,7 @@ class UnifiedFormEvaluation:
 class CodeGenerationKind(Enum):
     ENERGY_SOA = "energy_soa"
     RESIDUAL_SOA = "residual_soa"
+    BOUNDARY_RESIDUAL_SOA = "boundary_residual_soa"
 
 
 @dataclass(frozen=True)
@@ -884,6 +890,31 @@ def _energy_codegen_unit(material_name, dim, evaluated):
 
 
 def _residual_codegen_unit(material_name, dim, evaluated):
+    if evaluated.form_evaluation.measure == "ds":
+        blocks = _block_plans_from_form_collection(evaluated.form_evaluation)
+        return CodeGenerationUnit(
+            name=_unit_output_name_from_parts(material_name, evaluated.name),
+            kind=CodeGenerationKind.BOUNDARY_RESIDUAL_SOA,
+            form_collection=evaluated.form_evaluation,
+            dim=dim,
+            mesh_phases=(
+                MeshPhase.GATHER,
+                MeshPhase.GEOMETRY,
+                MeshPhase.LOCAL_CALL,
+                MeshPhase.SCATTER,
+            ),
+            mesh_phase_plans=(
+                MeshPhasePlan(MeshPhase.GATHER),
+                MeshPhasePlan(MeshPhase.GEOMETRY),
+                MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=blocks),
+                MeshPhasePlan(MeshPhase.SCATTER),
+            ),
+            blocks=blocks,
+            target=KernelTarget.OPENMP,
+            coupling=_kernel_coupling_for_collection(evaluated.form_evaluation),
+            material_name=material_name,
+            unit_name=evaluated.name,
+        )
     blocks = _block_plans_from_form_collection(evaluated.form_evaluation)
     block_kernels = _block_codegen_units(
         material_name,
@@ -997,6 +1028,8 @@ def _emit_codegen_unit(unit, context):
         return _emit_energy_soa(unit, context)
     if unit.kind is CodeGenerationKind.RESIDUAL_SOA:
         return _emit_residual_soa(unit, context)
+    if unit.kind is CodeGenerationKind.BOUNDARY_RESIDUAL_SOA:
+        return _emit_boundary_residual_soa(unit, context)
     raise ValueError("unsupported code generation unit kind %s" % unit.kind)
 
 
@@ -1033,6 +1066,16 @@ def _emit_energy_soa(unit, context):
 
 def _emit_residual_soa(unit, context):
     return tuple(OPENMP_SOA_BACKEND.emit(unit, context))
+
+
+def _emit_boundary_residual_soa(unit, context):
+    return tuple(
+        generate_boundary_residual_sfem_files(
+            unit.form_collection,
+            prefix=unit.mesh_kernel_plan(context, _unit_generated_prefix(unit)).name,
+            element_type=context.element_type,
+        )
+    )
 
 
 def _layout_codegen_files(unit, context, files):
@@ -1575,6 +1618,10 @@ __all__ = [
     "FormOrder",
     "FormBlock",
     "FormQualifier",
+    "BoundaryIntegral",
+    "Measure",
+    "dx",
+    "ds",
     "GenerationResult",
     "BasisDataLayout",
     "BasisEvaluation",
