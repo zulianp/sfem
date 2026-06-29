@@ -1,0 +1,17 @@
+lmbda*poro_hyperelasticity_inspect_tmp3**2/2 - mu*poro_hyperelasticity_inspect_tmp3 + mu*(poro_hyperelasticity_inspect_tmp4 + poro_hyperelasticity_inspect_tmp5 + poro_hyperelasticity_inspect_tmp6 + poro_hyperelasticity_inspect_tmp7 - 2)/2
+
+F[3]*poro_hyperelasticity_inspect_tmp12 - poro_hyperelasticity_inspect_tmp10*poro_hyperelasticity_inspect_tmp9 + poro_hyperelasticity_inspect_tmp8
+
+-F[2]*poro_hyperelasticity_inspect_tmp12 + poro_hyperelasticity_inspect_tmp13 + poro_hyperelasticity_inspect_tmp14*poro_hyperelasticity_inspect_tmp9
+
+-F[1]*poro_hyperelasticity_inspect_tmp12 + poro_hyperelasticity_inspect_tmp13*poro_hyperelasticity_inspect_tmp9 + poro_hyperelasticity_inspect_tmp14
+
+F[0]*poro_hyperelasticity_inspect_tmp12 + poro_hyperelasticity_inspect_tmp10 - poro_hyperelasticity_inspect_tmp8*poro_hyperelasticity_inspect_tmp9
+
+-poro_hyperelasticity_inspect_tmp19*trial_grad[2] - poro_hyperelasticity_inspect_tmp20*trial_grad[1] + poro_hyperelasticity_inspect_tmp23*poro_hyperelasticity_inspect_tmp9*trial_grad[3] + trial_grad[0]*(lmbda*poro_hyperelasticity_inspect_tmp21 + mu*poro_hyperelasticity_inspect_tmp21 + mu - poro_hyperelasticity_inspect_tmp11*poro_hyperelasticity_inspect_tmp21)
+
+-F[2]*poro_hyperelasticity_inspect_tmp25 - poro_hyperelasticity_inspect_tmp20*trial_grad[0] + poro_hyperelasticity_inspect_tmp28*poro_hyperelasticity_inspect_tmp9*trial_grad[2] + trial_grad[1]*(lmbda*poro_hyperelasticity_inspect_tmp26 + mu*poro_hyperelasticity_inspect_tmp26 + mu - poro_hyperelasticity_inspect_tmp11*poro_hyperelasticity_inspect_tmp26)
+
+-F[1]*poro_hyperelasticity_inspect_tmp25 - poro_hyperelasticity_inspect_tmp19*trial_grad[0] + poro_hyperelasticity_inspect_tmp28*poro_hyperelasticity_inspect_tmp9*trial_grad[1] + trial_grad[2]*(lmbda*poro_hyperelasticity_inspect_tmp29 + mu*poro_hyperelasticity_inspect_tmp29 + mu - poro_hyperelasticity_inspect_tmp11*poro_hyperelasticity_inspect_tmp29)
+
+-F[1]*poro_hyperelasticity_inspect_tmp24*trial_grad[2] - F[2]*poro_hyperelasticity_inspect_tmp24*trial_grad[1] + poro_hyperelasticity_inspect_tmp23*poro_hyperelasticity_inspect_tmp9*trial_grad[0] + trial_grad[3]*(lmbda*poro_hyperelasticity_inspect_tmp30 + mu*poro_hyperelasticity_inspect_tmp30 + mu - poro_hyperelasticity_inspect_tmp11*poro_hyperelasticity_inspect_tmp30)

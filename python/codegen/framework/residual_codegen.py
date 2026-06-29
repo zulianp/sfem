@@ -1019,7 +1019,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
 def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
-    uses_determinant = any(dependencies.value_coefficients)
+    uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
     uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
 
     lines = [
@@ -1456,7 +1456,7 @@ def _simplex_local_body(system, coefficients, dependencies):
 def _tensor_local_body(system, prefix, coefficients, dependencies):
     dim = system.dim
     n_fields = len(system.fields)
-    uses_determinant = any(dependencies.value_coefficients)
+    uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
     uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
     lines = []
     if not dependencies.uses_test_coefficients:

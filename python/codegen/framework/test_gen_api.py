@@ -1410,6 +1410,36 @@ class GenApiTest(unittest.TestCase):
                 "d2/tri6_tri3/poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
                 names,
             )
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity.cpp", names)
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity.hpp", names)
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity_c_abi.hpp", names)
+            wrapper = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity.cpp")
+            with open(wrapper, encoding="utf-8") as input_file:
+                wrapper_contents = input_file.read()
+            self.assertIn("class GeneratedPoroHyperelasticity::Impl", wrapper_contents)
+            self.assertIn(
+                "poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh_soa",
+                wrapper_contents,
+            )
+            self.assertIn(
+                "poro_hyperelasticity_poro_tri6_tri3_residual_isoparametric_mesh_soa",
+                wrapper_contents,
+            )
+            self.assertIn(
+                "poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa",
+                wrapper_contents,
+            )
+            c_abi = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_c_abi.hpp")
+            with open(c_abi, encoding="utf-8") as input_file:
+                declarations = input_file.read()
+            self.assertIn(
+                "extern \"C\" int poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
+                declarations,
+            )
 
     def test_poro_tensor_zero_block_does_not_force_empty_lane_loop(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -1505,6 +1535,10 @@ class GenApiTest(unittest.TestCase):
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedStokes::Impl", wrapper_contents)
             self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_tri6_tri3_residual_affine_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_tri6_tri3_jacobian_action_affine_mesh_soa", wrapper_contents)
+            self.assertIn("residual_uses_affine", wrapper_contents)
+            self.assertIn("jacobian_action_uses_affine", wrapper_contents)
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 3;", wrapper_contents)
             self.assertIn("const real_t *const SFEM_RESTRICT u_data[2]", wrapper_contents)
             self.assertIn("real_t *const SFEM_RESTRICT u_out[2]", wrapper_contents)
@@ -1513,6 +1547,14 @@ class GenApiTest(unittest.TestCase):
                 declarations = input_file.read()
             self.assertIn(
                 "extern \"C\" int stokes_tri6_tri3_residual_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int stokes_tri6_tri3_residual_affine_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" int stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa",
                 declarations,
             )
             self.assertIn(

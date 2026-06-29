@@ -1,0 +1,708 @@
+#include "../poro_hyperelasticity_poro_form_2_p_p_d3_tensor_product_local.hpp"
+#include "../../kernel_math.hpp"
+#include "../../geometry_kernels.hpp"
+#include "../../kernel_diagnostics.hpp"
+
+#ifndef SFEM_SUCCESS
+#define SFEM_SUCCESS 0
+#endif
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT
+#endif
+#ifndef SFEM_INLINE
+#define SFEM_INLINE inline
+#endif
+#ifndef SFEM_GENERATED_SCALAR_T
+#define SFEM_GENERATED_SCALAR_T
+typedef double real_t;
+typedef ptrdiff_t idx_t;
+typedef double geom_t;
+#endif
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace sfem {
+namespace codegen {
+
+
+template <typename scalar_t>
+struct poro_hyperelasticity_poro_form_2_p_p_affine_reference_data {
+    static const scalar_t *q_weight_1d() {
+        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+        return data;
+    }
+    static const scalar_t *hex8_shape_1d() {
+        static const scalar_t data[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+        return data;
+    }
+    static const scalar_t *hex8_grad_1d() {
+        static const scalar_t data[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+        return data;
+    }
+};
+
+template <typename scalar_t>
+struct poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data {
+    static const scalar_t *q_weight_1d() {
+        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
+        return data;
+    }
+    static const scalar_t *hex8_shape_1d() {
+        static const scalar_t data[8] = {scalar_t(0.93056815579702623), scalar_t(0.069431844202973714), scalar_t(0.66999052179242813), scalar_t(0.33000947820757187), scalar_t(0.33000947820757187), scalar_t(0.66999052179242813), scalar_t(0.069431844202973769), scalar_t(0.93056815579702623)};
+        return data;
+    }
+    static const scalar_t *hex8_grad_1d() {
+        static const scalar_t data[8] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+        return data;
+    }
+};
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data = {
+    "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa",
+    "HEX8",
+    3,
+    64,
+    8,
+    16,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    10,
+    16,
+    4,
+    0,
+    0,
+    0,
+    8,
+    1,
+    1,
+    1.0,
+    1.0,
+    8.0,
+    12.0,
+    16.0,
+    20.0,
+    20.0,
+    24.0,
+    1.0,
+    1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics(void) {
+    return &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data;
+}
+
+extern "C" double poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes) {
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            nelements, scalar_bytes, real_bytes, accumulator_bytes);
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data = {
+    "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa",
+    "HEX8",
+    3,
+    64,
+    8,
+    16,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    10,
+    16,
+    4,
+    3,
+    0,
+    8,
+    8,
+    1,
+    1,
+    1.0,
+    1.0,
+    8.0,
+    12.0,
+    16.0,
+    20.0,
+    20.0,
+    24.0,
+    1.0,
+    1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics(void) {
+    return &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data;
+}
+
+extern "C" double poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes) {
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            nelements, scalar_bytes, real_bytes, accumulator_bytes);
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(double), sizeof(double), sizeof(double));
+}
+
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs,
+        const int repeat) {
+    sfem::codegen::KernelDiagnostics_print_rate(
+            "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa_float",
+            &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
+            elapsed, nelements, ndofs, repeat,
+            sizeof(float), sizeof(float), sizeof(float));
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_mixed_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT p_out
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 64;
+    static constexpr int CELL_N_SHAPE = 8;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_FIELD_STREAMS = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_mixed_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT p_out
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 64;
+    static constexpr int CELL_N_SHAPE = 8;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_FIELD_STREAMS = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_mixed_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const scalar_t dt,
+        const scalar_t hydraulic_conductivity,
+        const scalar_t storage,
+        const ptrdiff_t direction_stride,
+        const scalar_t *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT p_out
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 64;
+    static constexpr int CELL_N_SHAPE = 8;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_FIELD_STREAMS = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_affine_reference_data<scalar_t>::hex8_shape_1d()};
+    const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_affine_reference_data<scalar_t>::hex8_grad_1d()};
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
+        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
+
+#pragma omp simd
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 3] = elements[3][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 4] = elements[4][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 6] = elements[6][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 7] = elements[7][evbegin + lane];
+        }
+
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            block_direction[0][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 0] * direction_stride];
+            block_output[0][lane] = scalar_t(0);
+            block_direction[1][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 1] * direction_stride];
+            block_output[1][lane] = scalar_t(0);
+            block_direction[2][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 2] * direction_stride];
+            block_output[2][lane] = scalar_t(0);
+            block_direction[3][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 3] * direction_stride];
+            block_output[3][lane] = scalar_t(0);
+            block_direction[4][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 4] * direction_stride];
+            block_output[4][lane] = scalar_t(0);
+            block_direction[5][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 5] * direction_stride];
+            block_output[5][lane] = scalar_t(0);
+            block_direction[6][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 6] * direction_stride];
+            block_output[6][lane] = scalar_t(0);
+            block_direction[7][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 7] * direction_stride];
+            block_output[7][lane] = scalar_t(0);
+        }
+        const scalar_t *const block_adjugate[DIM * DIM] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin};
+        const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[4], block_direction[5], block_direction[6], block_direction[7]};
+        scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+
+        poro_hyperelasticity_poro_form_2_p_p_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_affine_reference_data<scalar_t>::q_weight_1d(), block_direction_streams, dt, hydraulic_conductivity, storage, block_output_streams);
+
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[6][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[7][lane];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT p_out
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_mixed_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, dt, hydraulic_conductivity, storage, direction_stride, p_direction_data, out_stride, p_out);
+}
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT p_out
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_mixed_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, dt, hydraulic_conductivity, storage, direction_stride, p_direction_data, out_stride, p_out);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_mixed_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t dt,
+        const scalar_t hydraulic_conductivity,
+        const scalar_t storage,
+        const ptrdiff_t direction_stride,
+        const scalar_t *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT p_out
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 64;
+    static constexpr int CELL_N_SHAPE = 8;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_FIELD_STREAMS = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::hex8_shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::hex8_grad_1d();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
+        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
+        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+        scalar_t block_determinant[N_QP * VECTOR_SIZE];
+        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
+
+#pragma omp simd
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 3] = elements[3][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 4] = elements[4][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 6] = elements[6][evbegin + lane];
+            ev[lane * CELL_N_SHAPE + 7] = elements[7][evbegin + lane];
+        }
+
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            block_coordinates[0][lane] = points[0][ev[lane * CELL_N_SHAPE + 0]];
+            block_coordinates[1][lane] = points[1][ev[lane * CELL_N_SHAPE + 0]];
+            block_coordinates[2][lane] = points[2][ev[lane * CELL_N_SHAPE + 0]];
+            block_coordinates[3][lane] = points[0][ev[lane * CELL_N_SHAPE + 1]];
+            block_coordinates[4][lane] = points[1][ev[lane * CELL_N_SHAPE + 1]];
+            block_coordinates[5][lane] = points[2][ev[lane * CELL_N_SHAPE + 1]];
+            block_coordinates[6][lane] = points[0][ev[lane * CELL_N_SHAPE + 2]];
+            block_coordinates[7][lane] = points[1][ev[lane * CELL_N_SHAPE + 2]];
+            block_coordinates[8][lane] = points[2][ev[lane * CELL_N_SHAPE + 2]];
+            block_coordinates[9][lane] = points[0][ev[lane * CELL_N_SHAPE + 3]];
+            block_coordinates[10][lane] = points[1][ev[lane * CELL_N_SHAPE + 3]];
+            block_coordinates[11][lane] = points[2][ev[lane * CELL_N_SHAPE + 3]];
+            block_coordinates[12][lane] = points[0][ev[lane * CELL_N_SHAPE + 4]];
+            block_coordinates[13][lane] = points[1][ev[lane * CELL_N_SHAPE + 4]];
+            block_coordinates[14][lane] = points[2][ev[lane * CELL_N_SHAPE + 4]];
+            block_coordinates[15][lane] = points[0][ev[lane * CELL_N_SHAPE + 5]];
+            block_coordinates[16][lane] = points[1][ev[lane * CELL_N_SHAPE + 5]];
+            block_coordinates[17][lane] = points[2][ev[lane * CELL_N_SHAPE + 5]];
+            block_coordinates[18][lane] = points[0][ev[lane * CELL_N_SHAPE + 6]];
+            block_coordinates[19][lane] = points[1][ev[lane * CELL_N_SHAPE + 6]];
+            block_coordinates[20][lane] = points[2][ev[lane * CELL_N_SHAPE + 6]];
+            block_coordinates[21][lane] = points[0][ev[lane * CELL_N_SHAPE + 7]];
+            block_coordinates[22][lane] = points[1][ev[lane * CELL_N_SHAPE + 7]];
+            block_coordinates[23][lane] = points[2][ev[lane * CELL_N_SHAPE + 7]];
+            block_direction[0][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 0] * direction_stride];
+            block_output[0][lane] = scalar_t(0);
+            block_direction[1][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 1] * direction_stride];
+            block_output[1][lane] = scalar_t(0);
+            block_direction[2][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 2] * direction_stride];
+            block_output[2][lane] = scalar_t(0);
+            block_direction[3][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 3] * direction_stride];
+            block_output[3][lane] = scalar_t(0);
+            block_direction[4][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 4] * direction_stride];
+            block_output[4][lane] = scalar_t(0);
+            block_direction[5][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 5] * direction_stride];
+            block_output[5][lane] = scalar_t(0);
+            block_direction[6][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 6] * direction_stride];
+            block_output[6][lane] = scalar_t(0);
+            block_direction[7][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 7] * direction_stride];
+            block_output[7][lane] = scalar_t(0);
+        }
+
+        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[18], block_coordinates[19], block_coordinates[20]};
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
+        tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams,
+                coordinate_value, coordinate_grad_ref);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
+
+        const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::hex8_shape_1d()};
+        const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::hex8_grad_1d()};
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[4], block_direction[5], block_direction[6], block_direction[7]};
+        scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7]};
+
+        poro_hyperelasticity_poro_form_2_p_p_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_direction_streams, dt, hydraulic_conductivity, storage, block_output_streams);
+
+        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[6][lane];
+#pragma omp atomic update
+            p_out[ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[7][lane];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT p_out
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, dt, hydraulic_conductivity, storage, direction_stride, p_direction_data, out_stride, p_out);
+}
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT p_direction_data,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT p_out
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, dt, hydraulic_conductivity, storage, direction_stride, p_direction_data, out_stride, p_out);
+}
