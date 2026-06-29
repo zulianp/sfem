@@ -82,6 +82,8 @@ namespace {
             case smesh::PROTEUS_HEX8:
             case smesh::PROTEUS_HEX27:
             case smesh::PROTEUS_HEX64:
+            case smesh::PROTEUS_HEX125:
+            case smesh::PROTEUS_HEX729:
                 return true;
             default:
                 return false;
@@ -164,7 +166,7 @@ int main(int argc, char *argv[]) {
     const int         warmup                  = smesh::Env::read("SFEM_WARMUP", 3);
     const int         repeat                  = smesh::Env::read("SFEM_REPEAT", 10);
     const int         nl_max_it               = smesh::Env::read("SFEM_NL_MAX_IT", 10);
-    const int         linear_max_it           = smesh::Env::read("SFEM_LSOLVE_MAX_IT", 500);
+    const int         linear_max_it           = smesh::Env::read("SFEM_LSOLVE_MAX_IT", 1000);
     const real_t      linear_rtol             = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-6);
     const real_t      nonlinear_tol           = smesh::Env::read("SFEM_NL_TOL", 1e-9);
     const real_t      displacement_value      = smesh::Env::read("SFEM_DISPLACEMENT", 0.05);
