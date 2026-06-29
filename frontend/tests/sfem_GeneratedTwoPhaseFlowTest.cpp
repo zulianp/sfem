@@ -9,21 +9,22 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 
 extern "C" {
-int generated_two_phase_flow_hex8_residual_isoparametric_mesh_aos(
+int two_phase_flow_hex8_residual_isoparametric_mesh_aos(
         ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
         const real_t *, const real_t *, real_t *);
-int generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
+int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
         ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
-        const real_t *, const real_t *, const real_t *, real_t *);
+        const real_t *, const real_t *, real_t *);
 }
 
 namespace {
     std::array<real_t, 26> parameters() {
-        return {0.2, 0.1, 1e5, 2.0, 1000.0, 1e-9, 1e5, 0.044, 1.0,
-                8.314462618, 300.0, 1e-3, 1.5e-5, 2.0, 2.0, 2.0, 1.0,
-                1e-12, 0.0, 0.0, 0.0, 1e-12, 0.0, 0.0, 0.0, 1e-12};
+        return {1.8, 0.35, 0.52, 86.4, 0.0, 0.0, 0.0, 86.4, 0.0,
+                0.0, 0.0, 86.4, 0.04401, 0.095, 8.314e-6, 0.39, 333.0,
+                0.4252, 1.0, 0.000455, 4.2, 1.5, 5.2, 1.0, 0.1, 1100.0};
     }
 
     bool close(const real_t a, const real_t b) {
@@ -48,31 +49,51 @@ int test_generated_two_phase_flow_operator() {
     auto action_direct = sfem::create_host_buffer<real_t>(ndofs);
 
     for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
-        previous->data()[2 * node + 0] = 15e6 + 100 * node;
-        previous->data()[2 * node + 1] = 15.1e6 + 80 * node;
-        current->data()[2 * node + 0] = previous->data()[2 * node + 0] + 10;
-        current->data()[2 * node + 1] = previous->data()[2 * node + 1] + 15;
-        direction->data()[2 * node + 0] = 0.01 * (node + 1);
-        direction->data()[2 * node + 1] = -0.015 * (node + 1);
+        previous->data()[2 * node + 0] = 15.0 + 1e-3 * node;
+        previous->data()[2 * node + 1] = 15.1 + 8e-4 * node;
+        current->data()[2 * node + 0] = previous->data()[2 * node + 0] + 1e-2;
+        current->data()[2 * node + 1] = previous->data()[2 * node + 1] + 1.5e-2;
+        direction->data()[2 * node + 0] = 1e-4 * (node + 1);
+        direction->data()[2 * node + 1] = -1.5e-4 * (node + 1);
     }
 
     op->set_field("previous", previous, 0);
     op->update(previous->data(), current->data());
+    std::fill(residual->data(), residual->data() + ndofs, 0);
+    std::fill(action->data(), action->data() + ndofs, 0);
     SFEM_TEST_ASSERT(op->gradient(current->data(), residual->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(op->apply(current->data(), direction->data(), action->data()) == SFEM_SUCCESS);
 
     const auto p = parameters();
     auto block = mesh->block(0);
     const auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-    generated_two_phase_flow_hex8_residual_isoparametric_mesh_aos(
+    std::fill(residual_direct->data(), residual_direct->data() + ndofs, 0);
+    std::fill(action_direct->data(), action_direct->data() + ndofs, 0);
+    two_phase_flow_hex8_residual_isoparametric_mesh_aos(
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
             p.data(), current->data(), previous->data(), residual_direct->data());
-    generated_two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
+    two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
-            p.data(), current->data(), previous->data(), direction->data(), action_direct->data());
+            p.data(), current->data(), direction->data(), action_direct->data());
 
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        if (!close(residual->data()[i], residual_direct->data()[i])) {
+            fprintf(stderr,
+                    "residual mismatch i=%td op=%.17g direct=%.17g diff=%.17g\n",
+                    i,
+                    static_cast<double>(residual->data()[i]),
+                    static_cast<double>(residual_direct->data()[i]),
+                    static_cast<double>(residual->data()[i] - residual_direct->data()[i]));
+        }
         SFEM_TEST_ASSERT(close(residual->data()[i], residual_direct->data()[i]));
+        if (!close(action->data()[i], action_direct->data()[i])) {
+            fprintf(stderr,
+                    "action mismatch i=%td op=%.17g direct=%.17g diff=%.17g\n",
+                    i,
+                    static_cast<double>(action->data()[i]),
+                    static_cast<double>(action_direct->data()[i]),
+                    static_cast<double>(action->data()[i] - action_direct->data()[i]));
+        }
         SFEM_TEST_ASSERT(close(action->data()[i], action_direct->data()[i]));
     }
 
