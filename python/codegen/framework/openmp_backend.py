@@ -65,6 +65,16 @@ class OpenMPSoABackend:
         system = collection.source
         residual_coeffs = _coefficients_for_unit(unit, collection, FormOrder.ONE)
         action_coeffs = _coefficients_for_unit(unit, collection, FormOrder.TWO)
+        _validate_coefficient_dependencies(
+            unit.name,
+            collection.form_metadata(FormOrder.ONE).dependencies,
+            residual_coeffs,
+        )
+        _validate_coefficient_dependencies(
+            unit.name,
+            collection.form_metadata(FormOrder.TWO).dependencies,
+            action_coeffs,
+        )
         prefix = _generated_prefix(unit)
         if _is_diagonal_two_form_block(unit) and context.is_mixed_order:
             model = _diagonal_block_model(unit, collection, context)
@@ -273,6 +283,14 @@ class OpenMPSoABackend:
     @staticmethod
     def _validate_energy_plan(unit):
         _require_openmp(unit)
+        _require_form_metadata(unit, tuple(form.order for form in unit.form_collection.forms))
+        for form in unit.form_collection.forms:
+            _validate_expression_dependencies(
+                unit.name,
+                form.order,
+                unit.form_collection.form_metadata(form.order).dependencies,
+                (form.expression,),
+            )
         _require_mesh_phases(
             unit,
             (
@@ -285,6 +303,7 @@ class OpenMPSoABackend:
     @staticmethod
     def _validate_residual_plan(unit):
         _require_openmp(unit)
+        _require_form_metadata(unit, (FormOrder.ONE, FormOrder.TWO))
         _require_mesh_phases(
             unit,
             (
@@ -308,6 +327,7 @@ class OpenMPSoABackend:
     @staticmethod
     def _validate_boundary_residual_plan(unit):
         _require_openmp(unit)
+        _require_form_metadata(unit, (FormOrder.ONE,))
         _require_mesh_phases(
             unit,
             (
@@ -333,6 +353,60 @@ def _require_openmp(unit):
             "OpenMP SoA backend cannot emit target '%s'"
             % getattr(unit.target, "value", unit.target)
         )
+
+
+def _require_form_metadata(unit, orders):
+    for order in orders:
+        try:
+            unit.form_collection.form_metadata(order)
+        except ValueError as exc:
+            raise ValueError(
+                "kernel plan '%s' is missing FormMetadata for %s"
+                % (unit.name, FormOrder(order).name)
+            ) from exc
+
+
+def _validate_coefficient_dependencies(kernel_name, dependencies, coefficients):
+    expressions = []
+    for coefficient in coefficients:
+        expressions.append(coefficient.value)
+        expressions.extend(tuple(coefficient.gradient))
+    _validate_expression_dependencies(
+        kernel_name,
+        None,
+        dependencies,
+        expressions,
+    )
+
+
+def _validate_expression_dependencies(kernel_name, order, dependencies, expressions):
+    declared = set(_dependency_symbols(dependencies))
+    required = set()
+    for expression in expressions:
+        required.update(sp.sympify(expression).free_symbols)
+    missing = tuple(sorted(required.difference(declared), key=str))
+    if missing:
+        order_name = "" if order is None else " %s" % FormOrder(order).name
+        raise ValueError(
+            "kernel plan '%s'%s requests undeclared FormMetadata inputs: %s"
+            % (kernel_name, order_name, ", ".join(map(str, missing)))
+        )
+
+
+def _dependency_symbols(dependencies):
+    symbols = getattr(dependencies, "symbols", None)
+    if symbols is not None:
+        return tuple(symbols)
+    ret = []
+    for attr in (
+        "current_symbols",
+        "previous_symbols",
+        "direction_symbols",
+        "geometry_symbols",
+        "parameters",
+    ):
+        ret.extend(tuple(getattr(dependencies, attr, ())))
+    return tuple(dict.fromkeys(ret))
 
 
 def _require_mesh_phases(unit, expected):

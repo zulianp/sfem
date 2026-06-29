@@ -2209,6 +2209,7 @@ def _component_offsets(base, offset, components):
 
 
 def _metadata_parameter_args(parameters, parameter_index):
+    parameters = _dependency_parameters(parameters)
     names = set()
     for parameter in parameters or ():
         name = str(parameter)
@@ -2221,12 +2222,17 @@ def _metadata_parameter_args(parameters, parameter_index):
 
 
 def _dependency_parameter_args(parameters, parameter_index):
+    parameters = _dependency_parameters(parameters)
     names = []
     for parameter in parameters or ():
         name = str(parameter)
         if name in parameter_index and name not in names:
             names.append(name)
     return "".join(", storage[%d]" % parameter_index[name] for name in names)
+
+
+def _dependency_parameters(dependencies):
+    return tuple(getattr(dependencies, "parameters", dependencies or ()))
 
 
 def _compatible_element_for_field(element, field):
