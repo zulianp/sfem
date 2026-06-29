@@ -10,6 +10,7 @@ import sympy as sp
 from sfem import gen
 
 from .materials.neohookean_ogden import material as neohookean_ogden
+from .materials.neumann import material as neumann
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
 from .materials.stokes import material as stokes
 from .materials.two_phase_flow import material as two_phase_flow
@@ -1821,6 +1822,52 @@ class GenApiTest(unittest.TestCase):
                     out_dir,
                     elements=("HEX27",),
                 )
+
+    def test_boundary_measure_marks_residual_form(self):
+        system = gen.EquationSystemBuilder(3)
+        V = gen.FunctionSpace(gen.VectorElement("Lagrange", degree=1))
+        with gen.geometric_dimension_context(3):
+            u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+            v = gen.TestFunction(V, name="u_test")
+            traction = sp.Matrix([gen.material_parameter("tx"), sp.S.Zero, sp.S.Zero])
+            system.add_residual("traction", -gen.inner(traction, v) * gen.ds, fields=(u,))
+        built = system.build()
+        forms = built.form_collection("traction", orders=(gen.FormOrder.ONE,))
+        self.assertEqual(forms.measure, "ds")
+        self.assertEqual(forms.blocks_for(gen.FormOrder.ONE)[0].row_field, "u")
+
+    def test_generates_neumann_boundary_integral_kernel(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(neumann, out_dir, elements=("HEX8",))
+            names = _relative_sources(result, out_dir)
+            self.assertIn(
+                os.path.join("d3", "hex8", "neumann_hex8_boundary_operator.cpp"),
+                names,
+            )
+            with open(
+                os.path.join(
+                    out_dir,
+                    "d3",
+                    "hex8",
+                    "neumann_hex8_boundary_operator.cpp",
+                ),
+                encoding="utf-8",
+            ) as input_file:
+                source = input_file.read()
+            self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
+            self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
+            self.assertIn("static const scalar_t *shape_1d()", source)
+            self.assertIn("static const scalar_t *grad_1d()", source)
+            self.assertIn("static const scalar_t *weight_1d()", source)
+            self.assertIn("for (int qy = 0; qy < Q; ++qy)", source)
+            self.assertIn("for (int qx = 0; qx < Q; ++qx)", source)
+            self.assertIn("const element_idx_t *const SFEM_RESTRICT parent", source)
+            self.assertIn("const int16_t *const SFEM_RESTRICT side_idx", source)
+            self.assertIn("elements[side_nodes[side * n_shape + i]][parent_element]", source)
+            self.assertIn("const scalar_t coeff0 = -t0;", source)
+            self.assertIn("const scalar_t coeff1 = -t1;", source)
+            self.assertIn("const scalar_t coeff2 = -t2;", source)
+            self.assertIn("return sqrt(c0 * c0 + c1 * c1 + c2 * c2);", source)
 
 
 if __name__ == "__main__":

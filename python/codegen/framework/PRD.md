@@ -108,3 +108,9 @@ It is a code-generator, the runs are done by compiling the kernels and running t
 - Add performance reports with FLOPs, bytes, arithmetic intensity, and achieved throughput.
 - Benchmark standard mesh, packed mesh, patch, and tensor-product variants.
 - Keep the framework API small, procedural at the generated-code level, and wrapped with SFEM-style OOP interfaces.
+
+
+## M8: NASA Wall-Mounted Hump
+- Implement incompressible Navier Stokes material with Strang scheme using the UFL-like API
+- Implement the mesh generator for the Wall-Mounted Hump as Mesh::create_wall_mounted_hump in SMESH, with high-order surface PROTEUS elements
+- Implement the executable to set-up and run the simulation
