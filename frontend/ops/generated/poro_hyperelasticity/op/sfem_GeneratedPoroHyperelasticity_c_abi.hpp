@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #if defined(__has_include)
 #if __has_include("sfem_base.hpp")
@@ -11,6 +12,7 @@
 
 #ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
 typedef double real_t;
 typedef double geom_t;
 #endif

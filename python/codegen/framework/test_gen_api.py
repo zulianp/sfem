@@ -255,7 +255,9 @@ class GenApiTest(unittest.TestCase):
         p = builder.scalar_field("p")
 
         equation = builder.add_energy("stored", p * p, fields=(p,), variables=(p,))
-        evaluated = gen._evaluate_equation(1, equation)
+        system = builder.build()
+        forms = system.form_collection(equation)
+        evaluated = gen._evaluate_equation(1, equation, forms)
 
         self.assertEqual(equation.variables, (p.value,))
         self.assertEqual(
@@ -329,6 +331,19 @@ class GenApiTest(unittest.TestCase):
         self.assertIsNone(residual_unit.payload)
         self.assertIs(system.form_collection(energy), energy_forms)
         self.assertEqual(system.form_collections(), (energy_forms, residual_forms))
+
+    def test_generation_evaluation_requires_lowered_form_collection(self):
+        builder = gen.EquationSystemBuilder(1)
+        p = builder.scalar_field("p")
+        q = gen.test_function(p)
+
+        energy = builder.add_energy("stored", p * p, fields=(p,), variables=(p,))
+        residual = builder.add_residual("flow", p * q, fields=(p,))
+
+        with self.assertRaises(TypeError):
+            gen._evaluate_equation(1, energy, None)
+        with self.assertRaises(TypeError):
+            gen._evaluate_equation(1, residual, None)
 
     def test_hyperelastic_energy_records_deformation_gradient_explicitly(self):
         builder = gen.EquationSystemBuilder(2)
