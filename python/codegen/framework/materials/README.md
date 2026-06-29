@@ -24,6 +24,9 @@ Run an example from the repository root:
 PYTHONPATH=python python -m codegen.framework.materials.neohookean_ogden \
     --out-dir /tmp/neohookean --element HEX8 --compile
 
+PYTHONPATH=python python -m codegen.framework.materials.mooney_rivlin \
+    --out-dir /tmp/mooney_rivlin --element HEX8 --compile
+
 PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
     --out-dir /tmp/two_phase_flow --element HEX8 --compile
 

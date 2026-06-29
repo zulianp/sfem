@@ -338,7 +338,7 @@ Tasks:
 
 1. Move user-intended material examples into `python/codegen/framework/materials`.
 2. Move infrastructure APIs into `sfem.gen`.
-3. Delete legacy single-physics material adapter internals.
+3. Delete legacy single-physics material adapter internals (make sure the unified framework can reproduce the generations).
 4. Remove duplicate local-kernel and mesh-kernel generation code.
 5. Remove duplicated tensor-product geometry generation.
 6. Remove material-specific special cases from the code generation layer.
