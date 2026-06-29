@@ -3,6 +3,7 @@
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -204,6 +205,7 @@ namespace sfem {
     ptrdiff_t GeneratedNeoHookeanOgden::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int GeneratedNeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         auto mesh = impl_->space->mesh_ptr();
         const bool needs_affine_geometry =
@@ -230,6 +232,7 @@ namespace sfem {
     }
 
     int GeneratedNeoHookeanOgden::gradient(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::gradient");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -279,6 +282,7 @@ namespace sfem {
     int GeneratedNeoHookeanOgden::apply(const real_t *const x,
                       const real_t *const h,
                       real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::apply");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -326,6 +330,7 @@ namespace sfem {
     }
 
     int GeneratedNeoHookeanOgden::value(const real_t *x, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::value");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         *out = 0;
@@ -396,14 +401,101 @@ namespace sfem {
         });
     }
 
+    int GeneratedNeoHookeanOgden::value_steps(const real_t *x,
+                            const real_t *h,
+                            const int nsteps,
+                            const real_t *const steps,
+                            real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::value_steps");
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const ptrdiff_t nelements = domain.block->n_elements();
+            const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
+            const real_t *const *adjugate = nullptr;
+            const real_t *determinant = nullptr;
+            if (impl_->objective_uses_affine) {
+                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                        domain.user_data);
+                if (!jacobian) {
+                    SFEM_ERROR("GeneratedNeoHookeanOgden affine objective_steps requires cached geometry\n");
+                    return SFEM_FAILURE;
+                }
+                adjugate = reinterpret_cast<const real_t *const *>(
+                        jacobian->jacobian_adjugate_SoA()->data());
+                determinant = reinterpret_cast<const real_t *>(
+                        jacobian->jacobian_determinant()->data());
+            }
+            if (nvalues > impl_->element_capacity) {
+                impl_->element_values.reset(new real_t[nvalues]);
+                impl_->element_capacity = nvalues;
+            }
+            std::fill(impl_->element_values.get(),
+                      impl_->element_values.get() + nvalues,
+                      real_t(0));
+            int status = SFEM_FAILURE;
+            switch (domain.element_type) {
+                case smesh::TRI3:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_tri3_tri3_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_tri3_tri3_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::TRI6:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_tri6_tri6_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_tri6_tri6_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::QUAD4:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_quad4_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::TET4:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_tet4_tet4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_tet4_tet4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::TET10:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_tet10_tet10_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_tet10_tet10_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::HEX8:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_hex8_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_hex8_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::HEX27:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_hex27_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::PROTEUS_HEX8:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::PROTEUS_HEX27:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                case smesh::PROTEUS_HEX64:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_proteus_hex64_proteus_hex64_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_proteus_hex64_proteus_hex64_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    break;
+                default:
+                    SFEM_ERROR("GeneratedNeoHookeanOgden does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+            if (status != SFEM_SUCCESS) return status;
+            for (int step = 0; step < nsteps; ++step) {
+                real_t sum = 0;
+#pragma omp simd reduction(+ : sum)
+                for (ptrdiff_t element = 0; element < nelements; ++element) {
+                    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
+                }
+                out[step] += sum;
+            }
+            return SFEM_SUCCESS;
+        });
+    }
+
     int GeneratedNeoHookeanOgden::hessian_crs(const real_t *const,
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_crs");
         return SFEM_FAILURE;
     }
 
     void GeneratedNeoHookeanOgden::set_option(const std::string &name, const bool val) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::set_option");
         if (name == "assume_affine") {
             impl_->objective_uses_affine = val;
             impl_->gradient_uses_affine = val;
@@ -421,12 +513,14 @@ namespace sfem {
     void GeneratedNeoHookeanOgden::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> GeneratedNeoHookeanOgden::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::create_from_yaml");
         auto ret = std::make_shared<GeneratedNeoHookeanOgden>(space);
 
         std::vector<std::string> block_names;

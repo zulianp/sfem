@@ -25,6 +25,12 @@ def _header(material, residual):
         void set_field(const char *name,
                        const std::shared_ptr<Buffer<real_t>> &values,
                        int component) override;""" if residual else ""
+    value_steps = "" if residual else """
+        int value_steps(const real_t *x,
+                        const real_t *h,
+                        const int nsteps,
+                        const real_t *const steps,
+                        real_t *const out) override;"""
     return """#pragma once
 
 #include "sfem_Op.hpp"
@@ -47,7 +53,7 @@ namespace sfem {
         int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-        int value(const real_t *x, real_t *const out) override;
+        int value(const real_t *x, real_t *const out) override;%(value_steps)s
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
@@ -66,7 +72,7 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 }  // namespace sfem
-""" % {"op": material.op_name, "extra": extra}
+""" % {"op": material.op_name, "extra": extra, "value_steps": value_steps}
 
 
 def _hyperelastic_op(material, elements, c_abi_header=None):
@@ -76,6 +82,7 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
     gradient_cases = []
     apply_cases = []
     objective_cases = []
+    objective_steps_cases = []
     for element in elements:
         dim = _element_dim(element)
         stem = "%s_%s_%s" % (
@@ -170,12 +177,38 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
                 ),
             )
         )
+        objective_steps_cases.append(
+            _dual_status_case(
+                element,
+                "%s_objective_steps_affine_mesh_soa" % stem,
+                "%s, %d, %s, %d, %s, nsteps, steps, impl_->element_values.get()"
+                % (
+                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
+                    % (_affine_geometry_offsets(dim), args),
+                    dim,
+                    _offsets("x", components),
+                    dim,
+                    _offsets("h", components),
+                ),
+                "%s_objective_steps_isoparametric_mesh_soa" % stem,
+                "%s, %d, %s, %d, %s, nsteps, steps, impl_->element_values.get()"
+                % (
+                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
+                    % args,
+                    dim,
+                    _offsets("x", components),
+                    dim,
+                    _offsets("h", components),
+                ),
+            )
+        )
 
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -243,6 +276,7 @@ namespace sfem {
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("%(op)s::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         auto mesh = impl_->space->mesh_ptr();
         const bool needs_affine_geometry =
@@ -269,6 +303,7 @@ namespace sfem {
     }
 
     int %(op)s::gradient(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::gradient");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -299,6 +334,7 @@ namespace sfem {
     int %(op)s::apply(const real_t *const x,
                       const real_t *const h,
                       real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::apply");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -327,6 +363,7 @@ namespace sfem {
     }
 
     int %(op)s::value(const real_t *x, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::value");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         *out = 0;
@@ -368,14 +405,72 @@ namespace sfem {
         });
     }
 
+    int %(op)s::value_steps(const real_t *x,
+                            const real_t *h,
+                            const int nsteps,
+                            const real_t *const steps,
+                            real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::value_steps");
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const ptrdiff_t nelements = domain.block->n_elements();
+            const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
+            const real_t *const *adjugate = nullptr;
+            const real_t *determinant = nullptr;
+            if (impl_->objective_uses_affine) {
+                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                        domain.user_data);
+                if (!jacobian) {
+                    SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
+                    return SFEM_FAILURE;
+                }
+                adjugate = reinterpret_cast<const real_t *const *>(
+                        jacobian->jacobian_adjugate_SoA()->data());
+                determinant = reinterpret_cast<const real_t *>(
+                        jacobian->jacobian_determinant()->data());
+            }
+            if (nvalues > impl_->element_capacity) {
+                impl_->element_values.reset(new real_t[nvalues]);
+                impl_->element_capacity = nvalues;
+            }
+            std::fill(impl_->element_values.get(),
+                      impl_->element_values.get() + nvalues,
+                      real_t(0));
+            int status = SFEM_FAILURE;
+            switch (domain.element_type) {
+%(objective_steps_cases)s
+                default:
+                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+            if (status != SFEM_SUCCESS) return status;
+            for (int step = 0; step < nsteps; ++step) {
+                real_t sum = 0;
+#pragma omp simd reduction(+ : sum)
+                for (ptrdiff_t element = 0; element < nelements; ++element) {
+                    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
+                }
+                out[step] += sum;
+            }
+            return SFEM_SUCCESS;
+        });
+    }
+
     int %(op)s::hessian_crs(const real_t *const,
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
         return SFEM_FAILURE;
     }
 
     void %(op)s::set_option(const std::string &name, const bool val) {
+        SFEM_TRACE_SCOPE("%(op)s::set_option");
         if (name == "assume_affine") {
             impl_->objective_uses_affine = val;
             impl_->gradient_uses_affine = val;
@@ -393,12 +488,14 @@ namespace sfem {
     void %(op)s::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
+        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
         auto ret = std::make_shared<%(op)s>(space);
 
         std::vector<std::string> block_names;
@@ -462,6 +559,7 @@ namespace sfem {
         "gradient_cases": "\n".join(gradient_cases),
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
+        "objective_steps_cases": "\n".join(objective_steps_cases),
     }
     return _header(material, False), source
 
@@ -663,6 +761,7 @@ def _residual_op(material, elements, c_abi_header=None):
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -744,6 +843,7 @@ namespace sfem {
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("%(op)s::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
         auto mesh = impl_->space->mesh_ptr();
@@ -766,12 +866,14 @@ namespace sfem {
     }
 
     int %(op)s::update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("%(op)s::update");
         impl_->current = x;
         return SFEM_SUCCESS;
     }
 
     int %(op)s::update(const real_t *const previous,
                        const real_t *const current) {
+        SFEM_TRACE_SCOPE("%(op)s::update");
         impl_->previous_buffer.reset();
         impl_->previous = previous;
         impl_->current = current;
@@ -779,6 +881,7 @@ namespace sfem {
     }
 
     int %(op)s::gradient(const real_t *const state, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
         impl_->current = state;
         auto mesh = impl_->space->mesh_ptr();
@@ -816,6 +919,7 @@ namespace sfem {
     int %(op)s::apply(const real_t *const state,
                       const real_t *const direction,
                       real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::apply");
         const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
         auto mesh = impl_->space->mesh_ptr();
@@ -853,6 +957,7 @@ namespace sfem {
     void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
+        SFEM_TRACE_SCOPE("%(op)s::set_field");
         if (component != 0 || std::strcmp(name, "previous") != 0) {
             SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
             return;
@@ -864,10 +969,12 @@ namespace sfem {
     void %(op)s::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
+        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
     void %(op)s::set_option(const std::string &name, const bool val) {
+        SFEM_TRACE_SCOPE("%(op)s::set_option");
         if (name == "assume_affine") {
             impl_->residual_uses_affine = val;
             impl_->jacobian_action_uses_affine = val;
@@ -883,6 +990,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
         auto ret = std::make_shared<%(op)s>(space);
 
         std::vector<std::string> block_names;
@@ -935,10 +1043,12 @@ namespace sfem {
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
         return SFEM_FAILURE;
     }
 
     int %(op)s::value(const real_t *, real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::value");
         return SFEM_FAILURE;
     }
 }  // namespace sfem
@@ -1044,6 +1154,7 @@ def _coupled_energy_residual_op(material, elements, c_abi_header=None):
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -1135,6 +1246,7 @@ namespace sfem {
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("%(op)s::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
         auto mesh = impl_->space->mesh_ptr();
@@ -1163,12 +1275,14 @@ namespace sfem {
     }
 
     int %(op)s::update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("%(op)s::update");
         impl_->current = x;
         return SFEM_SUCCESS;
     }
 
     int %(op)s::update(const real_t *const previous,
                        const real_t *const current) {
+        SFEM_TRACE_SCOPE("%(op)s::update");
         impl_->previous_buffer.reset();
         impl_->previous = previous;
         impl_->current = current;
@@ -1176,6 +1290,7 @@ namespace sfem {
     }
 
     int %(op)s::gradient(const real_t *const state, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::gradient");
         if (!impl_->previous) {
             SFEM_ERROR("%(op)s requires a previous state\\n");
             return SFEM_FAILURE;
@@ -1214,6 +1329,7 @@ namespace sfem {
     int %(op)s::apply(const real_t *const state,
                       const real_t *const direction,
                       real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::apply");
         const real_t *const current = state ? state : impl_->current;
         if (!current) {
             SFEM_ERROR("%(op)s requires a current state\\n");
@@ -1249,6 +1365,7 @@ namespace sfem {
     }
 
     int %(op)s::value(const real_t *state, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::value");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         *out = 0;
@@ -1295,6 +1412,7 @@ namespace sfem {
     void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
+        SFEM_TRACE_SCOPE("%(op)s::set_field");
         if (component != 0 || std::strcmp(name, "previous") != 0) {
             SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
             return;
@@ -1304,6 +1422,7 @@ namespace sfem {
     }
 
     void %(op)s::set_option(const std::string &name, const bool val) {
+        SFEM_TRACE_SCOPE("%(op)s::set_option");
         if (name == "assume_affine") {
             impl_->objective_uses_affine = val;
             impl_->gradient_uses_affine = val;
@@ -1327,12 +1446,14 @@ namespace sfem {
     void %(op)s::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
+        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
         auto ret = std::make_shared<%(op)s>(space);
 
         std::vector<std::string> block_names;
@@ -1389,6 +1510,7 @@ namespace sfem {
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
         return SFEM_FAILURE;
     }
 }  // namespace sfem

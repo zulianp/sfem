@@ -3,6 +3,7 @@
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -242,6 +243,7 @@ namespace sfem {
     ptrdiff_t GeneratedPoroHyperelasticity::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int GeneratedPoroHyperelasticity::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
         auto mesh = impl_->space->mesh_ptr();
@@ -270,12 +272,14 @@ namespace sfem {
     }
 
     int GeneratedPoroHyperelasticity::update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::update");
         impl_->current = x;
         return SFEM_SUCCESS;
     }
 
     int GeneratedPoroHyperelasticity::update(const real_t *const previous,
                        const real_t *const current) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::update");
         impl_->previous_buffer.reset();
         impl_->previous = previous;
         impl_->current = current;
@@ -283,6 +287,7 @@ namespace sfem {
     }
 
     int GeneratedPoroHyperelasticity::gradient(const real_t *const state, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::gradient");
         if (!impl_->previous) {
             SFEM_ERROR("GeneratedPoroHyperelasticity requires a previous state\n");
             return SFEM_FAILURE;
@@ -356,6 +361,7 @@ namespace sfem {
     int GeneratedPoroHyperelasticity::apply(const real_t *const state,
                       const real_t *const direction,
                       real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::apply");
         const real_t *const current = state ? state : impl_->current;
         if (!current) {
             SFEM_ERROR("GeneratedPoroHyperelasticity requires a current state\n");
@@ -426,6 +432,7 @@ namespace sfem {
     }
 
     int GeneratedPoroHyperelasticity::value(const real_t *state, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::value");
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         *out = 0;
@@ -480,6 +487,7 @@ namespace sfem {
     void GeneratedPoroHyperelasticity::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::set_field");
         if (component != 0 || std::strcmp(name, "previous") != 0) {
             SFEM_ERROR("GeneratedPoroHyperelasticity supports set_field(\"previous\", buffer, 0)\n");
             return;
@@ -489,6 +497,7 @@ namespace sfem {
     }
 
     void GeneratedPoroHyperelasticity::set_option(const std::string &name, const bool val) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::set_option");
         if (name == "assume_affine") {
             impl_->objective_uses_affine = val;
             impl_->gradient_uses_affine = val;
@@ -512,12 +521,14 @@ namespace sfem {
     void GeneratedPoroHyperelasticity::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> GeneratedPoroHyperelasticity::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::create_from_yaml");
         auto ret = std::make_shared<GeneratedPoroHyperelasticity>(space);
 
         std::vector<std::string> block_names;
@@ -574,6 +585,7 @@ namespace sfem {
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::hessian_crs");
         return SFEM_FAILURE;
     }
 }  // namespace sfem

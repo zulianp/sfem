@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -69,13 +70,7 @@ namespace {
         const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
         const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
 
-        printf("%-72s %12.6e %16.3f %13.3f %10s %13s\n",
-               name,
-               seconds_per_call,
-               melements_per_s,
-               mdofs_per_s,
-               "-",
-               "-");
+        printf("%-72s %12.6e %16.3f %13.3f %10s %13s\n", name, seconds_per_call, melements_per_s, mdofs_per_s, "-", "-");
     }
 
     bool generated_neohookean_supported(const smesh::ElemType element_type) {
@@ -104,33 +99,30 @@ namespace {
         }
     }
 
-    void set_neohookean_geometry_options(const std::shared_ptr<sfem::Op> &op,
-                                         const bool                      assume_affine) {
+    void set_neohookean_geometry_options(const std::shared_ptr<sfem::Op> &op, const bool assume_affine) {
         op->set_option("assume_affine", assume_affine);
         op->set_option("ASSUME_AFFINE", assume_affine);
     }
 
-    void set_neohookean_material(const std::shared_ptr<sfem::Op> &op,
-                                 const real_t                    mu,
-                                 const real_t                    lambda) {
+    void set_neohookean_material(const std::shared_ptr<sfem::Op> &op, const real_t mu, const real_t lambda) {
         op->set_value_in_block("default", "mu", mu);
         op->set_value_in_block("default", "lambda", lambda);
         op->set_value_in_block("default", "lmbda", lambda);
     }
 
     void configure_initialized_neohookean_op(const std::shared_ptr<sfem::Op> &op,
-                                             const real_t                    mu,
-                                             const real_t                    lambda,
-                                             const bool                      assume_affine) {
+                                             const real_t                     mu,
+                                             const real_t                     lambda,
+                                             const bool                       assume_affine) {
         set_neohookean_geometry_options(op, assume_affine);
         set_neohookean_material(op, mu, lambda);
     }
 
-    double time_gradient(const std::shared_ptr<sfem::Function> &f,
-                         const real_t *const                   x,
-                         real_t *const                         out,
-                         const ptrdiff_t                       ndofs,
-                         const int                             repeat,
+    double time_gradient(const std::shared_ptr<sfem::Function>         &f,
+                         const real_t *const                            x,
+                         real_t *const                                  out,
+                         const ptrdiff_t                                ndofs,
+                         const int                                      repeat,
                          const std::shared_ptr<sfem::BLAS_Tpl<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
@@ -143,10 +135,10 @@ namespace {
     }
 
     double time_apply(const std::shared_ptr<sfem::Operator<real_t>> &op,
-                      const real_t *const                           direction,
-                      real_t *const                                 out,
-                      const ptrdiff_t                               ndofs,
-                      const int                                     repeat,
+                      const real_t *const                            direction,
+                      real_t *const                                  out,
+                      const ptrdiff_t                                ndofs,
+                      const int                                      repeat,
                       const std::shared_ptr<sfem::BLAS_Tpl<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
@@ -168,24 +160,23 @@ int main(int argc, char *argv[]) {
         SFEM_ERROR("bench_hyperelasticity.exe supports one MPI rank\n");
     }
 
-    const int         resolution         = smesh::Env::read("SFEM_BASE_RESOLUTION", 16);
-    const int         warmup             = smesh::Env::read("SFEM_WARMUP", 3);
-    const int         repeat             = smesh::Env::read("SFEM_REPEAT", 10);
-    const int         nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 10);
-    const int         linear_max_it      = smesh::Env::read("SFEM_LSOLVE_MAX_IT", 500);
-    const real_t      linear_rtol        = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-6);
-    const real_t      nonlinear_tol      = smesh::Env::read("SFEM_NL_TOL", 1e-9);
-    const real_t      displacement_value = smesh::Env::read("SFEM_DISPLACEMENT", 0.05);
-    const real_t      damping            = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
-    const real_t      mu                 = smesh::Env::read("SFEM_SHEAR_MODULUS", 1.0);
-    const real_t      lambda             = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", 1.0);
-    const std::string generated_operator_name =
-            smesh::Env::read_string("SFEM_GENERATED_OPERATOR", "GeneratedNeoHookeanOgden");
-    const std::string baseline_operator_name =
-            smesh::Env::read_string("SFEM_BASELINE_OPERATOR", "NeoHookeanOgden");
-    const std::string codegen_geometry   = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
-    const std::string output_path        = smesh::Env::read_string("SFEM_OUTPUT_PATH", "");
-    const bool        run_baseline_requested = smesh::Env::read("SFEM_RUN_BASELINE", true);
+    const int         resolution              = smesh::Env::read("SFEM_BASE_RESOLUTION", 16);
+    const int         warmup                  = smesh::Env::read("SFEM_WARMUP", 3);
+    const int         repeat                  = smesh::Env::read("SFEM_REPEAT", 10);
+    const int         nl_max_it               = smesh::Env::read("SFEM_NL_MAX_IT", 10);
+    const int         linear_max_it           = smesh::Env::read("SFEM_LSOLVE_MAX_IT", 500);
+    const real_t      linear_rtol             = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-6);
+    const real_t      nonlinear_tol           = smesh::Env::read("SFEM_NL_TOL", 1e-9);
+    const real_t      displacement_value      = smesh::Env::read("SFEM_DISPLACEMENT", 0.05);
+    const real_t      damping                 = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
+    const int         line_search_steps       = smesh::Env::read("SFEM_NL_LINE_SEARCH_STEPS", 20);
+    const real_t      mu                      = smesh::Env::read("SFEM_SHEAR_MODULUS", 1.0);
+    const real_t      lambda                  = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", 1.0);
+    const std::string generated_operator_name = smesh::Env::read_string("SFEM_GENERATED_OPERATOR", "GeneratedNeoHookeanOgden");
+    const std::string baseline_operator_name  = smesh::Env::read_string("SFEM_BASELINE_OPERATOR", "NeoHookeanOgden");
+    const std::string codegen_geometry        = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
+    const std::string output_path             = smesh::Env::read_string("SFEM_OUTPUT_PATH", "");
+    const bool        run_baseline_requested  = smesh::Env::read("SFEM_RUN_BASELINE", true);
 
     const auto element_type = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
     auto       mesh         = sfem::Mesh::create_cube(
@@ -210,8 +201,8 @@ int main(int argc, char *argv[]) {
                 sizeof(real_t));
     }
 
-    auto fs          = sfem::FunctionSpace::create(mesh, block_size);
-    auto generated_f = sfem::Function::create(fs);
+    auto                      fs          = sfem::FunctionSpace::create(mesh, block_size);
+    auto                      generated_f = sfem::Function::create(fs);
     std::shared_ptr<sfem::Op> generated_op;
     if (generated_operator_name == "GeneratedNeoHookeanOgden") {
         generated_op = std::make_shared<sfem::GeneratedNeoHookeanOgden>(fs);
@@ -229,10 +220,10 @@ int main(int argc, char *argv[]) {
     }
     generated_f->add_operator(generated_op);
 
-    const bool run_baseline = run_baseline_requested && baseline_neohookean_supported(mesh->element_type(0));
+    const bool                      run_baseline = run_baseline_requested && baseline_neohookean_supported(mesh->element_type(0));
     std::shared_ptr<sfem::Function> baseline_f;
     if (run_baseline) {
-        baseline_f = sfem::Function::create(fs);
+        baseline_f       = sfem::Function::create(fs);
         auto baseline_op = sfem::create_op(fs, baseline_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
         if (!baseline_op) {
             SFEM_ERROR("Unable to create baseline operator %s\n", baseline_operator_name.c_str());
@@ -254,14 +245,23 @@ int main(int argc, char *argv[]) {
         baseline_f->add_constraint(dirichlet);
     }
 
-    const ptrdiff_t nelements = mesh->n_elements();
-    const ptrdiff_t ndofs     = fs->n_dofs();
-    auto            x         = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
-    auto            rhs       = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
-    auto            increment = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
-    auto            trial     = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
-    auto            output    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
-    auto            blas      = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+    const ptrdiff_t     nelements = mesh->n_elements();
+    const ptrdiff_t     ndofs     = fs->n_dofs();
+    auto                x         = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                rhs       = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                increment = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                trial     = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                output    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                blas      = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+    std::vector<real_t> line_search_alphas(std::max(line_search_steps, 1));
+    std::vector<real_t> line_search_values(std::max(line_search_steps, 1));
+    if (line_search_steps > 0) {
+        real_t alpha = -damping;
+        for (int s = 0; s < line_search_steps; ++s) {
+            line_search_alphas[s] = alpha;
+            alpha *= static_cast<real_t>(0.5);
+        }
+    }
 
     blas->zeros(ndofs, x->data());
     generated_f->apply_constraints(x->data());
@@ -294,10 +294,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    const double generated_gradient_elapsed =
-            time_gradient(generated_f, x->data(), rhs->data(), ndofs, repeat, blas);
-    const double generated_apply_elapsed =
-            time_apply(generated_linear_op, trial->data(), output->data(), ndofs, repeat, blas);
+    const double generated_gradient_elapsed = time_gradient(generated_f, x->data(), rhs->data(), ndofs, repeat, blas);
+    const double generated_apply_elapsed    = time_apply(generated_linear_op, trial->data(), output->data(), ndofs, repeat, blas);
 
     double baseline_gradient_elapsed = 0;
     double baseline_apply_elapsed    = 0;
@@ -322,7 +320,8 @@ int main(int argc, char *argv[]) {
            "Rate [MDOF/s]",
            "AI",
            "Rate [GFLOP/s]");
-    printf("----------------------------------------------------------------------------------------------------------------------------------------------\n");
+    printf("---------------------------------------------------------------------------------------------------------------------"
+           "-------------------------\n");
     print_rate("generated_gradient", generated_gradient_elapsed, nelements, ndofs, repeat);
     print_rate("generated_hessian_apply", generated_apply_elapsed, nelements, ndofs, repeat);
     if (baseline_f) {
@@ -343,8 +342,8 @@ int main(int argc, char *argv[]) {
     cg->set_atol(1e-12);
     cg->verbose = false;
 
-    printf("\n%-10s %-8s %-14s %-12s %-14s\n", "Newton", "CG", "Residual", "Time [s]", "Rate [MDOF/s]");
-    printf("-----------------------------------------------------------------\n");
+    printf("\n%-10s %-8s %-14s %-12s %-14s %-12s\n", "Newton", "CG", "Residual", "Time [s]", "Rate [MDOF/s]", "Step");
+    printf("------------------------------------------------------------------------------\n");
     printf("solve_operator %s_%s\n", generated_operator_name.c_str(), codegen_geometry.c_str());
 
     int       completed_newton = 0;
@@ -356,7 +355,7 @@ int main(int argc, char *argv[]) {
 
         const real_t residual = blas->norm2(ndofs, rhs->data());
         if (residual < nonlinear_tol) {
-            printf("%-10d %-8d %-14.4e %-12.4e %-14.3f\n", i, 0, residual, 0.0, 0.0);
+            printf("%-10d %-8d %-14.4e %-12.4e %-14.3f %-12.4e\n", i, 0, residual, 0.0, 0.0, 0.0);
             completed_newton = i;
             break;
         }
@@ -367,11 +366,38 @@ int main(int argc, char *argv[]) {
 
         const int cg_it = cg->iterations();
         total_cg_it += cg_it;
-        blas->axpy(ndofs, -damping, increment->data(), x->data());
+
+        real_t step = -damping;
+        if (line_search_steps > 0) {
+            std::fill(line_search_values.begin(), line_search_values.begin() + line_search_steps, real_t(0));
+            if (generated_f->value_steps(
+                        x->data(), increment->data(), line_search_steps, line_search_alphas.data(), line_search_values.data()) !=
+                SFEM_SUCCESS) {
+                SFEM_ERROR("Generated value_steps failed during Newton line search\n");
+            }
+
+            real_t best_value = std::numeric_limits<real_t>::infinity();
+            int    best_step  = -1;
+            for (int s = 0; s < line_search_steps; ++s) {
+                const real_t value = line_search_values[s];
+                if (std::isfinite(value) && value < best_value) {
+                    best_value = value;
+                    best_step  = s;
+                }
+            }
+
+            if (best_step < 0) {
+                SFEM_ERROR("Generated value_steps returned no finite Newton line-search candidate\n");
+            }
+
+            step = line_search_alphas[best_step];
+        }
+
+        blas->axpy(ndofs, step, increment->data(), x->data());
 
         const double iteration_time = MPI_Wtime() - iteration_t0;
         const double rate_m         = 1e-6 * static_cast<double>(ndofs) / iteration_time;
-        printf("%-10d %-8d %-14.4e %-12.4e %-14.3f\n", i, cg_it, residual, iteration_time, rate_m);
+        printf("%-10d %-8d %-14.4e %-12.4e %-14.3f %-12.4e\n", i, cg_it, residual, iteration_time, rate_m, step);
         completed_newton = i + 1;
     }
     const double solve_time = MPI_Wtime() - solve_t0;

@@ -315,6 +315,143 @@ extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa_fl
 namespace sfem {
 namespace codegen {
 
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_solid_tri6_tri6_objective_steps_affine_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t u_stride,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const scalar_t *const SFEM_RESTRICT hx,
+        const scalar_t *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const scalar_t *const SFEM_RESTRICT steps,
+        scalar_t *const SFEM_RESTRICT value
+) {
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 3;
+    static constexpr int N_SHAPE = 6;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const scalar_t *const affine_grad_ref_x = sfem::codegen::poro_hyperelasticity_solid_tri6_affine_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const affine_grad_ref_y = sfem::codegen::poro_hyperelasticity_solid_tri6_affine_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const affine_q_weight = sfem::codegen::poro_hyperelasticity_solid_tri6_affine_reference_data<scalar_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * N_SHAPE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_value[VECTOR_SIZE];
+
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+
+        const scalar_t *const u_components[DIM] = {ux, uy};
+        const scalar_t *const h_components[DIM] = {hx, hy};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+
+        for (int step = 0; step < nsteps; ++step) {
+            const scalar_t alpha = steps[step];
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                const int stream_shape = shape;
+                for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                    }
+                }
+            }
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_value[lane] = scalar_t(0);
+            }
+
+            poro_hyperelasticity_solid_d2_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, mu, lmbda, block_u_streams, block_value);
+
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_steps_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+}
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_steps_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_steps_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+}
+
+
+namespace sfem {
+namespace codegen {
+
 template <typename scalar_t, typename geometry_t>
 static SFEM_INLINE int poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
@@ -460,6 +597,176 @@ extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mesh
         float *const SFEM_RESTRICT value
 ) {
     return sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t, typename geometry_t>
+static SFEM_INLINE int poro_hyperelasticity_solid_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geometry_t *const *const SFEM_RESTRICT points,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t u_stride,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const scalar_t *const SFEM_RESTRICT hx,
+        const scalar_t *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const scalar_t *const SFEM_RESTRICT steps,
+        scalar_t *const SFEM_RESTRICT value
+) {
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 6;
+    static constexpr int N_SHAPE = 6;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const geometry_t *const SFEM_RESTRICT x = points[0];
+    const geometry_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::poro_hyperelasticity_solid_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::poro_hyperelasticity_solid_tri6_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::poro_hyperelasticity_solid_tri6_isoparametric_reference_data<scalar_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * N_SHAPE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_value[VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const geometry_t *const coordinate_components[DIM] = {x, y};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                }
+            }
+        }
+
+        const scalar_t *const u_components[DIM] = {ux, uy};
+        const scalar_t *const h_components[DIM] = {hx, hy};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+
+        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_coordinate_streams[stream] = block_coordinate_data[stream];
+        }
+
+        for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                scalar_t J00 = scalar_t(0);
+                scalar_t J01 = scalar_t(0);
+                scalar_t J10 = scalar_t(0);
+                scalar_t J11 = scalar_t(0);
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const scalar_t g0 = isoparametric_grad_ref_x[q * N_SHAPE + shape];
+                    const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
+                    J00 += block_coordinate_streams[shape * 2 + 0][lane] * g0;
+                    J01 += block_coordinate_streams[shape * 2 + 0][lane] * g1;
+                    J10 += block_coordinate_streams[shape * 2 + 1][lane] * g0;
+                    J11 += block_coordinate_streams[shape * 2 + 1][lane] * g1;
+                }
+                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
+            }
+        }
+
+        for (int step = 0; step < nsteps; ++step) {
+            const scalar_t alpha = steps[step];
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                const int stream_shape = shape;
+                for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                    }
+                }
+            }
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_value[lane] = scalar_t(0);
+            }
+
+            poro_hyperelasticity_solid_d2_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
+
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+}
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 

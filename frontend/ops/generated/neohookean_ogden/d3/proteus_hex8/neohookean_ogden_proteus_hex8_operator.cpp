@@ -327,6 +327,166 @@ extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_affine_mesh_
 namespace sfem {
 namespace codegen {
 
+template <typename scalar_t>
+static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t u_stride,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const scalar_t *const SFEM_RESTRICT hx,
+        const scalar_t *const SFEM_RESTRICT hy,
+        const scalar_t *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const scalar_t *const SFEM_RESTRICT steps,
+        scalar_t *const SFEM_RESTRICT value
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 8;
+    static constexpr int N_SHAPE = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const scalar_t *const affine_shape_1d = sfem::codegen::neohookean_ogden_proteus_hex8_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::neohookean_ogden_proteus_hex8_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_hex8_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * N_SHAPE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_value[VECTOR_SIZE];
+
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+
+        const scalar_t *const u_components[DIM] = {ux, uy, uz};
+        const scalar_t *const h_components[DIM] = {hx, hy, hz};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+
+        for (int step = 0; step < nsteps; ++step) {
+            const scalar_t alpha = steps[step];
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                const int stream_shape = shape;
+                for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                    }
+                }
+            }
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_value[lane] = scalar_t(0);
+            }
+
+            neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const double *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+}
+
+extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const float *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+}
+
+
+namespace sfem {
+namespace codegen {
+
 template <typename scalar_t, typename geometry_t>
 static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
@@ -476,6 +636,183 @@ extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametri
         float *const SFEM_RESTRICT value
 ) {
     return sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t, typename geometry_t>
+static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geometry_t *const *const SFEM_RESTRICT points,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t u_stride,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const scalar_t *const SFEM_RESTRICT hx,
+        const scalar_t *const SFEM_RESTRICT hy,
+        const scalar_t *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const scalar_t *const SFEM_RESTRICT steps,
+        scalar_t *const SFEM_RESTRICT value
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 8;
+    static constexpr int N_SHAPE = 8;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const geometry_t *const SFEM_RESTRICT x = points[0];
+    const geometry_t *const SFEM_RESTRICT y = points[1];
+    const geometry_t *const SFEM_RESTRICT z = points[2];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        idx_t ev[VECTOR_SIZE * N_SHAPE];
+        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_value[VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+
+        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+            }
+        }
+        const geometry_t *const coordinate_components[DIM] = {x, y, z};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = shape;
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                }
+            }
+        }
+
+        const scalar_t *const u_components[DIM] = {ux, uy, uz};
+        const scalar_t *const h_components[DIM] = {hx, hy, hz};
+        const scalar_t *block_u_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_u_streams[stream] = block_u_data[stream];
+        }
+
+        const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
+        for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
+            block_coordinate_streams[stream] = block_coordinate_data[stream];
+        }
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
+                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+        for (int step = 0; step < nsteps; ++step) {
+            const scalar_t alpha = steps[step];
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                const int stream_shape = shape;
+                for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                    }
+                }
+            }
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                block_value[lane] = scalar_t(0);
+            }
+
+            neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+
+#pragma omp simd
+            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+}
+
+extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    return sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 
