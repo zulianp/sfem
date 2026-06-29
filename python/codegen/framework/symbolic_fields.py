@@ -257,6 +257,64 @@ class TensorField(SymbolicField):
         return self.as_array()
 
 
+class SpatialCoordinate:
+    __slots__ = ("name", "shape", "_symbols")
+
+    def __init__(self, mesh=None, dim=None, name="x"):
+        if dim is None:
+            dim = current_geometric_dimension()
+        if dim is None:
+            raise ValueError("SpatialCoordinate requires a geometric dimension context or explicit dim")
+        dim = int(dim)
+        if dim <= 0:
+            raise ValueError("spatial coordinate dimension must be positive")
+        name = str(name)
+        if not name or not name.isidentifier():
+            raise ValueError("spatial coordinate name must be a valid identifier")
+        self.name = name
+        self.shape = (dim,)
+        self._symbols = tuple(sp.Symbol("%s%d" % (name, d)) for d in range(dim))
+
+    @property
+    def dim(self):
+        return self.shape[0]
+
+    @property
+    def rank(self):
+        return 1
+
+    @property
+    def size(self):
+        return self.dim
+
+    @property
+    def symbols(self):
+        return self._symbols
+
+    @property
+    def free_symbols(self):
+        return set(self._symbols)
+
+    @property
+    def value(self):
+        return self.as_matrix()
+
+    def __len__(self):
+        return self.size
+
+    def __iter__(self):
+        return iter(self._symbols)
+
+    def __getitem__(self, index):
+        return self._symbols[_flat_index(self.shape, index)]
+
+    def as_matrix(self):
+        return sp.Matrix(self.dim, 1, self._symbols)
+
+    def __repr__(self):
+        return "SpatialCoordinate(dim=%d, name=%r)" % (self.dim, self.name)
+
+
 class SymbolicArgument:
     __slots__ = ("field", "name", "role", "_symbols")
 
@@ -568,6 +626,7 @@ def _flat_index_from_multi(index, shape):
 
 __all__ = [
     "ScalarField",
+    "SpatialCoordinate",
     "SymbolicField",
     "SymbolicArgument",
     "FiniteElement",

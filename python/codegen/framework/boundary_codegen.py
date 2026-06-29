@@ -2,7 +2,7 @@ import math
 
 import sympy as sp
 
-from .symbolic import GeneratedKernelFile, _sfem_ccode
+from .symbolic import GeneratedKernelFile, _sfem_ccode, _sfem_math_inline_source_lines
 from .fem import (
     sfem_is_proteus_hex_element,
     sfem_tensor_product_hex_order,
@@ -46,7 +46,7 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, element_type):
     coefficients = _boundary_coefficients(system)
     _validate_boundary_coefficients(system, coefficients)
     function = "%s_%s_boundary_residual_soa" % (prefix, surface.lower())
-    source = _boundary_source(function, element_type, surface, components, tuple(system.parameters), coefficients)
+    source = _boundary_source(function, element_type, surface, components, tuple(system.parameters), coefficients, system)
     return (GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),)
 
 
@@ -143,7 +143,7 @@ def _boundary_coefficients(system):
 def _validate_boundary_coefficients(system, coefficients):
     forbidden = set()
     for field in system.fields:
-        forbidden.update(field.current_symbols)
+        forbidden.update(field.gradient)
         forbidden.update(field.previous_symbols)
         forbidden.update(field.direction_symbols)
         forbidden.update(field.test_symbols)
@@ -156,7 +156,7 @@ def _validate_boundary_coefficients(system, coefficients):
             )
 
 
-def _boundary_source(function, element_type, surface, components, parameters, coefficients):
+def _boundary_source(function, element_type, surface, components, parameters, coefficients, system):
     if _use_tensor_product_boundary(element_type, surface):
         return _boundary_tensor_product_source(
             function,
@@ -165,6 +165,7 @@ def _boundary_source(function, element_type, surface, components, parameters, co
             components,
             parameters,
             coefficients,
+            system,
         )
 
     data = _surface_reference_data(surface)
@@ -173,6 +174,10 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     n_qp = data["n_qp"]
     ref_dim = data["ref_dim"]
     physical_dim = 2 if ref_dim == 1 else 3
+    coordinate_symbols = _coefficient_coordinate_symbols(coefficients, physical_dim)
+    current_symbols = _coefficient_current_symbols(system, coefficients)
+    codegen_coefficients = _replace_current_symbols(coefficients, current_symbols)
+    parameters = _filter_coordinate_parameters(parameters, physical_dim)
     if any(len(side) != n_shape for side in side_nodes):
         raise ValueError(
             "sideset side table for '%s' does not match surface shape count %d"
@@ -184,10 +189,29 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
+    current_decls = _current_declarations(current_symbols, "scalar_t")
+    extern_current_decls = _current_declarations(current_symbols, "real_t")
+    extern_float_current_decls = _current_declarations(current_symbols, "float")
+    current_args = "".join(", %s" % symbol for symbol in current_symbols)
+    component_uses_coordinates = tuple(
+        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
+        for coefficient in coefficients
+    )
+    component_uses_current = tuple(
+        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
+        for coefficient in coefficients
+    )
     coeff_lines = [
-        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(coefficients[i]))
+        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
+        if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
+    qp_coeff_lines = _value_eval_lines(coordinate_symbols, current_symbols) + [
+        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        for i in range(components)
+        if component_uses_coordinates[i] or component_uses_current[i]
+    ]
+    math_lines = _math_inline_lines(coefficients)
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
         "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
@@ -209,6 +233,8 @@ def _boundary_source(function, element_type, surface, components, parameters, co
 
 namespace sfem {{
 namespace codegen {{
+
+{math_lines}
 
 template <typename scalar_t>
 struct {function}_reference_data {{
@@ -271,7 +297,7 @@ static SFEM_INLINE void {function}_gather_sideset_element(
 template <typename scalar_t>
 static SFEM_INLINE void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         scalar_t element_vector[{components}][{n_shape}]) {{
     const scalar_t *const shape = {function}_reference_data<scalar_t>::shape();
     const scalar_t *const weight = {function}_reference_data<scalar_t>::weight();
@@ -283,6 +309,7 @@ static SFEM_INLINE void {function}_element(
     for (int q = 0; q < n_qp; ++q) {{
         const scalar_t dS = {function}_measure<scalar_t>(q, ev, points);
         const scalar_t qw = weight[q] * dS;
+{qp_coeff_lines}
         for (int i = 0; i < n_shape; ++i) {{
             const scalar_t test = shape[q * n_shape + i] * qw;
 {accum_lines}
@@ -308,7 +335,7 @@ static SFEM_INLINE int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 #pragma omp parallel for
@@ -323,7 +350,7 @@ static SFEM_INLINE int {function}_impl(
                 element_vector[c][i] = scalar_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{param_args}, element_vector);
+        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
         {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
@@ -337,7 +364,7 @@ static SFEM_INLINE int {sideset_function}_impl(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 #pragma omp parallel for
@@ -350,7 +377,7 @@ static SFEM_INLINE int {sideset_function}_impl(
                 element_vector[c][i] = scalar_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{param_args}, element_vector);
+        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
         {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
@@ -364,22 +391,22 @@ extern "C" int {function}(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{param_args}, out_stride, {scatter_streams});
+            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {function}_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{param_args}, out_stride, {scatter_streams});
+            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}(
@@ -388,11 +415,11 @@ extern "C" int {sideset_function}(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{param_args}, out_stride, {scatter_streams});
+            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}_float(
@@ -401,11 +428,11 @@ extern "C" int {sideset_function}_float(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{param_args}, out_stride, {scatter_streams});
+            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
         function=function,
@@ -423,6 +450,11 @@ extern "C" int {sideset_function}_float(
         grad_values=_cpp_array_values(data["grad"]),
         weight_values=_cpp_array_values(data["weight"]),
         measure_body=_measure_body(ref_dim, physical_dim),
+        math_lines=math_lines,
+        current_decls=current_decls,
+        extern_current_decls=extern_current_decls,
+        extern_float_current_decls=extern_float_current_decls,
+        current_args=current_args,
         param_decls=param_decls,
         extern_param_decls=extern_param_decls,
         extern_float_param_decls=extern_float_param_decls,
@@ -431,6 +463,7 @@ extern "C" int {sideset_function}_float(
         extern_out_params=extern_out_params,
         extern_float_out_params=extern_float_out_params,
         coeff_lines="\n".join(coeff_lines),
+        qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
         accum_lines="\n".join(
             "                element_vector[{c}][i] += coeff{c} * test;".format(c=c)
@@ -450,7 +483,122 @@ def _use_tensor_product_boundary(element_type, surface):
     return surface in ("QUADSHELL4", "QUADSHELL9") or surface.startswith("PROTEUS_QUADSHELL")
 
 
-def _boundary_tensor_product_source(function, element_type, surface, components, parameters, coefficients):
+def _coordinate_symbol_tuple(physical_dim):
+    return tuple(sp.Symbol("x%d" % d) for d in range(int(physical_dim)))
+
+
+def _coefficient_coordinate_symbols(coefficients, physical_dim):
+    coordinate_symbols = set(_coordinate_symbol_tuple(physical_dim))
+    used = set()
+    for coefficient in coefficients:
+        used.update(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
+    return tuple(symbol for symbol in _coordinate_symbol_tuple(physical_dim) if symbol in used)
+
+
+def _filter_coordinate_parameters(parameters, physical_dim):
+    coordinate_symbols = set(_coordinate_symbol_tuple(physical_dim))
+    return tuple(parameter for parameter in parameters if parameter not in coordinate_symbols)
+
+
+def _coefficient_current_symbols(system, coefficients):
+    current_symbols = tuple(field.value for field in system.fields)
+    used = set()
+    for coefficient in coefficients:
+        used.update(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
+    return tuple(symbol for symbol in current_symbols if symbol in used)
+
+
+def _replace_current_symbols(coefficients, current_symbols):
+    substitutions = {
+        symbol: sp.Symbol("%s_q" % symbol)
+        for symbol in current_symbols
+    }
+    if not substitutions:
+        return tuple(coefficients)
+    return tuple(sp.sympify(coefficient).xreplace(substitutions) for coefficient in coefficients)
+
+
+def _current_declarations(current_symbols, scalar_type):
+    return "".join(
+        ", const %s *const SFEM_RESTRICT %s" % (scalar_type, symbol)
+        for symbol in current_symbols
+    )
+
+
+def _math_inline_lines(coefficients):
+    if not any(sp.sympify(coefficient).has(sp.Pow) for coefficient in coefficients):
+        return ""
+    return "\n".join(_sfem_math_inline_source_lines())
+
+
+def _value_eval_lines(coordinate_symbols, current_symbols):
+    if not coordinate_symbols and not current_symbols:
+        return []
+    lines = [
+        "        scalar_t %s = scalar_t(0);" % symbol
+        for symbol in coordinate_symbols
+    ]
+    lines.extend(
+        "        scalar_t %s_q = scalar_t(0);" % symbol
+        for symbol in current_symbols
+    )
+    lines.extend(
+        [
+            "        for (int j = 0; j < n_shape; ++j) {",
+            "            const scalar_t phi = shape[q * n_shape + j];",
+            "            const idx_t node = ev[j];",
+        ]
+    )
+    for symbol in coordinate_symbols:
+        component = int(str(symbol)[1:])
+        lines.append(
+            "            %s += scalar_t(points[%d][node]) * phi;" % (symbol, component)
+        )
+    for symbol in current_symbols:
+        lines.append("            %s_q += %s[node] * phi;" % (symbol, symbol))
+    lines.append("        }")
+    return lines
+
+
+def _tensor_value_eval_lines(coordinate_symbols, current_symbols):
+    if not coordinate_symbols and not current_symbols:
+        return []
+    lines = [
+        "            scalar_t %s = scalar_t(0);" % symbol
+        for symbol in coordinate_symbols
+    ]
+    lines.extend(
+        "            scalar_t %s_q = scalar_t(0);" % symbol
+        for symbol in current_symbols
+    )
+    lines.extend(
+        [
+            "            for (int cy = 0; cy < S; ++cy) {",
+            "                const scalar_t vy_coord = shape_1d[qy * S + cy];",
+            "                for (int cx = 0; cx < S; ++cx) {",
+            "                    const int j = shape_index[cy * S + cx];",
+            "                    const idx_t node = ev[j];",
+            "                    const scalar_t phi = shape_1d[qx * S + cx] * vy_coord;",
+        ]
+    )
+    for symbol in coordinate_symbols:
+        component = int(str(symbol)[1:])
+        lines.append(
+            "                    %s += scalar_t(points[%d][node]) * phi;"
+            % (symbol, component)
+        )
+    for symbol in current_symbols:
+        lines.append("                    %s_q += %s[node] * phi;" % (symbol, symbol))
+    lines.extend(
+        [
+            "                }",
+            "            }",
+        ]
+    )
+    return lines
+
+
+def _boundary_tensor_product_source(function, element_type, surface, components, parameters, coefficients, system):
     proteus = surface.startswith("PROTEUS_QUADSHELL")
     if proteus:
         n_shape = int(surface.replace("PROTEUS_QUADSHELL", ""))
@@ -472,14 +620,37 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
         )
     side_node_values = tuple(node for side in side_nodes for node in side)
     sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_sideset_soa")
+    coordinate_symbols = _coefficient_coordinate_symbols(coefficients, 3)
+    current_symbols = _coefficient_current_symbols(system, coefficients)
+    codegen_coefficients = _replace_current_symbols(coefficients, current_symbols)
+    parameters = _filter_coordinate_parameters(parameters, 3)
     param_decls = "".join(", const scalar_t %s" % parameter for parameter in parameters)
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
+    current_decls = _current_declarations(current_symbols, "scalar_t")
+    extern_current_decls = _current_declarations(current_symbols, "real_t")
+    extern_float_current_decls = _current_declarations(current_symbols, "float")
+    current_args = "".join(", %s" % symbol for symbol in current_symbols)
+    component_uses_coordinates = tuple(
+        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
+        for coefficient in coefficients
+    )
+    component_uses_current = tuple(
+        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
+        for coefficient in coefficients
+    )
     coeff_lines = [
-        "    const scalar_t coeff%d = %s;" % (i, _sfem_ccode(coefficients[i]))
+        "    const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
+        if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
+    qp_coeff_lines = _tensor_value_eval_lines(coordinate_symbols, current_symbols) + [
+        "            const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        for i in range(components)
+        if component_uses_coordinates[i] or component_uses_current[i]
+    ]
+    math_lines = _math_inline_lines(coefficients)
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
         "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
@@ -501,6 +672,8 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
 
 namespace sfem {{
 namespace codegen {{
+
+{math_lines}
 
 template <typename scalar_t>
 struct {function}_reference_data {{
@@ -605,7 +778,7 @@ static SFEM_INLINE void {function}_gather_sideset_element(
 template <typename scalar_t>
 static SFEM_INLINE void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         scalar_t element_vector[{components}][{n_shape}]) {{
     const scalar_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<scalar_t>::shape_1d();
     const scalar_t *const SFEM_RESTRICT weight_1d = {function}_reference_data<scalar_t>::weight_1d();
@@ -619,6 +792,7 @@ static SFEM_INLINE void {function}_element(
         for (int qx = 0; qx < Q; ++qx) {{
             const scalar_t dS = {function}_measure<scalar_t>(qx, qy, ev, points);
             const scalar_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+{qp_coeff_lines}
             for (int sy = 0; sy < S; ++sy) {{
                 const scalar_t vy = shape_1d[qy * S + sy];
                 for (int sx = 0; sx < S; ++sx) {{
@@ -649,7 +823,7 @@ static SFEM_INLINE int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 #pragma omp parallel for
@@ -664,7 +838,7 @@ static SFEM_INLINE int {function}_impl(
                 element_vector[c][i] = scalar_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{param_args}, element_vector);
+        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
         {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
@@ -678,7 +852,7 @@ static SFEM_INLINE int {sideset_function}_impl(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 #pragma omp parallel for
@@ -691,7 +865,7 @@ static SFEM_INLINE int {sideset_function}_impl(
                 element_vector[c][i] = scalar_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{param_args}, element_vector);
+        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
         {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
@@ -705,22 +879,22 @@ extern "C" int {function}(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{param_args}, out_stride, {scatter_streams});
+            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {function}_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{param_args}, out_stride, {scatter_streams});
+            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}(
@@ -729,11 +903,11 @@ extern "C" int {sideset_function}(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{param_args}, out_stride, {scatter_streams});
+            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}_float(
@@ -742,11 +916,11 @@ extern "C" int {sideset_function}_float(
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_param_decls},
+        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{param_args}, out_stride, {scatter_streams});
+            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
         function=function,
@@ -764,6 +938,11 @@ extern "C" int {sideset_function}_float(
         shape_index_values=_cpp_int_array_values(data["shape_index"]),
         side_node_count=len(side_node_values),
         side_node_values=_cpp_int_array_values(side_node_values),
+        math_lines=math_lines,
+        current_decls=current_decls,
+        extern_current_decls=extern_current_decls,
+        extern_float_current_decls=extern_float_current_decls,
+        current_args=current_args,
         param_decls=param_decls,
         extern_param_decls=extern_param_decls,
         extern_float_param_decls=extern_float_param_decls,
@@ -772,6 +951,7 @@ extern "C" int {sideset_function}_float(
         extern_out_params=extern_out_params,
         extern_float_out_params=extern_float_out_params,
         coeff_lines="\n".join(coeff_lines),
+        qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
         accum_lines="\n".join(
             "                    element_vector[{c}][i] += coeff{c} * test;".format(c=c)
