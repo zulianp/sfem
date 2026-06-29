@@ -5,7 +5,10 @@
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_GeneratedNeoHookeanOgden.hpp"
+#include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
+#include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
 #include "generated/poro_hyperelasticity/op/sfem_GeneratedPoroHyperelasticity.hpp"
+#include "generated/stokes/op/sfem_GeneratedStokes.hpp"
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
@@ -59,7 +62,10 @@ namespace sfem {
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("NeoHookeanOgdenPacked", NeoHookeanOgdenPacked::create);
             instance_.private_register_op("GeneratedNeoHookeanOgden", GeneratedNeoHookeanOgden::create);
+            instance_.private_register_op("GeneratedNeumann", GeneratedNeumann::create);
+            instance_.private_register_op("GeneratedNeumannGeneral", GeneratedNeumannGeneral::create);
             instance_.private_register_op("GeneratedPoroHyperelasticity", GeneratedPoroHyperelasticity::create);
+            instance_.private_register_op("GeneratedStokes", GeneratedStokes::create);
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);

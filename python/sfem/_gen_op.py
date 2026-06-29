@@ -1194,6 +1194,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None):
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
 
+#include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -1245,6 +1246,63 @@ namespace sfem {
             SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
             return 0;
         }
+
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<smesh::Sideset> sideset_from_yaml(
+                const std::shared_ptr<FunctionSpace> &space,
+                const ryml::ConstNodeRef             &node) {
+            const bool is_sideset = node["type"].readable() && node["type"].val() == "sideset";
+            const bool is_file    = node["format"].readable() && node["format"].val() == "file";
+            const bool is_expr    = node["format"].readable() && node["format"].val() == "expr";
+
+            if (!is_sideset && node.has_child("type")) {
+                SFEM_ERROR("%(op)s neumann condition requires type=sideset\\n");
+                return nullptr;
+            }
+
+            if (is_file || node.has_child("path")) {
+                if (!node.has_child("path")) {
+                    SFEM_ERROR("%(op)s file sideset condition requires path\\n");
+                    return nullptr;
+                }
+                const std::string path = yaml_read_string(node["path"]);
+                return smesh::Sideset::create_from_file(
+                        space->mesh_ptr()->comm(), smesh::Path(path));
+            }
+
+            if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
+                if (!node["parent"].is_seq() || !node["lfi"].is_seq()) {
+                    SFEM_ERROR("%(op)s expr sideset condition requires parent/lfi sequences\\n");
+                    return nullptr;
+                }
+
+                const ptrdiff_t size = node["parent"].num_children();
+                if (node["lfi"].num_children() != size) {
+                    SFEM_ERROR("%(op)s expr sideset parent/lfi length mismatch\\n");
+                    return nullptr;
+                }
+
+                auto parent = create_host_buffer<element_idx_t>(size);
+                auto lfi    = create_host_buffer<int16_t>(size);
+
+                ptrdiff_t parent_count = 0;
+                for (auto p : node["parent"].children()) {
+                    p >> parent->data()[parent_count++];
+                }
+
+                ptrdiff_t lfi_count = 0;
+                for (auto p : node["lfi"].children()) {
+                    p >> lfi->data()[lfi_count++];
+                }
+
+                return std::make_shared<smesh::Sideset>(
+                        space->mesh_ptr()->comm(), parent, lfi);
+            }
+
+            SFEM_ERROR("%(op)s neumann condition requires format=file or format=expr\\n");
+            return nullptr;
+        }
+#endif  // SFEM_ENABLE_RYAML
     }  // namespace
 
     class %(op)s::Impl {
@@ -1393,17 +1451,15 @@ namespace sfem {
         copy_material_parameters(defaults, top_values);
         material_from_yaml(node, defaults, top_values);
 
-        const auto boundary_node =
-                node.has_child("boundary_conditions") ? node["boundary_conditions"] :
-                (node.has_child("neumann_conditions") ? node["neumann_conditions"] :
-                 ryml::ConstNodeRef());
-        if (boundary_node.readable() && boundary_node.is_seq()) {
-            for (auto condition_node : boundary_node.children()) {
-                if (!condition_node.has_child("path")) {
-                    continue;
+        const auto neumann_node =
+                node.has_child("neumann_conditions") ? node["neumann_conditions"] :
+                 ryml::ConstNodeRef();
+        if (neumann_node.readable() && neumann_node.is_seq()) {
+            for (auto condition_node : neumann_node.children()) {
+                auto sideset = sideset_from_yaml(space, condition_node);
+                if (!sideset) {
+                    return nullptr;
                 }
-                const std::string path = yaml_read_string(condition_node["path"]);
-                auto sideset = smesh::Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
                 real_t condition_values[MAX_PARAMETERS];
                 material_from_yaml(condition_node, top_values, condition_values);
                 ret->add_sideset(sideset, condition_values);

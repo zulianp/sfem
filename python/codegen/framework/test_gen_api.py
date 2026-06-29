@@ -1892,6 +1892,9 @@ class GenApiTest(unittest.TestCase):
                 "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
                 op_source,
             )
+            self.assertIn("sideset_from_yaml", op_source)
+            self.assertIn("neumann_conditions", op_source)
+            self.assertNotIn("boundary_conditions", op_source)
             with open(
                 os.path.join(out_dir, "op", "sfem_GeneratedNeumann_c_abi.hpp"),
                 encoding="utf-8",

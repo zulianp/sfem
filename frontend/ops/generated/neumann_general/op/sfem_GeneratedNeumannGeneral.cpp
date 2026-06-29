@@ -1,5 +1,5 @@
-#include "sfem_GeneratedNeumann.hpp"
-#include "sfem_GeneratedNeumann_c_abi.hpp"
+#include "sfem_GeneratedNeumannGeneral.hpp"
+#include "sfem_GeneratedNeumannGeneral_c_abi.hpp"
 
 #include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
@@ -18,12 +18,21 @@
 
 namespace sfem {
     namespace {
-        constexpr int MAX_PARAMETERS = 3;
+        constexpr int MAX_PARAMETERS = 12;
 
         void seed_parameters(Parameters &parameters) {
             parameters.set_value("t0", 0);
+            parameters.set_value("t0_001", 0);
+            parameters.set_value("t0_010", 0);
+            parameters.set_value("t0_100", 0);
             parameters.set_value("t1", 0);
+            parameters.set_value("t1_001", 0);
+            parameters.set_value("t1_010", 0);
+            parameters.set_value("t1_100", 0);
             parameters.set_value("t2", 0);
+            parameters.set_value("t2_001", 0);
+            parameters.set_value("t2_010", 0);
+            parameters.set_value("t2_100", 0);
         }
 
         void seed_material(MultiDomainOp &domains) {
@@ -33,9 +42,9 @@ namespace sfem {
         }
 
 #ifdef SFEM_ENABLE_RYAML
-        constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
-        constexpr int N_MATERIAL_PARAMETERS = 3;
-        static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t1", "t2"};
+        constexpr int N_DEFINED_MATERIAL_PARAMETERS = 12;
+        constexpr int N_MATERIAL_PARAMETERS = 12;
+        static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t0_001", "t0_010", "t0_100", "t1", "t1_001", "t1_010", "t1_100", "t2", "t2_001", "t2_010", "t2_100"};
 
         bool yaml_read_real(const ryml::ConstNodeRef &node,
                             const char *const key,
@@ -73,6 +82,15 @@ namespace sfem {
             values[0] = 0;
             values[1] = 0;
             values[2] = 0;
+            values[3] = 0;
+            values[4] = 0;
+            values[5] = 0;
+            values[6] = 0;
+            values[7] = 0;
+            values[8] = 0;
+            values[9] = 0;
+            values[10] = 0;
+            values[11] = 0;
         }
 
         void copy_material_parameters(const real_t *const src,
@@ -175,12 +193,25 @@ namespace sfem {
             switch (dim) {
                 case 2:
                     values[index++] = parameters.require_real_value("t0");
+                    values[index++] = parameters.require_real_value("t0_010");
+                    values[index++] = parameters.require_real_value("t0_100");
                     values[index++] = parameters.require_real_value("t1");
+                    values[index++] = parameters.require_real_value("t1_010");
+                    values[index++] = parameters.require_real_value("t1_100");
                     break;
                 case 3:
                     values[index++] = parameters.require_real_value("t0");
+                    values[index++] = parameters.require_real_value("t0_001");
+                    values[index++] = parameters.require_real_value("t0_010");
+                    values[index++] = parameters.require_real_value("t0_100");
                     values[index++] = parameters.require_real_value("t1");
+                    values[index++] = parameters.require_real_value("t1_001");
+                    values[index++] = parameters.require_real_value("t1_010");
+                    values[index++] = parameters.require_real_value("t1_100");
                     values[index++] = parameters.require_real_value("t2");
+                    values[index++] = parameters.require_real_value("t2_001");
+                    values[index++] = parameters.require_real_value("t2_010");
+                    values[index++] = parameters.require_real_value("t2_100");
                     break;
                 default:
                     SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\n", dim);
@@ -205,7 +236,7 @@ namespace sfem {
                     return static_cast<smesh::block_idx_t>(i);
                 }
             }
-            SFEM_ERROR("GeneratedNeumann: mesh block pointer not found in mesh.blocks()\n");
+            SFEM_ERROR("GeneratedNeumannGeneral: mesh block pointer not found in mesh.blocks()\n");
             return 0;
         }
 
@@ -218,13 +249,13 @@ namespace sfem {
             const bool is_expr    = node["format"].readable() && node["format"].val() == "expr";
 
             if (!is_sideset && node.has_child("type")) {
-                SFEM_ERROR("GeneratedNeumann neumann condition requires type=sideset\n");
+                SFEM_ERROR("GeneratedNeumannGeneral neumann condition requires type=sideset\n");
                 return nullptr;
             }
 
             if (is_file || node.has_child("path")) {
                 if (!node.has_child("path")) {
-                    SFEM_ERROR("GeneratedNeumann file sideset condition requires path\n");
+                    SFEM_ERROR("GeneratedNeumannGeneral file sideset condition requires path\n");
                     return nullptr;
                 }
                 const std::string path = yaml_read_string(node["path"]);
@@ -234,13 +265,13 @@ namespace sfem {
 
             if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
                 if (!node["parent"].is_seq() || !node["lfi"].is_seq()) {
-                    SFEM_ERROR("GeneratedNeumann expr sideset condition requires parent/lfi sequences\n");
+                    SFEM_ERROR("GeneratedNeumannGeneral expr sideset condition requires parent/lfi sequences\n");
                     return nullptr;
                 }
 
                 const ptrdiff_t size = node["parent"].num_children();
                 if (node["lfi"].num_children() != size) {
-                    SFEM_ERROR("GeneratedNeumann expr sideset parent/lfi length mismatch\n");
+                    SFEM_ERROR("GeneratedNeumannGeneral expr sideset parent/lfi length mismatch\n");
                     return nullptr;
                 }
 
@@ -261,13 +292,13 @@ namespace sfem {
                         space->mesh_ptr()->comm(), parent, lfi);
             }
 
-            SFEM_ERROR("GeneratedNeumann neumann condition requires format=file or format=expr\n");
+            SFEM_ERROR("GeneratedNeumannGeneral neumann condition requires format=file or format=expr\n");
             return nullptr;
         }
 #endif  // SFEM_ENABLE_RYAML
     }  // namespace
 
-    class GeneratedNeumann::Impl {
+    class GeneratedNeumannGeneral::Impl {
     public:
         struct BoundaryCondition {
             std::shared_ptr<smesh::Sideset> sideset;
@@ -281,42 +312,42 @@ namespace sfem {
         std::vector<BoundaryCondition> conditions;
     };
 
-    std::unique_ptr<Op> GeneratedNeumann::create(const std::shared_ptr<FunctionSpace> &space) {
+    std::unique_ptr<Op> GeneratedNeumannGeneral::create(const std::shared_ptr<FunctionSpace> &space) {
         const ptrdiff_t expected_block_size =
                 block_size_for_dim(space->mesh_ptr()->spatial_dimension());
         if (space->block_size() != expected_block_size) {
-            SFEM_ERROR("GeneratedNeumann requires block_size=%ld\n",
+            SFEM_ERROR("GeneratedNeumannGeneral requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
             return nullptr;
         }
-        auto op = std::make_unique<GeneratedNeumann>(space);
+        auto op = std::make_unique<GeneratedNeumannGeneral>(space);
         op->initialize();
         return op;
     }
 
-    GeneratedNeumann::GeneratedNeumann(const std::shared_ptr<FunctionSpace> &space)
+    GeneratedNeumannGeneral::GeneratedNeumannGeneral(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>(space)) {}
-    GeneratedNeumann::~GeneratedNeumann() = default;
+    GeneratedNeumannGeneral::~GeneratedNeumannGeneral() = default;
 
-    ptrdiff_t GeneratedNeumann::n_dofs_domain() const { return impl_->space->n_dofs(); }
-    ptrdiff_t GeneratedNeumann::n_dofs_image() const { return impl_->space->n_dofs(); }
+    ptrdiff_t GeneratedNeumannGeneral::n_dofs_domain() const { return impl_->space->n_dofs(); }
+    ptrdiff_t GeneratedNeumannGeneral::n_dofs_image() const { return impl_->space->n_dofs(); }
 
-    int GeneratedNeumann::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::initialize");
+    int GeneratedNeumannGeneral::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
         return SFEM_SUCCESS;
     }
 
-    void GeneratedNeumann::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
+    void GeneratedNeumannGeneral::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
         real_t values[MAX_PARAMETERS];
         material_defaults(values);
         add_sideset(sideset, values);
     }
 
-    void GeneratedNeumann::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+    void GeneratedNeumannGeneral::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                              const real_t *const parameters) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::add_sideset");
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::add_sideset");
         Impl::BoundaryCondition condition;
         condition.sideset = sideset;
         for (int i = 0; i < MAX_PARAMETERS; ++i) {
@@ -325,8 +356,8 @@ namespace sfem {
         impl_->conditions.push_back(condition);
     }
 
-    int GeneratedNeumann::gradient(const real_t *const, real_t *const out) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::gradient");
+    int GeneratedNeumannGeneral::gradient(const real_t *const, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::gradient");
         if (impl_->conditions.empty()) {
             return SFEM_SUCCESS;
         }
@@ -343,65 +374,65 @@ namespace sfem {
                     case smesh::TRI3: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                        status |= neumann_tri3_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], FIELD_STRIDE, u_out[0], u_out[1]);
+                        status |= neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[6], condition.parameters[7], FIELD_STRIDE, u_out[0], u_out[1]);
                         break;
                     }
                     case smesh::QUAD4: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                        status |= neumann_quad4_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], FIELD_STRIDE, u_out[0], u_out[1]);
+                        status |= neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[6], condition.parameters[7], FIELD_STRIDE, u_out[0], u_out[1]);
                         break;
                     }
                     case smesh::TET4: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_tet4_trishell3_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_tet4_trishell3_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::TET10: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_tet10_trishell6_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_tet10_trishell6_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::HEX8: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_hex8_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_hex8_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::HEX27: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_hex27_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_hex27_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX8: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX27: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX64: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX125: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     default:
-                        SFEM_ERROR("GeneratedNeumann does not support element type %d\n",
+                        SFEM_ERROR("GeneratedNeumannGeneral does not support element type %d\n",
                                    domain.element_type);
                         return SFEM_FAILURE;
                 }
@@ -410,48 +441,48 @@ namespace sfem {
         });
     }
 
-    int GeneratedNeumann::apply(const real_t *const,
+    int GeneratedNeumannGeneral::apply(const real_t *const,
                       const real_t *const,
                       real_t *const) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::apply");
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::apply");
         return SFEM_SUCCESS;
     }
 
-    int GeneratedNeumann::value(const real_t *, real_t *const) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::value");
+    int GeneratedNeumannGeneral::value(const real_t *, real_t *const) {
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::value");
         return SFEM_SUCCESS;
     }
 
-    int GeneratedNeumann::hessian_crs(const real_t *const,
+    int GeneratedNeumannGeneral::hessian_crs(const real_t *const,
                             const count_t *const,
                             const idx_t *const,
                             real_t *const) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::hessian_crs");
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::hessian_crs");
         return SFEM_SUCCESS;
     }
 
-    void GeneratedNeumann::set_field(const char *,
+    void GeneratedNeumannGeneral::set_field(const char *,
                            const std::shared_ptr<Buffer<real_t>> &,
                            const int) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::set_field");
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::set_field");
     }
 
-    void GeneratedNeumann::set_option(const std::string &, const bool) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::set_option");
+    void GeneratedNeumannGeneral::set_option(const std::string &, const bool) {
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::set_option");
     }
 
-    void GeneratedNeumann::set_value_in_block(const std::string &block_name,
+    void GeneratedNeumannGeneral::set_value_in_block(const std::string &block_name,
                                     const std::string &var_name,
                                     const real_t value) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::set_value_in_block");
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::set_value_in_block");
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
 #ifdef SFEM_ENABLE_RYAML
-    std::shared_ptr<Op> GeneratedNeumann::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Op> GeneratedNeumannGeneral::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
-        SFEM_TRACE_SCOPE("GeneratedNeumann::create_from_yaml");
-        auto ret = std::make_shared<GeneratedNeumann>(space);
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::create_from_yaml");
+        auto ret = std::make_shared<GeneratedNeumannGeneral>(space);
 
         std::vector<std::string> block_names;
         if (node.has_child("blocks")) {
