@@ -238,6 +238,14 @@ class _ResidualOpMaterialAdapter:
 
 
 @dataclass(frozen=True)
+class _CoupledOpMaterialAdapter:
+    name: str
+    op_name: str
+    parameter_defaults: tuple
+    systems_by_dim: object
+
+
+@dataclass(frozen=True)
 class ElementGenerationContext:
     material_name: str
     element_type: str
@@ -1153,9 +1161,24 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
         raise ValueError("generated Op wrapper requires at least one element context")
     representative_dim = user_input.element_contexts[0].specialization.dim
     equations = _material_equations(material, representative_dim)
-    if len(equations) != 1 or equations[0].name:
+    systems_by_dim = {
+        context.specialization.dim: material.systems.for_dim(context.specialization.dim)
+        for context in user_input.element_contexts
+    }
+    if len(equations) != 1:
+        return generate_op_files(
+            _CoupledOpMaterialAdapter(
+                material.name,
+                material.op_name,
+                material.parameter_defaults,
+                systems_by_dim,
+            ),
+            selected,
+            kernel_sources,
+        )
+    if equations[0].name:
         raise ValueError(
-            "generated Op wrappers for CodeGenerator require exactly one unnamed equation"
+            "single-equation generated Op wrappers require an unnamed equation"
         )
     equation = equations[0]
     if equation.is_energy:
@@ -1169,10 +1192,6 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
             kernel_sources,
         )
     if equation.is_residual:
-        systems_by_dim = {
-            context.specialization.dim: material.systems.for_dim(context.specialization.dim)
-            for context in user_input.element_contexts
-        }
         form_collections = {
             dim: system.form_collection(
                 system.equations[0],

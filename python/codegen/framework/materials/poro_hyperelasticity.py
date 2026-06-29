@@ -70,6 +70,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "poro_hyperelasticity",
     systems,
+    op_name="GeneratedPoroHyperelasticity",
     parameter_defaults=(
         ("mu", 1.0),
         ("lmbda", 1.0),
