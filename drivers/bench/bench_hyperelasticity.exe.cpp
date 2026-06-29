@@ -13,6 +13,7 @@
 #include "sfem_base.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
 
 namespace {
 
@@ -183,6 +184,7 @@ int main(int argc, char *argv[]) {
     const std::string baseline_operator_name =
             smesh::Env::read_string("SFEM_BASELINE_OPERATOR", "NeoHookeanOgden");
     const std::string codegen_geometry   = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
+    const std::string output_path        = smesh::Env::read_string("SFEM_OUTPUT_PATH", "");
     const bool        run_baseline_requested = smesh::Env::read("SFEM_RUN_BASELINE", true);
 
     const auto element_type = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
@@ -382,6 +384,24 @@ int main(int argc, char *argv[]) {
     printf("solve_time %g [s]\n", solve_time);
     printf("solve_rate %g [MDOF/s]\n", 1e-6 * static_cast<double>(ndofs) / solve_time);
     printf("final_residual %g\n", static_cast<double>(final_residual));
+
+    if (!output_path.empty()) {
+        const smesh::Path path(output_path);
+        smesh::create_directory(path);
+        if (fs->has_semi_structured_mesh()) {
+            smesh::semistructured_export_as_standard(mesh, path / "mesh");
+            mesh->write(path / "coarse_mesh");
+        } else {
+            mesh->write(path / "mesh");
+        }
+
+        auto out = generated_f->output();
+        smesh::create_directory(path / "out");
+        out->set_output_dir(path / "out");
+        out->enable_AoS_to_SoA(true);
+        out->write("disp", smesh::to_host(x)->data());
+        out->write("rhs", smesh::to_host(rhs)->data());
+    }
 
     return std::isfinite(final_residual) ? SFEM_SUCCESS : SFEM_FAILURE;
 }
