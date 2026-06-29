@@ -28,6 +28,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "neumann",
     systems,
+    op_name="GeneratedNeumann",
     elements=(
         "TRI3",
         "QUAD4",

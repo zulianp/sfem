@@ -89,6 +89,7 @@ def create_material(polynomial_order=DEFAULT_POLYNOMIAL_ORDER):
     return gen.CodeGenerator(
         "neumann",
         systems,
+        op_name="GeneratedNeumannGeneral",
         elements=(
             "TRI3",
             "QUAD4",
