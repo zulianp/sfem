@@ -38,6 +38,7 @@ from symbolic import (
     sfem_soa_weak_form,
     vector_symbols,
 )
+from fem import sfem_tensor_hex_shape_index
 
 
 def neohookean_ogden_energy(F, mu, lmbda):
@@ -315,6 +316,17 @@ def reference_element_coords(element_type):
             (1.0, 1.0, 1.0),
             (0.0, 1.0, 1.0),
         )
+    if element_type == "HEX27":
+        coords = [None] * 27
+        for sz, z in enumerate((0.0, 0.5, 1.0)):
+            for sy, y in enumerate((0.0, 0.5, 1.0)):
+                for sx, x in enumerate((0.0, 0.5, 1.0)):
+                    coords[sfem_tensor_hex_shape_index("HEX27", 3, sx, sy, sz)] = (
+                        x,
+                        y,
+                        z,
+                    )
+        return tuple(coords)
     raise ValueError("unsupported element type")
 
 
@@ -1340,7 +1352,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         mu = 1.7
         lmbda = 2.3
-        for element_type in ("TRI3", "TET4", "HEX8"):
+        for element_type in ("TRI3", "TET4", "HEX8", "HEX27"):
             with self.subTest(element_type=element_type):
                 prefix = "generated_%s_neohookean_action" % element_type.lower()
                 specialization, generated_files = generated_neohookean_weak_form_files(
