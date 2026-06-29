@@ -418,7 +418,7 @@ namespace sfem {
                 node.has_child("boundary_conditions") ? node["boundary_conditions"] :
                 (node.has_child("neumann_conditions") ? node["neumann_conditions"] :
                  ryml::ConstNodeRef());
-        if (boundary_node.valid() && boundary_node.is_seq()) {
+        if (boundary_node.readable() && boundary_node.is_seq()) {
             for (auto condition_node : boundary_node.children()) {
                 if (!condition_node.has_child("path")) {
                     continue;

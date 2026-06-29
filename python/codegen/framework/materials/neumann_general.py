@@ -87,7 +87,7 @@ def create_material(polynomial_order=DEFAULT_POLYNOMIAL_ORDER):
     for dim in (2, 3):
         systems.add(_build_system(dim, polynomial_order))
     return gen.CodeGenerator(
-        "neumann",
+        "neumann_general",
         systems,
         op_name="GeneratedNeumannGeneral",
         elements=(

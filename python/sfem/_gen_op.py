@@ -1132,6 +1132,11 @@ def _boundary_residual_op(material, elements, c_abi_header=None):
     if form_collections is None:
         raise ValueError("boundary residual generated Op requires form collections")
 
+    material_parameter_index = {
+        str(name): index
+        for index, (name, _) in enumerate(material.parameter_defaults)
+    }
+    material_parameter_names = set(material_parameter_index)
     parameter_names_by_dim = {}
     fields_by_dim = {}
     block_size_by_dim = {}
@@ -1141,11 +1146,13 @@ def _boundary_residual_op(material, elements, c_abi_header=None):
         fields = tuple(collection.fields)
         if len(fields) != 1:
             raise ValueError("boundary residual generated Op currently supports one field")
-        parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in collection.source.parameters)
+        parameter_names_by_dim[dim] = _boundary_residual_parameter_names(
+            collection, material_parameter_names
+        )
         fields_by_dim[dim] = fields
         block_size_by_dim[dim] = sum(int(field.components) for field in fields)
 
-    max_parameters = max(1, *(len(names) for names in parameter_names_by_dim.values()))
+    max_parameters = max(1, len(material.parameter_defaults))
     parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
     gradient_cases = []
     for element in elements:
@@ -1159,8 +1166,8 @@ def _boundary_residual_op(material, elements, c_abi_header=None):
         )
         setup = _residual_soa_view_declarations(fields, "out", "out", "real_t")
         parameter_args = ", ".join(
-            "condition.parameters[%d]" % index
-            for index, _ in enumerate(parameter_names_by_dim[dim])
+            "condition.parameters[%d]" % material_parameter_index[name]
+            for name in parameter_names_by_dim[dim]
         )
         output_args = _boundary_soa_component_argument_names(fields, "out")
         call_args = _nonempty(
@@ -1390,7 +1397,7 @@ namespace sfem {
                 node.has_child("boundary_conditions") ? node["boundary_conditions"] :
                 (node.has_child("neumann_conditions") ? node["neumann_conditions"] :
                  ryml::ConstNodeRef());
-        if (boundary_node.valid() && boundary_node.is_seq()) {
+        if (boundary_node.readable() && boundary_node.is_seq()) {
             for (auto condition_node : boundary_node.children()) {
                 if (!condition_node.has_child("path")) {
                     continue;
@@ -2123,6 +2130,20 @@ def _residual_form_collection(material, dim):
     system = EquationSystem(dim)
     equation = system.add_residual("", material.define, fields=())
     return system.form_collection(equation)
+
+
+def _boundary_residual_parameter_names(collection, available_parameters):
+    dependencies = collection.form_metadata(_form_order_one()).dependencies
+    used = {
+        str(symbol)
+        for symbol in dependencies.parameters
+        if str(symbol) in available_parameters
+    }
+    return tuple(
+        str(symbol)
+        for symbol in collection.source.parameters
+        if str(symbol) in used
+    )
 
 
 def _form_order_one():
