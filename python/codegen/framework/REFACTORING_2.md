@@ -51,6 +51,12 @@ Verification:
 
 Goal: remove geometry and basis-policy reconstruction from emitters.
 
+Status: in progress. Context-specialized emission plans now carry affine and
+isoparametric geometry phase data, geometry streams, field-specific basis plans,
+reference-data streams, and tensor-product sum-factorization plans. OpenMP
+emission validates and consumes geometry modes from the phase plan before
+calling the current low-level generators.
+
 Tasks:
 
 1. Add explicit mesh geometry phase data to `MeshPhasePlan`, including affine
@@ -74,6 +80,10 @@ Acceptance criteria:
   contractions are selected by plan nodes.
 - Boundary, energy, residual, and mixed kernels use the same geometry/basis plan
   schema.
+
+Verification:
+
+- `PYTHONPATH=python python -m unittest python.codegen.framework.test_gen_api`
 
 ## M3. Replace Specialized Generator Entry Points With One Backend Traversal
 

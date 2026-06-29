@@ -1240,7 +1240,12 @@ class GenApiTest(unittest.TestCase):
             ),
         )
         plan.validate_for_context(context)
-        self.assertEqual(plan.emission_kernels_for_context(context), (kernel,))
+        emission = plan.emission_kernels_for_context(context)
+        self.assertEqual(tuple(unit.name for unit in emission), (kernel.name,))
+        self.assertEqual(
+            tuple(geometry.mode for geometry in emission[0].mesh_phase_plans[0].geometries),
+            (gen.GeometryMode.AFFINE, gen.GeometryMode.ISOPARAMETRIC),
+        )
 
     def test_codegen_stage_uses_shared_openmp_soa_backend(self):
         self.assertIsInstance(gen.OPENMP_SOA_BACKEND, gen.OpenMPSoABackend)
@@ -1253,14 +1258,15 @@ class GenApiTest(unittest.TestCase):
         ).run()
         unit = plan.units[0]
         context = user_input.element_contexts[0]
+        specialized = plan.emission_kernels_for_context(context)[0]
         invalid_unit = gen.CodeGenerationUnit(
             name=unit.name,
             kind=unit.kind,
             form_collection=unit.form_collection,
             dim=unit.dim,
             mesh_phase_plans=(
-                gen.MeshPhasePlan(gen.MeshPhase.GEOMETRY),
-                gen.MeshPhasePlan(gen.MeshPhase.LOCAL_CALL),
+                specialized.mesh_phase_plans[0],
+                specialized.mesh_phase_plans[1],
             ),
             target=unit.target,
             payload=unit.payload,
@@ -1349,9 +1355,75 @@ class GenApiTest(unittest.TestCase):
             (gen.KernelEmission.FILES,) * len(residual_plan.block_kernels),
         )
         self.assertEqual(
-            residual_plan.emission_kernels_for_context(residual_input.element_contexts[0]),
-            residual_plan.units + residual_plan.block_kernels,
+            tuple(
+                kernel.name
+                for kernel in residual_plan.emission_kernels_for_context(
+                    residual_input.element_contexts[0],
+                )
+            ),
+            tuple(
+                kernel.name
+                for kernel in residual_plan.units + residual_plan.block_kernels
+            ),
         )
+
+    def test_context_specialized_plan_exposes_geometry_and_basis_policy(self):
+        hex_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
+        hex_plan = gen.SpecializedFormManipulationStage(
+            hex_input,
+            gen._evaluate_forms(hex_input),
+        ).run()
+        hex_unit = hex_plan.emission_kernels_for_context(hex_input.element_contexts[0])[0]
+        geometry_phase = hex_unit.mesh_phase_plans[0]
+        self.assertEqual(
+            tuple(geometry.mode for geometry in geometry_phase.geometries),
+            (gen.GeometryMode.AFFINE, gen.GeometryMode.ISOPARAMETRIC),
+        )
+        affine_geometry, iso_geometry = geometry_phase.geometries
+        self.assertEqual(affine_geometry.node.jacobian_scope, "element")
+        self.assertEqual(iso_geometry.node.jacobian_scope, "quadrature_point")
+        self.assertFalse(affine_geometry.uses_sum_factorization)
+        self.assertTrue(iso_geometry.uses_sum_factorization)
+        self.assertEqual(affine_geometry.streams[0].name, "adjugate")
+        self.assertEqual(affine_geometry.streams[1].name, "determinant")
+        self.assertEqual(iso_geometry.streams[0].name, "coordinates")
+        self.assertEqual(
+            iso_geometry.node.sum_factorization_plan.operations[0].value,
+            "geometry_jacobian",
+        )
+
+        simplex_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        simplex_plan = gen.SpecializedFormManipulationStage(
+            simplex_input,
+            gen._evaluate_forms(simplex_input),
+        ).run()
+        simplex_unit = simplex_plan.emission_kernels_for_context(
+            simplex_input.element_contexts[0],
+        )[0]
+        simplex_iso = simplex_unit.mesh_phase_plans[1].geometries[1]
+        self.assertFalse(simplex_iso.uses_sum_factorization)
+        first_block = simplex_unit.blocks[0]
+        self.assertTrue(first_block.basis_plans)
+        self.assertEqual(first_block.basis_plans[0].family.value, "simplex")
+        self.assertEqual(
+            first_block.local_phase_plans[0].basis_plans[0].data_layout.value,
+            "qp_shape",
+        )
+
+        mixed_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
+        mixed_input = gen.UserInputStage.create(stokes, (mixed_element,), 16, None)
+        mixed_plan = gen.SpecializedFormManipulationStage(
+            mixed_input,
+            gen._evaluate_forms(mixed_input),
+        ).run()
+        mixed_unit = mixed_plan.emission_kernels_for_context(mixed_input.element_contexts[0])[0]
+        mixed_basis_elements = {
+            basis.element_type
+            for block in mixed_unit.blocks
+            for basis in block.basis_plans
+        }
+        self.assertIn("TRI6", mixed_basis_elements)
+        self.assertIn("TRI3", mixed_basis_elements)
 
     def test_generation_plan_validation_rejects_unsupported_combinations(self):
         context = gen.ElementGenerationContext.create("test_material", "TRI3", 16, None)

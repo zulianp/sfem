@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from .basis import BasisPlanNode
@@ -213,6 +213,9 @@ class GeometryPlan:
             "jacobian_scope": self.node.jacobian_scope,
             "geometry_points_per_element": self.node.geometry_points_per_element,
             "uses_sum_factorization": self.node.uses_sum_factorization,
+            "sum_factorization_plan": _sum_factorization_dump(
+                self.node.sum_factorization_plan
+            ),
             "streams": [stream.to_dict() for stream in self.streams],
         }
 
@@ -286,9 +289,15 @@ class BlockPlan:
                     "element_type": basis.element_type,
                     "cell_element_type": basis.cell_element_type,
                     "family": basis.family.value,
+                    "evaluation": basis.evaluation.value,
+                    "data_layout": basis.data_layout.value,
                     "n_shape": basis.n_shape,
                     "n_qp": basis.n_qp,
                     "uses_sum_factorization": basis.uses_sum_factorization,
+                    "sum_factorization_plans": [
+                        _sum_factorization_dump(plan)
+                        for plan in basis.sum_factorization_plans
+                    ],
                 }
                 for basis in self.basis_plans
             ],
@@ -345,8 +354,15 @@ class LocalPhasePlan:
                     "element_type": basis.element_type,
                     "cell_element_type": basis.cell_element_type,
                     "family": basis.family.value,
+                    "evaluation": basis.evaluation.value,
+                    "data_layout": basis.data_layout.value,
                     "n_shape": basis.n_shape,
                     "n_qp": basis.n_qp,
+                    "uses_sum_factorization": basis.uses_sum_factorization,
+                    "sum_factorization_plans": [
+                        _sum_factorization_dump(plan)
+                        for plan in basis.sum_factorization_plans
+                    ],
                 }
                 for basis in self.basis_plans
             ],
@@ -358,12 +374,14 @@ class MeshPhasePlan:
     phase: MeshPhase
     streams: tuple = ()
     geometry: GeometryPlan = None
+    geometries: tuple = ()
     blocks: tuple = ()
     label: str = ""
 
     def __post_init__(self):
         phase = MeshPhase(self.phase)
         streams = tuple(self.streams)
+        geometries = tuple(self.geometries)
         blocks = tuple(self.blocks)
         label = str(self.label)
         for stream in streams:
@@ -371,11 +389,17 @@ class MeshPhasePlan:
                 raise TypeError("mesh phase streams must be DataStreamPlan objects")
         if self.geometry is not None and not isinstance(self.geometry, GeometryPlan):
             raise TypeError("mesh phase geometry must be a GeometryPlan")
+        if self.geometry is not None and self.geometry not in geometries:
+            geometries = (self.geometry,) + geometries
+        for geometry in geometries:
+            if not isinstance(geometry, GeometryPlan):
+                raise TypeError("mesh phase geometries must be GeometryPlan objects")
         for block in blocks:
             if not isinstance(block, BlockPlan):
                 raise TypeError("mesh phase blocks must be BlockPlan objects")
         object.__setattr__(self, "phase", phase)
         object.__setattr__(self, "streams", streams)
+        object.__setattr__(self, "geometries", geometries)
         object.__setattr__(self, "blocks", blocks)
         object.__setattr__(self, "label", label)
 
@@ -400,6 +424,7 @@ class MeshPhasePlan:
             "phase": self.phase.value,
             "label": self.label,
             "geometry": None if self.geometry is None else self.geometry.to_dict(),
+            "geometries": [geometry.to_dict() for geometry in self.geometries],
             "blocks": [block.name for block in self.blocks],
             "streams": [stream.name for stream in self.streams],
         }
@@ -561,6 +586,33 @@ class KernelPlan:
         for block_kernel in self.block_kernels:
             block_kernel.validate_for_context(context)
 
+    def specialize_for_context(self, context):
+        self.validate_for_context(context)
+        blocks = tuple(
+            _specialize_block_for_context(block, self.form_collection, context)
+            for block in self.blocks
+        )
+        block_by_name = {block.name: block for block in blocks}
+        selected_block = None
+        if self.block is not None:
+            selected_block = block_by_name[self.block.name]
+        mesh_phase_plans = tuple(
+            _specialize_mesh_phase_for_context(phase, context, blocks)
+            for phase in self.mesh_phase_plans
+        )
+        block_kernels = tuple(
+            kernel.specialize_for_context(context)
+            for kernel in self.block_kernels
+        )
+        return replace(
+            self,
+            mesh_phases=(),
+            mesh_phase_plans=mesh_phase_plans,
+            blocks=blocks,
+            block=selected_block,
+            block_kernels=block_kernels,
+        )
+
     def local_kernel_plan(self, context, prefix, suffix=""):
         return LocalKernelPlan(
             prefix,
@@ -635,7 +687,7 @@ class GenerationPlan:
     def emission_kernels_for_context(self, context):
         self.validate_for_context(context)
         return tuple(
-            kernel
+            kernel.specialize_for_context(context)
             for kernel in _flatten_kernels(self.kernels_for_context(context))
             if kernel.emits_files
         )
@@ -685,12 +737,163 @@ def _value_or_name(value):
     return str(value)
 
 
+def _sum_factorization_dump(plan):
+    if plan is None:
+        return None
+    return {
+        "dim": plan.dim,
+        "n_shape": plan.n_shape,
+        "n_qp": plan.n_qp,
+        "n_shape_1d": plan.n_shape_1d,
+        "n_qp_1d": plan.n_qp_1d,
+        "operations": [operation.value for operation in plan.operations],
+        "input_layout": plan.input_layout.value,
+        "basis_layout": plan.basis_layout.value,
+        "output_layout": plan.output_layout.value,
+    }
+
+
 def _flatten_kernels(kernels):
     ret = []
     for kernel in kernels:
         ret.append(kernel)
         ret.extend(_flatten_kernels(kernel.block_kernels))
     return tuple(ret)
+
+
+def _specialize_mesh_phase_for_context(phase, context, blocks):
+    if phase.phase is MeshPhase.GEOMETRY:
+        geometries = tuple(_geometry_plan_from_node(node) for node in context.geometry_plans)
+        return replace(
+            phase,
+            geometry=geometries[0] if geometries else None,
+            geometries=geometries,
+            streams=tuple(stream for geometry in geometries for stream in geometry.streams),
+        )
+    if phase.phase is MeshPhase.LOCAL_CALL:
+        return replace(phase, blocks=blocks)
+    return phase
+
+
+def _geometry_plan_from_node(node):
+    return GeometryPlan(node, streams=_geometry_streams_for_node(node))
+
+
+def _geometry_streams_for_node(node):
+    if node.requires_adjugate_determinant_streams:
+        return (
+            DataStreamPlan(
+                "adjugate",
+                DataStreamRole.GEOMETRY,
+                DataStreamLayout.SOA,
+                scalar_type="geom_t",
+                components=node.dim * node.dim,
+                n_items=1,
+                source=node.mode.value,
+            ),
+            DataStreamPlan(
+                "determinant",
+                DataStreamRole.GEOMETRY,
+                DataStreamLayout.SOA,
+                scalar_type="geom_t",
+                components=1,
+                n_items=1,
+                source=node.mode.value,
+            ),
+        )
+    if node.requires_coordinates:
+        return (
+            DataStreamPlan(
+                "coordinates",
+                DataStreamRole.GEOMETRY,
+                DataStreamLayout.AOS,
+                scalar_type="geom_t",
+                components=node.dim,
+                n_items=node.n_shape,
+                source=node.mode.value,
+            ),
+        )
+    return ()
+
+
+def _specialize_block_for_context(block, collection, context):
+    fields = _fields_for_block(collection.fields, block)
+    basis_plans = context.field_basis_plans(fields)
+    local_phase_plans = tuple(
+        _specialize_local_phase_for_context(phase, block, collection, context, basis_plans)
+        for phase in block.local_phase_plans
+    )
+    return replace(
+        block,
+        local_phases=(),
+        local_phase_plans=local_phase_plans,
+        basis_plans=basis_plans,
+        streams=tuple(stream for phase in local_phase_plans for stream in phase.streams),
+    )
+
+
+def _specialize_local_phase_for_context(phase, block, collection, context, basis_plans):
+    if phase.phase is LocalPhase.EVALUATE_MATERIAL:
+        return phase
+    if phase.phase is LocalPhase.CONTRACT_TEST:
+        phase_basis = context.field_basis_plans(_fields_by_name(collection.fields, (block.row_field,)))
+    else:
+        phase_basis = basis_plans
+    return replace(
+        phase,
+        basis_plans=phase_basis,
+        streams=tuple(stream for basis in phase_basis for stream in _basis_reference_streams(basis)),
+    )
+
+
+def _fields_for_block(fields, block):
+    names = [block.row_field]
+    if block.column_field:
+        names.append(block.column_field)
+    return _fields_by_name(fields, names)
+
+
+def _fields_by_name(fields, names):
+    names = tuple(dict.fromkeys(names))
+    by_name = {field.name: field for field in fields}
+    return tuple(by_name[name] for name in names if name in by_name)
+
+
+def _basis_reference_streams(basis):
+    if basis.is_tensor_product:
+        return (
+            DataStreamPlan(
+                "%s_shape_1d" % basis.role,
+                DataStreamRole.REFERENCE,
+                DataStreamLayout.TENSOR_PRODUCT_1D,
+                n_items=basis.reference_shape_size,
+                source=basis.role,
+            ),
+            DataStreamPlan(
+                "%s_grad_1d" % basis.role,
+                DataStreamRole.REFERENCE,
+                DataStreamLayout.TENSOR_PRODUCT_1D,
+                n_items=basis.reference_gradient_size,
+                source=basis.role,
+            ),
+        )
+    return (
+        DataStreamPlan(
+            "%s_shape" % basis.role,
+            DataStreamRole.REFERENCE,
+            DataStreamLayout.QP_SOA,
+            n_items=basis.reference_shape_size,
+            source=basis.role,
+        ),
+        DataStreamPlan(
+            "%s_grad_ref" % basis.role,
+            DataStreamRole.REFERENCE,
+            DataStreamLayout.QP_SOA,
+            components=basis.dim,
+            n_items=basis.n_qp * basis.n_shape,
+            source=basis.role,
+        ),
+    )
 
 
 def _validate_phase_sequence(name, phases, allowed_order):
