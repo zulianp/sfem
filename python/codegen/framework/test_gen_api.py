@@ -1867,6 +1867,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("static const scalar_t *shape_1d()", source)
             self.assertIn("static const scalar_t *grad_1d()", source)
             self.assertIn("static const scalar_t *weight_1d()", source)
+            self.assertIn('#include "../../kernel_math.hpp"', source)
             self.assertIn("for (int qy = 0; qy < Q; ++qy)", source)
             self.assertIn("for (int qx = 0; qx < Q; ++qx)", source)
             self.assertIn("const element_idx_t *const SFEM_RESTRICT parent", source)
@@ -1903,9 +1904,37 @@ class GenApiTest(unittest.TestCase):
 
         self.assertIn("x0 += scalar_t(points[0][node]) * phi;", source)
         self.assertIn("x1 += scalar_t(points[1][node]) * phi;", source)
+        self.assertIn('#include "../../kernel_math.hpp"', source)
         self.assertIn("const scalar_t coeff0 = -pow_2(x0);", source)
         self.assertIn("const scalar_t coeff1 = -x1;", source)
+        self.assertNotIn("static SFEM_INLINE T pow_2", source)
         self.assertNotIn("const scalar_t x0,", source)
+
+    def test_neumann_general_polynomial_order_controls_coefficients(self):
+        from .materials.neumann_general import create_material
+
+        material = create_material(polynomial_order=1)
+        parameter_names = tuple(name for name, _ in material.parameter_defaults)
+        self.assertIn("t0_100", parameter_names)
+        self.assertIn("t0_010", parameter_names)
+        self.assertIn("t0_001", parameter_names)
+        self.assertNotIn("t0_020", parameter_names)
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(material, out_dir, elements=("TRI3",))
+            source_path = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "neumann_tri3_boundary_operator.cpp",
+            )
+            self.assertIn(source_path, result.sources)
+            with open(source_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+
+        self.assertIn("const scalar_t coeff0 = t0 + t0_010*x1 + t0_100*x0;", source)
+        self.assertNotIn("pow_2", source)
+        self.assertNotIn("t0_020", source)
 
 
 if __name__ == "__main__":

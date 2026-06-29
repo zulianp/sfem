@@ -2,7 +2,7 @@ import math
 
 import sympy as sp
 
-from .symbolic import GeneratedKernelFile, _sfem_ccode, _sfem_math_inline_source_lines
+from .symbolic import GeneratedKernelFile, _sfem_ccode, _sfem_math_header_source
 from .fem import (
     sfem_is_proteus_hex_element,
     sfem_tensor_product_hex_order,
@@ -47,7 +47,10 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, element_type):
     _validate_boundary_coefficients(system, coefficients)
     function = "%s_%s_boundary_residual_soa" % (prefix, surface.lower())
     source = _boundary_source(function, element_type, surface, components, tuple(system.parameters), coefficients, system)
-    return (GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),)
+    return (
+        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
+    )
 
 
 def _surface_element(element_type):
@@ -211,7 +214,6 @@ def _boundary_source(function, element_type, surface, components, parameters, co
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
-    math_lines = _math_inline_lines(coefficients)
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
         "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
@@ -230,11 +232,10 @@ def _boundary_source(function, element_type, surface, components, parameters, co
 #include "sfem_macros.hpp"
 
 #include <math.h>
+#include "kernel_math.hpp"
 
 namespace sfem {{
 namespace codegen {{
-
-{math_lines}
 
 template <typename scalar_t>
 struct {function}_reference_data {{
@@ -450,7 +451,6 @@ extern "C" int {sideset_function}_float(
         grad_values=_cpp_array_values(data["grad"]),
         weight_values=_cpp_array_values(data["weight"]),
         measure_body=_measure_body(ref_dim, physical_dim),
-        math_lines=math_lines,
         current_decls=current_decls,
         extern_current_decls=extern_current_decls,
         extern_float_current_decls=extern_float_current_decls,
@@ -523,12 +523,6 @@ def _current_declarations(current_symbols, scalar_type):
         ", const %s *const SFEM_RESTRICT %s" % (scalar_type, symbol)
         for symbol in current_symbols
     )
-
-
-def _math_inline_lines(coefficients):
-    if not any(sp.sympify(coefficient).has(sp.Pow) for coefficient in coefficients):
-        return ""
-    return "\n".join(_sfem_math_inline_source_lines())
 
 
 def _value_eval_lines(coordinate_symbols, current_symbols):
@@ -650,7 +644,6 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
-    math_lines = _math_inline_lines(coefficients)
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
         "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
@@ -669,11 +662,10 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
 #include "sfem_macros.hpp"
 
 #include <math.h>
+#include "kernel_math.hpp"
 
 namespace sfem {{
 namespace codegen {{
-
-{math_lines}
 
 template <typename scalar_t>
 struct {function}_reference_data {{
@@ -938,7 +930,6 @@ extern "C" int {sideset_function}_float(
         shape_index_values=_cpp_int_array_values(data["shape_index"]),
         side_node_count=len(side_node_values),
         side_node_values=_cpp_int_array_values(side_node_values),
-        math_lines=math_lines,
         current_decls=current_decls,
         extern_current_decls=extern_current_decls,
         extern_float_current_decls=extern_float_current_decls,
