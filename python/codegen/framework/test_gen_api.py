@@ -305,10 +305,10 @@ class GenApiTest(unittest.TestCase):
         self.assertFalse(residual_metadata.dependencies.direction)
         self.assertIn(gen.FormQualifier("p", "field_family", "pressure"), energy_forms.qualifiers)
         self.assertIn(gen.FormQualifier("p", "field_family", "pressure"), residual_forms.qualifiers)
-        self.assertEqual(
-            energy_forms.form_metadata(gen.FormOrder.ONE).dependencies,
-            (p.value,),
-        )
+        energy_dependencies = energy_forms.form_metadata(gen.FormOrder.ONE).dependencies
+        self.assertIsInstance(energy_dependencies, gen.FormDependencies)
+        self.assertEqual(energy_dependencies.symbols, (p.value,))
+        self.assertEqual(energy_dependencies.current_symbols, (p.value,))
         self.assertEqual(action_metadata.coefficients[0].value, sp.Symbol("p_direction"))
         self.assertTrue(action_metadata.dependencies.direction)
         self.assertFalse(action_metadata.dependencies.previous)
@@ -443,6 +443,20 @@ class GenApiTest(unittest.TestCase):
         self.assertTrue(matrix[1][1].is_diagonal)
         self.assertEqual(matrix[0][1].coefficients[0].row_field, "u")
         self.assertTrue(matrix[0][1].dependencies.direction)
+        self.assertEqual(matrix[0][1].dependencies.direction_symbols, (sp.Symbol("v_direction"),))
+        self.assertNotIn(sp.Symbol("u_direction"), matrix[0][1].dependencies.symbols)
+
+    def test_backend_rejects_coefficients_not_declared_by_form_metadata(self):
+        from .openmp_backend import _validate_coefficient_dependencies
+        from .residual_codegen import WeakResidualCoefficients
+
+        coeffs = (WeakResidualCoefficients("u", sp.Symbol("mu"), (sp.S.Zero, sp.S.Zero)),)
+        with self.assertRaisesRegex(ValueError, "undeclared FormMetadata inputs: mu"):
+            _validate_coefficient_dependencies(
+                "broken",
+                gen.FormDependencies(),
+                coeffs,
+            )
 
     def test_generates_hyperelastic_material(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -494,6 +508,43 @@ class GenApiTest(unittest.TestCase):
                 "extern \"C\" int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa",
                 declarations,
             )
+
+    def test_energy_kernel_signatures_prune_unused_material_parameters(self):
+        mu = gen.material_parameter("mu")
+        system = gen.EquationSystemBuilder(2)
+        V = gen.FunctionSpace(gen.VectorElement("Lagrange", degree=1))
+        with gen.geometric_dimension_context(2):
+            u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+            F = gen.variable(
+                gen.Identity(2) + gen.grad(u),
+                name="F",
+                qualifier=gen.DEFORMATION_GRADIENT,
+            )
+            system.add_energy("", mu * gen.inner(F, F), fields=(u,), variables=(F,))
+        material = gen.CodeGenerator(
+            "energy_pruning",
+            gen.EquationSystems(system.build()),
+            elements=("TRI3",),
+            parameter_defaults=(("mu", 1.0), ("unused", 2.0)),
+        )
+
+        forms = material.systems.for_dim(2).form_collection("")
+        for order in (gen.FormOrder.ZERO, gen.FormOrder.ONE, gen.FormOrder.TWO):
+            dependencies = forms.form_metadata(order).dependencies
+            self.assertIn(mu.value, dependencies.parameters)
+            self.assertNotIn(sp.Symbol("unused"), dependencies.symbols)
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(material, out_dir, elements=("TRI3",))
+            generated_parts = []
+            for path in result.sources:
+                if path.endswith((".cpp", ".hpp")):
+                    with open(path, encoding="utf-8") as input_file:
+                        generated_parts.append(input_file.read())
+            generated = "\n".join(generated_parts)
+
+        self.assertIn("const scalar_t mu", generated)
+        self.assertNotIn("unused", generated)
 
     def test_material_runner_writes_generation_plan_dump(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -1864,6 +1915,47 @@ class GenApiTest(unittest.TestCase):
         forms = built.form_collection("traction", orders=(gen.FormOrder.ONE,))
         self.assertEqual(forms.measure, "ds")
         self.assertEqual(forms.blocks_for(gen.FormOrder.ONE)[0].row_field, "u")
+
+    def test_boundary_kernel_signatures_prune_unused_inputs(self):
+        tx = gen.material_parameter("tx")
+        system = gen.EquationSystemBuilder(2)
+        V = gen.FunctionSpace(gen.VectorElement("Lagrange", degree=1))
+        with gen.geometric_dimension_context(2):
+            u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
+            v = gen.TestFunction(V, name="u_test")
+            traction = sp.Matrix([tx, sp.S.Zero])
+            system.add_boundary_residual("traction", -gen.inner(traction, v), fields=(u,))
+        material = gen.CodeGenerator(
+            "boundary_pruning",
+            gen.EquationSystems(system.build()),
+            elements=("TRI3",),
+            parameter_defaults=(("tx", 1.0), ("unused", 2.0)),
+        )
+
+        forms = material.systems.for_dim(2).form_collection("traction")
+        dependencies = forms.form_metadata(gen.FormOrder.ONE).dependencies
+        self.assertEqual(dependencies.parameters, (tx.value,))
+        self.assertFalse(dependencies.current)
+        self.assertFalse(dependencies.previous)
+        self.assertFalse(dependencies.direction)
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(material, out_dir, elements=("TRI3",))
+            source_path = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "boundary_pruning_traction_tri3_boundary_operator.cpp",
+            )
+            self.assertIn(source_path, result.sources)
+            with open(source_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+
+        self.assertIn("const scalar_t tx", source)
+        self.assertNotIn("unused", source)
+        self.assertNotIn("_old", source)
+        self.assertNotIn("_direction", source)
+        self.assertNotRegex(source, r"const (?:real_t|float|scalar_t) u[0-9]")
 
     def test_generates_neumann_boundary_integral_kernel(self):
         with tempfile.TemporaryDirectory() as out_dir:

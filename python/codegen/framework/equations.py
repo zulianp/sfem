@@ -7,6 +7,7 @@ import sympy as sp
 from .forms import (
     FormBlock,
     FormCollection,
+    FormDependencies,
     FormMetadata,
     FormOrder,
     FormQualifier,
@@ -563,7 +564,11 @@ def _build_form_collection(system, equation, orders):
             variables,
             directions or None,
         ).evaluate(orders)
-        metadata = _evaluation_metadata(evaluation)
+        metadata = _evaluation_metadata(
+            evaluation,
+            variables=variables,
+            directions=directions,
+        )
         return FormCollection.from_evaluation(
             equation.name,
             evaluation,
@@ -807,13 +812,35 @@ def _equation_qualifiers(equation):
     return tuple(ret)
 
 
-def _evaluation_metadata(evaluation):
+def _evaluation_metadata(evaluation, *, variables=(), directions=()):
     return tuple(
         FormMetadata(
             form.order,
-            dependencies=_free_symbols(form.expression),
+            dependencies=_expression_dependencies(
+                form.expression,
+                variables=variables,
+                directions=directions,
+            ),
         )
         for form in evaluation.forms
+    )
+
+
+def _expression_dependencies(expression, *, variables=(), directions=()):
+    free_symbols = _free_symbols(expression)
+    free_set = set(free_symbols)
+    current_symbols = tuple(symbol for symbol in _symbols_from_variables(variables) if symbol in free_set)
+    direction_symbols = tuple(symbol for symbol in _symbols_from_variables(directions) if symbol in free_set)
+    categorized = set(current_symbols)
+    categorized.update(direction_symbols)
+    parameters = tuple(symbol for symbol in free_symbols if symbol not in categorized)
+    return FormDependencies(
+        current=bool(current_symbols),
+        direction=bool(direction_symbols),
+        parameters=parameters,
+        current_symbols=current_symbols,
+        direction_symbols=direction_symbols,
+        symbols=free_symbols,
     )
 
 

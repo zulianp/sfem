@@ -122,6 +122,7 @@ from .tensor_product import (
 )
 from .forms import (
     FormBlock,
+    FormDependencies,
     FormEvaluation,
     FormCollection,
     FormKind,
@@ -341,6 +342,7 @@ __all__ = [
     "TransformedFirstPiola",
     "FormKind",
     "FormBlock",
+    "FormDependencies",
     "FormMetadata",
     "FormOrder",
     "FormEvaluation",

@@ -56,6 +56,48 @@ class PipelineStage(Enum):
     CODE_GENERATION = "code_generation"
 
 
+@dataclass(frozen=True)
+class FormDependencies:
+    current: bool = False
+    previous: bool = False
+    direction: bool = False
+    geometry: bool = False
+    parameters: tuple = ()
+    current_symbols: tuple = ()
+    previous_symbols: tuple = ()
+    direction_symbols: tuple = ()
+    geometry_symbols: tuple = ()
+    symbols: tuple = ()
+
+    def __post_init__(self):
+        parameters = tuple(self.parameters)
+        current_symbols = tuple(self.current_symbols)
+        previous_symbols = tuple(self.previous_symbols)
+        direction_symbols = tuple(self.direction_symbols)
+        geometry_symbols = tuple(self.geometry_symbols)
+        symbols = tuple(self.symbols)
+        if not symbols:
+            symbols = tuple(
+                dict.fromkeys(
+                    current_symbols
+                    + previous_symbols
+                    + direction_symbols
+                    + geometry_symbols
+                    + parameters
+                )
+            )
+        object.__setattr__(self, "parameters", parameters)
+        object.__setattr__(self, "current_symbols", current_symbols)
+        object.__setattr__(self, "previous_symbols", previous_symbols)
+        object.__setattr__(self, "direction_symbols", direction_symbols)
+        object.__setattr__(self, "geometry_symbols", geometry_symbols)
+        object.__setattr__(self, "symbols", symbols)
+        object.__setattr__(self, "current", bool(self.current or current_symbols))
+        object.__setattr__(self, "previous", bool(self.previous or previous_symbols))
+        object.__setattr__(self, "direction", bool(self.direction or direction_symbols))
+        object.__setattr__(self, "geometry", bool(self.geometry or geometry_symbols))
+
+
 class FormCollectionMixin:
     @property
     def stage(self):

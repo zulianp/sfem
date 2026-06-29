@@ -2,6 +2,7 @@ import math
 
 import sympy as sp
 
+from .forms import FormOrder
 from .symbolic import GeneratedKernelFile, _sfem_ccode, _sfem_math_header_source
 from .fem import (
     sfem_is_proteus_hex_element,
@@ -43,10 +44,13 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, element_type):
         raise ValueError("boundary residual form collection requires a lowered residual system")
     field = tuple(collection.fields)[0]
     components = int(field.components)
+    metadata = collection.form_metadata(FormOrder.ONE)
     coefficients = _boundary_coefficients(system)
     _validate_boundary_coefficients(system, coefficients)
+    _validate_boundary_metadata(metadata.dependencies, coefficients)
+    parameters = _dependency_parameters(metadata.dependencies)
     function = "%s_%s_boundary_residual_soa" % (prefix, surface.lower())
-    source = _boundary_source(function, element_type, surface, components, tuple(system.parameters), coefficients, system)
+    source = _boundary_source(function, element_type, surface, components, parameters, coefficients, system)
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
         GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
@@ -157,6 +161,39 @@ def _validate_boundary_coefficients(system, coefficients):
                 "boundary residual coefficients cannot depend on field/test/direction symbols: %s"
                 % ", ".join(map(str, invalid))
             )
+
+
+def _validate_boundary_metadata(dependencies, coefficients):
+    declared = set(_dependency_symbols(dependencies))
+    required = set()
+    for coeff in coefficients:
+        required.update(sp.sympify(coeff).free_symbols)
+    missing = tuple(sorted(required.difference(declared), key=str))
+    if missing:
+        raise ValueError(
+            "boundary residual metadata does not declare coefficient dependencies: %s"
+            % ", ".join(map(str, missing))
+        )
+
+
+def _dependency_parameters(dependencies):
+    return tuple(getattr(dependencies, "parameters", ()))
+
+
+def _dependency_symbols(dependencies):
+    symbols = getattr(dependencies, "symbols", None)
+    if symbols is not None:
+        return tuple(symbols)
+    ret = []
+    for attr in (
+        "current_symbols",
+        "previous_symbols",
+        "direction_symbols",
+        "geometry_symbols",
+        "parameters",
+    ):
+        ret.extend(tuple(getattr(dependencies, attr, ())))
+    return tuple(dict.fromkeys(ret))
 
 
 def _boundary_source(function, element_type, surface, components, parameters, coefficients, system):
