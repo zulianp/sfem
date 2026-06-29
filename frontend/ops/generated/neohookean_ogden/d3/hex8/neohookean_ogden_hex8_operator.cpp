@@ -373,6 +373,8 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_objective_steps_affine_mesh_so
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
         static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6};
 
@@ -391,15 +393,25 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_objective_steps_affine_mesh_so
             block_u_streams[stream] = block_u_data[stream];
         }
 
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = STREAM_SHAPE_ORDER[shape];
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
+                }
+            }
+        }
+
         for (int step = 0; step < nsteps; ++step) {
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
-                const int stream_shape = STREAM_SHAPE_ORDER[shape];
                 for (int d = 0; d < DIM; ++d) {
 #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
-                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                        block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }
@@ -684,6 +696,8 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_objective_steps_isoparametric_
         const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
         scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
         static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6};
@@ -724,6 +738,18 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_objective_steps_isoparametric_
             block_u_streams[stream] = block_u_data[stream];
         }
 
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const int stream_shape = STREAM_SHAPE_ORDER[shape];
+            for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
+                }
+            }
+        }
+
         const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
         for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
             block_coordinate_streams[stream] = block_coordinate_data[stream];
@@ -746,12 +772,10 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_objective_steps_isoparametric_
         for (int step = 0; step < nsteps; ++step) {
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
-                const int stream_shape = STREAM_SHAPE_ORDER[shape];
                 for (int d = 0; d < DIM; ++d) {
 #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                        const idx_t node = ev[lane * N_SHAPE + stream_shape];
-                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];
+                        block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }

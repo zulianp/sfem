@@ -4274,6 +4274,8 @@ def _sfem_soa_mesh_objective_steps_function(
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
         lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        lines.append("        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
         lines.append("        scalar_t block_value[VECTOR_SIZE];")
         if geometry_mode == "isoparametric":
             lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
@@ -4292,6 +4294,9 @@ def _sfem_soa_mesh_objective_steps_function(
                 lines.append("        scalar_t block_%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         for stream in _field_stream_names("u", dim, n_nodes):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+            lines.append("        scalar_t block_%s_base[VECTOR_SIZE];" % stream)
+        for stream in _field_stream_names("h", dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
         lines.append("        scalar_t block_value[VECTOR_SIZE];")
 
@@ -4353,6 +4358,27 @@ def _sfem_soa_mesh_objective_steps_function(
                 "        }",
             ]
         )
+        lines.extend(
+            [
+                "",
+                "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "            const int stream_shape = %s;"
+                % (
+                    "STREAM_SHAPE_ORDER[shape]"
+                    if tuple(stream_shape_order) != tuple(range(n_nodes))
+                    else "shape"
+                ),
+                "            for (int d = 0; d < DIM; ++d) {",
+                "#pragma omp simd",
+                "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                "                    const idx_t node = ev[lane * N_SHAPE + stream_shape];",
+                "                    block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];",
+                "                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];",
+                "                }",
+                "            }",
+                "        }",
+            ]
+        )
     else:
         lines.append(
             "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
@@ -4368,6 +4394,19 @@ def _sfem_soa_mesh_objective_steps_function(
                 ),
             )
         )
+        lines.extend(["", "#pragma omp simd", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+        for shape in range(n_nodes):
+            for d in range(dim):
+                component = _component_name(d)
+                lines.append(
+                    "            block_u%s%d_base[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride];"
+                    % (component, shape, component, shape)
+                )
+                lines.append(
+                    "            block_h%s%d[lane] = h%s[ev[lane * N_SHAPE + %d] * h_stride];"
+                    % (component, shape, component, shape)
+                )
+        lines.append("        }")
 
     if geometry_mode == "isoparametric" and not use_tensor_product_reference:
         lines.append("")
@@ -4486,17 +4525,10 @@ def _sfem_soa_mesh_objective_steps_function(
         lines.extend(
             [
                 "            for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "                const int stream_shape = %s;"
-                % (
-                    "STREAM_SHAPE_ORDER[shape]"
-                    if tuple(stream_shape_order) != tuple(range(n_nodes))
-                    else "shape"
-                ),
                 "                for (int d = 0; d < DIM; ++d) {",
                 "#pragma omp simd",
                 "                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                        const idx_t node = ev[lane * N_SHAPE + stream_shape];",
-                "                        block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride] + alpha * h_components[d][node * h_stride];",
+                "                        block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];",
                 "                    }",
                 "                }",
                 "            }",
@@ -4508,7 +4540,7 @@ def _sfem_soa_mesh_objective_steps_function(
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "                block_u%s%d[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride] + alpha * h%s[ev[lane * N_SHAPE + %d] * h_stride];"
+                    "                block_u%s%d[lane] = block_u%s%d_base[lane] + alpha * block_h%s%d[lane];"
                     % (component, shape, component, shape, component, shape)
                 )
         lines.append("            }")
