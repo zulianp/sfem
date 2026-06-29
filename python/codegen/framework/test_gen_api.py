@@ -7,6 +7,7 @@ import unittest
 
 import sympy as sp
 
+import codegen.framework as framework
 from sfem import gen
 
 from .materials.neohookean_ogden import material as neohookean_ogden
@@ -27,6 +28,11 @@ def _relative_sources(result, out_dir):
 
 
 class GenApiTest(unittest.TestCase):
+    def test_sfem_gen_exports_framework_public_api(self):
+        missing = sorted(name for name in framework.__all__ if not hasattr(gen, name))
+        self.assertEqual([], missing)
+        self.assertTrue(set(framework.__all__).issubset(set(gen.__all__)))
+
     def test_symbolic_scalar_field_is_sympy_compatible(self):
         p = gen.scalar_field("p", family="pressure")
         expression = p * p + 2 * p + 1

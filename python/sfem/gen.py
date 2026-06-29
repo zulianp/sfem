@@ -9,6 +9,7 @@ from enum import Enum
 import sympy as sp
 
 from ._gen_op import generate_op_files
+import codegen.framework as _framework_public
 from codegen.framework import (
     CodegenQualifier,
     CoupledResidualSystem,
@@ -169,6 +170,10 @@ from codegen.framework.boundary_codegen import generate_boundary_residual_sfem_f
 
 DEFAULT_VECTOR_SIZE = 16
 OPENMP_SOA_BACKEND = OpenMPSoABackend()
+
+for _name in _framework_public.__all__:
+    if _name not in globals():
+        globals()[_name] = getattr(_framework_public, _name)
 
 
 @dataclass(frozen=True)
@@ -1749,3 +1754,5 @@ __all__ = [
     "variable",
     "value",
 ]
+
+__all__ = sorted(set(__all__).union(_framework_public.__all__))
