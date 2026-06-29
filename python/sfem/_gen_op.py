@@ -3,12 +3,33 @@ import re
 
 def generate_op_files(material, elements, kernel_sources=None):
     c_abi_header = "sfem_%s_c_abi.hpp" % material.op_name if kernel_sources else None
-    if hasattr(material, "systems_by_dim"):
-        header, source = _coupled_energy_residual_op(material, elements, c_abi_header)
-    elif hasattr(material, "energy"):
+    systems_by_dim = _systems_by_dim(material, elements)
+    equations = _representative_equations(systems_by_dim)
+    if len(equations) > 1:
+        header, source = _coupled_energy_residual_op(
+            material, elements, c_abi_header, systems_by_dim
+        )
+    elif not equations:
+        raise ValueError("generated Op wrappers require at least one equation")
+    elif equations[0].name:
+        raise ValueError("single-equation generated Op wrappers require an unnamed equation")
+    elif equations[0].is_energy:
         header, source = _hyperelastic_op(material, elements, c_abi_header)
+    elif equations[0].is_residual:
+        form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
+        measures = {collection.measure for collection in form_collections.values()}
+        if measures == {"ds"}:
+            header, source = _boundary_residual_op(
+                material, elements, c_abi_header, form_collections
+            )
+        elif "ds" in measures:
+            raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
+        else:
+            header, source = _residual_op(
+                material, elements, c_abi_header, form_collections
+            )
     else:
-        header, source = _residual_op(material, elements, c_abi_header)
+        raise ValueError("unsupported generated Op equation form")
     files = {
         "op/sfem_%s.hpp" % material.op_name: header,
         "op/sfem_%s.cpp" % material.op_name: source,
@@ -16,6 +37,48 @@ def generate_op_files(material, elements, kernel_sources=None):
     if c_abi_header:
         files["op/%s" % c_abi_header] = _c_abi_header(material, kernel_sources)
     return files
+
+
+def _systems_by_dim(material, elements):
+    systems = getattr(material, "systems", None)
+    if systems is None:
+        raise TypeError("generated Op wrappers require a CodeGenerator with equation systems")
+    return {
+        dim: systems.for_dim(dim)
+        for dim in sorted({_element_dim(element) for element in elements})
+    }
+
+
+def _representative_equations(systems_by_dim):
+    first_dim = next(iter(sorted(systems_by_dim)))
+    return tuple(systems_by_dim[first_dim].equations)
+
+
+def _single_equation_form_collections(systems_by_dim, representative_equation):
+    orders = _equation_form_orders(representative_equation)
+    collections = {}
+    for dim, system in systems_by_dim.items():
+        equations = tuple(system.equations)
+        if len(equations) != 1:
+            raise ValueError("single-equation generated Op wrappers require one equation per dimension")
+        collections[dim] = system.form_collection(equations[0], orders=orders)
+    return collections
+
+
+def _equation_form_orders(equation):
+    if equation.is_energy:
+        orders = [_form_order_zero()]
+        for kernel in equation.kernels:
+            if kernel == "objective":
+                orders.append(_form_order_zero())
+            elif kernel == "gradient":
+                orders.append(_form_order_one())
+            elif kernel == "apply":
+                orders.append(_form_order_two())
+        return tuple(dict.fromkeys(orders))
+    if equation.is_residual:
+        return (_form_order_zero(), _form_order_one(), _form_order_two())
+    raise ValueError("unsupported equation form")
 
 
 def _header(material, residual):
@@ -564,14 +627,14 @@ namespace sfem {
     return _header(material, False), source
 
 
-def _residual_op(material, elements, c_abi_header=None):
-    collections = getattr(material, "form_collections", None)
-    if collections is not None:
-        measures = {collection.measure for collection in collections.values()}
-        if measures == {"ds"}:
-            return _boundary_residual_op(material, elements, c_abi_header)
-        if "ds" in measures:
-            raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
+def _residual_op(material, elements, c_abi_header=None, form_collections=None):
+    if form_collections is None:
+        raise ValueError("residual generated Op requires form collections")
+    measures = {collection.measure for collection in form_collections.values()}
+    if measures == {"ds"}:
+        return _boundary_residual_op(material, elements, c_abi_header, form_collections)
+    if "ds" in measures:
+        raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
 
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
@@ -585,7 +648,7 @@ def _residual_op(material, elements, c_abi_header=None):
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
         if dependencies is None:
-            collection = _residual_form_collection(material, dim)
+            collection = form_collections[dim]
             system = collection.source
             dependencies = (
                 collection.form_metadata(_form_order_one()).dependencies,
@@ -1126,9 +1189,8 @@ namespace sfem {
     return _header(material, True), source
 
 
-def _boundary_residual_op(material, elements, c_abi_header=None):
+def _boundary_residual_op(material, elements, c_abi_header=None, form_collections=None):
     defaults = _seed_lines(material.parameter_defaults)
-    form_collections = getattr(material, "form_collections", None)
     if form_collections is None:
         raise ValueError("boundary residual generated Op requires form collections")
 
@@ -1539,10 +1601,12 @@ namespace sfem {
 """ % {"op": material.op_name}
 
 
-def _coupled_energy_residual_op(material, elements, c_abi_header=None):
+def _coupled_energy_residual_op(material, elements, c_abi_header=None, systems_by_dim=None):
+    if systems_by_dim is None:
+        systems_by_dim = _systems_by_dim(material, elements)
     equations_by_dim = {
         dim: tuple(system.equations)
-        for dim, system in material.systems_by_dim.items()
+        for dim, system in systems_by_dim.items()
     }
     representative = next(iter(equations_by_dim.values()))
     energy_equations = tuple(equation for equation in representative if equation.is_energy)
@@ -1565,6 +1629,7 @@ def _coupled_energy_residual_op(material, elements, c_abi_header=None):
     cases = _coupled_cases(
         material,
         elements,
+        systems_by_dim,
         energy_name,
         residual_name,
         parameter_index,
@@ -1943,7 +2008,7 @@ namespace sfem {
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
-        "block_size_lines": _coupled_block_size_lines(material.systems_by_dim),
+        "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
@@ -1951,13 +2016,13 @@ namespace sfem {
     return _header(material, True), source
 
 
-def _coupled_cases(material, elements, energy_name, residual_name, parameter_index):
+def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_name, parameter_index):
     from codegen.framework.forms import FormOrder
 
     cases = {"gradient": [], "apply": [], "objective": []}
     for element in elements:
         dim = _element_dim(element)
-        system = material.systems_by_dim[dim]
+        system = systems_by_dim[dim]
         energy_equation = next(equation for equation in system.equations if equation.name == energy_name)
         residual_equation = next(equation for equation in system.equations if equation.name == residual_name)
         energy_collection = system.form_collection(energy_equation)
@@ -2176,18 +2241,6 @@ def _nonempty(*values):
     return tuple(str(value) for value in values if str(value))
 
 
-def _residual_form_collection(material, dim):
-    collections = getattr(material, "form_collections", None)
-    if collections is not None:
-        return collections[dim]
-
-    from codegen.framework.equations import EquationSystem
-
-    system = EquationSystem(dim)
-    equation = system.add_residual("", material.define, fields=())
-    return system.form_collection(equation)
-
-
 def _boundary_residual_parameter_names(collection, available_parameters):
     dependencies = collection.form_metadata(_form_order_one()).dependencies
     used = {
@@ -2200,6 +2253,12 @@ def _boundary_residual_parameter_names(collection, available_parameters):
         for symbol in collection.source.parameters
         if str(symbol) in used
     )
+
+
+def _form_order_zero():
+    from codegen.framework.forms import FormOrder
+
+    return FormOrder.ZERO
 
 
 def _form_order_one():

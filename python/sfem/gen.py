@@ -232,31 +232,6 @@ class GenerationResult:
 
 
 @dataclass(frozen=True)
-class _EnergyOpMaterialAdapter:
-    name: str
-    op_name: str
-    parameter_defaults: tuple
-    energy: bool = True
-
-
-@dataclass(frozen=True)
-class _ResidualOpMaterialAdapter:
-    name: str
-    define: object
-    op_name: str
-    parameter_defaults: tuple
-    form_collections: object = None
-
-
-@dataclass(frozen=True)
-class _CoupledOpMaterialAdapter:
-    name: str
-    op_name: str
-    parameter_defaults: tuple
-    systems_by_dim: object
-
-
-@dataclass(frozen=True)
 class ElementGenerationContext:
     material_name: str
     element_type: str
@@ -527,8 +502,7 @@ def _value_residual_integration_case(system):
     for equation in system.equations:
         if not equation.is_residual:
             continue
-        residual_system = CoupledResidualSystem(system.dim)
-        equation.define(residual_system)
+        residual_system = system.form_collection(equation).source
         value_symbols = set()
         for field in residual_system.fields:
             value_symbols.add(field.value)
@@ -1210,59 +1184,14 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
         raise ValueError("generated Op wrapper requires at least one element context")
     representative_dim = user_input.element_contexts[0].specialization.dim
     equations = _material_equations(material, representative_dim)
-    systems_by_dim = {
-        context.specialization.dim: material.systems.for_dim(context.specialization.dim)
-        for context in user_input.element_contexts
-    }
-    if len(equations) != 1:
-        return generate_op_files(
-            _CoupledOpMaterialAdapter(
-                material.name,
-                material.op_name,
-                material.parameter_defaults,
-                systems_by_dim,
-            ),
-            selected,
-            kernel_sources,
-        )
-    if equations[0].name:
+    if len(equations) == 1 and equations[0].name:
         raise ValueError(
             "single-equation generated Op wrappers require an unnamed equation"
         )
-    equation = equations[0]
-    if equation.is_energy:
-        return generate_op_files(
-            _EnergyOpMaterialAdapter(
-                material.name,
-                material.op_name,
-                material.parameter_defaults,
-            ),
-            selected,
-            kernel_sources,
-        )
-    if equation.is_residual:
-        form_collections = {
-            dim: system.form_collection(
-                system.equations[0],
-                orders=_equation_form_orders(equation),
-            )
-            for dim, system in systems_by_dim.items()
-        }
-        return generate_op_files(
-            _ResidualOpMaterialAdapter(
-                material.name,
-                equation.define,
-                material.op_name,
-                material.parameter_defaults,
-                form_collections,
-            ),
-            selected,
-            kernel_sources,
-        )
-    raise TypeError("unsupported unified equation form %s" % equation.form)
+    return generate_op_files(material, selected, kernel_sources)
 
 
-def _evaluate_equation(dim, equation, form_collection=None):
+def _evaluate_equation(dim, equation, form_collection):
     if equation.is_energy:
         return _evaluate_energy_equation(dim, equation, form_collection)
     if equation.is_residual:
@@ -1278,26 +1207,16 @@ def _equation_form_orders(equation):
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
-def _evaluate_energy_equation(dim, equation, form_collection=None):
-    orders = _energy_form_orders(equation.kernels)
-    variables = tuple(equation.variables)
+def _evaluate_energy_equation(dim, equation, form_collection):
+    if not isinstance(form_collection, FormCollection):
+        raise TypeError("energy equation evaluation requires a lowered FormCollection")
+    variables = tuple(form_collection.variables)
     if not variables:
         raise ValueError("energy equation '%s' requires explicit variables" % equation.name)
     data_symbols = _energy_data_symbols(dim, variables)
-    if form_collection is None:
-        directions = None
-        if FormOrder.TWO in orders:
-            directions = tuple(equation.directions) or _default_energy_directions(variables)
-        form_evaluation = energy_form_pipeline(
-            equation.define,
-            variables,
-            directions,
-        ).evaluate(orders)
-    else:
-        form_evaluation = form_collection
     return EnergyDimensionEvaluation(
         equation.name,
-        form_evaluation,
+        form_collection,
         data_symbols,
         variables,
         equation.kernels,
@@ -1311,47 +1230,12 @@ def _energy_data_symbols(dim, variables):
     return sp.Matrix(len(variables), 1, variables)
 
 
-def _default_energy_directions(variables):
-    directions = []
-    for variable in variables:
-        name = str(variable)
-        if name.startswith("F["):
-            directions.append(sp.Symbol("d%s" % name))
-        elif "[" in name:
-            directions.append(sp.Symbol("d_%s" % name))
-        else:
-            directions.append(sp.Symbol("%s_trial" % name))
-    return tuple(directions)
-
-
-def _evaluate_residual_equation(dim, equation, form_collection=None):
-    if form_collection is None:
-        system = CoupledResidualSystem(dim)
-        equation.define(system)
-        residual_vector = sp.Matrix(
-            [system.residual_expression(field) for field in system.fields]
-        )
-        variables = tuple(
-            symbol
-            for field in system.fields
-            for symbol in field.variables
-        )
-        directions = tuple(
-            symbol
-            for field in system.fields
-            for symbol in field.directions
-        )
-        form_evaluation = residual_form_pipeline(
-            residual_vector,
-            variables,
-            directions,
-        ).evaluate((FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO))
-    else:
-        system = form_collection.source
-        form_evaluation = form_collection
+def _evaluate_residual_equation(dim, equation, form_collection):
+    if not isinstance(form_collection, FormCollection):
+        raise TypeError("residual equation evaluation requires a lowered FormCollection")
     return ResidualDimensionEvaluation(
         equation.name,
-        form_evaluation,
+        form_collection,
     )
 
 
