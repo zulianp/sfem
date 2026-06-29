@@ -565,6 +565,14 @@ namespace sfem {
 
 
 def _residual_op(material, elements, c_abi_header=None):
+    collections = getattr(material, "form_collections", None)
+    if collections is not None:
+        measures = {collection.measure for collection in collections.values()}
+        if measures == {"ds"}:
+            return _boundary_residual_op(material, elements, c_abi_header)
+        if "ds" in measures:
+            raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
+
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
     residual_cases = []
@@ -1116,6 +1124,356 @@ namespace sfem {
         ),
     }
     return _header(material, True), source
+
+
+def _boundary_residual_op(material, elements, c_abi_header=None):
+    defaults = _seed_lines(material.parameter_defaults)
+    form_collections = getattr(material, "form_collections", None)
+    if form_collections is None:
+        raise ValueError("boundary residual generated Op requires form collections")
+
+    parameter_names_by_dim = {}
+    fields_by_dim = {}
+    block_size_by_dim = {}
+    for dim, collection in form_collections.items():
+        if collection.measure != "ds":
+            raise ValueError("boundary residual generated Op requires ds measure")
+        fields = tuple(collection.fields)
+        if len(fields) != 1:
+            raise ValueError("boundary residual generated Op currently supports one field")
+        parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in collection.source.parameters)
+        fields_by_dim[dim] = fields
+        block_size_by_dim[dim] = sum(int(field.components) for field in fields)
+
+    max_parameters = max(1, *(len(names) for names in parameter_names_by_dim.values()))
+    parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
+    gradient_cases = []
+    for element in elements:
+        dim = _element_dim(element)
+        fields = fields_by_dim[dim]
+        block_size = block_size_by_dim[dim]
+        stem = "%s_%s_%s_boundary_residual_sideset_soa" % (
+            material.name,
+            _element_name(element).lower(),
+            _boundary_surface_name(element),
+        )
+        setup = _residual_soa_view_declarations(fields, "out", "out", "real_t")
+        parameter_args = ", ".join(
+            "condition.parameters[%d]" % index
+            for index, _ in enumerate(parameter_names_by_dim[dim])
+        )
+        output_args = _boundary_soa_component_argument_names(fields, "out")
+        call_args = _nonempty(
+            "condition.sideset->size()",
+            "mesh->n_nodes()",
+            "domain.block->elements()->data()",
+            "condition.sideset->parent()->data()",
+            "condition.sideset->lfi()->data()",
+            "points",
+            parameter_args,
+            "FIELD_STRIDE",
+            *output_args,
+        )
+        gradient_cases.append(
+            _boundary_residual_soa_case(
+                element,
+                stem,
+                ", ".join(call_args),
+                block_size,
+                setup,
+            )
+        )
+
+    source = """#include "sfem_%(op)s.hpp"
+%(c_abi_include)s
+
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
+#include "sfem_Parameters.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
+
+#include <array>
+#include <cstring>
+#include <memory>
+#include <vector>
+
+%(declaration_block)s
+
+namespace sfem {
+    namespace {
+        constexpr int MAX_PARAMETERS = %(max_parameters)d;
+
+        void seed_parameters(Parameters &parameters) {
+%(defaults)s
+        }
+
+        void seed_material(MultiDomainOp &domains) {
+            for (auto &entry : domains.domains()) {
+                seed_parameters(*entry.second.parameters);
+            }
+        }
+
+%(yaml_helpers)s
+
+        void parameter_array(const Parameters &parameters,
+                             const int dim,
+                             real_t *const values) {
+            int index = 0;
+%(parameter_lines)s
+        }
+
+        ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+        }
+
+        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+                                               const smesh::Mesh::Block &block) {
+            for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+                if (mesh.block(i).get() == &block) {
+                    return static_cast<smesh::block_idx_t>(i);
+                }
+            }
+            SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
+            return 0;
+        }
+    }  // namespace
+
+    class %(op)s::Impl {
+    public:
+        struct BoundaryCondition {
+            std::shared_ptr<smesh::Sideset> sideset;
+            std::array<real_t, MAX_PARAMETERS> parameters;
+        };
+
+        explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<MultiDomainOp> domains;
+        std::vector<BoundaryCondition> conditions;
+    };
+
+    std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
+        const ptrdiff_t expected_block_size =
+                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        if (space->block_size() != expected_block_size) {
+            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
+            return nullptr;
+        }
+        auto op = std::make_unique<%(op)s>(space);
+        op->initialize();
+        return op;
+    }
+
+    %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
+        : impl_(std::make_unique<Impl>(space)) {}
+    %(op)s::~%(op)s() = default;
+
+    ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
+    ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+    int %(op)s::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("%(op)s::initialize");
+        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        seed_material(*impl_->domains);
+        return SFEM_SUCCESS;
+    }
+
+    void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
+        real_t values[MAX_PARAMETERS];
+        material_defaults(values);
+        add_sideset(sideset, values);
+    }
+
+    void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+                             const real_t *const parameters) {
+        SFEM_TRACE_SCOPE("%(op)s::add_sideset");
+        Impl::BoundaryCondition condition;
+        condition.sideset = sideset;
+        for (int i = 0; i < MAX_PARAMETERS; ++i) {
+            condition.parameters[i] = parameters[i];
+        }
+        impl_->conditions.push_back(condition);
+    }
+
+    int %(op)s::gradient(const real_t *const, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::gradient");
+        if (impl_->conditions.empty()) {
+            return SFEM_SUCCESS;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
+            int status = SFEM_SUCCESS;
+            for (const auto &condition : impl_->conditions) {
+                if (!condition.sideset || condition.sideset->block_id() != block_id) {
+                    continue;
+                }
+                switch (domain.element_type) {
+%(gradient_cases)s
+                    default:
+                        SFEM_ERROR("%(op)s does not support element type %%d\\n",
+                                   domain.element_type);
+                        return SFEM_FAILURE;
+                }
+            }
+            return status;
+        });
+    }
+
+    int %(op)s::apply(const real_t *const,
+                      const real_t *const,
+                      real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::apply");
+        return SFEM_SUCCESS;
+    }
+
+    int %(op)s::value(const real_t *, real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::value");
+        return SFEM_SUCCESS;
+    }
+
+    int %(op)s::hessian_crs(const real_t *const,
+                            const count_t *const,
+                            const idx_t *const,
+                            real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+        return SFEM_SUCCESS;
+    }
+
+    void %(op)s::set_field(const char *,
+                           const std::shared_ptr<Buffer<real_t>> &,
+                           const int) {
+        SFEM_TRACE_SCOPE("%(op)s::set_field");
+    }
+
+    void %(op)s::set_option(const std::string &, const bool) {
+        SFEM_TRACE_SCOPE("%(op)s::set_option");
+    }
+
+    void %(op)s::set_value_in_block(const std::string &block_name,
+                                    const std::string &var_name,
+                                    const real_t value) {
+        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
+        impl_->domains->set_value_in_block(block_name, var_name, value);
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                 const ryml::ConstNodeRef             &node) {
+        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
+        auto ret = std::make_shared<%(op)s>(space);
+
+        std::vector<std::string> block_names;
+        if (node.has_child("blocks")) {
+            for (auto block : node["blocks"].children()) {
+                if (block.has_child("name")) {
+                    block_names.push_back(yaml_read_string(block["name"]));
+                }
+            }
+        }
+
+        if (ret->initialize(block_names) != SFEM_SUCCESS) {
+            return nullptr;
+        }
+
+        real_t defaults[MAX_PARAMETERS];
+        material_defaults(defaults);
+        real_t top_values[MAX_PARAMETERS];
+        copy_material_parameters(defaults, top_values);
+        material_from_yaml(node, defaults, top_values);
+
+        const auto boundary_node =
+                node.has_child("boundary_conditions") ? node["boundary_conditions"] :
+                (node.has_child("neumann_conditions") ? node["neumann_conditions"] :
+                 ryml::ConstNodeRef());
+        if (boundary_node.valid() && boundary_node.is_seq()) {
+            for (auto condition_node : boundary_node.children()) {
+                if (!condition_node.has_child("path")) {
+                    continue;
+                }
+                const std::string path = yaml_read_string(condition_node["path"]);
+                auto sideset = smesh::Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
+                real_t condition_values[MAX_PARAMETERS];
+                material_from_yaml(condition_node, top_values, condition_values);
+                ret->add_sideset(sideset, condition_values);
+            }
+        }
+
+        return ret;
+    }
+#endif  // SFEM_ENABLE_RYAML
+}  // namespace sfem
+""" % {
+        "op": material.op_name,
+        "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        "declaration_block": "",
+        "max_parameters": max_parameters,
+        "defaults": defaults,
+        "yaml_helpers": _yaml_helpers(material.parameter_defaults),
+        "parameter_lines": parameter_lines,
+        "block_size_lines": _residual_block_size_lines(block_size_by_dim),
+        "gradient_cases": "\n".join(gradient_cases),
+    }
+    return _boundary_header(material), source
+
+
+def _boundary_header(material):
+    return """#pragma once
+
+#include "sfem_Op.hpp"
+
+namespace smesh {
+    class Sideset;
+}
+
+namespace sfem {
+    class %(op)s final : public Op {
+    public:
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+
+        explicit %(op)s(const std::shared_ptr<FunctionSpace> &space);
+        ~%(op)s() override;
+
+        const char *name() const override { return "%(op)s"; }
+        bool is_linear() const override { return true; }
+        ptrdiff_t n_dofs_domain() const override;
+        ptrdiff_t n_dofs_image() const override;
+
+        int initialize(const std::vector<std::string> &block_names = {}) override;
+        void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset);
+        void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+                         const real_t *parameters);
+        int gradient(const real_t *const x, real_t *const out) override;
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const out) override;
+        int value(const real_t *x, real_t *const out) override;
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
+        void set_field(const char *name,
+                       const std::shared_ptr<Buffer<real_t>> &values,
+                       int component) override;
+        void set_option(const std::string &name, bool val) override;
+        void set_value_in_block(const std::string &block_name,
+                                const std::string &var_name,
+                                real_t value) override;
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif  // SFEM_ENABLE_RYAML
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+}  // namespace sfem
+""" % {"op": material.op_name}
 
 
 def _coupled_energy_residual_op(material, elements, c_abi_header=None):
@@ -1843,12 +2201,39 @@ def _residual_soa_field_argument_names(fields, suffix):
     )
 
 
+def _boundary_soa_component_argument_names(fields, suffix):
+    names = []
+    for field in fields:
+        components = int(field.components)
+        name = _safe_identifier("%s_%s" % (field.name, suffix))
+        if components == 1:
+            names.append(name)
+        else:
+            names.extend("%s[%d]" % (name, component) for component in range(components))
+    return tuple(names)
+
+
 def _residual_soa_case(element, function, arguments, field_stride, setup_lines):
     return """                case smesh::%(element)s: {
                     static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
 %(setup)s
                     return %(function)s(%(arguments)s);
                 }""" % {
+        "element": _mesh_element_name(element),
+        "function": function,
+        "arguments": arguments,
+        "field_stride": field_stride,
+        "setup": "\n".join(setup_lines),
+    }
+
+
+def _boundary_residual_soa_case(element, function, arguments, field_stride, setup_lines):
+    return """                    case smesh::%(element)s: {
+                        static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
+%(setup)s
+                        status |= %(function)s(%(arguments)s);
+                        break;
+                    }""" % {
         "element": _mesh_element_name(element),
         "function": function,
         "arguments": arguments,
@@ -1894,6 +2279,7 @@ def _c_abi_header(material, kernel_sources):
     return """#pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #if defined(__has_include)
 #if __has_include("sfem_base.hpp")
@@ -1904,6 +2290,7 @@ def _c_abi_header(material, kernel_sources):
 
 #ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
 typedef double real_t;
 typedef double geom_t;
 #endif
@@ -2187,6 +2574,30 @@ def _offsets(name, components):
 
 def _affine_geometry_offsets(dim):
     return ", ".join("adjugate[%d]" % i for i in range(dim * dim))
+
+
+def _boundary_surface_name(element):
+    name = _element_name(element)
+    surface_by_cell = {
+        "TRI3": "edgeshell2",
+        "QUAD4": "edgeshell2",
+        "TET4": "trishell3",
+        "TET10": "trishell6",
+        "HEX8": "quadshell4",
+        "HEX27": "quadshell9",
+        "PROTEUS_HEX8": "proteus_quadshell4",
+        "PROTEUS_HEX27": "proteus_quadshell9",
+        "PROTEUS_HEX64": "proteus_quadshell16",
+        "PROTEUS_HEX125": "proteus_quadshell25",
+        "PROTEUS_HEX216": "proteus_quadshell36",
+        "PROTEUS_HEX343": "proteus_quadshell49",
+        "PROTEUS_HEX512": "proteus_quadshell64",
+        "PROTEUS_HEX729": "proteus_quadshell81",
+    }
+    try:
+        return surface_by_cell[name]
+    except KeyError as exc:
+        raise ValueError("unsupported generated boundary Op element %s" % element) from exc
 
 
 def _element_dim(element):

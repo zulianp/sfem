@@ -3,6 +3,7 @@
 #include "sfem_macros.hpp"
 
 #include <math.h>
+#include "../../kernel_math.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -269,6 +270,7 @@ static SFEM_INLINE void neumann_proteus_hex64_proteus_quadshell16_boundary_resid
         for (int qx = 0; qx < Q; ++qx) {
             const scalar_t dS = neumann_proteus_hex64_proteus_quadshell16_boundary_residual_soa_measure<scalar_t>(qx, qy, ev, points);
             const scalar_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+
             for (int sy = 0; sy < S; ++sy) {
                 const scalar_t vy = shape_1d[qy * S + sy];
                 for (int sx = 0; sx < S; ++sx) {
