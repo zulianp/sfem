@@ -1288,31 +1288,35 @@ class GenApiTest(unittest.TestCase):
             result = gen.generate(
                 neohookean_ogden,
                 out_dir,
-                elements=("TRI3",),
+                elements=("QUAD4",),
                 target="cuda",
                 dump_plan=True,
             )
             relative = _relative_sources(result, out_dir)
             self.assertIn(
-                os.path.join("d2", "tri3", "neohookean_ogden_tri3_operator.cu"),
+                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.cu"),
                 relative,
             )
             self.assertIn(
-                os.path.join("d2", "neohookean_ogden_d2_simplex_local.hpp"),
+                os.path.join("d2", "neohookean_ogden_d2_tensor_product_local.hpp"),
                 relative,
             )
             operator_path = os.path.join(
                 out_dir,
                 "d2",
-                "tri3",
-                "neohookean_ogden_tri3_operator.cu",
+                "quad4",
+                "neohookean_ogden_quad4_operator.cu",
             )
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
-            self.assertIn("__global__ void neohookean_ogden_tri3_tri3_objective_affine_mesh_soa_impl", operator_source)
+            self.assertIn("__global__ void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl", operator_source)
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
+            with open(os.path.join(out_dir, "tensor_product_kernels.hpp"), encoding="utf-8") as input_file:
+                tensor_product_source = input_file.read()
+            self.assertIn("__host__ __device__ __forceinline__", tensor_product_source)
+            self.assertNotIn("#pragma omp", tensor_product_source)
 
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
