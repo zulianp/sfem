@@ -93,7 +93,8 @@ Current implementation:
 
 - `SpecializedFormManipulationStage`
 - `FormCollection`
-- `EnergyCodeGenerationPayload` for energy-only kernel form state
+- `KernelExpressionPlan` for kernel expression graphs, kernel forms, diagnostics,
+  coefficients, dependencies, and selected blocks
 - `CodeGenerationUnit`
 - `CodeGenerationPlan`
 
@@ -237,13 +238,12 @@ The result is a dimension-keyed `UnifiedFormEvaluation` containing one unnamed
 `CodeGenerationUnit`.
 
 For each dimension, it creates a `CodeGenerationUnit` with kind
-`ENERGY_SOA`, the standardized `FormCollection`, and an
-`EnergyCodeGenerationPayload` containing only the remaining energy-specific
-emission state:
+`ENERGY_SOA`, the standardized `FormCollection`, and `KernelExpressionPlan`
+entries for the objective, gradient, and Hessian action:
 
 - kernel forms
 - diagnostic graph
-- diagnostics flag
+- form order and expression role
 
 ### Unified Code Generation
 

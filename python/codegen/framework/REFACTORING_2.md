@@ -51,7 +51,7 @@ Verification:
 
 Goal: remove geometry and basis-policy reconstruction from emitters.
 
-Status: in progress. Context-specialized emission plans now carry affine and
+Status: implemented. Context-specialized emission plans now carry affine and
 isoparametric geometry phase data, geometry streams, field-specific basis plans,
 reference-data streams, and tensor-product sum-factorization plans. OpenMP
 emission validates and consumes geometry modes through a shared
@@ -95,29 +95,43 @@ Acceptance criteria:
 Verification:
 
 - `PYTHONPATH=python python -m unittest python.codegen.framework.test_gen_api`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.test_neohookean_ogden`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.test_residual`
 
 ## M3. Replace Specialized Generator Entry Points With One Backend Traversal
 
 Goal: make OpenMP emission consume one unified kernel-plan representation.
 
+Status: implemented. `KernelExpressionPlan` is now part of the backend plan
+schema and energy, residual, boundary, and block units populate it without
+material-family payloads. Energy kernel forms and diagnostic graphs are carried
+by expression plans instead of `EnergyCodeGenerationPayload`.
+Residual monolithic and block coefficient routing also comes from expression
+plans. Boundary residual coefficient/dependency routing is also driven by the
+form-1 expression plan. OpenMP emission now builds one traversal object for
+local and mesh codegen setup across energy, residual, mixed residual, and
+boundary kernels. Legacy low-level generator functions remain available only
+from their concrete implementation modules and are no longer exported through
+the high-level framework API.
+
 Tasks:
 
-1. Define a backend-level `KernelExpressionPlan` that stores local expression
+- [x] Define a backend-level `KernelExpressionPlan` that stores local expression
    graphs, output roles, diagnostics, and required data streams for 0-, 1-, and
    2-form kernels.
-2. Move energy-specific kernel-form data out of `EnergyCodeGenerationPayload`
+- [x] Move energy-specific kernel-form data out of `EnergyCodeGenerationPayload`
    and into `KernelExpressionPlan`.
-3. Convert residual monolithic and block coefficient data into the same
+- [x] Convert residual monolithic and block coefficient data into the same
    expression-plan schema.
-4. Convert boundary residual coefficient data into the same expression-plan
+- [x] Convert boundary residual coefficient data into the same expression-plan
    schema.
-5. Replace backend calls to:
+- [x] Replace backend calls to:
    - `generate_sfem_soa_cpp_files_for_element`
    - `generate_coupled_residual_sfem_files`
    - `generate_mixed_residual_sfem_files`
    - `generate_boundary_residual_sfem_files`
    with one OpenMP backend traversal over the unified plans.
-6. Keep old low-level generator functions internal during the migration, then
+- [x] Keep old low-level generator functions internal during the migration, then
    remove or de-export them once the unified backend covers all maintained
    examples.
 

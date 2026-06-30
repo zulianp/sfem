@@ -416,9 +416,8 @@ Keep this list focused on acceptance criteria, not general cleanup.
   `generate_boundary_residual_sfem_files`. Replace these with one backend
   traversal over `KernelPlan`, `BlockPlan`, geometry plans, basis plans, and
   data-stream plans.
-- `EnergyCodeGenerationPayload` still carries energy-specific emission state.
-  Remove it once the plan contains all kernel expressions, diagnostics, and
-  data-stream metadata needed by the backend.
+- Energy-specific emission state has been moved into `KernelExpressionPlan`;
+  `CodeGenerationUnit` no longer needs an `EnergyCodeGenerationPayload`.
 - The code-generation layer still reconstructs some FEM/material semantics
   during emission, e.g. diagonal mixed block models and field-specific element
   labels. Move these decisions into form manipulation so code generation only
