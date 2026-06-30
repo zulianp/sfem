@@ -56,9 +56,17 @@ isoparametric geometry phase data, geometry streams, field-specific basis plans,
 reference-data streams, and tensor-product sum-factorization plans. OpenMP
 emission validates and consumes geometry modes through a shared
 `ElementEmissionPlan` before calling the current low-level generators. Energy,
-residual, mixed residual, and boundary entry points now accept this shared plan;
-energy tensor-product reference selection is plan-driven with quadrature-based
-selection kept only as a legacy direct-call fallback.
+coupled residual, mixed residual, and boundary residual entry points now require
+this shared plan instead of reconstructing element family from element names or
+quadrature flags. Shared `emission_plan_for_element(...)` construction is used
+for field-element plans such as synthetic diagonal mixed-order residual blocks,
+so the OpenMP backend no longer reconstructs FEM geometry/basis details itself.
+Energy and mixed residual local/mesh/diagnostic reference routing uses the
+basis-plan-derived family, including reference parameter, pointer,
+call-argument, wrapper-argument, and diagnostic-data helpers. Isoparametric
+Jacobian generation is routed separately through the geometry-plan-derived
+family, so tensor-product geometry sum-factorization is no longer tied to basis
+reference staging.
 
 Tasks:
 

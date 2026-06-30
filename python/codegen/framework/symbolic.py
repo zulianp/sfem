@@ -1511,6 +1511,7 @@ def generate_sfem_soa_cpp_files(
     quadrature_rule=None,
     affine_quadrature_rule=None,
     basis_family=None,
+    geometry_family=None,
     local_prefix=None,
 ):
     forms = tuple(forms)
@@ -1612,6 +1613,7 @@ def generate_sfem_soa_cpp_files(
                 quadrature_rule,
                 affine_quadrature_rule,
                 basis_family,
+                geometry_family,
                 use_shared_weak_local,
             ),
         ),
@@ -1622,16 +1624,16 @@ def generate_sfem_soa_cpp_files_for_element(
     forms,
     *,
     prefix,
-    specialization=None,
-    affine_specialization=None,
-    emission_plan=None,
+    emission_plan,
     array_inputs=None,
     local_prefix=None,
 ):
-    if emission_plan is not None:
-        specialization = emission_plan.isoparametric_specialization
-        affine_specialization = emission_plan.affine_specialization
-    basis_family = None if emission_plan is None else emission_plan.family
+    if emission_plan is None:
+        raise ValueError("energy code generation requires an ElementEmissionPlan")
+    specialization = emission_plan.isoparametric_specialization
+    affine_specialization = emission_plan.affine_specialization
+    basis_family = emission_plan.basis_family
+    geometry_family = emission_plan.geometry_family
     if isinstance(specialization, SfemElementQuadratureRule):
         specialization = SfemSoAElementSpecialization(specialization)
     if not isinstance(specialization, SfemSoAElementSpecialization):
@@ -1658,6 +1660,7 @@ def generate_sfem_soa_cpp_files_for_element(
         quadrature_rule=specialization.quadrature_rule,
         affine_quadrature_rule=affine_specialization.quadrature_rule,
         basis_family=basis_family,
+        geometry_family=geometry_family,
         local_prefix=local_prefix,
     )
 
@@ -2482,9 +2485,8 @@ def _use_tensor_product_reference(quadrature_rule, reference_inputs, basis_famil
     if quadrature_rule is None:
         return False
     if basis_family is None:
-        tensor_product = quadrature_rule.is_tensor_product
-    else:
-        tensor_product = str(basis_family) == "tensor_product"
+        raise ValueError("basis family must be provided by the emission plan")
+    tensor_product = str(basis_family) == "tensor_product"
     return (
         tensor_product
         and len(reference_inputs) == 1
@@ -2770,6 +2772,7 @@ def _sfem_soa_operator_source(
     quadrature_rule,
     affine_quadrature_rule,
     basis_family=None,
+    geometry_family=None,
     use_shared_weak_local=False,
 ):
     lines = [
@@ -2821,6 +2824,7 @@ def _sfem_soa_operator_source(
                 vector_size,
                 array_inputs,
                 quadrature_rule,
+                basis_family,
             )
         )
         lines.append("")
@@ -2843,6 +2847,7 @@ def _sfem_soa_operator_source(
                     array_inputs,
                     affine_rule,
                     basis_family,
+                    geometry_family,
                     use_shared_weak_local,
                     geometry_mode="affine",
                 )
@@ -2861,6 +2866,7 @@ def _sfem_soa_operator_source(
                         array_inputs,
                         affine_rule,
                         basis_family,
+                        geometry_family,
                         use_shared_weak_local,
                         geometry_mode="affine",
                     )
@@ -2878,6 +2884,7 @@ def _sfem_soa_operator_source(
                     array_inputs,
                     quadrature_rule,
                     basis_family,
+                    geometry_family,
                     use_shared_weak_local,
                     geometry_mode="isoparametric",
                 )
@@ -2896,6 +2903,7 @@ def _sfem_soa_operator_source(
                         array_inputs,
                         quadrature_rule,
                         basis_family,
+                        geometry_family,
                         use_shared_weak_local,
                         geometry_mode="isoparametric",
                     )
@@ -2916,6 +2924,7 @@ def _sfem_soa_operator_function(
     array_inputs,
     quadrature_rule,
     basis_family=None,
+    geometry_family=None,
     use_shared_weak_local=False,
     isoparametric_geometry=False,
 ):
@@ -2932,6 +2941,9 @@ def _sfem_soa_operator_function(
         quadrature_rule,
         reference_inputs,
         basis_family,
+    )
+    use_tensor_product_geometry = (
+        isoparametric_geometry and str(geometry_family) == "tensor_product"
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -3273,7 +3285,7 @@ def _sfem_soa_operator_function(
                 )
             )
 
-    if isoparametric_geometry and not use_tensor_product_reference:
+    if isoparametric_geometry and not use_tensor_product_geometry:
         lines.append("")
         if compact_stream_buffers:
             lines.extend(
@@ -3296,7 +3308,7 @@ def _sfem_soa_operator_function(
                 )
             )
 
-    if isoparametric_geometry and use_tensor_product_reference:
+    if isoparametric_geometry and use_tensor_product_geometry:
         lines.append("")
         if form.weak_form is not None:
             lines.extend(
@@ -3313,7 +3325,11 @@ def _sfem_soa_operator_function(
                             n_nodes,
                             _coordinate_stream_names(dim, n_nodes),
                             lambda stream: "block_%s" % stream,
-                            shape_order=stream_shape_order,
+                            shape_order=_tensor_product_stream_shape_order(
+                                quadrature_rule,
+                                dim,
+                                n_nodes,
+                            ),
                         )
                     ),
                     adjugate_target=lambda component, index: (
@@ -3342,7 +3358,11 @@ def _sfem_soa_operator_function(
                             n_nodes,
                             _coordinate_stream_names(dim, n_nodes),
                             lambda stream: "block_%s" % stream,
-                            shape_order=stream_shape_order,
+                            shape_order=_tensor_product_stream_shape_order(
+                                quadrature_rule,
+                                dim,
+                                n_nodes,
+                            ),
                         )
                     ),
                 )
@@ -3516,6 +3536,7 @@ def _sfem_soa_operator_function(
             wrapper_params,
             reference_inputs,
             use_reference_gradient_vectors,
+            basis_family,
         )
     lines.extend(
         [
@@ -3545,6 +3566,7 @@ def _sfem_soa_mesh_operator_function(
     array_inputs,
     quadrature_rule,
     basis_family=None,
+    geometry_family=None,
     use_shared_weak_local=False,
     geometry_mode="affine",
 ):
@@ -3567,6 +3589,10 @@ def _sfem_soa_mesh_operator_function(
         quadrature_rule,
         reference_inputs,
         basis_family,
+    )
+    use_tensor_product_geometry = (
+        geometry_mode == "isoparametric"
+        and str(geometry_family) == "tensor_product"
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -3942,7 +3968,7 @@ def _sfem_soa_mesh_operator_function(
     if (
         geometry_mode == "isoparametric"
         and form.weak_form is not None
-        and use_tensor_product_reference
+        and use_tensor_product_geometry
     ):
         lines.append("")
         lines.extend(
@@ -3959,7 +3985,11 @@ def _sfem_soa_mesh_operator_function(
                         n_nodes,
                         _coordinate_stream_names(dim, n_nodes),
                         lambda stream: "block_%s" % stream,
-                        shape_order=stream_shape_order,
+                        shape_order=_tensor_product_stream_shape_order(
+                            quadrature_rule,
+                            dim,
+                            n_nodes,
+                        ),
                     )
                 ),
                 adjugate_target=lambda component, index: (
@@ -3979,14 +4009,14 @@ def _sfem_soa_mesh_operator_function(
         )
     elif geometry_mode == "isoparametric" and form.weak_form is not None:
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
-        if use_tensor_product_reference:
+        if use_tensor_product_geometry:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
                 quadrature_rule,
-                use_tensor_product_reference,
+                use_tensor_product_geometry,
                 use_reference_gradient_vectors,
                 reference_inputs,
                 q_major=form.weak_form is not None,
@@ -4000,7 +4030,7 @@ def _sfem_soa_mesh_operator_function(
                 dim,
                 n_nodes,
                 quadrature_rule,
-                use_tensor_product_reference,
+                use_tensor_product_geometry,
                 use_reference_gradient_vectors,
                 reference_inputs,
                 False,
@@ -4158,6 +4188,7 @@ def _sfem_soa_mesh_objective_steps_function(
     array_inputs,
     quadrature_rule,
     basis_family=None,
+    geometry_family=None,
     use_shared_weak_local=False,
     geometry_mode="affine",
 ):
@@ -4182,6 +4213,10 @@ def _sfem_soa_mesh_objective_steps_function(
         quadrature_rule,
         reference_inputs,
         basis_family,
+    )
+    use_tensor_product_geometry = (
+        geometry_mode == "isoparametric"
+        and str(geometry_family) == "tensor_product"
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -4440,7 +4475,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 )
         lines.append("        }")
 
-    if geometry_mode == "isoparametric" and not use_tensor_product_reference:
+    if geometry_mode == "isoparametric" and not use_tensor_product_geometry:
         lines.append("")
         if compact_stream_buffers:
             lines.extend(
@@ -4463,7 +4498,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 )
             )
 
-    if geometry_mode == "isoparametric" and use_tensor_product_reference:
+    if geometry_mode == "isoparametric" and use_tensor_product_geometry:
         lines.append("")
         lines.extend(
             tensor_product_gradient_isoparametric_geometry_lines(
@@ -4479,7 +4514,11 @@ def _sfem_soa_mesh_objective_steps_function(
                         n_nodes,
                         _coordinate_stream_names(dim, n_nodes),
                         lambda stream: "block_%s" % stream,
-                        shape_order=stream_shape_order,
+                        shape_order=_tensor_product_stream_shape_order(
+                            quadrature_rule,
+                            dim,
+                            n_nodes,
+                        ),
                     )
                 ),
                 adjugate_target=lambda component, index: (
@@ -4499,14 +4538,14 @@ def _sfem_soa_mesh_objective_steps_function(
         )
     elif geometry_mode == "isoparametric":
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
-        if use_tensor_product_reference:
+        if use_tensor_product_geometry:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
                 quadrature_rule,
-                use_tensor_product_reference,
+                use_tensor_product_geometry,
                 use_reference_gradient_vectors,
                 reference_inputs,
                 q_major=True,
@@ -4822,6 +4861,7 @@ def _sfem_soa_diagnostics_lines(
     vector_size,
     array_inputs,
     quadrature_rule,
+    basis_family,
 ):
     public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
     struct_name = _sfem_soa_diagnostics_struct_name()
@@ -4843,7 +4883,7 @@ def _sfem_soa_diagnostics_lines(
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     geometry_streams = sum(array_input.size for array_input in element_inputs)
-    if quadrature_rule is not None and quadrature_rule.is_tensor_product:
+    if quadrature_rule is not None and str(basis_family) == "tensor_product":
         reference_scalars = (
             len(quadrature_rule.tensor_product_shape_values_1d)
             + len(quadrature_rule.tensor_product_shape_gradients_1d)
@@ -4985,9 +5025,12 @@ def _sfem_soa_specialized_wrapper_arguments(
     wrapper_params,
     reference_inputs,
     use_reference_gradient_vectors=False,
+    basis_family=None,
 ):
     arguments = [_cpp_argument_name(param) for param in wrapper_params]
-    if quadrature_rule.is_tensor_product:
+    if basis_family is None:
+        raise ValueError("basis family must be provided by the emission plan")
+    if str(basis_family) == "tensor_product":
         offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
         arguments.insert(
             offset,

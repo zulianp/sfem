@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
 
 import sympy as sp
 
@@ -1397,10 +1398,36 @@ class GenApiTest(unittest.TestCase):
         )
         self.assertIsInstance(hex_emission_plan, gen.ElementEmissionPlan)
         self.assertEqual(hex_emission_plan.family, "tensor_product")
+        self.assertEqual(hex_emission_plan.basis_family, "tensor_product")
+        self.assertEqual(hex_emission_plan.geometry_family, "tensor_product")
         self.assertTrue(hex_emission_plan.uses_tensor_product_geometry)
         self.assertTrue(hex_emission_plan.uses_tensor_product_basis)
         self.assertEqual(hex_emission_plan.affine_geometry, affine_geometry)
         self.assertEqual(hex_emission_plan.isoparametric_geometry, iso_geometry)
+        direct_hex_emission_plan = gen.emission_plan_for_element("HEX8", 16)
+        self.assertIsInstance(direct_hex_emission_plan, gen.ElementEmissionPlan)
+        self.assertEqual(direct_hex_emission_plan.family, "tensor_product")
+        self.assertTrue(direct_hex_emission_plan.uses_tensor_product_geometry)
+        self.assertTrue(direct_hex_emission_plan.uses_tensor_product_basis)
+        mixed_policy_plan = gen.ElementEmissionPlan(
+            direct_hex_emission_plan.element_type,
+            direct_hex_emission_plan.label,
+            direct_hex_emission_plan.family,
+            direct_hex_emission_plan.vector_size,
+            direct_hex_emission_plan.affine_geometry,
+            replace(
+                direct_hex_emission_plan.isoparametric_geometry,
+                evaluation=gen.GeometryEvaluation.SIMPLEX_REFERENCE,
+                sum_factorization_plan=None,
+            ),
+            direct_hex_emission_plan.basis_plans,
+            direct_hex_emission_plan.affine_specialization,
+            direct_hex_emission_plan.isoparametric_specialization,
+        )
+        self.assertEqual(mixed_policy_plan.basis_family, "tensor_product")
+        self.assertEqual(mixed_policy_plan.geometry_family, "simplex")
+        self.assertTrue(mixed_policy_plan.uses_tensor_product_basis)
+        self.assertFalse(mixed_policy_plan.uses_tensor_product_geometry)
 
         simplex_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         simplex_plan = gen.SpecializedFormManipulationStage(
@@ -1415,6 +1442,8 @@ class GenApiTest(unittest.TestCase):
             simplex_input.element_contexts[0],
         )
         self.assertEqual(simplex_emission_plan.family, "simplex")
+        self.assertEqual(simplex_emission_plan.basis_family, "simplex")
+        self.assertEqual(simplex_emission_plan.geometry_family, "simplex")
         self.assertFalse(simplex_emission_plan.uses_tensor_product_geometry)
         self.assertFalse(simplex_emission_plan.uses_tensor_product_basis)
         simplex_iso = simplex_unit.mesh_phase_plans[1].geometries[1]

@@ -253,8 +253,8 @@ def _field_stream_initializer(layout, field_index, array_name):
     )
 
 
-def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies):
-    if cell_rule.is_tensor_product:
+def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies, basis_family=None):
+    if _is_tensor_product_family(cell_rule, basis_family):
         params = [
             "const scalar_t *const SFEM_RESTRICT field_shape_1d[%d]" % n_fields
         ]
@@ -282,12 +282,13 @@ def _mixed_reference_pointer_lines(
     dependencies,
     indent,
     field_element_types=None,
+    basis_family=None,
 ):
     dim = system.dim
     field_element_types = {} if field_element_types is None else field_element_types
     layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
     lines = []
-    if cell_rule.is_tensor_product:
+    if _is_tensor_product_family(cell_rule, basis_family):
         lines.append(
             "%sconst scalar_t *const field_shape_1d[N_FIELDS] = {%s};"
             % (
@@ -363,8 +364,8 @@ def _mixed_reference_pointer_lines(
     return lines
 
 
-def _mixed_reference_call_args(cell_rule, dependencies, reference_data):
-    if cell_rule.is_tensor_product:
+def _mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family=None):
+    if _is_tensor_product_family(cell_rule, basis_family):
         args = ["field_shape_1d"]
         if dependencies.uses_reference_gradients:
             args.append("field_grad_1d")
@@ -549,16 +550,17 @@ def _is_zero(expression):
     return expression == 0 or expression.is_zero is True
 
 
+def _is_tensor_product_family(rule, basis_family=None):
+    if basis_family is None:
+        raise ValueError("basis family must be provided by the emission plan")
+    return str(basis_family) == "tensor_product"
+
+
 def generate_coupled_residual_sfem_files(
     system,
     *,
     prefix,
-    element_type=None,
-    vector_size=16,
-    quadrature_order=None,
-    specialization=None,
-    affine_specialization=None,
-    emission_plan=None,
+    emission_plan,
     residual_coeffs=None,
     action_coeffs=None,
     local_prefix=None,
@@ -568,22 +570,11 @@ def generate_coupled_residual_sfem_files(
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
-    if emission_plan is not None:
-        element_type = emission_plan.element_type
-        vector_size = emission_plan.vector_size
-        quadrature_order = emission_plan.quadrature_order
-        specialization = emission_plan.isoparametric_specialization
-        affine_specialization = emission_plan.affine_specialization
-    if element_type is None:
-        raise ValueError("residual code generation requires element_type or emission_plan")
-    if specialization is None:
-        specialization = sfem_soa_element_specialization(
-            element_type,
-            vector_size,
-            quadrature_order,
-        )
-    if affine_specialization is None:
-        affine_specialization = specialization
+    if emission_plan is None:
+        raise ValueError("residual code generation requires an ElementEmissionPlan")
+    element_type = emission_plan.element_type
+    specialization = emission_plan.isoparametric_specialization
+    affine_specialization = emission_plan.affine_specialization
     if system.dim != specialization.dim:
         raise ValueError("residual system dimension does not match element dimension")
     if affine_specialization.dim != specialization.dim:
@@ -594,11 +585,8 @@ def generate_coupled_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
-    family = emission_plan.family if emission_plan is not None else (
-        "tensor_product"
-        if specialization.quadrature_rule.is_tensor_product
-        else "simplex"
-    )
+    family = emission_plan.basis_family
+    geometry_family = emission_plan.geometry_family
     local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
     element_prefix = "%s_%s" % (prefix, element_type.lower()) if operator_prefix is None else str(operator_prefix)
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
@@ -609,6 +597,7 @@ def generate_coupled_residual_sfem_files(
         specialization,
         residual_coeffs,
         action_coeffs,
+        basis_family=family,
     )
     operator_source = _operator_source(
         system,
@@ -619,6 +608,8 @@ def generate_coupled_residual_sfem_files(
         local_name,
         residual_coeffs,
         action_coeffs,
+        basis_family=family,
+        geometry_family=geometry_family,
     )
     diagnostics_name = "kernel_diagnostics.hpp"
     return (
@@ -645,9 +636,7 @@ def generate_mixed_residual_sfem_files(
     *,
     prefix,
     compatible_element,
-    vector_size=16,
-    quadrature_order=None,
-    emission_plan=None,
+    emission_plan,
     residual_coeffs=None,
     action_coeffs=None,
     field_element_types=None,
@@ -658,14 +647,9 @@ def generate_mixed_residual_sfem_files(
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
-    if emission_plan is not None:
-        vector_size = emission_plan.vector_size
-        quadrature_order = emission_plan.quadrature_order
-    cell_specialization = sfem_soa_element_specialization(
-        compatible_element.cell_element_type,
-        vector_size,
-        quadrature_order,
-    )
+    if emission_plan is None:
+        raise ValueError("mixed residual code generation requires an ElementEmissionPlan")
+    cell_specialization = emission_plan.isoparametric_specialization
     if system.dim != cell_specialization.dim:
         raise ValueError("residual system dimension does not match element dimension")
     field_element_types = dict(field_element_types or ())
@@ -685,11 +669,8 @@ def generate_mixed_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
-    family = emission_plan.family if emission_plan is not None else (
-        "tensor_product"
-        if cell_specialization.quadrature_rule.is_tensor_product
-        else "simplex"
-    )
+    family = emission_plan.basis_family
+    geometry_family = emission_plan.geometry_family
     local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
     element_prefix = "%s_%s" % (prefix, compatible_element.name.lower()) if operator_prefix is None else str(operator_prefix)
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
@@ -701,6 +682,7 @@ def generate_mixed_residual_sfem_files(
         field_element_types,
         residual_coeffs,
         action_coeffs,
+        basis_family=family,
     )
     operator_source = _mixed_operator_source(
         system,
@@ -712,6 +694,8 @@ def generate_mixed_residual_sfem_files(
         field_element_types,
         residual_coeffs,
         action_coeffs,
+        basis_family=family,
+        geometry_family=geometry_family,
     )
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
@@ -732,7 +716,7 @@ def generate_mixed_residual_sfem_files(
     )
 
 
-def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs):
+def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs, basis_family=None):
     rule = specialization.quadrature_rule
     residual_dependencies = _codegen_dependencies(
         system,
@@ -785,6 +769,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             residual_coeffs,
             dependencies=residual_dependencies,
             local_prefix=local_prefix,
+            basis_family=basis_family,
         )
     )
     lines.append("")
@@ -796,6 +781,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             action_coeffs,
             dependencies=action_dependencies,
             local_prefix=local_prefix,
+            basis_family=basis_family,
         )
     )
     lines.extend(
@@ -811,6 +797,7 @@ def _mixed_local_header(
     field_element_types,
     residual_coeffs,
     action_coeffs,
+    basis_family=None,
 ):
     residual_dependencies = _codegen_dependencies(
         system,
@@ -863,6 +850,7 @@ def _mixed_local_header(
             field_element_types,
             residual_coeffs,
             dependencies=residual_dependencies,
+            basis_family=basis_family,
         )
     )
     lines.append("")
@@ -874,6 +862,7 @@ def _mixed_local_header(
             field_element_types,
             action_coeffs,
             dependencies=action_dependencies,
+            basis_family=basis_family,
         )
     )
     lines.extend(
@@ -889,6 +878,7 @@ def _mixed_local_function(
     field_element_types,
     coefficients,
     dependencies,
+    basis_family=None,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -902,7 +892,7 @@ def _mixed_local_function(
         params.append(
             "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
-    params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies))
+    params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies, basis_family))
     if dependencies.current:
         params.append(
             "const scalar_t *const SFEM_RESTRICT current[%d]" % layout.total_streams
@@ -942,7 +932,7 @@ def _mixed_local_function(
         % (group.name.upper(), group.shape_count)
         for group in layout.groups
     )
-    if rule.is_tensor_product:
+    if _is_tensor_product_family(rule, basis_family):
         lines.extend(
             _mixed_tensor_local_body(
                 system,
@@ -1329,6 +1319,7 @@ def _local_function(
     coefficients,
     dependencies,
     local_prefix,
+    basis_family=None,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1342,7 +1333,8 @@ def _local_function(
         params.append(
             "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
-    if rule.is_tensor_product:
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    if tensor_product:
         params.append("const scalar_t *const SFEM_RESTRICT shape_1d")
         if dependencies.uses_reference_gradients:
             params.append("const scalar_t *const SFEM_RESTRICT grad_1d")
@@ -1390,7 +1382,7 @@ def _local_function(
             "    static constexpr int N_FIELDS = %d;" % n_fields,
         ]
     )
-    if rule.is_tensor_product:
+    if tensor_product:
         lines.extend(
             _tensor_local_body(
                 system,
@@ -1725,6 +1717,8 @@ def _operator_source(
     local_name,
     residual_coeffs,
     action_coeffs,
+    basis_family=None,
+    geometry_family=None,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1733,6 +1727,7 @@ def _operator_source(
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
     element = rule.element_type.lower()
+    tensor_product = _is_tensor_product_family(rule, basis_family)
     lines = [
         '#include "%s"' % local_name,
         '#include "geometry_kernels.hpp"',
@@ -1828,7 +1823,7 @@ def _operator_source(
             call_args = ["nelems", "geometry_stride", "determinant"]
             if dependencies.uses_adjugate:
                 call_args.append("adjugate")
-            if rule.is_tensor_product:
+            if tensor_product:
                 call_args.append(
                     quadrature_reference_accessor(
                         prefix, "isoparametric", "shape_1d", scalar_type
@@ -1896,6 +1891,8 @@ def _operator_source(
                 specialization,
                 form,
                 dependencies,
+                basis_family,
+                geometry_family,
             )
         )
         lines.extend(
@@ -1919,6 +1916,8 @@ def _mixed_operator_source(
     field_element_types,
     residual_coeffs,
     action_coeffs,
+    basis_family=None,
+    geometry_family=None,
 ):
     rule = cell_specialization.quadrature_rule
     element = compatible_element.name.lower()
@@ -1954,8 +1953,8 @@ def _mixed_operator_source(
         "namespace codegen {",
         "",
     ]
-    lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types))
-    lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types))
+    lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types, basis_family))
+    lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types, basis_family))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     lines.extend(
         _mixed_residual_diagnostics_lines(
@@ -1966,6 +1965,7 @@ def _mixed_operator_source(
             field_element_types,
             residual_coeffs,
             action_coeffs,
+            basis_family,
         )
     )
     lines.append("")
@@ -2002,6 +2002,7 @@ def _mixed_operator_source(
                 field_element_types,
                 form,
                 dependencies,
+                basis_family,
             )
         )
         lines.extend(
@@ -2017,21 +2018,23 @@ def _mixed_operator_source(
                 form,
                 coefficients,
                 dependencies,
+                basis_family,
+                geometry_family,
             )
         )
     return "\n".join(lines)
 
 
-def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types):
+def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types, basis_family=None):
     return quadrature_reference_struct_lines(
         prefix,
         reference_stage,
-        _mixed_reference_data(cell_rule, system, field_element_types),
+        _mixed_reference_data(cell_rule, system, field_element_types, basis_family),
     )
 
 
-def _mixed_reference_data(cell_rule, system, field_element_types):
-    if cell_rule.is_tensor_product:
+def _mixed_reference_data(cell_rule, system, field_element_types, basis_family=None):
+    if _is_tensor_product_family(cell_rule, basis_family):
         data = (
             SfemReferenceData("q_weight_1d", cell_rule.tensor_product_weights_1d),
         )
@@ -2135,6 +2138,7 @@ def _mixed_affine_function(
     field_element_types,
     form,
     dependencies,
+    basis_family=None,
 ):
     dim = system.dim
     layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
@@ -2206,6 +2210,7 @@ def _mixed_affine_function(
             dependencies,
             "    ",
             field_element_types,
+            basis_family,
         )
     )
     lines.extend(
@@ -2273,7 +2278,7 @@ def _mixed_affine_function(
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
-    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data))
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
         "block_%s_streams" % group.name
         for group in _dependency_stream_groups(dependencies)
@@ -2350,6 +2355,8 @@ def _mixed_isoparametric_function(
     form,
     coefficients,
     dependencies,
+    basis_family=None,
+    geometry_family=None,
 ):
     dim = system.dim
     layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
@@ -2407,7 +2414,9 @@ def _mixed_isoparametric_function(
         )
         return lines
     reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
-    if cell_rule.is_tensor_product:
+    tensor_product = _is_tensor_product_family(cell_rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(cell_rule, geometry_family)
+    if tensor_product:
         lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     else:
         lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
@@ -2472,7 +2481,7 @@ def _mixed_isoparametric_function(
                 )
             lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.append("        }")
-    if cell_rule.is_tensor_product:
+    if tensor_product_geometry:
         lines.append("")
         lines.extend(
             tensor_product_evaluated_isoparametric_geometry_lines(
@@ -2545,6 +2554,7 @@ def _mixed_isoparametric_function(
             dependencies,
             "        ",
             field_element_types,
+            basis_family,
         )
     )
     lines.append(
@@ -2559,7 +2569,7 @@ def _mixed_isoparametric_function(
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
-    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data))
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
         "block_%s_streams" % group.name
         for group in _dependency_stream_groups(dependencies)
@@ -2706,6 +2716,7 @@ def _mixed_residual_diagnostics_lines(
     field_element_types,
     residual_coeffs,
     action_coeffs,
+    basis_family,
 ):
     diagnostics = (
         (
@@ -2741,6 +2752,7 @@ def _mixed_residual_diagnostics_lines(
                 specialization,
                 field_element_types,
                 dependencies,
+                basis_family,
             )
         )
     return lines
@@ -2753,6 +2765,7 @@ def _mixed_kernel_diagnostics_lines(
     specialization,
     field_element_types,
     dependencies,
+    basis_family,
 ):
     rule = specialization.quadrature_rule
     layout = MixedFieldLayout.create(system, rule, field_element_types)
@@ -2763,7 +2776,7 @@ def _mixed_kernel_diagnostics_lines(
         specialization,
         dependencies,
         field_streams=layout.total_streams,
-        reference_data=_mixed_reference_data(rule, system, field_element_types),
+        reference_data=_mixed_reference_data(rule, system, field_element_types, basis_family),
     )
 
 
@@ -2894,6 +2907,8 @@ def _mesh_operator_source(
     isoparametric_specialization,
     form,
     dependencies,
+    basis_family=None,
+    geometry_family=None,
 ):
     rule = affine_specialization.quadrature_rule
     dim = system.dim
@@ -2901,11 +2916,12 @@ def _mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = affine_specialization.vector_size
+    tensor_product = _is_tensor_product_family(rule, basis_family)
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
         else tensor_product_cartesian_shape_order(dim, n_shape)
-        if rule.is_tensor_product
+        if tensor_product
         else tuple(range(n_shape))
     )
     field_stream_order = streams_in_shape_order(
@@ -3073,7 +3089,7 @@ def _mesh_operator_source(
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
-    if rule.is_tensor_product:
+    if tensor_product:
         call_args.append(_mesh_reference_name("affine", "shape_1d"))
         if dependencies.uses_reference_gradients:
             call_args.append(_mesh_reference_name("affine", "grad_1d"))
@@ -3177,6 +3193,8 @@ def _mesh_operator_source(
             isoparametric_specialization,
             form,
             dependencies,
+            basis_family,
+            geometry_family,
         )
     )
     return lines
@@ -3257,6 +3275,8 @@ def _isoparametric_mesh_operator_source(
     specialization,
     form,
     dependencies,
+    basis_family=None,
+    geometry_family=None,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -3264,11 +3284,13 @@ def _isoparametric_mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
         else tensor_product_cartesian_shape_order(dim, n_shape)
-        if rule.is_tensor_product
+        if tensor_product
         else tuple(range(n_shape))
     )
     field_stream_order = streams_in_shape_order(
@@ -3403,7 +3425,7 @@ def _isoparametric_mesh_operator_source(
             "        }",
         ]
     )
-    if rule.is_tensor_product:
+    if tensor_product_geometry:
         lines.append("")
         lines.extend(
             tensor_product_evaluated_isoparametric_geometry_lines(
@@ -3509,7 +3531,7 @@ def _isoparametric_mesh_operator_source(
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
-    if rule.is_tensor_product:
+    if tensor_product:
         call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
         if dependencies.uses_reference_gradients:
             call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))

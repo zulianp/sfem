@@ -9,12 +9,11 @@ from .generation_plan import (
     MeshPhase,
     LocalPhase,
 )
-from .emission_plan import emission_plan_from_unit_context
+from .emission_plan import emission_plan_for_element, emission_plan_from_unit_context
 from .symbolic import (
     generate_sfem_soa_cpp_files_for_element,
 )
 from .boundary_codegen import generate_boundary_residual_sfem_files
-from .fem import sfem_soa_element_specialization
 from .residual import CoupledResidualSystem
 from .residual_codegen import (
     WeakResidualCoefficients,
@@ -88,8 +87,7 @@ class OpenMPSoABackend:
                     model.element_type,
                     model.element_type,
                 ),
-                vector_size=model.specialization.vector_size,
-                quadrature_order=model.specialization.quadrature_rule.order,
+                emission_plan=model.emission_plan,
                 residual_coeffs=model.residual_coeffs,
                 action_coeffs=model.action_coeffs,
                 field_element_types={
@@ -212,9 +210,7 @@ class OpenMPSoABackend:
         local_name,
         operator_prefix,
         operator_name,
-        emission_plan=None,
-        vector_size=16,
-        quadrature_order=None,
+        emission_plan,
     ):
         files = tuple(
             generate_mixed_residual_sfem_files(
@@ -222,8 +218,6 @@ class OpenMPSoABackend:
                 prefix=prefix,
                 compatible_element=compatible_element,
                 emission_plan=emission_plan,
-                vector_size=vector_size,
-                quadrature_order=quadrature_order,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 field_element_types=field_element_types,
@@ -491,6 +485,7 @@ class _DiagonalBlockModel:
     element_type: str
     specialization: object
     affine_specialization: object
+    emission_plan: object
     residual_coeffs: tuple
     action_coeffs: tuple
 
@@ -518,16 +513,14 @@ def _diagonal_block_model(unit, collection, context):
         for equation_field, element_type in context.fem_policy.field_element_types_for(collection.fields)
     }
     element_type = field_element_types[field.name]
-    specialization = sfem_soa_element_specialization(
+    emission_plan = emission_plan_for_element(
         element_type,
         context.specialization.vector_size,
         context.specialization.quadrature_rule.order,
+        affine_quadrature_order=context.affine_specialization.quadrature_rule.order,
     )
-    affine_specialization = sfem_soa_element_specialization(
-        element_type,
-        context.affine_specialization.vector_size,
-        context.affine_specialization.quadrature_rule.order,
-    )
+    specialization = emission_plan.isoparametric_specialization
+    affine_specialization = emission_plan.affine_specialization
     system = CoupledResidualSystem(collection.source.dim)
     if collection.source.parameters:
         system.add_parameters(*collection.source.parameters)
@@ -545,6 +538,7 @@ def _diagonal_block_model(unit, collection, context):
         element_type,
         specialization,
         affine_specialization,
+        emission_plan,
         _zero_coefficients(system),
         block.coefficients,
     )

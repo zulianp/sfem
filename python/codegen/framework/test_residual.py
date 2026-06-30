@@ -14,7 +14,12 @@ from .residual_codegen import (
     generate_coupled_residual_sfem_files,
     weak_residual_coefficients,
 )
+from .emission_plan import emission_plan_for_element
 from .symbolic import ExpressionRole, sfem_element_quadrature_rule
+
+
+def _element_emission_plan(element, vector_size=16, quadrature_order=None):
+    return emission_plan_for_element(element, vector_size, quadrature_order)
 
 
 def two_field_diffusion_system(dim=2):
@@ -298,7 +303,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             files = generate_coupled_residual_sfem_files(
                 system,
                 prefix="value_only",
-                element_type=element,
+                emission_plan=_element_emission_plan(element),
             )
             local = next(source.source for source in files if source.path.endswith("_local.hpp"))
             operator = next(source.source for source in files if source.path.endswith("_operator.cpp"))
@@ -406,7 +411,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 files = generate_coupled_residual_sfem_files(
                     system,
                     prefix="coupled_diffusion",
-                    element_type=element,
+                    emission_plan=_element_emission_plan(element),
                 )
                 for generated in files:
                     path = os.path.join(tmpdir, generated.path)
@@ -527,7 +532,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 regenerated = generate_coupled_residual_sfem_files(
                     system,
                     prefix="coupled_diffusion",
-                    element_type=element,
+                    emission_plan=_element_emission_plan(element),
                 )
                 self.assertEqual(
                     tuple(file.source for file in files),
@@ -643,7 +648,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         files = generate_coupled_residual_sfem_files(
             system,
             prefix="coupled_diffusion_hex27",
-            element_type="HEX27",
+            emission_plan=_element_emission_plan("HEX27"),
         )
         source_by_path = {generated.path: generated.source for generated in files}
         local_source = source_by_path["coupled_diffusion_hex27_d3_tensor_product_local.hpp"]
@@ -715,8 +720,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             files = generate_coupled_residual_sfem_files(
                 system,
                 prefix="coupled_diffusion",
-                element_type=element,
-                vector_size=16,
+                emission_plan=_element_emission_plan(element),
             )
             with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
                 for generated in files:

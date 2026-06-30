@@ -161,7 +161,11 @@ from .generation_plan import (
     MeshPhase,
     MeshPhasePlan,
 )
-from .emission_plan import ElementEmissionPlan, emission_plan_from_unit_context
+from .emission_plan import (
+    ElementEmissionPlan,
+    emission_plan_for_element,
+    emission_plan_from_unit_context,
+)
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
@@ -323,6 +327,7 @@ __all__ = [
     "DataStreamRole",
     "GenerationPlan",
     "ElementEmissionPlan",
+    "emission_plan_for_element",
     "emission_plan_from_unit_context",
     "GeometryPlan",
     "KernelCoupling",
