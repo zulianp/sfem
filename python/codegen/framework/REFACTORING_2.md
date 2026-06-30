@@ -155,7 +155,9 @@ template parameters and stream arguments from `KernelPlan`,
 these signatures for energy, residual, mixed residual, and boundary kernels.
 Local signatures now carry reuse keys, and the mixed/local suffix policy is
 centralized so `_mixed` is added only when the local block really depends on
-mixed-order streams.
+mixed-order streams. Mesh operator labels are now selected through one planner,
+including compatible mixed systems, single-field equations inside mixed
+contexts, and explicit diagonal-block element specializations.
 
 Tasks:
 
@@ -167,7 +169,7 @@ Tasks:
    parameters, field streams, direction streams, and output streams.
 - [x] Generate local kernels by dimension and family only when their plan and
    signature are reusable; otherwise encode only the necessary block/form suffix.
-- [ ] Generate mesh kernels by element or compatible-element label with one naming
+- [x] Generate mesh kernels by element or compatible-element label with one naming
    convention across all form kinds.
 - [ ] Generate reference-data includes and accessors through one reference-data
    planner for affine/isoparametric, simplex/tensor-product, and mixed-order

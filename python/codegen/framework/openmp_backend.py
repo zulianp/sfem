@@ -5,9 +5,9 @@ import sympy as sp
 from .forms import FormOrder
 from .generation_plan import (
     KernelTarget,
-    MeshKernelPlan,
     MeshPhase,
     LocalPhase,
+    mesh_kernel_plan_from_context,
 )
 from .emission_plan import emission_plan_for_element, emission_plan_from_unit_context
 from .kernel_signature import (
@@ -93,7 +93,7 @@ class OpenMPSoABackend:
         self._validate_energy_plan(unit)
         prefix = _generated_prefix(unit)
         local_kernel = unit.local_kernel_plan(context, prefix)
-        mesh_kernel = MeshKernelPlan(prefix, context.element_type)
+        mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
         emission_plan = _validated_emission_plan(unit, context)
         return _OpenMPTraversal(
             "energy_soa",
@@ -141,7 +141,12 @@ class OpenMPSoABackend:
         prefix = _generated_prefix(unit)
         if _is_diagonal_two_form_block(unit) and context.is_mixed_order:
             model = _diagonal_block_model(unit, collection, context)
-            operator_prefix = "%s_%s" % (prefix, model.element_type.lower())
+            mesh_kernel = mesh_kernel_plan_from_context(
+                unit,
+                context,
+                prefix,
+                element_label=model.element_type,
+            )
             kind = "mixed_residual_soa"
             local_kernel = unit.local_kernel_plan(
                 context,
@@ -155,8 +160,8 @@ class OpenMPSoABackend:
                 prefix,
                 local_prefix=local_kernel.name,
                 local_name=local_kernel.header,
-                operator_prefix=operator_prefix,
-                operator_name="%s_operator.cpp" % operator_prefix,
+                operator_prefix=mesh_kernel.name,
+                operator_name=mesh_kernel.source,
                 emission_plan=model.emission_plan,
                 system=model.system,
                 compatible_element=_CompatibleElementLabel(
@@ -177,11 +182,11 @@ class OpenMPSoABackend:
                 mesh_signature=mesh_kernel_signature_from_plan(
                     unit,
                     model.emission_plan,
-                    operator_prefix,
+                    mesh_kernel.name,
                     kind,
                 ),
             )
-        mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
         if context.is_mixed_order:
             kind = "mixed_residual_soa"
             emission_plan = _validated_emission_plan(unit, context)
@@ -258,7 +263,7 @@ class OpenMPSoABackend:
     def _boundary_residual_traversal(self, unit, context):
         self._validate_boundary_residual_plan(unit)
         prefix = _generated_prefix(unit)
-        mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
         emission_plan = _validated_emission_plan(unit, context)
         kind = "boundary_residual_soa"
         return _OpenMPTraversal(
