@@ -54,8 +54,11 @@ Goal: remove geometry and basis-policy reconstruction from emitters.
 Status: in progress. Context-specialized emission plans now carry affine and
 isoparametric geometry phase data, geometry streams, field-specific basis plans,
 reference-data streams, and tensor-product sum-factorization plans. OpenMP
-emission validates and consumes geometry modes from the phase plan before
-calling the current low-level generators.
+emission validates and consumes geometry modes through a shared
+`ElementEmissionPlan` before calling the current low-level generators. Energy,
+residual, mixed residual, and boundary entry points now accept this shared plan;
+energy tensor-product reference selection is plan-driven with quadrature-based
+selection kept only as a legacy direct-call fallback.
 
 Tasks:
 

@@ -1510,6 +1510,7 @@ def generate_sfem_soa_cpp_files(
     quadrature_order=None,
     quadrature_rule=None,
     affine_quadrature_rule=None,
+    basis_family=None,
     local_prefix=None,
 ):
     forms = tuple(forms)
@@ -1588,6 +1589,7 @@ def generate_sfem_soa_cpp_files(
                 n_nodes,
                 array_inputs,
                 quadrature_rule,
+                basis_family,
                 use_shared_weak_local,
                 math_name,
                 tensor_product_name,
@@ -1609,6 +1611,7 @@ def generate_sfem_soa_cpp_files(
                 array_inputs,
                 quadrature_rule,
                 affine_quadrature_rule,
+                basis_family,
                 use_shared_weak_local,
             ),
         ),
@@ -1619,11 +1622,16 @@ def generate_sfem_soa_cpp_files_for_element(
     forms,
     *,
     prefix,
-    specialization,
+    specialization=None,
     affine_specialization=None,
+    emission_plan=None,
     array_inputs=None,
     local_prefix=None,
 ):
+    if emission_plan is not None:
+        specialization = emission_plan.isoparametric_specialization
+        affine_specialization = emission_plan.affine_specialization
+    basis_family = None if emission_plan is None else emission_plan.family
     if isinstance(specialization, SfemElementQuadratureRule):
         specialization = SfemSoAElementSpecialization(specialization)
     if not isinstance(specialization, SfemSoAElementSpecialization):
@@ -1649,6 +1657,7 @@ def generate_sfem_soa_cpp_files_for_element(
         array_inputs=array_inputs,
         quadrature_rule=specialization.quadrature_rule,
         affine_quadrature_rule=affine_specialization.quadrature_rule,
+        basis_family=basis_family,
         local_prefix=local_prefix,
     )
 
@@ -1660,6 +1669,7 @@ def _sfem_soa_local_header(
     n_nodes,
     array_inputs,
     quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
     math_name="kernel_math.hpp",
     tensor_product_name="tensor_product_kernels.hpp",
@@ -1708,6 +1718,7 @@ def _sfem_soa_local_header(
                 n_nodes,
                 array_inputs,
                 quadrature_rule,
+                basis_family,
                 use_shared_weak_local,
             )
         )
@@ -1724,16 +1735,16 @@ def _sfem_soa_block_function(
     n_nodes,
     array_inputs,
     quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
 ):
     name = "%s_%s_block" % (prefix, form.name)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
-    use_tensor_product_reference = (
-        quadrature_rule is not None
-        and quadrature_rule.is_tensor_product
-        and len(reference_inputs) == 1
-        and reference_inputs[0].name == "grad_ref"
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -2467,6 +2478,20 @@ def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
     return tensor_product_cartesian_shape_order(dim, n_nodes)
 
 
+def _use_tensor_product_reference(quadrature_rule, reference_inputs, basis_family=None):
+    if quadrature_rule is None:
+        return False
+    if basis_family is None:
+        tensor_product = quadrature_rule.is_tensor_product
+    else:
+        tensor_product = str(basis_family) == "tensor_product"
+    return (
+        tensor_product
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+
+
 def _tensor_product_node_coords(quadrature_rule):
     dim = quadrature_rule.dim
     n_shape_1d = quadrature_rule.tensor_product_n_shape_1d
@@ -2744,6 +2769,7 @@ def _sfem_soa_operator_source(
     array_inputs,
     quadrature_rule,
     affine_quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
 ):
     lines = [
@@ -2816,6 +2842,7 @@ def _sfem_soa_operator_source(
                     local_prefix,
                     array_inputs,
                     affine_rule,
+                    basis_family,
                     use_shared_weak_local,
                     geometry_mode="affine",
                 )
@@ -2833,6 +2860,7 @@ def _sfem_soa_operator_source(
                         local_prefix,
                         array_inputs,
                         affine_rule,
+                        basis_family,
                         use_shared_weak_local,
                         geometry_mode="affine",
                     )
@@ -2849,6 +2877,7 @@ def _sfem_soa_operator_source(
                     local_prefix,
                     array_inputs,
                     quadrature_rule,
+                    basis_family,
                     use_shared_weak_local,
                     geometry_mode="isoparametric",
                 )
@@ -2866,6 +2895,7 @@ def _sfem_soa_operator_source(
                         local_prefix,
                         array_inputs,
                         quadrature_rule,
+                        basis_family,
                         use_shared_weak_local,
                         geometry_mode="isoparametric",
                     )
@@ -2885,6 +2915,7 @@ def _sfem_soa_operator_function(
     local_prefix,
     array_inputs,
     quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
     isoparametric_geometry=False,
 ):
@@ -2897,11 +2928,10 @@ def _sfem_soa_operator_function(
     block_name = "%s_%s_block" % (local_prefix, form.name)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
-    use_tensor_product_reference = (
-        quadrature_rule is not None
-        and quadrature_rule.is_tensor_product
-        and len(reference_inputs) == 1
-        and reference_inputs[0].name == "grad_ref"
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -3514,6 +3544,7 @@ def _sfem_soa_mesh_operator_function(
     local_prefix,
     array_inputs,
     quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
     geometry_mode="affine",
 ):
@@ -3532,10 +3563,10 @@ def _sfem_soa_mesh_operator_function(
     block_name = "%s_%s_block" % (local_prefix, form.name)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
-    use_tensor_product_reference = (
-        quadrature_rule.is_tensor_product
-        and len(reference_inputs) == 1
-        and reference_inputs[0].name == "grad_ref"
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -4126,6 +4157,7 @@ def _sfem_soa_mesh_objective_steps_function(
     local_prefix,
     array_inputs,
     quadrature_rule,
+    basis_family=None,
     use_shared_weak_local=False,
     geometry_mode="affine",
 ):
@@ -4146,10 +4178,10 @@ def _sfem_soa_mesh_objective_steps_function(
     block_name = "%s_objective_block" % local_prefix
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
-    use_tensor_product_reference = (
-        quadrature_rule.is_tensor_product
-        and len(reference_inputs) == 1
-        and reference_inputs[0].name == "grad_ref"
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
