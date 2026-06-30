@@ -32,7 +32,11 @@ _CELL_TO_SURFACE = {
 }
 
 
-def generate_boundary_residual_sfem_files(collection, *, prefix, element_type):
+def generate_boundary_residual_sfem_files(collection, *, prefix, element_type=None, emission_plan=None):
+    if emission_plan is not None:
+        element_type = emission_plan.element_type
+    if element_type is None:
+        raise ValueError("boundary residual codegen requires element_type or emission_plan")
     element_type = str(element_type).upper()
     surface = _surface_element(element_type)
     if collection.measure != "ds":
@@ -50,7 +54,18 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, element_type):
     _validate_boundary_metadata(metadata.dependencies, coefficients)
     parameters = _dependency_parameters(metadata.dependencies)
     function = "%s_%s_boundary_residual_soa" % (prefix, surface.lower())
-    source = _boundary_source(function, element_type, surface, components, parameters, coefficients, system)
+    source = _boundary_source(
+        function,
+        element_type,
+        surface,
+        components,
+        parameters,
+        coefficients,
+        system,
+        use_tensor_product=(
+            None if emission_plan is None else emission_plan.family == "tensor_product"
+        ),
+    )
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
         GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
@@ -196,8 +211,13 @@ def _dependency_symbols(dependencies):
     return tuple(dict.fromkeys(ret))
 
 
-def _boundary_source(function, element_type, surface, components, parameters, coefficients, system):
-    if _use_tensor_product_boundary(element_type, surface):
+def _boundary_source(function, element_type, surface, components, parameters, coefficients, system, use_tensor_product=None):
+    use_tensor_product = (
+        _use_tensor_product_boundary(element_type, surface)
+        if use_tensor_product is None
+        else bool(use_tensor_product)
+    )
+    if use_tensor_product:
         return _boundary_tensor_product_source(
             function,
             element_type,

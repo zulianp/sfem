@@ -553,11 +553,12 @@ def generate_coupled_residual_sfem_files(
     system,
     *,
     prefix,
-    element_type,
+    element_type=None,
     vector_size=16,
     quadrature_order=None,
     specialization=None,
     affine_specialization=None,
+    emission_plan=None,
     residual_coeffs=None,
     action_coeffs=None,
     local_prefix=None,
@@ -567,6 +568,14 @@ def generate_coupled_residual_sfem_files(
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
+    if emission_plan is not None:
+        element_type = emission_plan.element_type
+        vector_size = emission_plan.vector_size
+        quadrature_order = emission_plan.quadrature_order
+        specialization = emission_plan.isoparametric_specialization
+        affine_specialization = emission_plan.affine_specialization
+    if element_type is None:
+        raise ValueError("residual code generation requires element_type or emission_plan")
     if specialization is None:
         specialization = sfem_soa_element_specialization(
             element_type,
@@ -585,7 +594,7 @@ def generate_coupled_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
-    family = (
+    family = emission_plan.family if emission_plan is not None else (
         "tensor_product"
         if specialization.quadrature_rule.is_tensor_product
         else "simplex"
@@ -638,6 +647,7 @@ def generate_mixed_residual_sfem_files(
     compatible_element,
     vector_size=16,
     quadrature_order=None,
+    emission_plan=None,
     residual_coeffs=None,
     action_coeffs=None,
     field_element_types=None,
@@ -648,6 +658,9 @@ def generate_mixed_residual_sfem_files(
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
+    if emission_plan is not None:
+        vector_size = emission_plan.vector_size
+        quadrature_order = emission_plan.quadrature_order
     cell_specialization = sfem_soa_element_specialization(
         compatible_element.cell_element_type,
         vector_size,
@@ -672,7 +685,7 @@ def generate_mixed_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
-    family = (
+    family = emission_plan.family if emission_plan is not None else (
         "tensor_product"
         if cell_specialization.quadrature_rule.is_tensor_product
         else "simplex"

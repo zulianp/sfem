@@ -1391,6 +1391,16 @@ class GenApiTest(unittest.TestCase):
             iso_geometry.node.sum_factorization_plan.operations[0].value,
             "geometry_jacobian",
         )
+        hex_emission_plan = gen.emission_plan_from_unit_context(
+            hex_unit,
+            hex_input.element_contexts[0],
+        )
+        self.assertIsInstance(hex_emission_plan, gen.ElementEmissionPlan)
+        self.assertEqual(hex_emission_plan.family, "tensor_product")
+        self.assertTrue(hex_emission_plan.uses_tensor_product_geometry)
+        self.assertTrue(hex_emission_plan.uses_tensor_product_basis)
+        self.assertEqual(hex_emission_plan.affine_geometry, affine_geometry)
+        self.assertEqual(hex_emission_plan.isoparametric_geometry, iso_geometry)
 
         simplex_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         simplex_plan = gen.SpecializedFormManipulationStage(
@@ -1400,6 +1410,13 @@ class GenApiTest(unittest.TestCase):
         simplex_unit = simplex_plan.emission_kernels_for_context(
             simplex_input.element_contexts[0],
         )[0]
+        simplex_emission_plan = gen.emission_plan_from_unit_context(
+            simplex_unit,
+            simplex_input.element_contexts[0],
+        )
+        self.assertEqual(simplex_emission_plan.family, "simplex")
+        self.assertFalse(simplex_emission_plan.uses_tensor_product_geometry)
+        self.assertFalse(simplex_emission_plan.uses_tensor_product_basis)
         simplex_iso = simplex_unit.mesh_phase_plans[1].geometries[1]
         self.assertFalse(simplex_iso.uses_sum_factorization)
         first_block = simplex_unit.blocks[0]

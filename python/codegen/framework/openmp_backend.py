@@ -9,6 +9,7 @@ from .generation_plan import (
     MeshPhase,
     LocalPhase,
 )
+from .emission_plan import emission_plan_from_unit_context
 from .symbolic import (
     generate_sfem_soa_cpp_files_for_element,
 )
@@ -51,16 +52,12 @@ class OpenMPSoABackend:
         prefix = _generated_prefix(unit)
         local_kernel = unit.local_kernel_plan(context, prefix)
         mesh_kernel = MeshKernelPlan(prefix, context.element_type)
-        affine_specialization, isoparametric_specialization = _geometry_specializations(
-            unit,
-            context,
-        )
+        emission_plan = _validated_emission_plan(unit, context)
         return self.emit_energy(
             payload.kernel_forms,
             prefix=mesh_kernel.name,
             local_prefix=local_kernel.name,
-            specialization=isoparametric_specialization,
-            affine_specialization=affine_specialization,
+            emission_plan=emission_plan,
         )
 
     def _emit_residual_plan(self, unit, context):
@@ -109,17 +106,13 @@ class OpenMPSoABackend:
             "_mixed" if context.is_mixed_order else "",
         )
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
-        affine_specialization, isoparametric_specialization = _geometry_specializations(
-            unit,
-            context,
-        )
         if context.is_mixed_order:
+            emission_plan = _validated_emission_plan(unit, context)
             return self.emit_mixed_residual(
                 system,
                 prefix=prefix,
                 compatible_element=context.compatible_element,
-                vector_size=isoparametric_specialization.vector_size,
-                quadrature_order=isoparametric_specialization.quadrature_rule.order,
+                emission_plan=emission_plan,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 field_element_types=_field_element_types_for_context(
@@ -131,14 +124,11 @@ class OpenMPSoABackend:
                 operator_prefix=mesh_kernel.name,
                 operator_name=mesh_kernel.source,
             )
+        emission_plan = _validated_emission_plan(unit, context)
         return self.emit_residual(
             system,
             prefix=prefix,
-            element_type=context.element_type,
-            vector_size=isoparametric_specialization.vector_size,
-            quadrature_order=isoparametric_specialization.quadrature_rule.order,
-            specialization=isoparametric_specialization,
-            affine_specialization=affine_specialization,
+            emission_plan=emission_plan,
             residual_coeffs=residual_coeffs,
             action_coeffs=action_coeffs,
             local_prefix=local_kernel.name,
@@ -150,12 +140,13 @@ class OpenMPSoABackend:
     def _emit_boundary_residual_plan(self, unit, context):
         self._validate_boundary_residual_plan(unit)
         mesh_kernel = unit.mesh_kernel_plan(context, _generated_prefix(unit))
+        emission_plan = _validated_emission_plan(unit, context)
         return OpenMPSoAEmission(
             tuple(
                 generate_boundary_residual_sfem_files(
                     unit.form_collection,
                     prefix=mesh_kernel.name,
-                    element_type=context.element_type,
+                    emission_plan=emission_plan,
                 )
             )
         )
@@ -166,16 +157,14 @@ class OpenMPSoABackend:
         *,
         prefix,
         local_prefix,
-        specialization,
-        affine_specialization=None,
+        emission_plan,
     ):
         files = tuple(
             generate_sfem_soa_cpp_files_for_element(
                 kernel_forms,
                 prefix=prefix,
                 local_prefix=local_prefix,
-                specialization=specialization,
-                affine_specialization=affine_specialization,
+                emission_plan=emission_plan,
             )
         )
         self._validate_common_source_contract(files, local_prefix)
@@ -186,11 +175,7 @@ class OpenMPSoABackend:
         system,
         *,
         prefix,
-        element_type,
-        vector_size,
-        quadrature_order,
-        specialization,
-        affine_specialization,
+        emission_plan,
         residual_coeffs,
         action_coeffs,
         local_prefix,
@@ -202,11 +187,7 @@ class OpenMPSoABackend:
             generate_coupled_residual_sfem_files(
                 system,
                 prefix=prefix,
-                element_type=element_type,
-                vector_size=vector_size,
-                quadrature_order=quadrature_order,
-                specialization=specialization,
-                affine_specialization=affine_specialization,
+                emission_plan=emission_plan,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 local_prefix=local_prefix,
@@ -224,8 +205,6 @@ class OpenMPSoABackend:
         *,
         prefix,
         compatible_element,
-        vector_size,
-        quadrature_order,
         residual_coeffs,
         action_coeffs,
         field_element_types,
@@ -233,12 +212,16 @@ class OpenMPSoABackend:
         local_name,
         operator_prefix,
         operator_name,
+        emission_plan=None,
+        vector_size=16,
+        quadrature_order=None,
     ):
         files = tuple(
             generate_mixed_residual_sfem_files(
                 system,
                 prefix=prefix,
                 compatible_element=compatible_element,
+                emission_plan=emission_plan,
                 vector_size=vector_size,
                 quadrature_order=quadrature_order,
                 residual_coeffs=residual_coeffs,
@@ -387,12 +370,19 @@ def _require_geometry_modes(unit, modes):
         )
 
 
-def _geometry_specializations(unit, context):
-    affine = _geometry_plan_for_mode(unit, "affine")
-    isoparametric = _geometry_plan_for_mode(unit, "isoparametric")
-    _validate_geometry_specialization(unit.name, affine, context.affine_specialization)
-    _validate_geometry_specialization(unit.name, isoparametric, context.specialization)
-    return context.affine_specialization, context.specialization
+def _validated_emission_plan(unit, context):
+    emission_plan = emission_plan_from_unit_context(unit, context)
+    _validate_geometry_specialization(
+        unit.name,
+        emission_plan.affine_geometry,
+        emission_plan.affine_specialization,
+    )
+    _validate_geometry_specialization(
+        unit.name,
+        emission_plan.isoparametric_geometry,
+        emission_plan.isoparametric_specialization,
+    )
+    return emission_plan
 
 
 def _validate_geometry_specialization(kernel_name, geometry, specialization):
@@ -410,16 +400,6 @@ def _validate_geometry_specialization(kernel_name, geometry, specialization):
                 rule.n_qp,
             )
         )
-
-
-def _geometry_plan_for_mode(unit, mode):
-    mode = str(mode)
-    for geometry in _geometry_phase(unit).geometries:
-        if geometry.mode.value == mode:
-            return geometry
-    raise ValueError(
-        "kernel plan '%s' has no geometry mode '%s'" % (unit.name, mode)
-    )
 
 
 def _geometry_phase(unit):
