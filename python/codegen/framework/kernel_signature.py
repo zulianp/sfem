@@ -36,6 +36,8 @@ class LocalKernelSignature:
     form_order: FormOrder
     template_parameters: tuple
     arguments: tuple
+    reuse_key: tuple = ()
+    reusable: bool = True
 
     def __post_init__(self):
         name = str(self.name)
@@ -49,6 +51,8 @@ class LocalKernelSignature:
         object.__setattr__(self, "form_order", FormOrder(self.form_order))
         object.__setattr__(self, "template_parameters", tuple(self.template_parameters))
         object.__setattr__(self, "arguments", arguments)
+        object.__setattr__(self, "reuse_key", tuple(self.reuse_key))
+        object.__setattr__(self, "reusable", bool(self.reusable))
 
     @property
     def template_line(self):
@@ -64,6 +68,8 @@ class LocalKernelSignature:
             "form_order": self.form_order.value,
             "template_parameters": list(self.template_parameters),
             "arguments": [argument.to_dict() for argument in self.arguments],
+            "reuse_key": list(self.reuse_key),
+            "reusable": self.reusable,
         }
 
 
@@ -116,15 +122,27 @@ def local_kernel_signatures_from_plan(unit, emission_plan, local_prefix, kind):
         for expression_plan in unit.expression_plans
         if _expression_plan_has_local_kernel(kind, expression_plan)
     )
-    return tuple(
-        LocalKernelSignature(
-            _local_signature_name(local_prefix, expression_plan),
-            expression_plan.form_order,
-            LOCAL_KERNEL_TEMPLATE_PARAMETERS,
-            _local_arguments(unit, emission_plan, kind, expression_plan),
+    signatures = []
+    for expression_plan in expression_plans:
+        arguments = _local_arguments(unit, emission_plan, kind, expression_plan)
+        signatures.append(
+            LocalKernelSignature(
+                _local_signature_name(local_prefix, expression_plan),
+                expression_plan.form_order,
+                LOCAL_KERNEL_TEMPLATE_PARAMETERS,
+                arguments,
+                reuse_key=_local_reuse_key(unit, emission_plan, kind, local_prefix, expression_plan, arguments),
+                reusable=bool(local_prefix),
+            )
         )
-        for expression_plan in expression_plans
-    )
+    return tuple(signatures)
+
+
+def local_kernel_suffix_from_plan(unit, context, kind):
+    kind = str(kind)
+    if kind == "mixed_residual_soa" and not _is_diagonal_two_form_block(unit):
+        return "_mixed"
+    return ""
 
 
 def mesh_kernel_signature_from_plan(unit, emission_plan, operator_prefix, kind):
@@ -149,6 +167,32 @@ def _local_signature_name(local_prefix, expression_plan):
     if local_prefix:
         return "%s_%s" % (local_prefix, expression_plan.name)
     return expression_plan.name
+
+
+def _local_reuse_key(unit, emission_plan, kind, local_prefix, expression_plan, arguments):
+    return (
+        _safe_name(unit.name),
+        str(kind),
+        "d%d" % int(unit.dim),
+        emission_plan.basis_family,
+        str(local_prefix),
+        FormOrder(expression_plan.form_order).value,
+        tuple(argument.declaration for argument in arguments),
+    )
+
+
+def _safe_name(value):
+    return str(value)
+
+
+def _is_diagonal_two_form_block(unit):
+    return (
+        unit.is_block
+        and unit.block is not None
+        and unit.block.form_order is FormOrder.TWO
+        and unit.block.column_field
+        and unit.block.row_field == unit.block.column_field
+    )
 
 
 def _mesh_arguments(unit, emission_plan, kind):

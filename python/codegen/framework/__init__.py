@@ -170,6 +170,7 @@ from .kernel_signature import (
     LocalKernelSignature,
     MeshKernelSignature,
     local_kernel_signatures_from_plan,
+    local_kernel_suffix_from_plan,
     mesh_kernel_signature_from_plan,
 )
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
@@ -457,6 +458,7 @@ __all__ = [
     "linearized_transformed_first_piola",
     "layout_offset",
     "local_kernel_signatures_from_plan",
+    "local_kernel_suffix_from_plan",
     "matrix_inner",
     "mesh_kernel_signature_from_plan",
     "matrix_symbols",

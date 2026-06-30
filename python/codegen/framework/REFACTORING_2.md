@@ -153,6 +153,9 @@ Status: in progress. Common local and mesh kernel signature planners now derive
 template parameters and stream arguments from `KernelPlan`,
 `KernelExpressionPlan`, and `ElementEmissionPlan`; the OpenMP traversal carries
 these signatures for energy, residual, mixed residual, and boundary kernels.
+Local signatures now carry reuse keys, and the mixed/local suffix policy is
+centralized so `_mixed` is added only when the local block really depends on
+mixed-order streams.
 
 Tasks:
 
@@ -162,7 +165,7 @@ Tasks:
 - [x] Introduce common mesh-kernel signature generation from plan data:
    element count, node count, connectivity, geometry inputs, material
    parameters, field streams, direction streams, and output streams.
-- [ ] Generate local kernels by dimension and family only when their plan and
+- [x] Generate local kernels by dimension and family only when their plan and
    signature are reusable; otherwise encode only the necessary block/form suffix.
 - [ ] Generate mesh kernels by element or compatible-element label with one naming
    convention across all form kinds.
