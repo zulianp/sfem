@@ -23,7 +23,6 @@ try:
         sfem_mesh_reference_data,
         sfem_soa_reference_input,
         sfem_tensor_product_hex_uses_cartesian_ordering,
-        sfem_tensor_product_kernels_header_source,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
         tensor_product_coordinate_gradient_lines,
@@ -55,7 +54,6 @@ except ImportError:
         sfem_mesh_reference_data,
         sfem_soa_reference_input,
         sfem_tensor_product_hex_uses_cartesian_ordering,
-        sfem_tensor_product_kernels_header_source,
         streams_in_shape_order,
         tensor_product_cartesian_shape_order,
         tensor_product_coordinate_gradient_lines,
@@ -181,7 +179,7 @@ def generate_sfem_soa_cpp_files(
         files.append(
             GeneratedKernelFile(
                 tensor_product_name,
-                sfem_tensor_product_kernels_header_source(),
+                source_builder.tensor_product_header_source(),
             )
         )
     files.extend(

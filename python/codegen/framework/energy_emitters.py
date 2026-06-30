@@ -293,6 +293,11 @@ class OpenMPEnergySoASourceBuilder:
     def emits_tensor_product_header(self, basis_family):
         return True
 
+    def tensor_product_header_source(self):
+        from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+
+        return sfem_tensor_product_kernels_header_source()
+
     def simd_lines(self):
         return ("#pragma omp simd",)
 
@@ -371,6 +376,17 @@ class CUDAEnergySoASourceBuilder:
 
     def emits_tensor_product_header(self, basis_family):
         return str(basis_family) == "tensor_product"
+
+    def tensor_product_header_source(self):
+        from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+
+        source = sfem_tensor_product_kernels_header_source()
+        source = source.replace(
+            "#define SFEM_INLINE inline",
+            "#define SFEM_INLINE __host__ __device__ __forceinline__",
+        )
+        source = source.replace("#define SFEM_RESTRICT", "#define SFEM_RESTRICT __restrict__")
+        return "\n".join(line for line in source.splitlines() if "#pragma omp" not in line)
 
     def simd_lines(self):
         return ()
