@@ -12,6 +12,7 @@ from .generation_plan import (
 from .emission_plan import emission_plan_for_element, emission_plan_from_unit_context
 from .kernel_signature import (
     local_kernel_signatures_from_plan,
+    local_kernel_suffix_from_plan,
     mesh_kernel_signature_from_plan,
 )
 from .symbolic import (
@@ -140,9 +141,13 @@ class OpenMPSoABackend:
         prefix = _generated_prefix(unit)
         if _is_diagonal_two_form_block(unit) and context.is_mixed_order:
             model = _diagonal_block_model(unit, collection, context)
-            local_kernel = unit.local_kernel_plan(context, prefix)
             operator_prefix = "%s_%s" % (prefix, model.element_type.lower())
             kind = "mixed_residual_soa"
+            local_kernel = unit.local_kernel_plan(
+                context,
+                prefix,
+                local_kernel_suffix_from_plan(unit, context, kind),
+            )
             return _OpenMPTraversal(
                 kind,
                 unit,
@@ -176,15 +181,15 @@ class OpenMPSoABackend:
                     kind,
                 ),
             )
-        local_kernel = unit.local_kernel_plan(
-            context,
-            prefix,
-            "_mixed" if context.is_mixed_order else "",
-        )
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
         if context.is_mixed_order:
             kind = "mixed_residual_soa"
             emission_plan = _validated_emission_plan(unit, context)
+            local_kernel = unit.local_kernel_plan(
+                context,
+                prefix,
+                local_kernel_suffix_from_plan(unit, context, kind),
+            )
             return _OpenMPTraversal(
                 kind,
                 unit,
@@ -218,6 +223,11 @@ class OpenMPSoABackend:
             )
         kind = "residual_soa"
         emission_plan = _validated_emission_plan(unit, context)
+        local_kernel = unit.local_kernel_plan(
+            context,
+            prefix,
+            local_kernel_suffix_from_plan(unit, context, kind),
+        )
         return _OpenMPTraversal(
             kind,
             unit,

@@ -1302,6 +1302,9 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("grad_1d", energy_signatures[0].argument_names)
         self.assertIn("u_streams", energy_signatures[0].argument_names)
         self.assertIn("h_streams", energy_signatures[2].argument_names)
+        self.assertTrue(all(signature.reusable for signature in energy_signatures))
+        self.assertEqual(energy_signatures[0].reuse_key[2], "d3")
+        self.assertEqual(energy_signatures[0].reuse_key[3], "tensor_product")
         energy_mesh_signature = gen.OPENMP_SOA_BACKEND.mesh_signature(
             energy_unit,
             energy_input.element_contexts[0],
@@ -1349,6 +1352,32 @@ class GenApiTest(unittest.TestCase):
             residual_input.element_contexts[0],
         )
         self.assertTrue(all("N_SHAPE" in signature.arguments[-1].declaration for signature in block_signatures))
+
+        stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
+        mixed_input = gen.UserInputStage.create(stokes, (stokes_element,), 16, None)
+        mixed_plan = gen.SpecializedFormManipulationStage(
+            mixed_input,
+            gen._evaluate_forms(mixed_input),
+        ).run()
+        mixed_unit = mixed_plan.emission_kernels_for_context(mixed_input.element_contexts[0])[0]
+        mixed_signatures = gen.OPENMP_SOA_BACKEND.local_signatures(
+            mixed_unit,
+            mixed_input.element_contexts[0],
+        )
+        self.assertTrue(all(signature.name.startswith("stokes_d2_simplex_mixed") for signature in mixed_signatures))
+        self.assertEqual(
+            gen.local_kernel_suffix_from_plan(mixed_unit, mixed_input.element_contexts[0], "mixed_residual_soa"),
+            "_mixed",
+        )
+        diagonal_block = next(
+            kernel
+            for kernel in mixed_plan.emission_kernels_for_context(mixed_input.element_contexts[0])
+            if kernel.is_block and kernel.block.name.endswith("_u_u")
+        )
+        self.assertEqual(
+            gen.local_kernel_suffix_from_plan(diagonal_block, mixed_input.element_contexts[0], "mixed_residual_soa"),
+            "",
+        )
 
     def test_openmp_backend_consumes_kernel_phase_plan(self):
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
