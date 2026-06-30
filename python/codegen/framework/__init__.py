@@ -159,6 +159,7 @@ from .generation_plan import (
     MeshKernelPlan,
     MeshPhase,
     MeshPhasePlan,
+    mesh_kernel_plan_from_context,
 )
 from .emission_plan import (
     ElementEmissionPlan,
@@ -348,6 +349,7 @@ __all__ = [
     "LocalPhasePlan",
     "MeshKernelPlan",
     "MeshKernelSignature",
+    "mesh_kernel_plan_from_context",
     "MeshPhase",
     "MeshPhasePlan",
     "OpenMPSoABackend",

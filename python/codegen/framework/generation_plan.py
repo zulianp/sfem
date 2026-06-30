@@ -138,6 +138,23 @@ class MeshKernelPlan:
         }
 
 
+def mesh_kernel_plan_from_context(unit, context, prefix, *, element_label=None):
+    label = _mesh_kernel_element_label(unit, context, element_label)
+    return MeshKernelPlan(prefix, label)
+
+
+def _mesh_kernel_element_label(unit, context, element_label=None):
+    if element_label is not None:
+        return str(element_label)
+    compatible = getattr(context, "compatible_element", None)
+    if compatible is not None and unit.is_monolithic:
+        fields = tuple(getattr(unit.form_collection, "fields", ()))
+        if len(fields) == 1:
+            return context.fem_policy.element_for_field(fields[0])
+        return getattr(compatible, "name", context.label)
+    return context.label
+
+
 @dataclass(frozen=True)
 class DataStreamPlan:
     name: str
@@ -629,7 +646,7 @@ class KernelPlan:
         )
 
     def mesh_kernel_plan(self, context, prefix):
-        return MeshKernelPlan(prefix, context.label)
+        return mesh_kernel_plan_from_context(self, context, prefix)
 
     def to_dict(self, include_block_kernels=True):
         return {

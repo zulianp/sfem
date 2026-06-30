@@ -1725,6 +1725,41 @@ class GenApiTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "element label"):
             gen.MeshKernelPlan("generated_material", "tri6-tri3")
 
+    def test_mesh_kernel_plan_from_context_centralizes_element_label_policy(self):
+        energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
+        energy_plan = gen.SpecializedFormManipulationStage(
+            energy_input,
+            gen._evaluate_forms(energy_input),
+        ).run()
+        energy_context = energy_input.element_contexts[0]
+        energy_unit = energy_plan.emission_kernels_for_context(energy_context)[0]
+        energy_mesh = gen.mesh_kernel_plan_from_context(energy_unit, energy_context, energy_unit.name)
+        self.assertEqual(energy_mesh.name, "neohookean_ogden_hex8")
+
+        stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
+        mixed_input = gen.UserInputStage.create(stokes, (stokes_element,), 16, None)
+        mixed_plan = gen.SpecializedFormManipulationStage(
+            mixed_input,
+            gen._evaluate_forms(mixed_input),
+        ).run()
+        mixed_context = mixed_input.element_contexts[0]
+        mixed_unit = mixed_plan.emission_kernels_for_context(mixed_context)[0]
+        mixed_mesh = gen.mesh_kernel_plan_from_context(mixed_unit, mixed_context, mixed_unit.name)
+        self.assertEqual(mixed_mesh.name, "stokes_tri6_tri3")
+
+        diagonal_block = next(
+            kernel
+            for kernel in mixed_plan.emission_kernels_for_context(mixed_context)
+            if kernel.is_block and kernel.block.name.endswith("_u_u")
+        )
+        diagonal_mesh = gen.mesh_kernel_plan_from_context(
+            diagonal_block,
+            mixed_context,
+            diagonal_block.name,
+            element_label="TRI6",
+        )
+        self.assertEqual(diagonal_mesh.name, "%s_tri6" % diagonal_block.name)
+
     def test_generation_plan_dumps_json_for_inspection(self):
         residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         residual_plan = gen.SpecializedFormManipulationStage(
