@@ -1504,7 +1504,7 @@ class GenApiTest(unittest.TestCase):
             residual_diagnostics.public_names,
         )
         block_entry = residual_diagnostics.entry("two_phase_flow_tri3_jacobian_p_w_p_c")
-        self.assertEqual(block_entry.expression_name, "form_2")
+        self.assertEqual(block_entry.expression_name, "jacobian_action")
         self.assertEqual(block_entry.block_name, "jacobian_p_w_p_c")
         self.assertEqual(block_entry.reference_dataset.stage, "isoparametric")
 

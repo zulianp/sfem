@@ -231,15 +231,16 @@ def _residual_diagnostics_entries(
         )
     action_plan = by_order.get(FormOrder.TWO)
     if action_plan is not None and include_block_entries:
-        for block in action_plan.blocks:
+        for block_name in _diagnostic_block_names(unit, action_plan):
+            diagnostic_block_name = _diagnostic_block_name(block_name)
             entries.append(
                 _entry_from_expression_plan(
-                    "%s_%s" % (operator_prefix, block.name),
+                    "%s_%s" % (operator_prefix, diagnostic_block_name),
                     action_plan,
                     mesh_signature,
                     local_by_order,
                     reference_data_plan.isoparametric,
-                    block_name=block.name,
+                    block_name=diagnostic_block_name,
                 )
             )
     if action_plan is not None:
@@ -269,6 +270,25 @@ def _boundary_diagnostics_entries(unit, operator_prefix, mesh_signature, local_b
                 )
             )
     return tuple(entries)
+
+
+def _diagnostic_block_names(unit, action_plan):
+    system = getattr(unit.form_collection, "source", None)
+    if getattr(unit, "is_block", False) and system is not None and hasattr(system, "jacobian_blocks"):
+        return tuple(block.name for block in system.jacobian_blocks())
+    names = tuple(getattr(block, "name", str(block)) for block in action_plan.blocks)
+    if names:
+        return names
+    if system is not None and hasattr(system, "jacobian_blocks"):
+        return tuple(block.name for block in system.jacobian_blocks())
+    return ()
+
+
+def _diagnostic_block_name(block_name):
+    block_name = str(block_name)
+    if block_name.startswith("form_2_"):
+        return "jacobian_%s" % block_name[len("form_2_"):]
+    return block_name
 
 
 def _entry_from_expression_plan(
