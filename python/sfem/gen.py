@@ -78,6 +78,7 @@ from codegen.framework import (
     GeometryPlan,
     GeometryPlanNode,
     KernelCoupling,
+    KernelExpressionPlan,
     KernelPlan,
     KernelEmission,
     KernelScope,
@@ -590,13 +591,6 @@ class CodeGenerationUnit(KernelPlan):
     unit_name: str = ""
 
 
-@dataclass(frozen=True)
-class EnergyCodeGenerationPayload:
-    kernel_forms: tuple
-    diagnostic_graph: object
-    diagnostics: bool
-
-
 CodeGenerationPlan = GenerationPlan
 
 
@@ -858,10 +852,10 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             MeshPhasePlan(MeshPhase.SCATTER),
         ),
         target=KernelTarget.OPENMP,
-        payload=EnergyCodeGenerationPayload(
+        expression_plans=_energy_expression_plans(
             kernel_forms,
             diagnostic_graph,
-            evaluated.diagnostics,
+            evaluated.form_evaluation,
         ),
         coupling=KernelCoupling.SINGLE_FIELD,
         material_name=material_name,
@@ -881,6 +875,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             mesh_phases=_residual_mesh_phases(),
             mesh_phase_plans=_residual_mesh_phase_plans(blocks),
             blocks=blocks,
+            expression_plans=_form_collection_expression_plans(collection),
             target=KernelTarget.OPENMP,
             coupling=_kernel_coupling_for_collection(collection),
             material_name=material_name,
@@ -903,10 +898,109 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         block_kernels=block_kernels,
         scope=KernelScope.MONOLITHIC,
         coupling=_kernel_coupling_for_collection(collection),
+        expression_plans=_form_collection_expression_plans(collection),
         target=KernelTarget.OPENMP,
         material_name=material_name,
         unit_name=evaluated.name,
     )
+
+
+def _energy_expression_plans(kernel_forms, diagnostic_graph, collection):
+    plans = []
+    for kernel_form in kernel_forms:
+        form_order = _form_order_for_kernel_name(kernel_form.name)
+        plans.append(
+            KernelExpressionPlan(
+                name=kernel_form.name,
+                form_order=form_order,
+                role=_role_for_form(collection, form_order),
+                expression_graph=kernel_form.expression_graph,
+                weak_form=kernel_form.weak_form,
+                coefficients=collection.coefficients,
+                dependencies=_metadata_dependencies(collection, form_order),
+                diagnostics=diagnostic_graph if kernel_form.name == "apply" else None,
+                fields=collection.fields,
+                blocks=_metadata_blocks(collection, form_order),
+                source=kernel_form,
+                output_mode=kernel_form.output_mode,
+                has_direction=kernel_form.has_direction,
+            )
+        )
+    return tuple(plans)
+
+
+def _form_collection_expression_plans(collection, block=None):
+    plans = []
+    for form in collection.forms:
+        blocks = _metadata_blocks(collection, form.order)
+        coefficients = _metadata_coefficients(collection, form.order)
+        if block is not None:
+            blocks = tuple(
+                candidate
+                for candidate in blocks
+                if candidate.name == block.name
+            )
+            coefficients = tuple(
+                coefficient
+                for selected_block in blocks
+                for coefficient in selected_block.coefficients
+            )
+        plans.append(
+            KernelExpressionPlan(
+                name=form.name,
+                form_order=form.order,
+                role=form.role,
+                expression_graph=form.expression,
+                coefficients=coefficients,
+                dependencies=_metadata_dependencies(collection, form.order),
+                fields=collection.fields,
+                blocks=blocks,
+                source=form,
+            )
+        )
+    return tuple(plans)
+
+
+def _form_order_for_kernel_name(name):
+    if name == "objective":
+        return FormOrder.ZERO
+    if name == "gradient":
+        return FormOrder.ONE
+    if name == "apply":
+        return FormOrder.TWO
+    raise ValueError("unsupported energy kernel form '%s'" % name)
+
+
+def _role_for_form(collection, order):
+    return collection.form(order).role
+
+
+def _metadata_for_order(collection, order):
+    try:
+        return collection.form_metadata(order)
+    except ValueError:
+        return None
+
+
+def _metadata_coefficients(collection, order):
+    metadata = _metadata_for_order(collection, order)
+    if metadata is None:
+        return collection.coefficients
+    return metadata.coefficients
+
+
+def _metadata_dependencies(collection, order):
+    metadata = _metadata_for_order(collection, order)
+    if metadata is None:
+        return collection.dependencies
+    return metadata.dependencies
+
+
+def _metadata_blocks(collection, order):
+    metadata = _metadata_for_order(collection, order)
+    if metadata is None:
+        return ()
+    return metadata.blocks
 
 
 def _block_plans_from_form_collection(collection):
@@ -967,6 +1061,10 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
             block=block,
             emission=KernelEmission.FILES,
             target=KernelTarget.OPENMP,
+            expression_plans=_form_collection_expression_plans(
+                evaluated.form_evaluation,
+                block,
+            ),
             material_name=material_name,
             unit_name=_block_unit_name(evaluated.name, block),
         )
@@ -997,8 +1095,8 @@ def _emit_codegen_unit(unit, context):
 def _diagnostic_files_for_unit(unit, context):
     if unit.kind is not CodeGenerationKind.ENERGY_SOA:
         return ()
-    payload = unit.payload
-    if not payload.diagnostics:
+    diagnostic_graph = _diagnostic_graph_from_expression_plans(unit)
+    if diagnostic_graph is None:
         return ()
     report_prefix = "%s_%s" % (
         _unit_report_name(unit),
@@ -1010,7 +1108,7 @@ def _diagnostic_files_for_unit(unit, context):
                 "%s_summary.md" % report_prefix,
                 _summary(
                     unit.material_name,
-                    payload.diagnostic_graph,
+                    diagnostic_graph,
                     context.specialization,
                 ),
             ),
@@ -1018,12 +1116,19 @@ def _diagnostic_files_for_unit(unit, context):
                 "%s_reduced_outputs.txt" % report_prefix,
                 "\n\n".join(
                     str(output)
-                    for output in payload.diagnostic_graph.reduced_outputs
+                    for output in diagnostic_graph.reduced_outputs
                 )
                 + "\n",
             ),
         )
     )
+
+
+def _diagnostic_graph_from_expression_plans(unit):
+    for expression_plan in unit.expression_plans:
+        if expression_plan.diagnostics is not None:
+            return expression_plan.diagnostics
+    return None
 
 
 def _layout_codegen_files(unit, context, files):

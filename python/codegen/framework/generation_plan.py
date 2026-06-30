@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 
 from .basis import BasisPlanNode
+from .expression_plan import KernelExpressionPlan
 from .forms import FormCollection, FormOrder, PipelineStage
 from .geometry import GeometryPlanNode
 
@@ -448,6 +449,7 @@ class KernelPlan:
     block: BlockPlan = None
     block_kernels: tuple = ()
     emission: KernelEmission = KernelEmission.FILES
+    expression_plans: tuple = ()
 
     def __post_init__(self):
         name = str(self.name)
@@ -459,6 +461,7 @@ class KernelPlan:
         coupling = KernelCoupling(self.coupling)
         emission = KernelEmission(self.emission)
         block_kernels = tuple(self.block_kernels)
+        expression_plans = tuple(self.expression_plans)
         mesh_phase_plans = tuple(self.mesh_phase_plans)
         if mesh_phase_plans:
             for plan in mesh_phase_plans:
@@ -507,6 +510,9 @@ class KernelPlan:
                 raise TypeError("kernel plan block_kernels must be KernelPlan objects")
             if kernel.scope is not KernelScope.BLOCK:
                 raise ValueError("kernel plan block_kernels must have BLOCK scope")
+        for expression_plan in expression_plans:
+            if not isinstance(expression_plan, KernelExpressionPlan):
+                raise TypeError("kernel plan expression_plans must be KernelExpressionPlan objects")
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "dim", dim)
         object.__setattr__(self, "mesh_phases", mesh_phases)
@@ -518,6 +524,7 @@ class KernelPlan:
         object.__setattr__(self, "coupling", coupling)
         object.__setattr__(self, "emission", emission)
         object.__setattr__(self, "block_kernels", block_kernels)
+        object.__setattr__(self, "expression_plans", expression_plans)
 
     @staticmethod
     def _mesh_phase_plans_from_phases(mesh_phases, geometry, blocks, streams):
@@ -640,6 +647,10 @@ class KernelPlan:
             "geometry": None if self.geometry is None else self.geometry.to_dict(),
             "blocks": [block.to_dict() for block in self.blocks],
             "streams": [stream.to_dict() for stream in self.streams],
+            "expression_plans": [
+                expression_plan.to_dict()
+                for expression_plan in self.expression_plans
+            ],
             "block_kernels": [
                 kernel.to_dict(include_block_kernels=False)
                 for kernel in self.block_kernels

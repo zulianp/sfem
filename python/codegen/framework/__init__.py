@@ -39,8 +39,6 @@ from .symbolic import (
     execution_scope,
     generate_cpp_kernel,
     generate_openmp_cpp_kernel,
-    generate_sfem_soa_cpp_files,
-    generate_sfem_soa_cpp_files_for_element,
     gradient_from_energy,
     hessian_action_from_energy,
     jacobian_action_from_residual,
@@ -136,6 +134,7 @@ from .forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
+from .expression_plan import KernelExpressionPlan
 from .boundary_forms import (
     BoundaryIntegral,
     Measure,
@@ -273,8 +272,6 @@ from .residual import (
 from .residual_codegen import (
     WeakResidualCoefficients,
     coupled_residual_weak_coefficients,
-    generate_coupled_residual_sfem_files,
-    generate_mixed_residual_sfem_files,
     weak_residual_coefficients,
 )
 
@@ -331,6 +328,7 @@ __all__ = [
     "emission_plan_from_unit_context",
     "GeometryPlan",
     "KernelCoupling",
+    "KernelExpressionPlan",
     "KernelPlan",
     "KernelEmission",
     "KernelScope",
@@ -425,8 +423,6 @@ __all__ = [
     "energy_form_pipeline",
     "generate_cpp_kernel",
     "generate_openmp_cpp_kernel",
-    "generate_sfem_soa_cpp_files",
-    "generate_sfem_soa_cpp_files_for_element",
     "det",
     "deformation_gradient",
     "derivative",
@@ -520,7 +516,5 @@ __all__ = [
     "coupled_residual_system",
     "WeakResidualCoefficients",
     "coupled_residual_weak_coefficients",
-    "generate_coupled_residual_sfem_files",
-    "generate_mixed_residual_sfem_files",
     "weak_residual_coefficients",
 ]

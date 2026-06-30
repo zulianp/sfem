@@ -2,7 +2,6 @@ import math
 
 import sympy as sp
 
-from .forms import FormOrder
 from .symbolic import GeneratedKernelFile, _sfem_ccode, _sfem_math_header_source
 from .fem import (
     sfem_is_proteus_hex_element,
@@ -32,9 +31,11 @@ _CELL_TO_SURFACE = {
 }
 
 
-def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan):
+def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan, expression_plan):
     if emission_plan is None:
         raise ValueError("boundary residual codegen requires an ElementEmissionPlan")
+    if expression_plan is None:
+        raise ValueError("boundary residual codegen requires a KernelExpressionPlan")
     element_type = emission_plan.element_type
     surface = _surface_element(element_type)
     if collection.measure != "ds":
@@ -46,11 +47,10 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan):
         raise ValueError("boundary residual form collection requires a lowered residual system")
     field = tuple(collection.fields)[0]
     components = int(field.components)
-    metadata = collection.form_metadata(FormOrder.ONE)
-    coefficients = _boundary_coefficients(system)
+    coefficients = _boundary_coefficients_from_expression_plan(system, expression_plan)
     _validate_boundary_coefficients(system, coefficients)
-    _validate_boundary_metadata(metadata.dependencies, coefficients)
-    parameters = _dependency_parameters(metadata.dependencies)
+    _validate_boundary_metadata(expression_plan.dependencies, coefficients)
+    parameters = _dependency_parameters(expression_plan.dependencies)
     function = "%s_%s_boundary_residual_soa" % (prefix, surface.lower())
     source = _boundary_source(
         function,
@@ -143,19 +143,32 @@ def _proteus_hex_side_nodes(order):
     return tuple(sides)
 
 
-def _boundary_coefficients(system):
-    coefficients = []
-    for field in system.fields:
-        residual = sp.sympify(system.residual_expression(field))
-        coeff = sp.diff(residual, field.test_value)
-        remainder = sp.simplify(residual - coeff * field.test_value)
-        if remainder != 0:
+def _boundary_coefficients_from_expression_plan(system, expression_plan):
+    coefficients = tuple(expression_plan.coefficients)
+    if not coefficients:
+        raise ValueError("boundary expression plan '%s' has no coefficients" % expression_plan.name)
+    if len(coefficients) != len(system.fields):
+        raise ValueError(
+            "boundary expression plan '%s' has %d coefficient entries for %d fields"
+            % (expression_plan.name, len(coefficients), len(system.fields))
+        )
+    values = []
+    by_name = {field.name: field for field in system.fields}
+    for coefficient in coefficients:
+        row_field = getattr(coefficient, "row_field", None)
+        if row_field is None:
+            values.append(sp.simplify(coefficient))
+            continue
+        if row_field not in by_name:
+            raise ValueError("boundary coefficient row field '%s' is not in the residual system" % row_field)
+        gradient = tuple(getattr(coefficient, "gradient", ()))
+        if any(sp.sympify(value) != 0 for value in gradient):
             raise ValueError(
                 "boundary residual for field '%s' must be linear in the test value only"
-                % field.name
+                % row_field
             )
-        coefficients.append(sp.simplify(coeff))
-    return tuple(coefficients)
+        values.append(sp.simplify(getattr(coefficient, "value")))
+    return tuple(values)
 
 
 def _validate_boundary_coefficients(system, coefficients):

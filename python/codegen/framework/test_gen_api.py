@@ -1197,6 +1197,14 @@ class GenApiTest(unittest.TestCase):
             (stream,),
             (context.basis_plan(),),
         )
+        expression_plan = gen.KernelExpressionPlan(
+            "apply",
+            gen.FormOrder.TWO,
+            form_collection.form(gen.FormOrder.TWO).role,
+            required_streams=(stream,),
+            fields=form_collection.fields,
+            blocks=(block,),
+        )
         kernel = gen.KernelPlan(
             "test_material_solid",
             "energy",
@@ -1210,6 +1218,7 @@ class GenApiTest(unittest.TestCase):
             geometry,
             (block,),
             (stream,),
+            expression_plans=(expression_plan,),
         )
         plan = gen.GenerationPlan((kernel,))
 
@@ -1232,6 +1241,15 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(kernel.mesh_phase_plans[1].blocks, (block,))
         self.assertEqual(kernel.mesh_phase_plans[2].streams, (stream,))
         self.assertTrue(all(isinstance(phase, gen.LocalPhasePlan) for phase in block.local_phase_plans))
+        self.assertEqual(kernel.expression_plans, (expression_plan,))
+        self.assertEqual(
+            kernel.to_dict()["expression_plans"][0]["form_order"],
+            gen.FormOrder.TWO.value,
+        )
+        self.assertEqual(
+            kernel.to_dict()["expression_plans"][0]["required_streams"],
+            ["u"],
+        )
         self.assertEqual(
             tuple(phase.phase for phase in block.local_phase_plans),
             (
@@ -1250,6 +1268,13 @@ class GenApiTest(unittest.TestCase):
 
     def test_codegen_stage_uses_shared_openmp_soa_backend(self):
         self.assertIsInstance(gen.OPENMP_SOA_BACKEND, gen.OpenMPSoABackend)
+        self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_energy"))
+        self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_residual"))
+        self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_mixed_residual"))
+        self.assertFalse(hasattr(gen, "generate_sfem_soa_cpp_files"))
+        self.assertFalse(hasattr(gen, "generate_sfem_soa_cpp_files_for_element"))
+        self.assertFalse(hasattr(gen, "generate_coupled_residual_sfem_files"))
+        self.assertFalse(hasattr(gen, "generate_mixed_residual_sfem_files"))
 
     def test_openmp_backend_consumes_kernel_phase_plan(self):
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
@@ -1298,6 +1323,27 @@ class GenApiTest(unittest.TestCase):
         self.assertTrue(energy_plan.units[0].mesh_phase_plans[0].is_geometry)
         self.assertTrue(energy_plan.units[0].mesh_phase_plans[1].is_local_call)
         self.assertTrue(energy_plan.units[0].mesh_phase_plans[2].is_scatter)
+        self.assertTrue(
+            all(
+                isinstance(expression_plan, gen.KernelExpressionPlan)
+                for expression_plan in energy_plan.units[0].expression_plans
+            )
+        )
+        self.assertEqual(
+            tuple(expression_plan.form_order for expression_plan in energy_plan.units[0].expression_plans),
+            (gen.FormOrder.ZERO, gen.FormOrder.ONE, gen.FormOrder.TWO),
+        )
+        self.assertEqual(
+            tuple(expression_plan.name for expression_plan in energy_plan.units[0].expression_plans),
+            ("objective", "gradient", "apply"),
+        )
+        self.assertIsNone(energy_plan.units[0].payload)
+        self.assertTrue(
+            any(
+                expression_plan.diagnostics is not None
+                for expression_plan in energy_plan.units[0].expression_plans
+            )
+        )
 
         residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         residual_plan = gen.SpecializedFormManipulationStage(
@@ -1320,6 +1366,16 @@ class GenApiTest(unittest.TestCase):
         self.assertTrue(residual_plan.units[0].mesh_phase_plans[3].is_scatter)
         self.assertTrue(residual_plan.units[0].is_monolithic)
         self.assertTrue(residual_plan.units[0].is_complete_system)
+        self.assertTrue(
+            all(
+                isinstance(expression_plan, gen.KernelExpressionPlan)
+                for expression_plan in residual_plan.units[0].expression_plans
+            )
+        )
+        self.assertEqual(
+            tuple(expression_plan.form_order for expression_plan in residual_plan.units[0].expression_plans),
+            (gen.FormOrder.ZERO, gen.FormOrder.ONE, gen.FormOrder.TWO),
+        )
         self.assertEqual(residual_plan.monolithic_kernels, residual_plan.units)
         self.assertEqual(residual_plan.complete_system_kernels, residual_plan.units)
         self.assertEqual(len(residual_plan.units[0].blocks), 6)
@@ -1327,6 +1383,27 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(residual_plan.block_kernels, residual_plan.units[0].block_kernels)
         self.assertTrue(all(kernel.is_block for kernel in residual_plan.block_kernels))
         self.assertTrue(all(kernel.coupling is gen.KernelCoupling.BLOCK for kernel in residual_plan.block_kernels))
+        self.assertEqual(
+            tuple(
+                tuple(
+                    block.name
+                    for expression_plan in kernel.expression_plans
+                    for block in expression_plan.blocks
+                )
+                for kernel in residual_plan.block_kernels
+            ),
+            tuple((kernel.block.name,) for kernel in residual_plan.block_kernels),
+        )
+        self.assertEqual(
+            tuple(
+                tuple(len(expression_plan.coefficients) for expression_plan in kernel.expression_plans)
+                for kernel in residual_plan.block_kernels
+            ),
+            tuple(
+                tuple(1 if expression_plan.form_order is kernel.block.form_order else 0 for expression_plan in kernel.expression_plans)
+                for kernel in residual_plan.block_kernels
+            ),
+        )
         self.assertEqual(
             tuple(kernel.block.name for kernel in residual_plan.block_kernels),
             (
@@ -2059,6 +2136,16 @@ class GenApiTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(material, out_dir, elements=("TRI3",))
+            expression_plan = next(
+                expression_plan
+                for expression_plan in result.plan.units[0].expression_plans
+                if expression_plan.form_order is gen.FormOrder.ONE
+            )
+            self.assertEqual(len(expression_plan.coefficients), 2)
+            self.assertEqual(
+                tuple(coefficient.row_field for coefficient in expression_plan.coefficients),
+                ("u0", "u1"),
+            )
             source_path = os.path.join(
                 out_dir,
                 "d2",

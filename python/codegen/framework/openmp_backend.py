@@ -31,48 +31,83 @@ class OpenMPSoAEmission:
 
 
 @dataclass(frozen=True)
+class _OpenMPTraversal:
+    kind: str
+    unit: object
+    context: object
+    prefix: str
+    local_prefix: str = ""
+    local_name: str = ""
+    operator_prefix: str = ""
+    operator_name: str = ""
+    emission_plan: object = None
+    kernel_forms: tuple = ()
+    system: object = None
+    compatible_element: object = None
+    residual_coeffs: tuple = ()
+    action_coeffs: tuple = ()
+    field_element_types: object = None
+    boundary_expression_plan: object = None
+
+
+@dataclass(frozen=True)
 class OpenMPSoABackend:
     """Single OpenMP/SoA backend boundary for planned code-generation units."""
 
     def emit(self, unit, context):
         unit.validate_for_context(context)
+        traversal = self._traversal(unit, context)
+        files = tuple(self._emit_traversal_files(traversal))
+        if traversal.local_name:
+            self._validate_common_source_contract(files, traversal.local_prefix)
+        else:
+            self._validate_mesh_source_contract(files)
+        return OpenMPSoAEmission(files)
+
+    def _traversal(self, unit, context):
         kind = _kind_value(unit.kind)
         if kind == "energy_soa":
-            return self._emit_energy_plan(unit, context)
+            return self._energy_traversal(unit, context)
         if kind == "residual_soa":
-            return self._emit_residual_plan(unit, context)
+            return self._residual_traversal(unit, context)
         if kind == "boundary_residual_soa":
-            return self._emit_boundary_residual_plan(unit, context)
+            return self._boundary_residual_traversal(unit, context)
         raise ValueError("unsupported OpenMP SoA kernel kind '%s'" % kind)
 
-    def _emit_energy_plan(self, unit, context):
+    def _energy_traversal(self, unit, context):
         self._validate_energy_plan(unit)
-        payload = unit.payload
         prefix = _generated_prefix(unit)
         local_kernel = unit.local_kernel_plan(context, prefix)
         mesh_kernel = MeshKernelPlan(prefix, context.element_type)
-        emission_plan = _validated_emission_plan(unit, context)
-        return self.emit_energy(
-            payload.kernel_forms,
-            prefix=mesh_kernel.name,
+        return _OpenMPTraversal(
+            "energy_soa",
+            unit,
+            context,
+            prefix,
             local_prefix=local_kernel.name,
-            emission_plan=emission_plan,
+            local_name=local_kernel.header,
+            operator_prefix=mesh_kernel.name,
+            operator_name=mesh_kernel.source,
+            emission_plan=_validated_emission_plan(unit, context),
+            kernel_forms=_energy_kernel_forms(unit),
         )
 
-    def _emit_residual_plan(self, unit, context):
+    def _residual_traversal(self, unit, context):
         self._validate_residual_plan(unit)
         collection = unit.form_collection
         system = collection.source
         residual_coeffs = _coefficients_for_unit(unit, collection, FormOrder.ONE)
         action_coeffs = _coefficients_for_unit(unit, collection, FormOrder.TWO)
+        residual_plan = _expression_plan_for_order(unit, FormOrder.ONE)
+        action_plan = _expression_plan_for_order(unit, FormOrder.TWO)
         _validate_coefficient_dependencies(
             unit.name,
-            collection.form_metadata(FormOrder.ONE).dependencies,
+            residual_plan.dependencies,
             residual_coeffs,
         )
         _validate_coefficient_dependencies(
             unit.name,
-            collection.form_metadata(FormOrder.TWO).dependencies,
+            action_plan.dependencies,
             action_coeffs,
         )
         prefix = _generated_prefix(unit)
@@ -80,23 +115,26 @@ class OpenMPSoABackend:
             model = _diagonal_block_model(unit, collection, context)
             local_kernel = unit.local_kernel_plan(context, prefix)
             operator_prefix = "%s_%s" % (prefix, model.element_type.lower())
-            return self.emit_mixed_residual(
-                model.system,
-                prefix=prefix,
+            return _OpenMPTraversal(
+                "mixed_residual_soa",
+                unit,
+                context,
+                prefix,
+                local_prefix=local_kernel.name,
+                local_name=local_kernel.header,
+                operator_prefix=operator_prefix,
+                operator_name="%s_operator.cpp" % operator_prefix,
+                emission_plan=model.emission_plan,
+                system=model.system,
                 compatible_element=_CompatibleElementLabel(
                     model.element_type,
                     model.element_type,
                 ),
-                emission_plan=model.emission_plan,
                 residual_coeffs=model.residual_coeffs,
                 action_coeffs=model.action_coeffs,
                 field_element_types={
                     field.field_name: model.element_type for field in model.system.fields
                 },
-                local_prefix=local_kernel.name,
-                local_name=local_kernel.header,
-                operator_prefix=operator_prefix,
-                operator_name="%s_operator.cpp" % operator_prefix,
             )
         local_kernel = unit.local_kernel_plan(
             context,
@@ -105,130 +143,105 @@ class OpenMPSoABackend:
         )
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
         if context.is_mixed_order:
-            emission_plan = _validated_emission_plan(unit, context)
-            return self.emit_mixed_residual(
-                system,
-                prefix=prefix,
+            return _OpenMPTraversal(
+                "mixed_residual_soa",
+                unit,
+                context,
+                prefix,
+                local_prefix=local_kernel.name,
+                local_name=local_kernel.header,
+                operator_prefix=mesh_kernel.name,
+                operator_name=mesh_kernel.source,
+                emission_plan=_validated_emission_plan(unit, context),
+                system=system,
                 compatible_element=context.compatible_element,
-                emission_plan=emission_plan,
                 residual_coeffs=residual_coeffs,
                 action_coeffs=action_coeffs,
                 field_element_types=_field_element_types_for_context(
                     collection.fields,
                     context,
                 ),
-                local_prefix=local_kernel.name,
-                local_name=local_kernel.header,
-                operator_prefix=mesh_kernel.name,
-                operator_name=mesh_kernel.source,
             )
-        emission_plan = _validated_emission_plan(unit, context)
-        return self.emit_residual(
-            system,
-            prefix=prefix,
-            emission_plan=emission_plan,
-            residual_coeffs=residual_coeffs,
-            action_coeffs=action_coeffs,
+        return _OpenMPTraversal(
+            "residual_soa",
+            unit,
+            context,
+            prefix,
             local_prefix=local_kernel.name,
             local_name=local_kernel.header,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
+            emission_plan=_validated_emission_plan(unit, context),
+            system=system,
+            residual_coeffs=residual_coeffs,
+            action_coeffs=action_coeffs,
         )
 
-    def _emit_boundary_residual_plan(self, unit, context):
+    def _boundary_residual_traversal(self, unit, context):
         self._validate_boundary_residual_plan(unit)
-        mesh_kernel = unit.mesh_kernel_plan(context, _generated_prefix(unit))
-        emission_plan = _validated_emission_plan(unit, context)
-        return OpenMPSoAEmission(
-            tuple(
-                generate_boundary_residual_sfem_files(
-                    unit.form_collection,
-                    prefix=mesh_kernel.name,
-                    emission_plan=emission_plan,
-                )
-            )
+        prefix = _generated_prefix(unit)
+        mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        return _OpenMPTraversal(
+            "boundary_residual_soa",
+            unit,
+            context,
+            prefix,
+            operator_prefix=mesh_kernel.name,
+            operator_name=mesh_kernel.source,
+            emission_plan=_validated_emission_plan(unit, context),
+            boundary_expression_plan=_expression_plan_for_order(unit, FormOrder.ONE),
         )
 
-    def emit_energy(
-        self,
-        kernel_forms,
-        *,
-        prefix,
-        local_prefix,
-        emission_plan,
-    ):
-        files = tuple(
-            generate_sfem_soa_cpp_files_for_element(
-                kernel_forms,
-                prefix=prefix,
-                local_prefix=local_prefix,
-                emission_plan=emission_plan,
+    def _emit_traversal_files(self, traversal):
+        if traversal.kind == "energy_soa":
+            return generate_sfem_soa_cpp_files_for_element(
+                traversal.kernel_forms,
+                prefix=traversal.operator_prefix,
+                local_prefix=traversal.local_prefix,
+                emission_plan=traversal.emission_plan,
             )
-        )
-        self._validate_common_source_contract(files, local_prefix)
-        return OpenMPSoAEmission(files)
+        if traversal.kind == "residual_soa":
+            return generate_coupled_residual_sfem_files(
+                traversal.system,
+                prefix=traversal.prefix,
+                emission_plan=traversal.emission_plan,
+                residual_coeffs=traversal.residual_coeffs,
+                action_coeffs=traversal.action_coeffs,
+                local_prefix=traversal.local_prefix,
+                local_name=traversal.local_name,
+                operator_prefix=traversal.operator_prefix,
+                operator_name=traversal.operator_name,
+            )
+        if traversal.kind == "mixed_residual_soa":
+            return generate_mixed_residual_sfem_files(
+                traversal.system,
+                prefix=traversal.prefix,
+                compatible_element=traversal.compatible_element,
+                emission_plan=traversal.emission_plan,
+                residual_coeffs=traversal.residual_coeffs,
+                action_coeffs=traversal.action_coeffs,
+                field_element_types=traversal.field_element_types,
+                local_prefix=traversal.local_prefix,
+                local_name=traversal.local_name,
+                operator_prefix=traversal.operator_prefix,
+                operator_name=traversal.operator_name,
+            )
+        if traversal.kind == "boundary_residual_soa":
+            return generate_boundary_residual_sfem_files(
+                traversal.unit.form_collection,
+                prefix=traversal.operator_prefix,
+                emission_plan=traversal.emission_plan,
+                expression_plan=traversal.boundary_expression_plan,
+            )
+        raise ValueError("unsupported OpenMP SoA traversal kind '%s'" % traversal.kind)
 
-    def emit_residual(
-        self,
-        system,
-        *,
-        prefix,
-        emission_plan,
-        residual_coeffs,
-        action_coeffs,
-        local_prefix,
-        local_name,
-        operator_prefix,
-        operator_name,
-    ):
-        files = tuple(
-            generate_coupled_residual_sfem_files(
-                system,
-                prefix=prefix,
-                emission_plan=emission_plan,
-                residual_coeffs=residual_coeffs,
-                action_coeffs=action_coeffs,
-                local_prefix=local_prefix,
-                local_name=local_name,
-                operator_prefix=operator_prefix,
-                operator_name=operator_name,
-            )
+    @staticmethod
+    def _validate_mesh_source_contract(files):
+        operator_sources = tuple(
+            file for file in files if file.path.endswith("_operator.cpp")
         )
-        self._validate_common_source_contract(files, local_prefix)
-        return OpenMPSoAEmission(files)
-
-    def emit_mixed_residual(
-        self,
-        system,
-        *,
-        prefix,
-        compatible_element,
-        residual_coeffs,
-        action_coeffs,
-        field_element_types,
-        local_prefix,
-        local_name,
-        operator_prefix,
-        operator_name,
-        emission_plan,
-    ):
-        files = tuple(
-            generate_mixed_residual_sfem_files(
-                system,
-                prefix=prefix,
-                compatible_element=compatible_element,
-                emission_plan=emission_plan,
-                residual_coeffs=residual_coeffs,
-                action_coeffs=action_coeffs,
-                field_element_types=field_element_types,
-                local_prefix=local_prefix,
-                local_name=local_name,
-                operator_prefix=operator_prefix,
-                operator_name=operator_name,
-            )
-        )
-        self._validate_common_source_contract(files, local_prefix)
-        return OpenMPSoAEmission(files)
+        if not operator_sources:
+            raise RuntimeError("OpenMP SoA backend did not emit a mesh operator")
 
     @staticmethod
     def _validate_common_source_contract(files, local_prefix):
@@ -237,11 +250,7 @@ class OpenMPSoABackend:
         local_source = source_by_path.get(local_name)
         if local_source is None:
             raise RuntimeError("OpenMP SoA backend did not emit '%s'" % local_name)
-        operator_sources = tuple(
-            file for file in files if file.path.endswith("_operator.cpp")
-        )
-        if not operator_sources:
-            raise RuntimeError("OpenMP SoA backend did not emit a mesh operator")
+        OpenMPSoABackend._validate_mesh_source_contract(files)
         if "template <typename scalar_t, int N_QP" not in local_source:
             raise RuntimeError(
                 "OpenMP SoA local kernel '%s' is not templated on N_QP" % local_name
@@ -258,7 +267,7 @@ class OpenMPSoABackend:
                 % (local_name, local_prefix)
             )
         include = '#include "%s"' % local_name
-        for operator in operator_sources:
+        for operator in (file for file in files if file.path.endswith("_operator.cpp")):
             if include not in operator.source:
                 raise RuntimeError(
                     "OpenMP SoA operator '%s' does not include '%s'"
@@ -333,6 +342,28 @@ def _kind_value(kind):
 
 def _generated_prefix(unit):
     return unit.name
+
+
+def _energy_kernel_forms(unit):
+    kernel_forms = tuple(
+        expression_plan.source
+        for expression_plan in unit.expression_plans
+        if expression_plan.source is not None
+    )
+    if not kernel_forms:
+        raise ValueError("energy kernel plan '%s' has no expression-plan kernel forms" % unit.name)
+    return kernel_forms
+
+
+def _expression_plan_for_order(unit, order):
+    order = FormOrder(order)
+    for expression_plan in unit.expression_plans:
+        if expression_plan.form_order is order:
+            return expression_plan
+    raise ValueError(
+        "kernel plan '%s' has no expression plan for %s"
+        % (unit.name, order.name)
+    )
 
 
 def _require_openmp(unit):
@@ -561,19 +592,17 @@ def _component_field_names(field):
 
 def _coefficients_for_unit(unit, collection, order):
     order = FormOrder(order)
-    metadata = collection.form_metadata(order)
+    expression_plan = _expression_plan_for_order(unit, order)
     if not unit.is_block:
-        return metadata.coefficients
+        return expression_plan.coefficients
     if unit.block.form_order is not order:
         return _zero_coefficients(collection.source)
-    column = unit.block.column_field or None
-    block = collection.block(order, unit.block.row_field, column)
-    if not block.coefficients:
+    if not expression_plan.coefficients:
         raise ValueError(
             "block kernel '%s' has no coefficient sets for '%s'"
-            % (unit.name, block.name)
+            % (unit.name, unit.block.name)
         )
-    return _selected_row_coefficients(collection.source, block.coefficients)
+    return _selected_row_coefficients(collection.source, expression_plan.coefficients)
 
 
 def _zero_coefficients(system):
