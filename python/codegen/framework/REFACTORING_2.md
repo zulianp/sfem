@@ -197,9 +197,15 @@ Acceptance criteria:
 Goal: make OpenMP and CUDA target-specific behavior pluggable while sharing plan
 traversal.
 
+Status: in progress. `TargetPlatform` now exposes target hooks for generated
+function qualifiers, restrict qualifiers, parallel/vector/atomic pragmas,
+alignment assumptions, math helper names, diagnostics/profiling helper names,
+kernel launch style, wrapper style, and device-kernel capability. `OpenMPTarget`
+and `CUDATarget` specialize those hooks while preserving the existing target API.
+
 Tasks:
 
-1. Extend `TargetPlatform` with hooks for:
+- [x] Extend `TargetPlatform` with hooks for:
    - function qualifiers
    - restrict qualifiers
    - vectorization pragmas
@@ -207,15 +213,15 @@ Tasks:
    - math helper names
    - diagnostic/profiling emission
    - kernel launch/wrapper style
-2. Move OpenMP-specific pragmas and vectorization assumptions out of emitters
+- [ ] Move OpenMP-specific pragmas and vectorization assumptions out of emitters
    and into `OpenMPTarget`.
-3. Implement a CUDA backend skeleton that consumes the same kernel plans and
+- [ ] Implement a CUDA backend skeleton that consumes the same kernel plans and
    emits CUDA-safe local/device code for at least one simple residual kernel.
-4. Ensure CUDA emission uses `kernel_math.hpp` helpers including specialized
+- [ ] Ensure CUDA emission uses `kernel_math.hpp` helpers including specialized
    `pow_y(x)` instead of generic `pow` where possible.
-5. Add compile tests for generated OpenMP and generated CUDA code when the CUDA
+- [ ] Add compile tests for generated OpenMP and generated CUDA code when the CUDA
    compiler is available.
-6. Extend vectorization diagnostics tests to all OpenMP hot-loop families:
+- [ ] Extend vectorization diagnostics tests to all OpenMP hot-loop families:
    simplex energy, tensor-product energy, simplex residual, tensor-product
    residual, mixed Taylor-Hood, and boundary residual.
 
