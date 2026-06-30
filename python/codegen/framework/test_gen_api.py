@@ -1379,6 +1379,76 @@ class GenApiTest(unittest.TestCase):
             "",
         )
 
+    def test_openmp_backend_plans_reference_data_once_per_stage(self):
+        energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
+        energy_plan = gen.SpecializedFormManipulationStage(
+            energy_input,
+            gen._evaluate_forms(energy_input),
+        ).run()
+        energy_context = energy_input.element_contexts[0]
+        energy_unit = energy_plan.emission_kernels_for_context(energy_context)[0]
+        energy_reference = gen.OPENMP_SOA_BACKEND.reference_data_plan(
+            energy_unit,
+            energy_context,
+        )
+        self.assertIsInstance(energy_reference, gen.ReferenceDataPlan)
+        self.assertEqual(
+            tuple(dataset.stage for dataset in energy_reference.datasets),
+            ("affine", "isoparametric"),
+        )
+        self.assertEqual(energy_reference.families, ("tensor_product",))
+        for dataset in energy_reference.datasets:
+            self.assertIsInstance(dataset, gen.ReferenceDataSetPlan)
+            self.assertEqual(dataset.weight_accessor, "q_weight_1d")
+            self.assertEqual(dataset.accessors, ("q_weight_1d", "shape_1d", "grad_1d"))
+            self.assertEqual(dataset.unique_element_types, ("HEX8",))
+            self.assertFalse(dataset.is_mixed_order)
+            self.assertEqual(
+                dataset.accessor_call("shape_1d"),
+                "sfem::codegen::neohookean_ogden_hex8_%s_reference_data<scalar_t>::shape_1d()"
+                % dataset.stage,
+            )
+
+        residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        residual_plan = gen.SpecializedFormManipulationStage(
+            residual_input,
+            gen._evaluate_forms(residual_input),
+        ).run()
+        residual_context = residual_input.element_contexts[0]
+        residual_unit = residual_plan.emission_kernels_for_context(residual_context)[0]
+        residual_reference = gen.OPENMP_SOA_BACKEND.reference_data_plan(
+            residual_unit,
+            residual_context,
+        )
+        simplex_iso = residual_reference.isoparametric
+        self.assertEqual(simplex_iso.family, "simplex")
+        self.assertEqual(simplex_iso.weight_accessor, "q_weight")
+        self.assertIn("shape", simplex_iso.accessors)
+        self.assertIn("grad_ref_x", simplex_iso.accessors)
+        self.assertIn("grad_ref_y", simplex_iso.accessors)
+        self.assertEqual(simplex_iso.unique_element_types, ("TRI3",))
+
+        stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
+        mixed_input = gen.UserInputStage.create(stokes, (stokes_element,), 16, None)
+        mixed_plan = gen.SpecializedFormManipulationStage(
+            mixed_input,
+            gen._evaluate_forms(mixed_input),
+        ).run()
+        mixed_context = mixed_input.element_contexts[0]
+        mixed_unit = mixed_plan.emission_kernels_for_context(mixed_context)[0]
+        mixed_reference = gen.OPENMP_SOA_BACKEND.reference_data_plan(
+            mixed_unit,
+            mixed_context,
+        )
+        mixed_iso = mixed_reference.isoparametric
+        self.assertTrue(mixed_reference.is_mixed_order)
+        self.assertEqual(mixed_iso.unique_element_types, ("TRI6", "TRI3"))
+        self.assertEqual(mixed_iso.field_element_types, (("u", "TRI6"), ("p", "TRI3")))
+        self.assertIn("tri6_shape", mixed_iso.accessors)
+        self.assertIn("tri6_grad_ref_x", mixed_iso.accessors)
+        self.assertIn("tri3_shape", mixed_iso.accessors)
+        self.assertIn("tri3_grad_ref_y", mixed_iso.accessors)
+
     def test_openmp_backend_consumes_kernel_phase_plan(self):
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         plan = gen.SpecializedFormManipulationStage(

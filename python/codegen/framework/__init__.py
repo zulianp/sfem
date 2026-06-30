@@ -174,6 +174,12 @@ from .kernel_signature import (
     local_kernel_suffix_from_plan,
     mesh_kernel_signature_from_plan,
 )
+from .reference_data_plan import (
+    ReferenceBasisDataPlan,
+    ReferenceDataPlan,
+    ReferenceDataSetPlan,
+    reference_data_plan_from_emission_plan,
+)
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
@@ -354,6 +360,9 @@ __all__ = [
     "MeshPhasePlan",
     "OpenMPSoABackend",
     "OpenMPSoAEmission",
+    "ReferenceBasisDataPlan",
+    "ReferenceDataPlan",
+    "ReferenceDataSetPlan",
     "TensorProductDataLayout",
     "TensorProductOperation",
     "TensorProductSumFactorizationPlan",
@@ -470,6 +479,7 @@ __all__ = [
     "qualifiers",
     "qualify",
     "residual_from_energy",
+    "reference_data_plan_from_emission_plan",
     "residual_form_pipeline",
     "sfem_cell_rule_points",
     "sfem_detect_compatible_element_types",

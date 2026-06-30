@@ -20,6 +20,7 @@ try:
         sfem_supported_element_types,
         sfem_tensor_product_hex_uses_cartesian_ordering,
     )
+    from .reference_data_plan import validate_reference_data_plan
 except ImportError:
     from fem import (
         SfemElementQuadratureRule,
@@ -34,6 +35,8 @@ except ImportError:
         sfem_supported_element_types,
         sfem_tensor_product_hex_uses_cartesian_ordering,
     )
+    def validate_reference_data_plan(*args, **kwargs):
+        return None
 
 try:
     from .tensor_product_geometry import (
@@ -1513,6 +1516,7 @@ def generate_sfem_soa_cpp_files(
     basis_family=None,
     geometry_family=None,
     local_prefix=None,
+    reference_data_plan=None,
 ):
     forms = tuple(forms)
     if quadrature_rule is None and element_type is not None:
@@ -1555,6 +1559,14 @@ def generate_sfem_soa_cpp_files(
             )
     if quadrature_rule is not None:
         _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs)
+    if reference_data_plan is not None:
+        validate_reference_data_plan(
+            reference_data_plan,
+            prefix,
+            affine_quadrature_rule,
+            quadrature_rule,
+            basis_family,
+        )
 
     local_prefix = prefix if local_prefix is None else str(local_prefix)
     use_shared_weak_local = local_prefix != prefix
@@ -1627,6 +1639,7 @@ def generate_sfem_soa_cpp_files_for_element(
     emission_plan,
     array_inputs=None,
     local_prefix=None,
+    reference_data_plan=None,
 ):
     if emission_plan is None:
         raise ValueError("energy code generation requires an ElementEmissionPlan")
@@ -1662,6 +1675,7 @@ def generate_sfem_soa_cpp_files_for_element(
         basis_family=basis_family,
         geometry_family=geometry_family,
         local_prefix=local_prefix,
+        reference_data_plan=reference_data_plan,
     )
 
 

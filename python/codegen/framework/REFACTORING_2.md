@@ -157,7 +157,10 @@ Local signatures now carry reuse keys, and the mixed/local suffix policy is
 centralized so `_mixed` is added only when the local block really depends on
 mixed-order streams. Mesh operator labels are now selected through one planner,
 including compatible mixed systems, single-field equations inside mixed
-contexts, and explicit diagonal-block element specializations.
+contexts, and explicit diagonal-block element specializations. Reference data is
+now described by a shared `ReferenceDataPlan` with affine/isoparametric dataset
+entries, simplex/tensor-product accessors, and mixed-order field-element
+mappings derived from the same emission plan used by the backend.
 
 Tasks:
 
@@ -171,7 +174,7 @@ Tasks:
    signature are reusable; otherwise encode only the necessary block/form suffix.
 - [x] Generate mesh kernels by element or compatible-element label with one naming
    convention across all form kinds.
-- [ ] Generate reference-data includes and accessors through one reference-data
+- [x] Generate reference-data includes and accessors through one reference-data
    planner for affine/isoparametric, simplex/tensor-product, and mixed-order
    cases.
 - [ ] Generate diagnostics from the same kernel expression and data-stream plan

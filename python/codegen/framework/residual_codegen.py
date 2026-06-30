@@ -30,6 +30,7 @@ from .quadrature_codegen import (
     quadrature_reference_accessor,
     quadrature_reference_struct_lines,
 )
+from .reference_data_plan import validate_reference_data_plan
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -567,6 +568,7 @@ def generate_coupled_residual_sfem_files(
     local_name=None,
     operator_prefix=None,
     operator_name=None,
+    reference_data_plan=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -589,6 +591,14 @@ def generate_coupled_residual_sfem_files(
     geometry_family = emission_plan.geometry_family
     local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
     element_prefix = "%s_%s" % (prefix, element_type.lower()) if operator_prefix is None else str(operator_prefix)
+    if reference_data_plan is not None:
+        validate_reference_data_plan(
+            reference_data_plan,
+            element_prefix,
+            affine_specialization.quadrature_rule,
+            specialization.quadrature_rule,
+            family,
+        )
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
     operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
     local_source = _local_header(
@@ -644,12 +654,14 @@ def generate_mixed_residual_sfem_files(
     local_name=None,
     operator_prefix=None,
     operator_name=None,
+    reference_data_plan=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
     if emission_plan is None:
         raise ValueError("mixed residual code generation requires an ElementEmissionPlan")
     cell_specialization = emission_plan.isoparametric_specialization
+    affine_specialization = emission_plan.affine_specialization
     if system.dim != cell_specialization.dim:
         raise ValueError("residual system dimension does not match element dimension")
     field_element_types = dict(field_element_types or ())
@@ -671,6 +683,14 @@ def generate_mixed_residual_sfem_files(
         action_coeffs = coupled_residual_weak_coefficients(system, True)
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
+    if reference_data_plan is not None:
+        validate_reference_data_plan(
+            reference_data_plan,
+            prefix,
+            affine_specialization.quadrature_rule,
+            cell_specialization.quadrature_rule,
+            family,
+        )
     local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
     element_prefix = "%s_%s" % (prefix, compatible_element.name.lower()) if operator_prefix is None else str(operator_prefix)
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
