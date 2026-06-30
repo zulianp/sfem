@@ -149,22 +149,27 @@ Acceptance criteria:
 Goal: make emitted C++ uniform across energy, residual, mixed, and boundary
 kernels.
 
+Status: in progress. Common local and mesh kernel signature planners now derive
+template parameters and stream arguments from `KernelPlan`,
+`KernelExpressionPlan`, and `ElementEmissionPlan`; the OpenMP traversal carries
+these signatures for energy, residual, mixed residual, and boundary kernels.
+
 Tasks:
 
-1. Introduce common local-kernel signature generation from plan data:
+- [x] Introduce common local-kernel signature generation from plan data:
    `scalar_t`, `N_QP`, `N_SHAPE`, and `VECTOR_SIZE` template parameters, plus
    plan-derived stream arguments.
-2. Introduce common mesh-kernel signature generation from plan data:
+- [x] Introduce common mesh-kernel signature generation from plan data:
    element count, node count, connectivity, geometry inputs, material
    parameters, field streams, direction streams, and output streams.
-3. Generate local kernels by dimension and family only when their plan and
+- [ ] Generate local kernels by dimension and family only when their plan and
    signature are reusable; otherwise encode only the necessary block/form suffix.
-4. Generate mesh kernels by element or compatible-element label with one naming
+- [ ] Generate mesh kernels by element or compatible-element label with one naming
    convention across all form kinds.
-5. Generate reference-data includes and accessors through one reference-data
+- [ ] Generate reference-data includes and accessors through one reference-data
    planner for affine/isoparametric, simplex/tensor-product, and mixed-order
    cases.
-6. Generate diagnostics from the same kernel expression and data-stream plan
+- [ ] Generate diagnostics from the same kernel expression and data-stream plan
    used by the kernel body.
 
 Acceptance criteria:

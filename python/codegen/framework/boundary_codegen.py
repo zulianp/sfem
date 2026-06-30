@@ -60,7 +60,7 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan, 
         parameters,
         coefficients,
         system,
-        use_tensor_product=emission_plan.uses_tensor_product_basis,
+        use_tensor_product=_uses_tensor_product_boundary_surface(surface),
     )
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
@@ -73,6 +73,14 @@ def _surface_element(element_type):
         return _CELL_TO_SURFACE[element_type]
     except KeyError as exc:
         raise ValueError("unsupported boundary cell element '%s'" % element_type) from exc
+
+
+def _uses_tensor_product_boundary_surface(surface):
+    surface = str(surface).upper()
+    return (
+        surface in ("QUADSHELL4", "QUADSHELL9")
+        or surface.startswith("PROTEUS_QUADSHELL")
+    )
 
 
 def _cell_side_nodes(element_type):

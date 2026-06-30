@@ -165,6 +165,13 @@ from .emission_plan import (
     emission_plan_for_element,
     emission_plan_from_unit_context,
 )
+from .kernel_signature import (
+    KernelArgument,
+    LocalKernelSignature,
+    MeshKernelSignature,
+    local_kernel_signatures_from_plan,
+    mesh_kernel_signature_from_plan,
+)
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
@@ -329,14 +336,17 @@ __all__ = [
     "GeometryPlan",
     "KernelCoupling",
     "KernelExpressionPlan",
+    "KernelArgument",
     "KernelPlan",
     "KernelEmission",
     "KernelScope",
     "KernelTarget",
+    "LocalKernelSignature",
     "LocalKernelPlan",
     "LocalPhase",
     "LocalPhasePlan",
     "MeshKernelPlan",
+    "MeshKernelSignature",
     "MeshPhase",
     "MeshPhasePlan",
     "OpenMPSoABackend",
@@ -446,7 +456,9 @@ __all__ = [
     "linearized_first_piola",
     "linearized_transformed_first_piola",
     "layout_offset",
+    "local_kernel_signatures_from_plan",
     "matrix_inner",
+    "mesh_kernel_signature_from_plan",
     "matrix_symbols",
     "material_parameter",
     "old",

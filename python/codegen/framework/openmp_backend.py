@@ -10,6 +10,10 @@ from .generation_plan import (
     LocalPhase,
 )
 from .emission_plan import emission_plan_for_element, emission_plan_from_unit_context
+from .kernel_signature import (
+    local_kernel_signatures_from_plan,
+    mesh_kernel_signature_from_plan,
+)
 from .symbolic import (
     generate_sfem_soa_cpp_files_for_element,
 )
@@ -48,6 +52,8 @@ class _OpenMPTraversal:
     action_coeffs: tuple = ()
     field_element_types: object = None
     boundary_expression_plan: object = None
+    local_signatures: tuple = ()
+    mesh_signature: object = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +70,14 @@ class OpenMPSoABackend:
             self._validate_mesh_source_contract(files)
         return OpenMPSoAEmission(files)
 
+    def local_signatures(self, unit, context):
+        unit.validate_for_context(context)
+        return self._traversal(unit, context).local_signatures
+
+    def mesh_signature(self, unit, context):
+        unit.validate_for_context(context)
+        return self._traversal(unit, context).mesh_signature
+
     def _traversal(self, unit, context):
         kind = _kind_value(unit.kind)
         if kind == "energy_soa":
@@ -79,6 +93,7 @@ class OpenMPSoABackend:
         prefix = _generated_prefix(unit)
         local_kernel = unit.local_kernel_plan(context, prefix)
         mesh_kernel = MeshKernelPlan(prefix, context.element_type)
+        emission_plan = _validated_emission_plan(unit, context)
         return _OpenMPTraversal(
             "energy_soa",
             unit,
@@ -88,8 +103,20 @@ class OpenMPSoABackend:
             local_name=local_kernel.header,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
-            emission_plan=_validated_emission_plan(unit, context),
+            emission_plan=emission_plan,
             kernel_forms=_energy_kernel_forms(unit),
+            local_signatures=local_kernel_signatures_from_plan(
+                unit,
+                emission_plan,
+                local_kernel.name,
+                "energy_soa",
+            ),
+            mesh_signature=mesh_kernel_signature_from_plan(
+                unit,
+                emission_plan,
+                mesh_kernel.name,
+                "energy_soa",
+            ),
         )
 
     def _residual_traversal(self, unit, context):
@@ -115,8 +142,9 @@ class OpenMPSoABackend:
             model = _diagonal_block_model(unit, collection, context)
             local_kernel = unit.local_kernel_plan(context, prefix)
             operator_prefix = "%s_%s" % (prefix, model.element_type.lower())
+            kind = "mixed_residual_soa"
             return _OpenMPTraversal(
-                "mixed_residual_soa",
+                kind,
                 unit,
                 context,
                 prefix,
@@ -135,6 +163,18 @@ class OpenMPSoABackend:
                 field_element_types={
                     field.field_name: model.element_type for field in model.system.fields
                 },
+                local_signatures=local_kernel_signatures_from_plan(
+                    unit,
+                    model.emission_plan,
+                    local_kernel.name,
+                    kind,
+                ),
+                mesh_signature=mesh_kernel_signature_from_plan(
+                    unit,
+                    model.emission_plan,
+                    operator_prefix,
+                    kind,
+                ),
             )
         local_kernel = unit.local_kernel_plan(
             context,
@@ -143,8 +183,10 @@ class OpenMPSoABackend:
         )
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
         if context.is_mixed_order:
+            kind = "mixed_residual_soa"
+            emission_plan = _validated_emission_plan(unit, context)
             return _OpenMPTraversal(
-                "mixed_residual_soa",
+                kind,
                 unit,
                 context,
                 prefix,
@@ -152,7 +194,7 @@ class OpenMPSoABackend:
                 local_name=local_kernel.header,
                 operator_prefix=mesh_kernel.name,
                 operator_name=mesh_kernel.source,
-                emission_plan=_validated_emission_plan(unit, context),
+                emission_plan=emission_plan,
                 system=system,
                 compatible_element=context.compatible_element,
                 residual_coeffs=residual_coeffs,
@@ -161,9 +203,23 @@ class OpenMPSoABackend:
                     collection.fields,
                     context,
                 ),
+                local_signatures=local_kernel_signatures_from_plan(
+                    unit,
+                    emission_plan,
+                    local_kernel.name,
+                    kind,
+                ),
+                mesh_signature=mesh_kernel_signature_from_plan(
+                    unit,
+                    emission_plan,
+                    mesh_kernel.name,
+                    kind,
+                ),
             )
+        kind = "residual_soa"
+        emission_plan = _validated_emission_plan(unit, context)
         return _OpenMPTraversal(
-            "residual_soa",
+            kind,
             unit,
             context,
             prefix,
@@ -171,25 +227,51 @@ class OpenMPSoABackend:
             local_name=local_kernel.header,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
-            emission_plan=_validated_emission_plan(unit, context),
+            emission_plan=emission_plan,
             system=system,
             residual_coeffs=residual_coeffs,
             action_coeffs=action_coeffs,
+            local_signatures=local_kernel_signatures_from_plan(
+                unit,
+                emission_plan,
+                local_kernel.name,
+                kind,
+            ),
+            mesh_signature=mesh_kernel_signature_from_plan(
+                unit,
+                emission_plan,
+                mesh_kernel.name,
+                kind,
+            ),
         )
 
     def _boundary_residual_traversal(self, unit, context):
         self._validate_boundary_residual_plan(unit)
         prefix = _generated_prefix(unit)
         mesh_kernel = unit.mesh_kernel_plan(context, prefix)
+        emission_plan = _validated_emission_plan(unit, context)
+        kind = "boundary_residual_soa"
         return _OpenMPTraversal(
-            "boundary_residual_soa",
+            kind,
             unit,
             context,
             prefix,
             operator_prefix=mesh_kernel.name,
             operator_name=mesh_kernel.source,
-            emission_plan=_validated_emission_plan(unit, context),
+            emission_plan=emission_plan,
             boundary_expression_plan=_expression_plan_for_order(unit, FormOrder.ONE),
+            local_signatures=local_kernel_signatures_from_plan(
+                unit,
+                emission_plan,
+                "",
+                kind,
+            ),
+            mesh_signature=mesh_kernel_signature_from_plan(
+                unit,
+                emission_plan,
+                mesh_kernel.name,
+                kind,
+            ),
         )
 
     def _emit_traversal_files(self, traversal):
