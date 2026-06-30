@@ -160,7 +160,11 @@ including compatible mixed systems, single-field equations inside mixed
 contexts, and explicit diagonal-block element specializations. Reference data is
 now described by a shared `ReferenceDataPlan` with affine/isoparametric dataset
 entries, simplex/tensor-product accessors, and mixed-order field-element
-mappings derived from the same emission plan used by the backend.
+mappings derived from the same emission plan used by the backend. Diagnostics
+are now described by a shared `KernelDiagnosticsPlan` built from the same
+kernel expression plans, mesh/local signatures, and reference-data plan used by
+backend emission, with emitter-side validation of generated diagnostic ABI
+names.
 
 Tasks:
 
@@ -177,7 +181,7 @@ Tasks:
 - [x] Generate reference-data includes and accessors through one reference-data
    planner for affine/isoparametric, simplex/tensor-product, and mixed-order
    cases.
-- [ ] Generate diagnostics from the same kernel expression and data-stream plan
+- [x] Generate diagnostics from the same kernel expression and data-stream plan
    used by the kernel body.
 
 Acceptance criteria:

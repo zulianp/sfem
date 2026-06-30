@@ -38,6 +38,7 @@ def generate_boundary_residual_sfem_files(
     emission_plan,
     expression_plan,
     reference_data_plan=None,
+    diagnostics_plan=None,
 ):
     if emission_plan is None:
         raise ValueError("boundary residual codegen requires an ElementEmissionPlan")

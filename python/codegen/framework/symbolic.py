@@ -38,6 +38,19 @@ except ImportError:
     def validate_reference_data_plan(*args, **kwargs):
         return None
 
+
+def _validate_diagnostics_plan_names(plan, expected_names):
+    if plan is None:
+        return None
+    expected_names = tuple(str(name) for name in expected_names)
+    public_names = tuple(getattr(plan, "public_names", ()))
+    missing = tuple(name for name in expected_names if name not in public_names)
+    if missing:
+        raise ValueError(
+            "diagnostics plan is missing entries: %s" % ", ".join(missing)
+        )
+    return plan
+
 try:
     from .tensor_product_geometry import (
         isoparametric_adjugate_lines,
@@ -1517,6 +1530,7 @@ def generate_sfem_soa_cpp_files(
     geometry_family=None,
     local_prefix=None,
     reference_data_plan=None,
+    diagnostics_plan=None,
 ):
     forms = tuple(forms)
     if quadrature_rule is None and element_type is not None:
@@ -1566,6 +1580,14 @@ def generate_sfem_soa_cpp_files(
             affine_quadrature_rule,
             quadrature_rule,
             basis_family,
+        )
+    if diagnostics_plan is not None:
+        _validate_diagnostics_plan_names(
+            diagnostics_plan,
+            tuple(
+                _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
+                for form in forms
+            ),
         )
 
     local_prefix = prefix if local_prefix is None else str(local_prefix)
@@ -1640,6 +1662,7 @@ def generate_sfem_soa_cpp_files_for_element(
     array_inputs=None,
     local_prefix=None,
     reference_data_plan=None,
+    diagnostics_plan=None,
 ):
     if emission_plan is None:
         raise ValueError("energy code generation requires an ElementEmissionPlan")
@@ -1676,6 +1699,7 @@ def generate_sfem_soa_cpp_files_for_element(
         geometry_family=geometry_family,
         local_prefix=local_prefix,
         reference_data_plan=reference_data_plan,
+        diagnostics_plan=diagnostics_plan,
     )
 
 

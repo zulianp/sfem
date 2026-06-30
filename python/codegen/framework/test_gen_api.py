@@ -1449,6 +1449,86 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("tri3_shape", mixed_iso.accessors)
         self.assertIn("tri3_grad_ref_y", mixed_iso.accessors)
 
+    def test_openmp_backend_plans_diagnostics_from_kernel_plan(self):
+        energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
+        energy_plan = gen.SpecializedFormManipulationStage(
+            energy_input,
+            gen._evaluate_forms(energy_input),
+        ).run()
+        energy_context = energy_input.element_contexts[0]
+        energy_unit = energy_plan.emission_kernels_for_context(energy_context)[0]
+        energy_diagnostics = gen.OPENMP_SOA_BACKEND.diagnostics_plan(
+            energy_unit,
+            energy_context,
+        )
+        self.assertIsInstance(energy_diagnostics, gen.KernelDiagnosticsPlan)
+        self.assertEqual(energy_diagnostics.kind, "energy_soa")
+        self.assertEqual(
+            energy_diagnostics.public_names,
+            (
+                "neohookean_ogden_hex8_hex8_objective_soa",
+                "neohookean_ogden_hex8_hex8_gradient_soa",
+                "neohookean_ogden_hex8_hex8_apply_soa",
+            ),
+        )
+        apply_entry = energy_diagnostics.entry("neohookean_ogden_hex8_hex8_apply_soa")
+        self.assertIsInstance(apply_entry, gen.KernelDiagnosticsEntryPlan)
+        self.assertEqual(apply_entry.expression_name, "apply")
+        self.assertIsNotNone(apply_entry.cost)
+        self.assertEqual(apply_entry.mesh_signature.name, "neohookean_ogden_hex8")
+        self.assertEqual(apply_entry.reference_dataset.stage, "isoparametric")
+        self.assertTrue(apply_entry.uses_direction)
+
+        residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        residual_plan = gen.SpecializedFormManipulationStage(
+            residual_input,
+            gen._evaluate_forms(residual_input),
+        ).run()
+        residual_context = residual_input.element_contexts[0]
+        residual_unit = residual_plan.emission_kernels_for_context(residual_context)[0]
+        residual_diagnostics = gen.OPENMP_SOA_BACKEND.diagnostics_plan(
+            residual_unit,
+            residual_context,
+        )
+        self.assertEqual(residual_diagnostics.kind, "residual_soa")
+        self.assertIn(
+            "two_phase_flow_tri3_residual_element_soa",
+            residual_diagnostics.public_names,
+        )
+        self.assertIn(
+            "two_phase_flow_tri3_jacobian_p_w_p_c",
+            residual_diagnostics.public_names,
+        )
+        self.assertIn(
+            "two_phase_flow_tri3_jacobian_action_element_soa",
+            residual_diagnostics.public_names,
+        )
+        block_entry = residual_diagnostics.entry("two_phase_flow_tri3_jacobian_p_w_p_c")
+        self.assertEqual(block_entry.expression_name, "form_2")
+        self.assertEqual(block_entry.block_name, "jacobian_p_w_p_c")
+        self.assertEqual(block_entry.reference_dataset.stage, "isoparametric")
+
+        stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
+        mixed_input = gen.UserInputStage.create(stokes, (stokes_element,), 16, None)
+        mixed_plan = gen.SpecializedFormManipulationStage(
+            mixed_input,
+            gen._evaluate_forms(mixed_input),
+        ).run()
+        mixed_context = mixed_input.element_contexts[0]
+        mixed_unit = mixed_plan.emission_kernels_for_context(mixed_context)[0]
+        mixed_diagnostics = gen.OPENMP_SOA_BACKEND.diagnostics_plan(
+            mixed_unit,
+            mixed_context,
+        )
+        self.assertEqual(mixed_diagnostics.kind, "mixed_residual_soa")
+        self.assertEqual(
+            mixed_diagnostics.public_names,
+            (
+                "stokes_tri6_tri3_residual_element_soa",
+                "stokes_tri6_tri3_jacobian_action_element_soa",
+            ),
+        )
+
     def test_openmp_backend_consumes_kernel_phase_plan(self):
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         plan = gen.SpecializedFormManipulationStage(

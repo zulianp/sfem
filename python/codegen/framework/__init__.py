@@ -174,6 +174,12 @@ from .kernel_signature import (
     local_kernel_suffix_from_plan,
     mesh_kernel_signature_from_plan,
 )
+from .diagnostics_plan import (
+    KernelDiagnosticsEntryPlan,
+    KernelDiagnosticsPlan,
+    kernel_diagnostics_plan_from_plan,
+    validate_diagnostics_plan_names,
+)
 from .reference_data_plan import (
     ReferenceBasisDataPlan,
     ReferenceDataPlan,
@@ -345,6 +351,8 @@ __all__ = [
     "KernelCoupling",
     "KernelExpressionPlan",
     "KernelArgument",
+    "KernelDiagnosticsEntryPlan",
+    "KernelDiagnosticsPlan",
     "KernelPlan",
     "KernelEmission",
     "KernelScope",
@@ -470,6 +478,7 @@ __all__ = [
     "layout_offset",
     "local_kernel_signatures_from_plan",
     "local_kernel_suffix_from_plan",
+    "kernel_diagnostics_plan_from_plan",
     "matrix_inner",
     "mesh_kernel_signature_from_plan",
     "matrix_symbols",
@@ -527,6 +536,7 @@ __all__ = [
     "vector_field",
     "variable",
     "value",
+    "validate_diagnostics_plan_names",
     "weak_gradient_from_transformed_first_piola",
     "weak_hessian_action_from_linearized_transformed_first_piola",
     "TwoPhaseFlowConstitutiveModel",
