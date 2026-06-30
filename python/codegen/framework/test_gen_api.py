@@ -1275,6 +1275,44 @@ class GenApiTest(unittest.TestCase):
         self.assertFalse(hasattr(gen, "generate_sfem_soa_cpp_files_for_element"))
         self.assertFalse(hasattr(gen, "generate_coupled_residual_sfem_files"))
         self.assertFalse(hasattr(gen, "generate_mixed_residual_sfem_files"))
+        self.assertFalse(hasattr(gen, "EnergySoAEmissionContext"))
+        self.assertTrue(hasattr(gen, "EnergySoAKernelEmissionPlan"))
+
+    def test_cuda_backend_is_separate_from_openmp_backend(self):
+        self.assertIsInstance(gen.CUDA_SOA_BACKEND, gen.CUDASoABackend)
+        self.assertNotIn("OpenMPSoABackend", gen.CUDASoABackend.__dict__)
+        self.assertFalse(hasattr(gen.CUDA_SOA_BACKEND, "openmp_backend"))
+
+    def test_cuda_backend_emits_material_energy_kernels_from_plan(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("TRI3",),
+                target="cuda",
+                dump_plan=True,
+            )
+            relative = _relative_sources(result, out_dir)
+            self.assertIn(
+                os.path.join("d2", "tri3", "neohookean_ogden_tri3_operator.cu"),
+                relative,
+            )
+            self.assertIn(
+                os.path.join("d2", "neohookean_ogden_d2_simplex_local.hpp"),
+                relative,
+            )
+            operator_path = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "neohookean_ogden_tri3_operator.cu",
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                operator_source = input_file.read()
+            self.assertIn("__global__ void neohookean_ogden_tri3_tri3_objective_affine_mesh_soa_impl", operator_source)
+            self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
+            self.assertIn("atomicAdd", operator_source)
+            self.assertNotIn("#pragma omp", operator_source)
 
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)

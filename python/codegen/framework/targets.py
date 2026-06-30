@@ -7,6 +7,27 @@ class TargetLanguage(Enum):
     CUDA = "cuda"
 
 
+class ExecutionModel(Enum):
+    VECTOR_LANES = "vector_lanes"
+    SIMT_THREADS = "simt_threads"
+
+
+@dataclass(frozen=True)
+class LoopLoweringPolicy:
+    execution_model: ExecutionModel = ExecutionModel.VECTOR_LANES
+    emits_lane_loop: bool = True
+    maps_lane_to_thread: bool = False
+    vectorize_lane_loop: bool = False
+    parallel_element_loop: bool = False
+    supports_shared_memory: bool = False
+    lane_index: str = "lane"
+    vector_size_symbol: str = "VECTOR_SIZE"
+    thread_index: str = "threadIdx.x"
+    block_index: str = "blockIdx.x"
+    block_dim: str = "blockDim.x"
+    grid_dim: str = "gridDim.x"
+
+
 @dataclass(frozen=True)
 class TargetPlatform:
     name: str
@@ -59,6 +80,9 @@ class TargetPlatform:
     def wrapper_style(self):
         return "c_abi"
 
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy()
+
     @property
     def supports_device_kernels(self):
         return False
@@ -91,6 +115,16 @@ class OpenMPTarget(TargetPlatform):
         alignment = self.default_alignment if alignment is None else int(alignment)
         return "__builtin_assume_aligned(%s, %d)" % (str(pointer), alignment)
 
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.VECTOR_LANES,
+            emits_lane_loop=True,
+            maps_lane_to_thread=False,
+            vectorize_lane_loop=True,
+            parallel_element_loop=True,
+            supports_shared_memory=False,
+        )
+
 
 @dataclass(frozen=True)
 class CUDATarget(TargetPlatform):
@@ -122,6 +156,16 @@ class CUDATarget(TargetPlatform):
 
     def wrapper_style(self):
         return "cuda_launcher"
+
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.SIMT_THREADS,
+            emits_lane_loop=False,
+            maps_lane_to_thread=True,
+            vectorize_lane_loop=False,
+            parallel_element_loop=False,
+            supports_shared_memory=True,
+        )
 
     @property
     def supports_device_kernels(self):

@@ -3,12 +3,7 @@ from dataclasses import dataclass
 import sympy as sp
 
 from .forms import FormOrder
-from .generation_plan import (
-    KernelTarget,
-    MeshPhase,
-    LocalPhase,
-    mesh_kernel_plan_from_context,
-)
+from .generation_plan import KernelTarget, MeshPhase, LocalPhase, mesh_kernel_plan_from_context
 from .emission_plan import emission_plan_for_element, emission_plan_from_unit_context
 from .kernel_signature import (
     local_kernel_signatures_from_plan,
@@ -16,10 +11,8 @@ from .kernel_signature import (
     mesh_kernel_signature_from_plan,
 )
 from .diagnostics_plan import kernel_diagnostics_plan_from_plan
+from .energy_emitters import OpenMPEnergySoAEmitter
 from .reference_data_plan import reference_data_plan_from_emission_plan
-from .symbolic import (
-    generate_sfem_soa_cpp_files_for_element,
-)
 from .boundary_codegen import generate_boundary_residual_sfem_files
 from .residual import CoupledResidualSystem
 from .residual_codegen import (
@@ -59,11 +52,15 @@ class _OpenMPTraversal:
     mesh_signature: object = None
     reference_data_plan: object = None
     diagnostics_plan: object = None
+    energy_plan: object = None
 
 
 @dataclass(frozen=True)
 class OpenMPSoABackend:
     """Single OpenMP/SoA backend boundary for planned code-generation units."""
+
+    supports_op_wrapper: bool = True
+    emitter: object = OpenMPEnergySoAEmitter()
 
     def emit(self, unit, context):
         unit.validate_for_context(context)
@@ -103,52 +100,23 @@ class OpenMPSoABackend:
 
     def _energy_traversal(self, unit, context):
         self._validate_energy_plan(unit)
-        prefix = _generated_prefix(unit)
-        local_kernel = unit.local_kernel_plan(context, prefix)
-        mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
-        emission_plan = _validated_emission_plan(unit, context)
-        reference_data_plan = reference_data_plan_from_emission_plan(
-            unit,
-            context,
-            emission_plan,
-            mesh_kernel.name,
-        )
-        local_signatures = local_kernel_signatures_from_plan(
-            unit,
-            emission_plan,
-            local_kernel.name,
-            "energy_soa",
-        )
-        mesh_signature = mesh_kernel_signature_from_plan(
-            unit,
-            emission_plan,
-            mesh_kernel.name,
-            "energy_soa",
-        )
-        diagnostics_plan = kernel_diagnostics_plan_from_plan(
-            unit,
-            emission_plan,
-            mesh_kernel.name,
-            "energy_soa",
-            reference_data_plan,
-            mesh_signature,
-            local_signatures,
-        )
+        energy_plan = self.emitter.plan(unit, context)
         return _OpenMPTraversal(
             "energy_soa",
             unit,
             context,
-            prefix,
-            local_prefix=local_kernel.name,
-            local_name=local_kernel.header,
-            operator_prefix=mesh_kernel.name,
-            operator_name=mesh_kernel.source,
-            emission_plan=emission_plan,
-            kernel_forms=_energy_kernel_forms(unit),
-            local_signatures=local_signatures,
-            mesh_signature=mesh_signature,
-            reference_data_plan=reference_data_plan,
-            diagnostics_plan=diagnostics_plan,
+            unit.name,
+            local_prefix=energy_plan.local_prefix,
+            local_name=energy_plan.local_kernel.header,
+            operator_prefix=energy_plan.mesh_kernel.name,
+            operator_name=energy_plan.mesh_kernel.source,
+            emission_plan=energy_plan.emission_plan,
+            kernel_forms=energy_plan.forms,
+            local_signatures=energy_plan.local_signatures,
+            mesh_signature=energy_plan.mesh_signature,
+            reference_data_plan=energy_plan.reference_data_plan,
+            diagnostics_plan=energy_plan.diagnostics_plan,
+            energy_plan=energy_plan,
         )
 
     def _residual_traversal(self, unit, context):
@@ -402,14 +370,7 @@ class OpenMPSoABackend:
 
     def _emit_traversal_files(self, traversal):
         if traversal.kind == "energy_soa":
-            return generate_sfem_soa_cpp_files_for_element(
-                traversal.kernel_forms,
-                prefix=traversal.operator_prefix,
-                local_prefix=traversal.local_prefix,
-                emission_plan=traversal.emission_plan,
-                reference_data_plan=traversal.reference_data_plan,
-                diagnostics_plan=traversal.diagnostics_plan,
-            )
+            return self.emitter.emit_plan(traversal.energy_plan)
         if traversal.kind == "residual_soa":
             return generate_coupled_residual_sfem_files(
                 traversal.system,
@@ -558,17 +519,6 @@ def _kind_value(kind):
 
 def _generated_prefix(unit):
     return unit.name
-
-
-def _energy_kernel_forms(unit):
-    kernel_forms = tuple(
-        expression_plan.source
-        for expression_plan in unit.expression_plans
-        if expression_plan.source is not None
-    )
-    if not kernel_forms:
-        raise ValueError("energy kernel plan '%s' has no expression-plan kernel forms" % unit.name)
-    return kernel_forms
 
 
 def _expression_plan_for_order(unit, order):

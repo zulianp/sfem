@@ -56,6 +56,7 @@ def isoparametric_adjugate_lines(
 
 
 def sfem_geometry_kernels_header_source():
+    simd = ("#pragma omp simd",)
     return "\n".join(
         [
             "#ifndef SFEM_CODEGEN_GEOMETRY_KERNELS_HPP",
@@ -129,7 +130,7 @@ def sfem_geometry_kernels_header_source():
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
             "        for (int q = 0; q < N_QP; ++q) {",
-            "#pragma omp simd",
+            *simd,
             "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
             "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];",
@@ -151,7 +152,7 @@ def sfem_geometry_kernels_header_source():
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
             "        for (int q = 0; q < N_QP; ++q) {",
-            "#pragma omp simd",
+            *simd,
             "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
             "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",

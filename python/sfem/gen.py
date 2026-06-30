@@ -170,11 +170,17 @@ from codegen.framework.fem import (
     sfem_tensor_product_hex_order,
     sfem_tensor_hex_shape_index,
 )
+from codegen.framework.cuda_backend import CUDASoABackend
 from codegen.framework.openmp_backend import OpenMPSoABackend
 
 
 DEFAULT_VECTOR_SIZE = 16
 OPENMP_SOA_BACKEND = OpenMPSoABackend()
+CUDA_SOA_BACKEND = CUDASoABackend()
+BACKENDS_BY_TARGET = {
+    KernelTarget.OPENMP: OPENMP_SOA_BACKEND,
+    KernelTarget.CUDA: CUDA_SOA_BACKEND,
+}
 
 for _name in _framework_public.__all__:
     if _name not in globals():
@@ -611,6 +617,7 @@ class SpecializedFormManipulationStage:
 class CodeGenerationStage:
     user_input: UserInputStage
     codegen_plan: CodeGenerationPlan
+    target: object = "openmp"
 
     @property
     def stage(self):
@@ -618,6 +625,7 @@ class CodeGenerationStage:
 
     def run(self):
         outputs = {}
+        target = _normalize_generation_target(self.target)
         for context in self.user_input.element_contexts:
             for unit in self.codegen_plan.emission_kernels_for_context(context):
                 _merge_files(
@@ -625,7 +633,7 @@ class CodeGenerationStage:
                     _layout_codegen_files(
                         unit,
                         context,
-                        _emit_codegen_unit(unit, context),
+                        _emit_codegen_unit(unit, context, target),
                     ),
                 )
         return outputs
@@ -642,6 +650,7 @@ def generate(
     clean=True,
     dump_plan=False,
     plan_out=None,
+    target="openmp",
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
@@ -668,9 +677,11 @@ def generate(
         form_evaluation,
     ).run()
     plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out) if dump_plan or plan_out else None
-    files = CodeGenerationStage(user_input, codegen_plan).run()
+    target = _normalize_generation_target(target)
+    backend = _backend_for_target(target)
+    files = CodeGenerationStage(user_input, codegen_plan, target).run()
 
-    if material.op_name:
+    if material.op_name and backend.supports_op_wrapper:
         files.update(_generate_op_wrapper_files(material, selected, user_input, files))
 
     source_paths = _write_files(out_dir, files)
@@ -693,6 +704,12 @@ def run(material, default_out_dir, argv=None):
     parser.add_argument("--quadrature-order", type=int)
     parser.add_argument("--vector-size", type=int, default=DEFAULT_VECTOR_SIZE)
     parser.add_argument("--compile", action="store_true")
+    parser.add_argument(
+        "--target",
+        choices=("openmp", "cuda"),
+        default="openmp",
+        help="Backend target to emit.",
+    )
     parser.add_argument(
         "--dump-plan",
         action="store_true",
@@ -719,6 +736,7 @@ def run(material, default_out_dir, argv=None):
             clean=not args.keep_existing,
             dump_plan=args.dump_plan,
             plan_out=args.plan_out,
+            target=args.target,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
@@ -1084,12 +1102,27 @@ def _block_unit_name(unit_name, block):
     return block.name
 
 
-def _emit_codegen_unit(unit, context):
+def _emit_codegen_unit(unit, context, target=KernelTarget.OPENMP):
     if unit.target is not KernelTarget.OPENMP:
-        raise ValueError("unsupported code generation target %s" % unit.target)
-    files = list(OPENMP_SOA_BACKEND.emit(unit, context))
+        raise ValueError("unsupported code generation plan target %s" % unit.target)
+    backend = _backend_for_target(target)
+    files = list(backend.emit(unit, context))
     files.extend(_diagnostic_files_for_unit(unit, context))
     return tuple(files)
+
+
+def _backend_for_target(target):
+    target = _normalize_generation_target(target)
+    try:
+        return BACKENDS_BY_TARGET[target]
+    except KeyError as exc:
+        raise ValueError("unsupported code generation target %s" % target) from exc
+
+
+def _normalize_generation_target(target):
+    if isinstance(target, KernelTarget):
+        return target
+    return KernelTarget(str(target).lower())
 
 
 def _diagnostic_files_for_unit(unit, context):
