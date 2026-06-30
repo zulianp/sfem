@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 import sympy as sp
 
@@ -38,7 +39,7 @@ from symbolic import (
     sfem_soa_weak_form,
     vector_symbols,
 )
-from fem import sfem_tensor_hex_shape_index
+from fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 
 
 def neohookean_ogden_energy(F, mu, lmbda):
@@ -48,6 +49,30 @@ def neohookean_ogden_energy(F, mu, lmbda):
     logJ = sp.log(J)
     return mu * sp.Rational(1, 2) * (I1 - dim) - mu * logJ + (
         lmbda * sp.Rational(1, 2) * logJ * logJ
+    )
+
+
+def element_emission_plan(element_type, vector_size=16, quadrature_order=None):
+    policy = sfem_fem_policy(element_type, vector_size, quadrature_order)
+    affine_policy = sfem_fem_policy(element_type, vector_size, quadrature_order)
+    return SimpleNamespace(
+        element_type=policy.cell_element_type,
+        label=policy.label,
+        family=policy.family,
+        basis_family=policy.family,
+        geometry_family=policy.family,
+        uses_tensor_product_basis=policy.family == "tensor_product",
+        vector_size=policy.specialization.vector_size,
+        affine_specialization=affine_policy.specialization,
+        isoparametric_specialization=policy.specialization,
+    )
+
+
+def emission_plan_from_specialization(specialization):
+    return element_emission_plan(
+        specialization.quadrature_rule.element_type,
+        specialization.vector_size,
+        specialization.quadrature_rule.order,
     )
 
 
@@ -382,7 +407,7 @@ def generated_neohookean_weak_form_files(element_type, prefix, vector_size=16, l
             ),
         ),
         prefix=prefix,
-        specialization=specialization,
+        emission_plan=emission_plan_from_specialization(specialization),
         local_prefix=local_prefix,
     )
 
@@ -824,7 +849,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_quad4_tensor_product",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -923,7 +948,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_hex8_tensor_product",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1011,7 +1036,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_weak_neohookean",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1099,7 +1124,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_quad4_weak_neohookean",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1157,7 +1182,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_quad4_iso_objective",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         operator_source = {
@@ -1214,7 +1239,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_hex27_weak_neohookean",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -2051,7 +2076,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 ),
             ),
             prefix="generated_neohookean_ogden",
-            specialization=specialization,
+            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}

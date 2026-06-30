@@ -1,7 +1,12 @@
 from dataclasses import dataclass
 
-from .basis import BasisFamily
-from .geometry import GeometryMode
+from .basis import BasisFamily, basis_plans_for_fem_policy
+from .fem import sfem_fem_policy
+from .geometry import (
+    GeometryMode,
+    affine_geometry_plan,
+    isoparametric_geometry_plan,
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,14 @@ class ElementEmissionPlan:
     def uses_tensor_product_basis(self):
         return any(basis.uses_sum_factorization for basis in self.basis_plans)
 
+    @property
+    def basis_family(self):
+        return "tensor_product" if self.uses_tensor_product_basis else "simplex"
+
+    @property
+    def geometry_family(self):
+        return "tensor_product" if self.uses_tensor_product_geometry else "simplex"
+
 
 def emission_plan_from_unit_context(unit, context):
     affine = _geometry_for_mode(unit, GeometryMode.AFFINE)
@@ -78,6 +91,40 @@ def emission_plan_from_unit_context(unit, context):
         tuple(dict.fromkeys(basis_plans)),
         context.affine_specialization,
         context.specialization,
+    )
+
+
+def emission_plan_for_element(
+    element,
+    vector_size,
+    isoparametric_quadrature_order=None,
+    *,
+    isoparametric_integration_case="standard",
+    affine_quadrature_order=None,
+    affine_integration_case="standard",
+):
+    policy = sfem_fem_policy(
+        element,
+        vector_size,
+        isoparametric_quadrature_order,
+        integration_case=isoparametric_integration_case,
+    )
+    affine_policy = sfem_fem_policy(
+        element,
+        vector_size,
+        affine_quadrature_order,
+        integration_case=affine_integration_case,
+    )
+    return ElementEmissionPlan(
+        policy.cell_element_type,
+        policy.label,
+        policy.family,
+        policy.specialization.vector_size,
+        affine_geometry_plan(affine_policy),
+        isoparametric_geometry_plan(policy),
+        basis_plans_for_fem_policy(policy),
+        affine_policy.specialization,
+        policy.specialization,
     )
 
 

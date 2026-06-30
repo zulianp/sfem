@@ -32,12 +32,10 @@ _CELL_TO_SURFACE = {
 }
 
 
-def generate_boundary_residual_sfem_files(collection, *, prefix, element_type=None, emission_plan=None):
-    if emission_plan is not None:
-        element_type = emission_plan.element_type
-    if element_type is None:
-        raise ValueError("boundary residual codegen requires element_type or emission_plan")
-    element_type = str(element_type).upper()
+def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan):
+    if emission_plan is None:
+        raise ValueError("boundary residual codegen requires an ElementEmissionPlan")
+    element_type = emission_plan.element_type
     surface = _surface_element(element_type)
     if collection.measure != "ds":
         raise ValueError("boundary residual codegen requires measure 'ds'")
@@ -62,9 +60,7 @@ def generate_boundary_residual_sfem_files(collection, *, prefix, element_type=No
         parameters,
         coefficients,
         system,
-        use_tensor_product=(
-            None if emission_plan is None else emission_plan.family == "tensor_product"
-        ),
+        use_tensor_product=emission_plan.uses_tensor_product_basis,
     )
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
@@ -211,12 +207,8 @@ def _dependency_symbols(dependencies):
     return tuple(dict.fromkeys(ret))
 
 
-def _boundary_source(function, element_type, surface, components, parameters, coefficients, system, use_tensor_product=None):
-    use_tensor_product = (
-        _use_tensor_product_boundary(element_type, surface)
-        if use_tensor_product is None
-        else bool(use_tensor_product)
-    )
+def _boundary_source(function, element_type, surface, components, parameters, coefficients, system, use_tensor_product):
+    use_tensor_product = bool(use_tensor_product)
     if use_tensor_product:
         return _boundary_tensor_product_source(
             function,
@@ -532,12 +524,6 @@ extern "C" int {sideset_function}_float(
         ),
         scatter_streams=scatter_streams,
     )
-
-
-def _use_tensor_product_boundary(element_type, surface):
-    element_type = str(element_type).upper()
-    surface = str(surface).upper()
-    return surface in ("QUADSHELL4", "QUADSHELL9") or surface.startswith("PROTEUS_QUADSHELL")
 
 
 def _coordinate_symbol_tuple(physical_dim):
