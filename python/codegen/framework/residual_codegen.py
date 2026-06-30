@@ -31,6 +31,7 @@ from .quadrature_codegen import (
     quadrature_reference_struct_lines,
 )
 from .reference_data_plan import validate_reference_data_plan
+from .diagnostics_plan import validate_diagnostics_plan_names
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -569,6 +570,7 @@ def generate_coupled_residual_sfem_files(
     operator_prefix=None,
     operator_name=None,
     reference_data_plan=None,
+    diagnostics_plan=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -599,6 +601,16 @@ def generate_coupled_residual_sfem_files(
             specialization.quadrature_rule,
             family,
         )
+    if diagnostics_plan is not None:
+        expected_diagnostics = [
+            "%s_residual_element_soa" % element_prefix,
+        ]
+        expected_diagnostics.extend(
+            "%s_%s" % (element_prefix, block.name)
+            for block in system.jacobian_blocks()
+        )
+        expected_diagnostics.append("%s_jacobian_action_element_soa" % element_prefix)
+        validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
     operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
     local_source = _local_header(
@@ -655,6 +667,7 @@ def generate_mixed_residual_sfem_files(
     operator_prefix=None,
     operator_name=None,
     reference_data_plan=None,
+    diagnostics_plan=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -693,6 +706,14 @@ def generate_mixed_residual_sfem_files(
         )
     local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
     element_prefix = "%s_%s" % (prefix, compatible_element.name.lower()) if operator_prefix is None else str(operator_prefix)
+    if diagnostics_plan is not None:
+        validate_diagnostics_plan_names(
+            diagnostics_plan,
+            (
+                "%s_residual_element_soa" % element_prefix,
+                "%s_jacobian_action_element_soa" % element_prefix,
+            ),
+        )
     local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
     operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
     local_source = _mixed_local_header(
