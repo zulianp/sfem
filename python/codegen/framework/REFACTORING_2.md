@@ -14,6 +14,11 @@ adding new material-specific paths.
 - Generated hot loops must remain SoA, branch-light, and vectorization-friendly.
 - No retro-compatibility shims for removed APIs.
 
+## Architecture
+The architecture is layered: Symbolic Layer (no string generation), Form unification layer, 
+laning layer, Code generation / emission layer (string generation). 
+Emitters take the full plan and generate the kernels
+
 ## M1. Complete Dependency-Pruned Form Collections
 
 Goal: make dependency pruning uniform for energy, residual, and boundary forms.
@@ -202,6 +207,11 @@ function qualifiers, restrict qualifiers, parallel/vector/atomic pragmas,
 alignment assumptions, math helper names, diagnostics/profiling helper names,
 kernel launch style, wrapper style, and device-kernel capability. `OpenMPTarget`
 and `CUDATarget` specialize those hooks while preserving the existing target API.
+Target loop lowering policies now distinguish OpenMP vector-lane execution from
+CUDA SIMT execution so CUDA backends do not inherit host `lane` loop assumptions.
+The first CUDA backend skeleton lowers a generic `ExpressionGraph` through the
+same evaluation plan used by the C++/OpenMP path into a grid-stride SIMT kernel
+with a host launcher.
 
 Tasks:
 
@@ -215,7 +225,7 @@ Tasks:
    - kernel launch/wrapper style
 - [ ] Move OpenMP-specific pragmas and vectorization assumptions out of emitters
    and into `OpenMPTarget`.
-- [ ] Implement a CUDA backend skeleton that consumes the same kernel plans and
+- [x] Implement a CUDA backend skeleton that consumes the same kernel plans and
    emits CUDA-safe local/device code for at least one simple residual kernel.
 - [ ] Ensure CUDA emission uses `kernel_math.hpp` helpers including specialized
    `pow_y(x)` instead of generic `pow` where possible.
@@ -342,3 +352,5 @@ Acceptance criteria:
    functional.
 7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
+
+

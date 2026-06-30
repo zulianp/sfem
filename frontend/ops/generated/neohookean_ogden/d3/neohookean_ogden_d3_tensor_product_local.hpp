@@ -1,6 +1,5 @@
 #ifndef NEOHOOKEAN_OGDEN_D3_TENSOR_PRODUCT_LOCAL_HPP
 #define NEOHOOKEAN_OGDEN_D3_TENSOR_PRODUCT_LOCAL_HPP
-
 #include <math.h>
 #include <stddef.h>
 #if defined(__has_include)
@@ -9,25 +8,20 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-
 #include "../kernel_math.hpp"
 #include "../tensor_product_kernels.hpp"
-
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
-
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
-
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
 typedef double geom_t;
 #endif
-
 namespace sfem {
 namespace codegen {
 

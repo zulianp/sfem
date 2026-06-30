@@ -1,17 +1,14 @@
 #include "../neohookean_ogden_d3_tensor_product_local.hpp"
 #include "../../geometry_kernels.hpp"
 #include "../../kernel_diagnostics.hpp"
-
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
 #endif
-
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifdef _OPENMP
-#include <omp.h>
 #endif
 
 namespace sfem {
@@ -1068,7 +1065,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_gradient_affine_mesh_soa_impl(
             for (int d = 0; d < DIM; ++d) {
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
+                    #pragma omp atomic update
                     out_components[d][node] += block_out_data[shape * DIM + d][lane];
                 }
             }
@@ -1264,7 +1261,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_gradient_isoparametric_mesh_so
             for (int d = 0; d < DIM; ++d) {
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
+                    #pragma omp atomic update
                     out_components[d][node] += block_out_data[shape * DIM + d][lane];
                 }
             }
@@ -1551,7 +1548,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_apply_affine_mesh_soa_impl(
             for (int d = 0; d < DIM; ++d) {
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
+                    #pragma omp atomic update
                     out_components[d][node] += block_out_data[shape * DIM + d][lane];
                 }
             }
@@ -1766,7 +1763,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_i
             for (int d = 0; d < DIM; ++d) {
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
+                    #pragma omp atomic update
                     out_components[d][node] += block_out_data[shape * DIM + d][lane];
                 }
             }

@@ -32,6 +32,7 @@ from symbolic import (
     displacement_gradient_from_reference,
     execution_scope,
     generate_cpp_kernel,
+    generate_cuda_kernel,
     gradient_from_energy,
     hessian_action_from_energy,
     jacobian_action_from_residual,
@@ -56,7 +57,7 @@ from forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from targets import CUDATarget, OpenMPTarget, TargetLanguage
+from targets import CUDATarget, ExecutionModel, OpenMPTarget, TargetLanguage
 
 
 class SymbolicFrameworkTest(unittest.TestCase):
@@ -150,6 +151,14 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(openmp.kernel_launch_style(), "host_function")
         self.assertEqual(openmp.wrapper_style(), "c_abi")
         self.assertFalse(openmp.supports_device_kernels)
+        openmp_loop = openmp.loop_lowering_policy()
+        self.assertEqual(openmp_loop.execution_model, ExecutionModel.VECTOR_LANES)
+        self.assertTrue(openmp_loop.emits_lane_loop)
+        self.assertFalse(openmp_loop.maps_lane_to_thread)
+        self.assertTrue(openmp_loop.vectorize_lane_loop)
+        self.assertTrue(openmp_loop.parallel_element_loop)
+        self.assertEqual(openmp_loop.lane_index, "lane")
+        self.assertEqual(openmp_loop.vector_size_symbol, "VECTOR_SIZE")
         self.assertEqual(cuda.language, TargetLanguage.CUDA)
         self.assertEqual(cuda.function_qualifier(), "__device__ __forceinline__")
         self.assertEqual(cuda.restrict_qualifier(), "__restrict__")
@@ -160,6 +169,13 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(cuda.kernel_launch_style(), "cuda_grid_stride")
         self.assertEqual(cuda.wrapper_style(), "cuda_launcher")
         self.assertTrue(cuda.supports_device_kernels)
+        cuda_loop = cuda.loop_lowering_policy()
+        self.assertEqual(cuda_loop.execution_model, ExecutionModel.SIMT_THREADS)
+        self.assertFalse(cuda_loop.emits_lane_loop)
+        self.assertTrue(cuda_loop.maps_lane_to_thread)
+        self.assertFalse(cuda_loop.vectorize_lane_loop)
+        self.assertFalse(cuda_loop.parallel_element_loop)
+        self.assertTrue(cuda_loop.supports_shared_memory)
 
     def test_accepts_all_m1_expression_roles(self):
         x, y, z = sp.symbols("x y z")
@@ -268,6 +284,30 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertIn("pow_m2(", generated.source)
         self.assertNotIn("pow(x", generated.source)
         self.assertNotIn("pow(y", generated.source)
+
+    def test_generated_cuda_kernel_uses_simt_grid_stride_lowering(self):
+        x, y = sp.symbols("x[0] y[0]")
+        graph = (
+            KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2)
+            .build_graph(data_symbols=(x, y))
+        )
+
+        generated = generate_cuda_kernel(
+            graph,
+            function_name="cuda_plan_kernel",
+        )
+
+        self.assertEqual(generated.language, "cuda")
+        self.assertIn("#include <cuda_runtime.h>", generated.source)
+        self.assertIn("__device__ __forceinline__", generated.source)
+        self.assertIn('extern "C" __global__ void cuda_plan_kernel_global', generated.source)
+        self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", generated.source)
+        self.assertIn("e += blockDim.x * gridDim.x", generated.source)
+        self.assertIn("cuda_plan_kernel_global<<<grid_size, block_size>>>", generated.source)
+        self.assertIn("pow_2(", generated.source)
+        self.assertNotIn("#pragma omp", generated.source)
+        self.assertNotIn("ptrdiff_t lane", generated.source)
 
     def test_tags_loop_symbols(self):
         i, x = sp.symbols("i x")

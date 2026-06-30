@@ -38,6 +38,7 @@ from .symbolic import (
     directional_derivative,
     execution_scope,
     generate_cpp_kernel,
+    generate_cuda_kernel,
     generate_openmp_cpp_kernel,
     gradient_from_energy,
     hessian_action_from_energy,
@@ -186,6 +187,12 @@ from .reference_data_plan import (
     ReferenceDataSetPlan,
     reference_data_plan_from_emission_plan,
 )
+from .energy_emitters import (
+    CUDAEnergySoAEmitter,
+    EnergySoAKernelEmissionPlan,
+    OpenMPEnergySoAEmitter,
+)
+from .cuda_backend import CUDASoABackend, CUDASoAEmission
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
@@ -269,6 +276,8 @@ from .symbolic_qualifiers import (
 )
 from .targets import (
     CUDATarget,
+    ExecutionModel,
+    LoopLoweringPolicy,
     OpenMPTarget,
     TargetLanguage,
     TargetPlatform,
@@ -368,6 +377,11 @@ __all__ = [
     "MeshPhasePlan",
     "OpenMPSoABackend",
     "OpenMPSoAEmission",
+    "OpenMPEnergySoAEmitter",
+    "CUDAEnergySoAEmitter",
+    "EnergySoAKernelEmissionPlan",
+    "CUDASoABackend",
+    "CUDASoAEmission",
     "ReferenceBasisDataPlan",
     "ReferenceDataPlan",
     "ReferenceDataSetPlan",
@@ -441,6 +455,8 @@ __all__ = [
     "QualifiedExpression",
     "VELOCITY",
     "CUDATarget",
+    "ExecutionModel",
+    "LoopLoweringPolicy",
     "OpenMPTarget",
     "TargetLanguage",
     "TargetPlatform",
@@ -452,6 +468,7 @@ __all__ = [
     "execution_scope",
     "energy_form_pipeline",
     "generate_cpp_kernel",
+    "generate_cuda_kernel",
     "generate_openmp_cpp_kernel",
     "det",
     "deformation_gradient",

@@ -27,7 +27,6 @@ from symbolic import (
     execution_scope,
     generate_cpp_kernel,
     generate_openmp_cpp_kernel,
-    generate_sfem_soa_cpp_files_for_element,
     hessian_action_from_energy,
     matrix_inner,
     residual_from_energy,
@@ -39,6 +38,7 @@ from symbolic import (
     sfem_soa_weak_form,
     vector_symbols,
 )
+from energy_codegen import generate_sfem_soa_cpp_files_for_element
 from fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 
 

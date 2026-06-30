@@ -36,9 +36,11 @@ from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
     _sfem_ccode,
+    _sfem_math_header_source,
+)
+from .energy_codegen import (
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
-    _sfem_math_header_source,
 )
 
 
