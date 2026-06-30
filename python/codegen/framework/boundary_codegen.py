@@ -31,7 +31,14 @@ _CELL_TO_SURFACE = {
 }
 
 
-def generate_boundary_residual_sfem_files(collection, *, prefix, emission_plan, expression_plan):
+def generate_boundary_residual_sfem_files(
+    collection,
+    *,
+    prefix,
+    emission_plan,
+    expression_plan,
+    reference_data_plan=None,
+):
     if emission_plan is None:
         raise ValueError("boundary residual codegen requires an ElementEmissionPlan")
     if expression_plan is None:
