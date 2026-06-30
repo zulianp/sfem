@@ -1276,6 +1276,80 @@ class GenApiTest(unittest.TestCase):
         self.assertFalse(hasattr(gen, "generate_coupled_residual_sfem_files"))
         self.assertFalse(hasattr(gen, "generate_mixed_residual_sfem_files"))
 
+    def test_openmp_backend_plans_common_local_kernel_signatures(self):
+        energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
+        energy_plan = gen.SpecializedFormManipulationStage(
+            energy_input,
+            gen._evaluate_forms(energy_input),
+        ).run()
+        energy_unit = energy_plan.emission_kernels_for_context(energy_input.element_contexts[0])[0]
+        energy_signatures = gen.OPENMP_SOA_BACKEND.local_signatures(
+            energy_unit,
+            energy_input.element_contexts[0],
+        )
+        self.assertEqual(len(energy_signatures), 3)
+        self.assertTrue(all(isinstance(signature, gen.LocalKernelSignature) for signature in energy_signatures))
+        self.assertEqual(
+            energy_signatures[0].template_parameters,
+            (
+                "typename scalar_t",
+                "int N_QP",
+                "int N_SHAPE",
+                "int VECTOR_SIZE",
+            ),
+        )
+        self.assertIn("shape_1d", energy_signatures[0].argument_names)
+        self.assertIn("grad_1d", energy_signatures[0].argument_names)
+        self.assertIn("u_streams", energy_signatures[0].argument_names)
+        self.assertIn("h_streams", energy_signatures[2].argument_names)
+        energy_mesh_signature = gen.OPENMP_SOA_BACKEND.mesh_signature(
+            energy_unit,
+            energy_input.element_contexts[0],
+        )
+        self.assertIsInstance(energy_mesh_signature, gen.MeshKernelSignature)
+        self.assertEqual(energy_mesh_signature.template_parameters, ("typename scalar_t",))
+        self.assertIn("nelements", energy_mesh_signature.argument_names)
+        self.assertIn("nnodes", energy_mesh_signature.argument_names)
+        self.assertIn("elements", energy_mesh_signature.argument_names)
+        self.assertIn("adjugate", energy_mesh_signature.argument_names)
+        self.assertIn("determinant", energy_mesh_signature.argument_names)
+        self.assertIn("coordinates", energy_mesh_signature.argument_names)
+        self.assertIn("current", energy_mesh_signature.argument_names)
+        self.assertIn("direction", energy_mesh_signature.argument_names)
+        self.assertIn("output", energy_mesh_signature.argument_names)
+
+        residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
+        residual_plan = gen.SpecializedFormManipulationStage(
+            residual_input,
+            gen._evaluate_forms(residual_input),
+        ).run()
+        residual_unit = residual_plan.emission_kernels_for_context(residual_input.element_contexts[0])[0]
+        residual_signatures = gen.OPENMP_SOA_BACKEND.local_signatures(
+            residual_unit,
+            residual_input.element_contexts[0],
+        )
+        self.assertEqual(
+            tuple(signature.form_order for signature in residual_signatures),
+            (gen.FormOrder.ONE, gen.FormOrder.TWO),
+        )
+        self.assertIn("shape", residual_signatures[0].argument_names)
+        self.assertIn("current", residual_signatures[0].argument_names)
+        self.assertIn("output", residual_signatures[0].argument_names)
+        residual_mesh_signature = gen.OPENMP_SOA_BACKEND.mesh_signature(
+            residual_unit,
+            residual_input.element_contexts[0],
+        )
+        self.assertIn("previous", residual_mesh_signature.argument_names)
+        self.assertIn("direction", residual_mesh_signature.argument_names)
+        self.assertIn("output", residual_mesh_signature.argument_names)
+
+        block_unit = residual_plan.emission_kernels_for_context(residual_input.element_contexts[0])[1]
+        block_signatures = gen.OPENMP_SOA_BACKEND.local_signatures(
+            block_unit,
+            residual_input.element_contexts[0],
+        )
+        self.assertTrue(all("N_SHAPE" in signature.arguments[-1].declaration for signature in block_signatures))
+
     def test_openmp_backend_consumes_kernel_phase_plan(self):
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         plan = gen.SpecializedFormManipulationStage(
@@ -2136,6 +2210,28 @@ class GenApiTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(material, out_dir, elements=("TRI3",))
+            boundary_context = gen.UserInputStage.create(
+                material,
+                ("TRI3",),
+                gen.DEFAULT_VECTOR_SIZE,
+                None,
+            ).element_contexts[0]
+            boundary_signatures = gen.OPENMP_SOA_BACKEND.local_signatures(
+                result.plan.emission_kernels_for_context(boundary_context)[0],
+                boundary_context,
+            )
+            self.assertEqual(len(boundary_signatures), 1)
+            self.assertEqual(boundary_signatures[0].template_parameters[0], "typename scalar_t")
+            self.assertIn("shape", boundary_signatures[0].argument_names)
+            self.assertIn("output", boundary_signatures[0].argument_names)
+            boundary_mesh_signature = gen.OPENMP_SOA_BACKEND.mesh_signature(
+                result.plan.emission_kernels_for_context(boundary_context)[0],
+                boundary_context,
+            )
+            self.assertIn("nelements", boundary_mesh_signature.argument_names)
+            self.assertIn("elements", boundary_mesh_signature.argument_names)
+            self.assertIn("coordinates", boundary_mesh_signature.argument_names)
+            self.assertIn("output", boundary_mesh_signature.argument_names)
             expression_plan = next(
                 expression_plan
                 for expression_plan in result.plan.units[0].expression_plans
@@ -2164,12 +2260,30 @@ class GenApiTest(unittest.TestCase):
 
     def test_generates_neumann_boundary_integral_kernel(self):
         with tempfile.TemporaryDirectory() as out_dir:
-            result = gen.generate(neumann, out_dir, elements=("HEX8",))
+            result = gen.generate(neumann, out_dir, elements=("QUAD4", "HEX8", "PROTEUS_HEX27"))
             names = _relative_sources(result, out_dir)
+            self.assertIn(
+                os.path.join("d2", "quad4", "neumann_quad4_boundary_operator.cpp"),
+                names,
+            )
             self.assertIn(
                 os.path.join("d3", "hex8", "neumann_hex8_boundary_operator.cpp"),
                 names,
             )
+            self.assertIn(
+                os.path.join("d3", "proteus_hex27", "neumann_proteus_hex27_boundary_operator.cpp"),
+                names,
+            )
+            with open(
+                os.path.join(
+                    out_dir,
+                    "d2",
+                    "quad4",
+                    "neumann_quad4_boundary_operator.cpp",
+                ),
+                encoding="utf-8",
+            ) as input_file:
+                quad_source = input_file.read()
             with open(
                 os.path.join(
                     out_dir,
@@ -2180,11 +2294,25 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as input_file:
                 source = input_file.read()
+            with open(
+                os.path.join(
+                    out_dir,
+                    "d3",
+                    "proteus_hex27",
+                    "neumann_proteus_hex27_boundary_operator.cpp",
+                ),
+                encoding="utf-8",
+            ) as input_file:
+                proteus_source = input_file.read()
+            self.assertIn("neumann_quad4_edgeshell2_boundary_residual_soa", quad_source)
+            self.assertNotIn("for (int qy = 0; qy < Q; ++qy)", quad_source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
+            self.assertIn("neumann_proteus_hex27_proteus_quadshell9_boundary_residual_soa", proteus_source)
             self.assertIn("static const scalar_t *shape_1d()", source)
             self.assertIn("static const scalar_t *grad_1d()", source)
             self.assertIn("static const scalar_t *weight_1d()", source)
+            self.assertIn("static const scalar_t *shape_1d()", proteus_source)
             self.assertIn('#include "../../kernel_math.hpp"', source)
             self.assertIn("for (int qy = 0; qy < Q; ++qy)", source)
             self.assertIn("for (int qx = 0; qx < Q; ++qx)", source)
