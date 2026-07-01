@@ -265,7 +265,7 @@ Acceptance criteria:
 Goal: generate runtime integration from plan metadata without manual frontend
 maintenance.
 
-Status: in progress. Generated OpenMP `sfem::Op` wrappers now emit a structured
+Status: implemented. Generated OpenMP `sfem::Op` wrappers now emit a structured
 `op/sfem_<Op>_manifest.json` next to the wrapper header/source and C ABI header.
 The manifest records wrapper paths, C ABI header path, generated include roots,
 factory entry-point names, and extracted C ABI declarations for energy,
@@ -280,13 +280,20 @@ unit, so maintained generated material wrappers no longer require
 hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
 Energy-only and coupled energy/residual wrappers now assemble generated kernel
 calls from form dependency metadata, so unused current, previous, direction, and
-parameter inputs are not forwarded through the wrapper layer.
+parameter inputs are not forwarded through the wrapper layer. Runtime affine
+and isoparametric selection is emitted from wrapper metadata and remains valid
+before and after initialization. Generated boundary wrappers now consume
+`NeumannConditions::Condition`, so sideset Neumann handling is integrated with
+the existing SFEM condition abstraction instead of defining a separate generated
+runtime condition type. `sfem_GeneratedOpWrapperCompileTest` now executes
+generated energy-only, residual-only, coupled energy/residual, and boundary
+residual wrappers.
 
 Tasks:
 
-1. Generate C ABI declarations for every emitted monolithic and block kernel
+1. [x] Generate C ABI declarations for every emitted monolithic and block kernel
    from the same plan data used by the backend.
-2. Generate `sfem::Op` wrappers from `CodeGenerationPlan` metadata, including
+2. [x] Generate `sfem::Op` wrappers from `CodeGenerationPlan` metadata, including
    block-system units and boundary units.
 3. [x] Generate a registration manifest listing wrapper headers, wrapper sources,
    factory names, and required generated include paths.
@@ -295,15 +302,19 @@ Tasks:
      metadata is produced at the code-generation boundary.
 4. [x] Use the manifest to update or generate SFEM factory registration instead of
    manually editing frontend includes/registration calls.
-5. Make runtime affine/isoparametric options plan-derived for objective,
+5. [x] Make runtime affine/isoparametric options plan-derived for objective,
    gradient, residual, Hessian action, and Jacobian action.
    - Generated wrappers now use one emitted affine-option table per wrapper for
      `set_option` and YAML parsing instead of duplicating operation alias logic
      in each wrapper family.
-6. Align generated boundary-condition support with SFEM condition abstractions;
+   - Generated wrappers now make affine options valid both before and after
+     wrapper initialization: YAML affine flags are read before `initialize()`,
+     and `set_option(..., true)` refreshes cached affine geometry for already
+     initialized factory-created operators.
+6. [x] Align generated boundary-condition support with SFEM condition abstractions;
    keep generated Neumann sideset handling as one condition implementation, not
    a separate runtime design.
-7. Add runtime tests that execute generated `sfem::Op` wrappers for:
+7. [x] Add runtime tests that execute generated `sfem::Op` wrappers for:
    - energy-only operator
    - residual-only operator
    - coupled energy/residual operator
