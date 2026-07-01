@@ -13,6 +13,7 @@ from .tensor_product_geometry import (
     tensor_product_ordered_coordinate_streams,
 )
 from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+from .targets import OpenMPTarget
 from .fem import (
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
@@ -42,6 +43,48 @@ from .energy_codegen import (
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
 )
+
+
+def _target():
+    return OpenMPTarget()
+
+
+def _inline_qualifier():
+    return _target().inline_qualifier()
+
+
+def _function_qualifier():
+    return _target().function_qualifier()
+
+
+def _inline_definition_lines():
+    return _target().inline_definition_lines()
+
+
+def _vectorize_pragma():
+    return _target().vectorize_pragma()
+
+
+def _parallel_for_pragma(schedule=None):
+    return _target().parallel_for_pragma(schedule)
+
+
+def _atomic_update_pragma():
+    return _target().atomic_update_pragma()
+
+
+def _work_item_index():
+    return _target().work_item_index()
+
+
+def _work_item_loop_lines(indent, *, vectorize):
+    if vectorize:
+        return _target().work_item_loop_lines(indent)
+    work_item = _work_item_index()
+    return (
+        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
+        % (indent, work_item, work_item, work_item),
+    )
 
 
 @dataclass(frozen=True)
@@ -787,9 +830,7 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
         '#include "kernel_math.hpp"',
         '#include "tensor_product_kernels.hpp"',
         "",
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
+        *_inline_definition_lines(),
         "#ifndef SFEM_RESTRICT",
         "#define SFEM_RESTRICT",
         "#endif",
@@ -868,9 +909,7 @@ def _mixed_local_header(
         '#include "kernel_math.hpp"',
         '#include "tensor_product_kernels.hpp"',
         "",
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
+        *_inline_definition_lines(),
         "#ifndef SFEM_RESTRICT",
         "#define SFEM_RESTRICT",
         "#endif",
@@ -956,7 +995,7 @@ def _mixed_local_function(
     )
     lines = [
         "template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>",
-        "static SFEM_INLINE void %s(" % function_name,
+        "%s void %s(" % (_function_qualifier(), function_name),
     ]
     for index, param in enumerate(params):
         lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -994,8 +1033,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
     lines = [
         "    for (int q = 0; q < N_QP; ++q) {",
-        "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        *_work_item_loop_lines("        ", vectorize=True),
         "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
         "            const scalar_t det = determinant[geometry_offset];",
     ]
@@ -1167,7 +1205,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         )
     lines.extend(
         [
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     if uses_geometry_offset:
@@ -1414,7 +1452,7 @@ def _local_function(
     )
     lines = [
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-        "static SFEM_INLINE void %s(" % function_name,
+        "%s void %s(" % (_function_qualifier(), function_name),
     ]
     for index, param in enumerate(params):
         lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -1444,8 +1482,7 @@ def _simplex_local_body(system, coefficients, dependencies):
     dim = system.dim
     lines = [
         "    for (int q = 0; q < N_QP; ++q) {",
-        "#pragma omp simd",
-        "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+        *_work_item_loop_lines("        ", vectorize=True),
         "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
         "            const scalar_t det = determinant[geometry_offset];",
     ]
@@ -1570,8 +1607,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
         )
     lines.extend(
         [
-            "#pragma omp simd",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=True),
         ]
     )
     if uses_geometry_offset:
@@ -1979,9 +2015,7 @@ def _mixed_operator_source(
         "#ifndef SFEM_RESTRICT",
         "#define SFEM_RESTRICT",
         "#endif",
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
+        *_inline_definition_lines(),
         "#ifndef SFEM_GENERATED_SCALAR_T",
         "#define SFEM_GENERATED_SCALAR_T",
         "typedef double real_t;",
@@ -2216,7 +2250,7 @@ def _mixed_affine_function(
         "namespace codegen {",
         "",
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s(" % impl,
+        "%s int %s(" % (_function_qualifier(), impl),
     ]
     for index, param in enumerate(params):
         lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -2259,7 +2293,7 @@ def _mixed_affine_function(
     lines.extend(
         [
             "",
-            "#pragma omp parallel for schedule(static)",
+            _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
@@ -2275,8 +2309,7 @@ def _mixed_affine_function(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
             "",
-            "#pragma omp simd",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=True),
         ]
     )
     for shape in range(cell_rule.n_shape):
@@ -2288,7 +2321,7 @@ def _mixed_affine_function(
         [
             "        }",
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for field_index, field in enumerate(system.fields):
@@ -2334,7 +2367,7 @@ def _mixed_affine_function(
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for field_index, field in enumerate(system.fields):
@@ -2342,7 +2375,7 @@ def _mixed_affine_function(
             stream = layout.stream_index(field_index, local_shape)
             lines.extend(
                 [
-                    "#pragma omp atomic update",
+                    _atomic_update_pragma(),
                     "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
                     % (_mixed_mesh_output_pointer(field), local_shape, stream),
                 ]
@@ -2427,7 +2460,7 @@ def _mixed_isoparametric_function(
         "namespace codegen {",
         "",
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s(" % impl,
+        "%s int %s(" % (_function_qualifier(), impl),
     ]
     for index, param in enumerate(params):
         lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -2465,7 +2498,7 @@ def _mixed_isoparametric_function(
         lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     lines.extend(
         [
-            "#pragma omp parallel for schedule(static)",
+            _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
@@ -2484,8 +2517,7 @@ def _mixed_isoparametric_function(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
             "",
-            "#pragma omp simd",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=True),
         ]
     )
     for shape in range(cell_rule.n_shape):
@@ -2497,7 +2529,7 @@ def _mixed_isoparametric_function(
         [
             "        }",
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for shape in range(cell_rule.n_shape):
@@ -2566,8 +2598,7 @@ def _mixed_isoparametric_function(
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < N_QP; ++q) {",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                *_work_item_loop_lines("            ", vectorize=True),
             ]
         )
         for i in range(dim):
@@ -2625,7 +2656,7 @@ def _mixed_isoparametric_function(
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for field_index, field in enumerate(system.fields):
@@ -2633,7 +2664,7 @@ def _mixed_isoparametric_function(
             stream = layout.stream_index(field_index, local_shape)
             lines.extend(
                 [
-                    "#pragma omp atomic update",
+                    _atomic_update_pragma(),
                     "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
                     % (_mixed_mesh_output_pointer(field), local_shape, stream),
                 ]
@@ -2979,7 +3010,7 @@ def _mesh_operator_source(
         "namespace codegen {",
         "",
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s(" % impl,
+        "%s int %s(" % (_function_qualifier(), impl),
     ]
     params = [
         "const ptrdiff_t nelements",
@@ -3039,7 +3070,7 @@ def _mesh_operator_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel for schedule(static)",
+            _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
@@ -3061,8 +3092,7 @@ def _mesh_operator_source(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
             "",
-            "#pragma omp simd",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=True),
         ]
     )
     for shape in range(n_shape):
@@ -3070,7 +3100,7 @@ def _mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["        }", "", *_work_item_loop_lines("        ", vectorize=False)])
     for shape in range(n_shape):
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
@@ -3162,7 +3192,7 @@ def _mesh_operator_source(
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for shape in range(n_shape):
@@ -3170,7 +3200,7 @@ def _mesh_operator_source(
             stream = shape * n_fields + field_index
             lines.extend(
                 [
-                    "#pragma omp atomic update",
+                    _atomic_update_pragma(),
                     "            %s_out[ev[lane * N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
                     % (field.name, shape, stream),
                 ]
@@ -3380,7 +3410,7 @@ def _isoparametric_mesh_operator_source(
         "namespace codegen {",
         "",
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s(" % impl,
+        "%s int %s(" % (_function_qualifier(), impl),
     ]
     for index, param in enumerate(params):
         lines.append(
@@ -3401,7 +3431,7 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel for schedule(static)",
+            _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
@@ -3428,8 +3458,7 @@ def _isoparametric_mesh_operator_source(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
             "",
-            "#pragma omp simd",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=True),
         ]
     )
     for shape in range(n_shape):
@@ -3437,7 +3466,7 @@ def _isoparametric_mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["        }", "", *_work_item_loop_lines("        ", vectorize=False)])
     for shape in range(n_shape):
         node = "ev[lane * N_SHAPE + %d]" % shape
         for d in range(dim):
@@ -3510,8 +3539,7 @@ def _isoparametric_mesh_operator_source(
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < N_QP; ++q) {",
-                "#pragma omp simd",
-                "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+                *_work_item_loop_lines("            ", vectorize=True),
             ]
         )
         for i in range(dim):
@@ -3604,7 +3632,7 @@ def _isoparametric_mesh_operator_source(
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for shape in range(n_shape):
@@ -3612,7 +3640,7 @@ def _isoparametric_mesh_operator_source(
             stream = shape * n_fields + field_index
             lines.extend(
                 [
-                    "#pragma omp atomic update",
+                    _atomic_update_pragma(),
                     "            %s_out[ev[lane * N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
                     % (field.name, shape, stream),
                 ]

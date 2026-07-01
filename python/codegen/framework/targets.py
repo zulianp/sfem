@@ -47,6 +47,9 @@ class TargetPlatform:
     def inline_qualifier(self):
         return "inline"
 
+    def inline_definition_lines(self, inline_definition="inline"):
+        return ()
+
     def restrict_qualifier(self):
         return ""
 
@@ -146,6 +149,13 @@ class OpenMPTarget(TargetPlatform):
 
     def inline_qualifier(self):
         return "SFEM_INLINE"
+
+    def inline_definition_lines(self, inline_definition="inline"):
+        return (
+            "#ifndef SFEM_INLINE",
+            "#define SFEM_INLINE %s" % str(inline_definition),
+            "#endif",
+        )
 
     def restrict_qualifier(self):
         return "SFEM_RESTRICT"
