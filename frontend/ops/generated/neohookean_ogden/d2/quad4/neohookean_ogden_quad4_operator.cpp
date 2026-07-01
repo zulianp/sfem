@@ -90,19 +90,21 @@ static const KernelDiagnostics neohookean_ogden_quad4_quad4_objective_soa_diagno
     4,
     16,
     2,
-    15,
-    27,
-    1,
+    9,
+    9,
+    0,
     0,
     5,
     0,
     1,
     0,
+    2,
     4,
-    13,
-    75,
-    8,
-    13,
+    43,
+    240,
+    444,
+    3,
+    7,
     5,
     8,
     2,
@@ -168,7 +170,7 @@ extern "C" void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_print_rat
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_objective_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -180,7 +182,7 @@ extern "C" void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float_pri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -192,7 +194,7 @@ extern "C" void neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -204,7 +206,7 @@ extern "C" void neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_fl
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -845,19 +847,21 @@ static const KernelDiagnostics neohookean_ogden_quad4_quad4_gradient_soa_diagnos
     4,
     16,
     2,
-    15,
-    27,
+    11,
+    22,
     1,
     0,
-    5,
+    0,
     0,
     1,
     0,
-    4,
+    2,
     13,
-    75,
-    8,
-    13,
+    61,
+    468,
+    672,
+    9,
+    10,
     5,
     8,
     2,
@@ -923,7 +927,7 @@ extern "C" void neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_print_rate
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -935,7 +939,7 @@ extern "C" void neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float_prin
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -947,7 +951,7 @@ extern "C" void neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_pri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -959,7 +963,7 @@ extern "C" void neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_flo
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1298,19 +1302,21 @@ static const KernelDiagnostics neohookean_ogden_quad4_quad4_apply_soa_diagnostic
     4,
     16,
     2,
-    48,
-    95,
+    36,
+    75,
     1,
     0,
     6,
     0,
     1,
     0,
-    4,
-    40,
-    177,
-    31,
-    26,
+    2,
+    34,
+    145,
+    468,
+    672,
+    30,
+    20,
     5,
     8,
     2,
@@ -1376,7 +1382,7 @@ extern "C" void neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_apply_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1388,7 +1394,7 @@ extern "C" void neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float_print_r
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1400,7 +1406,7 @@ extern "C" void neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_print_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1412,7 +1418,7 @@ extern "C" void neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

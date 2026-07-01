@@ -3095,6 +3095,8 @@ def _kernel_diagnostics_lines(
         "    %d," % cost.loads,
         "    %d," % cost.stores,
         "    %d," % cost.flops,
+        "    0,",
+        "    0,",
         "    %d," % cost.temporaries,
         "    %d," % cost.estimated_registers,
         "    %d," % geometry_streams,
@@ -3144,13 +3146,24 @@ def _kernel_diagnostics_lines(
     if public_name.endswith("_element_soa"):
         function_names.extend(
             (
-                public_name.replace("_element_soa", "_affine_mesh_soa"),
-                public_name.replace(
-                    "_element_soa", "_isoparametric_mesh_soa"
+                (
+                    public_name.replace("_element_soa", "_affine_mesh_soa"),
+                    "KernelDiagnostics_print_rate_affine_mesh",
+                ),
+                (
+                    public_name.replace(
+                        "_element_soa", "_isoparametric_mesh_soa"
+                    ),
+                    "KernelDiagnostics_print_rate_isoparametric_mesh",
                 ),
             )
         )
-    for function_name in function_names:
+    for function_name_entry in function_names:
+        if isinstance(function_name_entry, tuple):
+            function_name, print_rate_helper = function_name_entry
+        else:
+            function_name = function_name_entry
+            print_rate_helper = "KernelDiagnostics_print_rate"
         for scalar_type in ("double", "float"):
             lines.append("")
             lines.extend(
@@ -3158,6 +3171,7 @@ def _kernel_diagnostics_lines(
                     function_name,
                     variable_name,
                     scalar_type,
+                    print_rate_helper,
                 )
             )
     return lines

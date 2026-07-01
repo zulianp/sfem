@@ -691,11 +691,19 @@ class GenApiTest(unittest.TestCase):
             )
             self.assertIn("double GeneratedNeoHookeanOgden::flops_gradient() const", source)
             self.assertIn(
-                "KernelDiagnostics_total_flops(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics()",
                 source,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes(neohookean_ogden_tri3_tri3_apply_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics()",
+                source,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_tri3_tri3_apply_soa_diagnostics()",
+                source,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_tri3_tri3_apply_soa_diagnostics()",
                 source,
             )
             self.assertIn(
@@ -855,11 +863,19 @@ class GenApiTest(unittest.TestCase):
             wrapper = read_generated("sfem_GeneratedLinearElasticity.cpp")
             self.assertIn("double GeneratedLinearElasticity::flops_apply() const", wrapper)
             self.assertIn(
-                "KernelDiagnostics_total_flops(linear_elasticity_tet4_tet4_apply_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics()",
                 wrapper,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes(linear_elasticity_tet4_tet4_gradient_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics()",
+                wrapper,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics()",
+                wrapper,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics()",
                 wrapper,
             )
             apply_calls = re.findall(

@@ -98,19 +98,21 @@ static const KernelDiagnostics linear_elasticity_tri6_tri6_objective_soa_diagnos
     6,
     16,
     4,
-    10,
-    11,
+    5,
+    5,
     0,
     0,
     4,
     0,
     0,
     0,
-    4,
-    12,
-    25,
-    7,
-    9,
+    2,
+    1,
+    14,
+    0,
+    0,
+    0,
+    6,
     5,
     72,
     6,
@@ -176,7 +178,7 @@ extern "C" void linear_elasticity_tri6_tri6_objective_affine_mesh_soa_print_rate
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_objective_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -188,7 +190,7 @@ extern "C" void linear_elasticity_tri6_tri6_objective_affine_mesh_soa_float_prin
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_objective_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -200,7 +202,7 @@ extern "C" void linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa_pri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -212,7 +214,7 @@ extern "C" void linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa_flo
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -925,19 +927,21 @@ static const KernelDiagnostics linear_elasticity_tri6_tri6_gradient_soa_diagnost
     6,
     16,
     4,
-    10,
-    11,
-    0,
-    0,
     4,
+    5,
     0,
     0,
     0,
-    4,
-    12,
-    25,
+    0,
+    0,
+    0,
+    2,
     7,
     9,
+    0,
+    0,
+    3,
+    6,
     5,
     72,
     6,
@@ -1003,7 +1007,7 @@ extern "C" void linear_elasticity_tri6_tri6_gradient_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_gradient_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1015,7 +1019,7 @@ extern "C" void linear_elasticity_tri6_tri6_gradient_affine_mesh_soa_float_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_gradient_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1031,7 @@ extern "C" void linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa_prin
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1043,7 @@ extern "C" void linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa_floa
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1414,19 +1418,21 @@ static const KernelDiagnostics linear_elasticity_tri6_tri6_apply_soa_diagnostics
     6,
     16,
     4,
-    14,
-    16,
-    0,
-    0,
     4,
+    5,
     0,
     0,
     0,
-    4,
-    18,
-    34,
+    0,
+    0,
+    0,
+    0,
+    7,
     9,
-    12,
+    0,
+    0,
+    3,
+    6,
     5,
     72,
     6,
@@ -1492,7 +1498,7 @@ extern "C" void linear_elasticity_tri6_tri6_apply_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_apply_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1504,7 +1510,7 @@ extern "C" void linear_elasticity_tri6_tri6_apply_affine_mesh_soa_float_print_ra
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tri6_tri6_apply_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1516,7 +1522,7 @@ extern "C" void linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa_print_r
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1528,7 +1534,7 @@ extern "C" void linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa_float_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

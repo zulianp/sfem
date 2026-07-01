@@ -179,7 +179,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_residual_affine_mesh_soa_print_ra
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tri3_residual_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -191,7 +191,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_residual_affine_mesh_soa_float_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tri3_residual_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -203,7 +203,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_residual_isoparametric_mesh_soa_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tri3_residual_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -215,7 +215,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_residual_isoparametric_mesh_soa_f
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tri3_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -657,7 +657,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_jacobian_action_affine_mesh_soa_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tri3_jacobian_action_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -669,7 +669,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_jacobian_action_affine_mesh_soa_f
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tri3_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -681,7 +681,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_jacobian_action_isoparametric_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tri3_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -693,7 +693,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_jacobian_action_isoparametric_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tri3_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

@@ -98,19 +98,21 @@ static const KernelDiagnostics neohookean_ogden_tri6_tri6_objective_soa_diagnost
     6,
     16,
     4,
-    15,
-    27,
-    1,
+    9,
+    9,
+    0,
     0,
     5,
     0,
     1,
     0,
+    2,
     4,
-    13,
-    75,
-    8,
-    13,
+    43,
+    0,
+    0,
+    3,
+    7,
     5,
     72,
     6,
@@ -176,7 +178,7 @@ extern "C" void neohookean_ogden_tri6_tri6_objective_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_objective_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -188,7 +190,7 @@ extern "C" void neohookean_ogden_tri6_tri6_objective_affine_mesh_soa_float_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_objective_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -200,7 +202,7 @@ extern "C" void neohookean_ogden_tri6_tri6_objective_isoparametric_mesh_soa_prin
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_objective_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -212,7 +214,7 @@ extern "C" void neohookean_ogden_tri6_tri6_objective_isoparametric_mesh_soa_floa
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -925,19 +927,21 @@ static const KernelDiagnostics neohookean_ogden_tri6_tri6_gradient_soa_diagnosti
     6,
     16,
     4,
-    15,
-    27,
+    11,
+    22,
     1,
     0,
-    5,
+    0,
     0,
     1,
     0,
-    4,
+    2,
     13,
-    75,
-    8,
-    13,
+    61,
+    0,
+    0,
+    9,
+    10,
     5,
     72,
     6,
@@ -1003,7 +1007,7 @@ extern "C" void neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1015,7 +1019,7 @@ extern "C" void neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_float_print_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1031,7 @@ extern "C" void neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1043,7 @@ extern "C" void neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_float
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1414,19 +1418,21 @@ static const KernelDiagnostics neohookean_ogden_tri6_tri6_apply_soa_diagnostics_
     6,
     16,
     4,
-    48,
-    95,
+    36,
+    75,
     1,
     0,
     6,
     0,
     1,
     0,
-    4,
-    40,
-    177,
-    31,
-    26,
+    2,
+    34,
+    145,
+    0,
+    0,
+    30,
+    20,
     5,
     72,
     6,
@@ -1492,7 +1498,7 @@ extern "C" void neohookean_ogden_tri6_tri6_apply_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_apply_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1504,7 +1510,7 @@ extern "C" void neohookean_ogden_tri6_tri6_apply_affine_mesh_soa_float_print_rat
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_tri6_tri6_apply_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1516,7 +1522,7 @@ extern "C" void neohookean_ogden_tri6_tri6_apply_isoparametric_mesh_soa_print_ra
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_apply_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1528,7 +1534,7 @@ extern "C" void neohookean_ogden_tri6_tri6_apply_isoparametric_mesh_soa_float_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_tri6_tri6_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

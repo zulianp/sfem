@@ -55,7 +55,7 @@ struct neohookean_ogden_proteus_hex729_affine_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[9] = {scalar_t(0.040637194180786838), scalar_t(0.090324080347428712), scalar_t(0.13030534820146777), scalar_t(0.1561735385200016), scalar_t(0.16511967750063006), scalar_t(0.1561735385200016), scalar_t(0.13030534820146777), scalar_t(0.090324080347428712), scalar_t(0.040637194180786838)};
+        static const scalar_t data[9] = {scalar_t(0.040637194180787095), scalar_t(0.09032408034742867), scalar_t(0.13030534820146775), scalar_t(0.15617353852000149), scalar_t(0.16511967750062995), scalar_t(0.15617353852000149), scalar_t(0.13030534820146775), scalar_t(0.09032408034742867), scalar_t(0.040637194180787095)};
         return data;
     }
 };
@@ -71,7 +71,7 @@ struct neohookean_ogden_proteus_hex729_isoparametric_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[10] = {scalar_t(0.033335672154343646), scalar_t(0.074725674575290252), scalar_t(0.10954318125799113), scalar_t(0.13463335965499842), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499842), scalar_t(0.10954318125799113), scalar_t(0.074725674575290252), scalar_t(0.033335672154343646)};
+        static const scalar_t data[10] = {scalar_t(0.03333567215434368), scalar_t(0.074725674575290224), scalar_t(0.10954318125799124), scalar_t(0.13463335965499829), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499829), scalar_t(0.10954318125799124), scalar_t(0.074725674575290224), scalar_t(0.03333567215434368)};
         return data;
     }
 };
@@ -90,19 +90,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex729_proteus_hex729_ob
     729,
     16,
     10,
-    43,
-    81,
-    1,
+    19,
+    21,
+    0,
     0,
     10,
     0,
     1,
     0,
-    9,
-    30,
-    162,
-    20,
-    23,
+    6,
+    5,
+    70,
+    453280,
+    889560,
+    4,
+    12,
     10,
     180,
     10,
@@ -168,7 +170,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_objective_affine_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_objective_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -180,7 +182,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_objective_affine_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_objective_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -192,7 +194,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_objective_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_objective_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -204,7 +206,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_objective_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -937,19 +939,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex729_proteus_hex729_gr
     729,
     16,
     10,
-    43,
-    81,
+    35,
+    76,
     1,
     0,
-    10,
+    0,
     0,
     1,
     0,
-    9,
-    30,
-    162,
-    20,
-    23,
+    6,
+    31,
+    139,
+    921430,
+    1357710,
+    22,
+    16,
     10,
     180,
     10,
@@ -1015,7 +1019,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_gradient_affine_m
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_gradient_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1031,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_gradient_affine_m
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_gradient_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1043,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_gradient_isoparam
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_gradient_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1051,7 +1055,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_gradient_isoparam
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1439,19 +1443,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex729_proteus_hex729_ap
     729,
     16,
     10,
-    216,
-    404,
+    190,
+    387,
     1,
     0,
-    20,
+    10,
     0,
     1,
     0,
-    9,
-    136,
-    668,
-    117,
-    103,
+    6,
+    129,
+    615,
+    921430,
+    1357710,
+    120,
+    69,
     10,
     180,
     10,
@@ -1517,7 +1523,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_apply_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_apply_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1529,7 +1535,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_apply_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_apply_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1541,7 +1547,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1553,7 +1559,7 @@ extern "C" void neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

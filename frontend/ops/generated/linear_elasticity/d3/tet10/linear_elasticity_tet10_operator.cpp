@@ -106,19 +106,21 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_objective_soa_diagn
     10,
     16,
     4,
-    18,
-    15,
+    11,
+    6,
     0,
     0,
     7,
     0,
     0,
     0,
-    9,
-    22,
-    40,
-    12,
-    14,
+    6,
+    1,
+    24,
+    0,
+    0,
+    0,
+    11,
     10,
     330,
     11,
@@ -184,7 +186,7 @@ extern "C" void linear_elasticity_tet10_tet10_objective_affine_mesh_soa_print_ra
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_objective_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -196,7 +198,7 @@ extern "C" void linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -208,7 +210,7 @@ extern "C" void linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -220,7 +222,7 @@ extern "C" void linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_f
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1131,19 +1133,21 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_gradient_soa_diagno
     10,
     16,
     4,
-    18,
-    15,
-    0,
-    0,
-    7,
+    8,
+    8,
     0,
     0,
     0,
-    9,
-    22,
-    40,
-    12,
+    0,
+    0,
+    0,
+    6,
     14,
+    16,
+    0,
+    0,
+    5,
+    8,
     10,
     330,
     11,
@@ -1209,7 +1213,7 @@ extern "C" void linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_print_rat
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1221,7 +1225,7 @@ extern "C" void linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float_pri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1233,7 +1237,7 @@ extern "C" void linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1245,7 +1249,7 @@ extern "C" void linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_fl
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1722,19 +1726,21 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_apply_soa_diagnosti
     10,
     16,
     4,
-    28,
-    24,
-    0,
-    0,
-    7,
+    8,
+    8,
     0,
     0,
     0,
-    9,
-    38,
-    59,
-    19,
-    22,
+    0,
+    0,
+    0,
+    0,
+    14,
+    16,
+    0,
+    0,
+    5,
+    8,
     10,
     330,
     11,
@@ -1800,7 +1806,7 @@ extern "C" void linear_elasticity_tet10_tet10_apply_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_apply_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1812,7 +1818,7 @@ extern "C" void linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float_print_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1824,7 +1830,7 @@ extern "C" void linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1836,7 +1842,7 @@ extern "C" void linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

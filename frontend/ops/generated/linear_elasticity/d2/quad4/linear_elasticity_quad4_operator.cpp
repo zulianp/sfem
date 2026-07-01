@@ -90,19 +90,21 @@ static const KernelDiagnostics linear_elasticity_quad4_quad4_objective_soa_diagn
     4,
     16,
     2,
-    10,
-    11,
+    5,
+    5,
     0,
     0,
     4,
     0,
     0,
     0,
-    4,
-    12,
-    25,
-    7,
-    9,
+    2,
+    1,
+    14,
+    240,
+    444,
+    0,
+    6,
     5,
     8,
     2,
@@ -168,7 +170,7 @@ extern "C" void linear_elasticity_quad4_quad4_objective_affine_mesh_soa_print_ra
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_objective_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -180,7 +182,7 @@ extern "C" void linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -192,7 +194,7 @@ extern "C" void linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -204,7 +206,7 @@ extern "C" void linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_f
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -845,19 +847,21 @@ static const KernelDiagnostics linear_elasticity_quad4_quad4_gradient_soa_diagno
     4,
     16,
     2,
-    10,
-    11,
-    0,
-    0,
     4,
+    5,
     0,
     0,
     0,
-    4,
-    12,
-    25,
+    0,
+    0,
+    0,
+    2,
     7,
     9,
+    468,
+    672,
+    3,
+    6,
     5,
     8,
     2,
@@ -923,7 +927,7 @@ extern "C" void linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_print_rat
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_gradient_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -935,7 +939,7 @@ extern "C" void linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float_pri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -947,7 +951,7 @@ extern "C" void linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -959,7 +963,7 @@ extern "C" void linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_fl
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1298,19 +1302,21 @@ static const KernelDiagnostics linear_elasticity_quad4_quad4_apply_soa_diagnosti
     4,
     16,
     2,
-    14,
-    16,
-    0,
-    0,
     4,
+    5,
     0,
     0,
     0,
-    4,
-    18,
-    34,
+    0,
+    0,
+    0,
+    0,
+    7,
     9,
-    12,
+    468,
+    672,
+    3,
+    6,
     5,
     8,
     2,
@@ -1376,7 +1382,7 @@ extern "C" void linear_elasticity_quad4_quad4_apply_affine_mesh_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_apply_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1388,7 +1394,7 @@ extern "C" void linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float_print_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1400,7 +1406,7 @@ extern "C" void linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1412,7 +1418,7 @@ extern "C" void linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_quad4_quad4_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

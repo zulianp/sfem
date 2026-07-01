@@ -184,7 +184,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_s
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -196,7 +196,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_s
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -208,7 +208,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -220,7 +220,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_residual_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -318,7 +318,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -330,7 +330,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -342,7 +342,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isopar
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -354,7 +354,7 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isopar
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_element_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

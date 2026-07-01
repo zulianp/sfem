@@ -432,22 +432,22 @@ namespace sfem {
             switch (domain.element_type) {
                 case smesh::TRI3: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::HEX8: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 default:
@@ -506,22 +506,22 @@ namespace sfem {
             switch (domain.element_type) {
                 case smesh::TRI3: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::HEX8: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 default:

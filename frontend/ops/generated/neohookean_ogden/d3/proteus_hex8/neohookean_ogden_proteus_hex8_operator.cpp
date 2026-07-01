@@ -90,19 +90,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex8_proteus_hex8_object
     8,
     16,
     2,
-    43,
-    81,
-    1,
+    19,
+    21,
+    0,
     0,
     10,
     0,
     1,
     0,
-    9,
-    30,
-    162,
-    20,
-    23,
+    6,
+    5,
+    70,
+    1232,
+    2328,
+    4,
+    12,
     10,
     8,
     2,
@@ -168,7 +170,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_objective_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_objective_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -180,7 +182,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_objective_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -192,7 +194,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -204,7 +206,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -937,19 +939,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex8_proteus_hex8_gradie
     8,
     16,
     2,
-    43,
-    81,
+    35,
+    76,
     1,
     0,
-    10,
+    0,
     0,
     1,
     0,
-    9,
-    30,
-    162,
-    20,
-    23,
+    6,
+    31,
+    139,
+    2456,
+    3552,
+    22,
+    16,
     10,
     8,
     2,
@@ -1015,7 +1019,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1031,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1043,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isoparametri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1051,7 +1055,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isoparametri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1439,19 +1443,21 @@ static const KernelDiagnostics neohookean_ogden_proteus_hex8_proteus_hex8_apply_
     8,
     16,
     2,
-    216,
-    404,
+    190,
+    387,
     1,
     0,
-    20,
+    10,
     0,
     1,
     0,
-    9,
-    136,
-    668,
-    117,
-    103,
+    6,
+    129,
+    615,
+    2456,
+    3552,
+    120,
+    69,
     10,
     8,
     2,
@@ -1517,7 +1523,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_mesh_soa
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1529,7 +1535,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_mesh_soa
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1541,7 +1547,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparametric_m
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1553,7 +1559,7 @@ extern "C" void neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparametric_m
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

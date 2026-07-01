@@ -98,19 +98,19 @@ static const KernelDiagnostics poro_hyperelasticity_solid_tri6_tri6_objective_so
     6,
     16,
     4,
-    15,
-    27,
-    1,
+    9,
+    9,
+    0,
     0,
     5,
     0,
     1,
     0,
+    2,
     4,
-    13,
-    75,
-    8,
-    13,
+    43,
+    3,
+    7,
     5,
     72,
     6,
@@ -176,7 +176,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa_p
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -188,7 +188,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa_f
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -200,7 +200,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -212,7 +212,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -925,19 +925,19 @@ static const KernelDiagnostics poro_hyperelasticity_solid_tri6_tri6_gradient_soa
     6,
     16,
     4,
-    15,
-    27,
+    11,
+    22,
     1,
     0,
-    5,
+    0,
     0,
     1,
     0,
-    4,
+    2,
     13,
-    75,
-    8,
-    13,
+    61,
+    9,
+    10,
     5,
     72,
     6,
@@ -1003,7 +1003,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_gradient_affine_mesh_soa_pr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_gradient_affine_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1015,7 +1015,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_gradient_affine_mesh_soa_fl
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_gradient_affine_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1027,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1039,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1414,19 +1414,19 @@ static const KernelDiagnostics poro_hyperelasticity_solid_tri6_tri6_apply_soa_di
     6,
     16,
     4,
-    48,
-    95,
+    36,
+    75,
     1,
     0,
     6,
     0,
     1,
     0,
-    4,
-    40,
-    177,
-    31,
-    26,
+    2,
+    34,
+    145,
+    30,
+    20,
     5,
     72,
     6,
@@ -1492,7 +1492,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_apply_affine_mesh_soa_print
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_apply_affine_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1504,7 +1504,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_apply_affine_mesh_soa_float
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_apply_affine_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1516,7 +1516,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_apply_isoparametric_mesh_so
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_apply_isoparametric_mesh_soa",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1528,7 +1528,7 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_apply_isoparametric_mesh_so
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "poro_hyperelasticity_solid_tri6_tri6_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,

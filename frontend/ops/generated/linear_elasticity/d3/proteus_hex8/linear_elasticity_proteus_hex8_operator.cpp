@@ -90,19 +90,21 @@ static const KernelDiagnostics linear_elasticity_proteus_hex8_proteus_hex8_objec
     8,
     16,
     2,
-    18,
-    15,
+    11,
+    6,
     0,
     0,
     7,
     0,
     0,
     0,
-    9,
-    22,
-    40,
-    12,
-    14,
+    6,
+    1,
+    24,
+    1232,
+    2328,
+    0,
+    11,
     10,
     8,
     2,
@@ -168,7 +170,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -180,7 +182,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mes
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -192,7 +194,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparamet
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -204,7 +206,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparamet
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -937,19 +939,21 @@ static const KernelDiagnostics linear_elasticity_proteus_hex8_proteus_hex8_gradi
     8,
     16,
     2,
-    18,
-    15,
-    0,
-    0,
-    7,
+    8,
+    8,
     0,
     0,
     0,
-    9,
-    22,
-    40,
-    12,
+    0,
+    0,
+    0,
+    6,
     14,
+    16,
+    2456,
+    3552,
+    5,
+    8,
     10,
     8,
     2,
@@ -1015,7 +1019,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1027,7 +1031,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1039,7 +1043,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1051,7 +1055,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1439,19 +1443,21 @@ static const KernelDiagnostics linear_elasticity_proteus_hex8_proteus_hex8_apply
     8,
     16,
     2,
-    28,
-    24,
-    0,
-    0,
-    7,
+    8,
+    8,
     0,
     0,
     0,
-    9,
-    38,
-    59,
-    19,
-    22,
+    0,
+    0,
+    0,
+    0,
+    14,
+    16,
+    2456,
+    3552,
+    5,
+    8,
     10,
     8,
     2,
@@ -1517,7 +1523,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_so
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1529,7 +1535,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_so
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1541,7 +1547,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
@@ -1553,7 +1559,7 @@ extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat) {
-    sfem::codegen::KernelDiagnostics_print_rate(
+    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float",
             &sfem::codegen::linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics_data,
             elapsed, nelements, ndofs, repeat,
