@@ -160,7 +160,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(openmp_loop.lane_index, "lane")
         self.assertEqual(openmp_loop.vector_size_symbol, "VECTOR_SIZE")
         self.assertEqual(cuda.language, TargetLanguage.CUDA)
-        self.assertEqual(cuda.function_qualifier(), "__device__ __forceinline__")
+        self.assertEqual(cuda.function_qualifier(), "__host__ __device__ __forceinline__")
         self.assertEqual(cuda.restrict_qualifier(), "__restrict__")
         self.assertIsNone(cuda.parallel_for_pragma())
         self.assertIsNone(cuda.vectorize_pragma())
@@ -300,7 +300,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
         self.assertEqual(generated.language, "cuda")
         self.assertIn("#include <cuda_runtime.h>", generated.source)
-        self.assertIn("__device__ __forceinline__", generated.source)
+        self.assertIn("__host__ __device__ __forceinline__", generated.source)
+        self.assertNotIn("SFEM_INLINE", generated.source)
         self.assertIn('extern "C" __global__ void cuda_plan_kernel_global', generated.source)
         self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", generated.source)
         self.assertIn("e += blockDim.x * gridDim.x", generated.source)
