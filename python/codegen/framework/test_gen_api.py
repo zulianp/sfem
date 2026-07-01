@@ -13,6 +13,16 @@ import sympy as sp
 
 import codegen.framework as framework
 from sfem import gen
+from codegen.framework.cuda_backend import CUDASoABackend
+from codegen.framework.diagnostics_plan import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
+from codegen.framework.generation_plan import mesh_kernel_plan_from_context
+from codegen.framework.kernel_signature import (
+    LocalKernelSignature,
+    MeshKernelSignature,
+    local_kernel_suffix_from_plan,
+)
+from codegen.framework.openmp_backend import OpenMPSoABackend
+from codegen.framework.reference_data_plan import ReferenceDataPlan, ReferenceDataSetPlan
 
 from .materials.neohookean_ogden import material as neohookean_ogden
 from .materials.linear_elasticity import material as linear_elasticity
@@ -154,10 +164,31 @@ def _assert_generated_lane_loops_request_simd(test_case, result):
 
 
 class GenApiTest(unittest.TestCase):
-    def test_sfem_gen_exports_framework_public_api(self):
-        missing = sorted(name for name in framework.__all__ if not hasattr(gen, name))
-        self.assertEqual([], missing)
-        self.assertTrue(set(framework.__all__).issubset(set(gen.__all__)))
+    def test_public_api_hides_low_level_generator_internals(self):
+        self.assertIn("generate", gen.__all__)
+        self.assertIn("run", gen.__all__)
+        self.assertIn("CodeGenerator", gen.__all__)
+
+        low_level_names = {
+            "CUDAEnergySoAEmitter",
+            "CUDASoABackend",
+            "CUDASoAEmission",
+            "CodeGenerationStage",
+            "CUDA_SOA_BACKEND",
+            "EnergySoAKernelEmissionPlan",
+            "ElementEmissionPlan",
+            "GenerationPlan",
+            "OpenMPEnergySoAEmitter",
+            "OpenMPSoABackend",
+            "OpenMPSoAEmission",
+            "OPENMP_SOA_BACKEND",
+            "UserInputStage",
+            "generate_cpp_kernel",
+            "generate_cuda_kernel",
+            "generate_openmp_cpp_kernel",
+        }
+        self.assertFalse(low_level_names.intersection(gen.__all__))
+        self.assertFalse(low_level_names.intersection(framework.__all__))
 
     def test_symbolic_scalar_field_is_sympy_compatible(self):
         p = gen.scalar_field("p", family="pressure")
@@ -1638,7 +1669,7 @@ class GenApiTest(unittest.TestCase):
         )
 
     def test_codegen_stage_uses_shared_openmp_soa_backend(self):
-        self.assertIsInstance(gen.OPENMP_SOA_BACKEND, gen.OpenMPSoABackend)
+        self.assertIsInstance(gen.OPENMP_SOA_BACKEND, OpenMPSoABackend)
         self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_energy"))
         self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_residual"))
         self.assertFalse(hasattr(gen.OPENMP_SOA_BACKEND, "emit_mixed_residual"))
@@ -1647,11 +1678,11 @@ class GenApiTest(unittest.TestCase):
         self.assertFalse(hasattr(gen, "generate_coupled_residual_sfem_files"))
         self.assertFalse(hasattr(gen, "generate_mixed_residual_sfem_files"))
         self.assertFalse(hasattr(gen, "EnergySoAEmissionContext"))
-        self.assertTrue(hasattr(gen, "EnergySoAKernelEmissionPlan"))
+        self.assertNotIn("EnergySoAKernelEmissionPlan", gen.__all__)
 
     def test_cuda_backend_is_separate_from_openmp_backend(self):
-        self.assertIsInstance(gen.CUDA_SOA_BACKEND, gen.CUDASoABackend)
-        self.assertNotIn("OpenMPSoABackend", gen.CUDASoABackend.__dict__)
+        self.assertIsInstance(gen.CUDA_SOA_BACKEND, CUDASoABackend)
+        self.assertNotIn("OpenMPSoABackend", CUDASoABackend.__dict__)
         self.assertFalse(hasattr(gen.CUDA_SOA_BACKEND, "openmp_backend"))
 
     def test_cuda_backend_emits_material_energy_kernels_from_plan(self):
@@ -1830,7 +1861,7 @@ class GenApiTest(unittest.TestCase):
             energy_input.element_contexts[0],
         )
         self.assertEqual(len(energy_signatures), 3)
-        self.assertTrue(all(isinstance(signature, gen.LocalKernelSignature) for signature in energy_signatures))
+        self.assertTrue(all(isinstance(signature, LocalKernelSignature) for signature in energy_signatures))
         self.assertEqual(
             energy_signatures[0].template_parameters,
             (
@@ -1851,7 +1882,7 @@ class GenApiTest(unittest.TestCase):
             energy_unit,
             energy_input.element_contexts[0],
         )
-        self.assertIsInstance(energy_mesh_signature, gen.MeshKernelSignature)
+        self.assertIsInstance(energy_mesh_signature, MeshKernelSignature)
         self.assertEqual(energy_mesh_signature.template_parameters, ("typename scalar_t",))
         self.assertIn("nelements", energy_mesh_signature.argument_names)
         self.assertIn("nnodes", energy_mesh_signature.argument_names)
@@ -1908,7 +1939,7 @@ class GenApiTest(unittest.TestCase):
         )
         self.assertTrue(all(signature.name.startswith("stokes_d2_simplex_mixed") for signature in mixed_signatures))
         self.assertEqual(
-            gen.local_kernel_suffix_from_plan(mixed_unit, mixed_input.element_contexts[0], "mixed_residual_soa"),
+            local_kernel_suffix_from_plan(mixed_unit, mixed_input.element_contexts[0], "mixed_residual_soa"),
             "_mixed",
         )
         diagonal_block = next(
@@ -1917,7 +1948,7 @@ class GenApiTest(unittest.TestCase):
             if kernel.is_block and kernel.block.name.endswith("_u_u")
         )
         self.assertEqual(
-            gen.local_kernel_suffix_from_plan(diagonal_block, mixed_input.element_contexts[0], "mixed_residual_soa"),
+            local_kernel_suffix_from_plan(diagonal_block, mixed_input.element_contexts[0], "mixed_residual_soa"),
             "",
         )
 
@@ -1933,14 +1964,14 @@ class GenApiTest(unittest.TestCase):
             energy_unit,
             energy_context,
         )
-        self.assertIsInstance(energy_reference, gen.ReferenceDataPlan)
+        self.assertIsInstance(energy_reference, ReferenceDataPlan)
         self.assertEqual(
             tuple(dataset.stage for dataset in energy_reference.datasets),
             ("affine", "isoparametric"),
         )
         self.assertEqual(energy_reference.families, ("tensor_product",))
         for dataset in energy_reference.datasets:
-            self.assertIsInstance(dataset, gen.ReferenceDataSetPlan)
+            self.assertIsInstance(dataset, ReferenceDataSetPlan)
             self.assertEqual(dataset.weight_accessor, "q_weight_1d")
             self.assertEqual(dataset.accessors, ("q_weight_1d", "shape_1d", "grad_1d"))
             self.assertEqual(dataset.unique_element_types, ("HEX8",))
@@ -2003,7 +2034,7 @@ class GenApiTest(unittest.TestCase):
             energy_unit,
             energy_context,
         )
-        self.assertIsInstance(energy_diagnostics, gen.KernelDiagnosticsPlan)
+        self.assertIsInstance(energy_diagnostics, KernelDiagnosticsPlan)
         self.assertEqual(energy_diagnostics.kind, "energy_soa")
         self.assertEqual(
             energy_diagnostics.public_names,
@@ -2014,7 +2045,7 @@ class GenApiTest(unittest.TestCase):
             ),
         )
         apply_entry = energy_diagnostics.entry("neohookean_ogden_hex8_hex8_apply_soa")
-        self.assertIsInstance(apply_entry, gen.KernelDiagnosticsEntryPlan)
+        self.assertIsInstance(apply_entry, KernelDiagnosticsEntryPlan)
         self.assertEqual(apply_entry.expression_name, "apply")
         self.assertIsNotNone(apply_entry.cost)
         self.assertEqual(apply_entry.mesh_signature.name, "neohookean_ogden_hex8")
@@ -2425,7 +2456,7 @@ class GenApiTest(unittest.TestCase):
         ).run()
         energy_context = energy_input.element_contexts[0]
         energy_unit = energy_plan.emission_kernels_for_context(energy_context)[0]
-        energy_mesh = gen.mesh_kernel_plan_from_context(energy_unit, energy_context, energy_unit.name)
+        energy_mesh = mesh_kernel_plan_from_context(energy_unit, energy_context, energy_unit.name)
         self.assertEqual(energy_mesh.name, "neohookean_ogden_hex8")
 
         stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
@@ -2436,7 +2467,7 @@ class GenApiTest(unittest.TestCase):
         ).run()
         mixed_context = mixed_input.element_contexts[0]
         mixed_unit = mixed_plan.emission_kernels_for_context(mixed_context)[0]
-        mixed_mesh = gen.mesh_kernel_plan_from_context(mixed_unit, mixed_context, mixed_unit.name)
+        mixed_mesh = mesh_kernel_plan_from_context(mixed_unit, mixed_context, mixed_unit.name)
         self.assertEqual(mixed_mesh.name, "stokes_tri6_tri3")
 
         diagonal_block = next(
@@ -2444,7 +2475,7 @@ class GenApiTest(unittest.TestCase):
             for kernel in mixed_plan.emission_kernels_for_context(mixed_context)
             if kernel.is_block and kernel.block.name.endswith("_u_u")
         )
-        diagonal_mesh = gen.mesh_kernel_plan_from_context(
+        diagonal_mesh = mesh_kernel_plan_from_context(
             diagonal_block,
             mixed_context,
             diagonal_block.name,
