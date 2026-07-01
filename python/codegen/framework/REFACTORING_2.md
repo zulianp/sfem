@@ -424,3 +424,6 @@ Acceptance criteria:
    functional.
 7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
+
+
+ The looping is currently hardcoded as strings but before emition there should be an additional layer of loop model construction, we have explicitly model the kernels main compponents with classes and distinguish Kernel Loop (at kernel level) with Tiling (vector-size), Quadrature Loop and SIMD Loop, the FLOPs. Same is for memory buffers and scopes, Gather and Scatter 

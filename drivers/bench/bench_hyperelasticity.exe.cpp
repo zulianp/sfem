@@ -77,14 +77,19 @@ namespace {
         const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
         const double arithmetic_intensity =
                 memory_traffic_bytes ? flops / static_cast<double>(memory_traffic_bytes) : 0;
+        const double flops_per_element = nelements > 0 ? flops / static_cast<double>(nelements) : 0;
+        const double bytes_per_element =
+                nelements > 0 ? static_cast<double>(memory_traffic_bytes) / static_cast<double>(nelements) : 0;
         const double gflops_per_s = 1e-9 * flops / seconds_per_call;
         const double gbytes_per_s = 1e-9 * static_cast<double>(memory_traffic_bytes) / seconds_per_call;
 
-        printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f %12.3f\n",
+        printf("%-72s %12.6e %16.3f %13.3f %12.3f %12.3f %10.3f %13.3f %12.3f\n",
                name,
                seconds_per_call,
                melements_per_s,
                mdofs_per_s,
+               flops_per_element,
+               bytes_per_element,
                arithmetic_intensity,
                gflops_per_s,
                gbytes_per_s);
@@ -325,16 +330,18 @@ int main(int argc, char *argv[]) {
     printf("#dofs %ld\n", static_cast<long>(ndofs));
     printf("#left_nodes %ld\n", static_cast<long>(boundary.left->size()));
     printf("#right_nodes %ld\n", static_cast<long>(boundary.right->size()));
-    printf("\n%-72s %12s %16s %13s %10s %13s %12s\n",
+    printf("\n%-72s %12s %16s %13s %12s %12s %10s %13s %12s\n",
            "Operation",
            "Time [s]",
            "Rate [MElem/s]",
            "Rate [MDOF/s]",
+           "[FLOP/Elem]",
+           "[B/Elem]",
            "AI",
            "Rate [GFLOP/s]",
            "Rate [GB/s]");
     printf("---------------------------------------------------------------------------------------------------------------------"
-           "-------------------------\n");
+           "----------------------------------------------------\n");
     print_rate("generated_gradient",
                generated_gradient_elapsed,
                nelements,

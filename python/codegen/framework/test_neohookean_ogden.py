@@ -2124,6 +2124,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("reference_scalars", diagnostics_source)
         self.assertIn("output_reads_per_element", diagnostics_source)
         self.assertIn(
+            "const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+            diagnostics_source,
+        )
+        self.assertNotIn(
+            "d->output_streams * (size_t)(d->output_reads_per_element + d->output_writes_per_element)",
+            diagnostics_source,
+        )
+        self.assertIn(
             'extern "C" const sfem::codegen::KernelDiagnostics *generated_neohookean_ogden_tri3_apply_soa_diagnostics',
             operator_source,
         )
@@ -2132,6 +2140,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("KernelDiagnostics_total_bytes", diagnostics_source)
+        self.assertIn("KernelDiagnostics_total_bytes_affine_mesh", diagnostics_source)
+        self.assertIn("KernelDiagnostics_total_bytes_isoparametric_mesh", diagnostics_source)
+        self.assertIn("KernelDiagnostics_print_rate_affine_mesh", diagnostics_source)
+        self.assertIn("KernelDiagnostics_print_rate_isoparametric_mesh", diagnostics_source)
         self.assertIn("KernelDiagnostics_print_rate", diagnostics_source)
         self.assertIn("#include <stdio.h>", diagnostics_source)
         self.assertIn(
@@ -2140,6 +2152,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
         self.assertIn(
             'extern "C" void generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float_print_rate',
+            operator_source,
+        )
+        self.assertIn(
+            "sfem::codegen::KernelDiagnostics_print_rate_affine_mesh",
+            operator_source,
+        )
+        self.assertIn(
+            "sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh",
             operator_source,
         )
         self.assertNotIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)

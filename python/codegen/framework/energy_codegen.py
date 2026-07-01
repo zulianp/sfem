@@ -952,13 +952,12 @@ def _append_sfem_soa_tensor_weak_form_lines(
         lines.extend(["        }", "    }"])
         return
 
-    material = (
-        weak_form.linearized_first_piola(
-            tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim))
-        )
-        if form.name == "apply"
-        else weak_form.first_piola()
-    ).xreplace(deformation_gradient_substitutions)
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        deformation_gradient_substitutions,
+        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim)),
+    )
     lines.append("            scalar_t loperand[%d];" % (dim * dim))
     _append_transformed_loperand_lines(
         lines,
@@ -1138,13 +1137,12 @@ def _append_sfem_soa_weak_form_lines(
         lines.extend(["            }", "        }"])
         return
 
-    material = (
-        weak_form.linearized_first_piola(
-            tuple(sp.symbols("trial_grad%d" % i) for i in range(dim * dim))
-        )
-        if form.name == "apply"
-        else weak_form.first_piola()
-    ).xreplace(deformation_gradient_substitutions)
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        deformation_gradient_substitutions,
+        tuple(sp.symbols("trial_grad%d" % i) for i in range(dim * dim)),
+    )
 
     _append_transformed_loperand_lines(
         lines,
@@ -1230,6 +1228,58 @@ def _weak_form_deformation_gradient_substitutions(
                 value = sp.Integer(1) + value
             substitutions[weak_form.deformation_gradient[idx]] = value
     return substitutions
+
+
+def _weak_form_deformation_gradient_substitutions_from_symbols(weak_form, gradient):
+    substitutions = {}
+    for row in range(weak_form.dim):
+        for col in range(weak_form.dim):
+            idx = row * weak_form.dim + col
+            value = gradient[idx]
+            if row == col:
+                value = sp.Integer(1) + value
+            substitutions[weak_form.deformation_gradient[idx]] = value
+    return substitutions
+
+
+def _weak_form_expressions_are_identical(left, right):
+    for a, b in zip(tuple(left), tuple(right)):
+        diff = sp.expand(a - b)
+        if diff != 0 and sp.simplify(diff) != 0:
+            return False
+    return True
+
+
+def _weak_form_material_expression(
+    weak_form,
+    form_name,
+    deformation_gradient_substitutions,
+    trial_gradient=None,
+):
+    if form_name != "apply":
+        return weak_form.first_piola().xreplace(deformation_gradient_substitutions)
+
+    if trial_gradient is None:
+        raise ValueError("apply weak form material requires a trial gradient")
+
+    linearized = weak_form.linearized_first_piola(trial_gradient).xreplace(
+        deformation_gradient_substitutions
+    )
+    deformation_symbols = set()
+    for value in deformation_gradient_substitutions.values():
+        deformation_symbols.update(value.free_symbols)
+    if any(expr.free_symbols.intersection(deformation_symbols) for expr in tuple(linearized)):
+        return linearized
+
+    first_piola_at_trial = weak_form.first_piola().xreplace(
+        _weak_form_deformation_gradient_substitutions_from_symbols(
+            weak_form,
+            trial_gradient,
+        )
+    )
+    if _weak_form_expressions_are_identical(first_piola_at_trial, linearized):
+        return first_piola_at_trial
+    return linearized
 
 
 def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix, scale=None):
@@ -2989,6 +3039,8 @@ def _sfem_soa_diagnostics_header(
         "    long load_instructions_%s;" % per_qp,
         "    long store_instructions_%s;" % per_qp,
         "    long flops_%s;" % per_qp,
+        "    long affine_mesh_flops_per_element;",
+        "    long isoparametric_mesh_flops_per_element;",
         "    long temporaries;",
         "    long estimated_registers;",
         "    int geometry_streams;",
@@ -3016,7 +3068,21 @@ def _sfem_soa_diagnostics_header(
         "        const %s *const d," % struct_name,
         "        const ptrdiff_t nelements) {",
         "    const double n = nelements > 0 ? (double)nelements : 0.0;",
-        "    return n * (double)d->n_qp * (double)d->flops_%s;" % per_qp,
+        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
+        "}",
+        "",
+        "static %s double %s_total_flops_affine_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements) {",
+        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->affine_mesh_flops_per_element);" % per_qp,
+        "}",
+        "",
+        "static %s double %s_total_flops_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements) {",
+        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
         "}",
         "",
         "static %s size_t %s_total_bytes(" % (inline_qualifier, struct_name),
@@ -3029,7 +3095,37 @@ def _sfem_soa_diagnostics_header(
         "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
         "    const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;",
         "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
-        "    const size_t output_bytes = n * (size_t)d->output_streams * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "}",
+        "",
+        "static %s size_t %s_total_bytes_affine_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    (void)accumulator_bytes;",
+        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "    const size_t geometry_bytes = n * (size_t)(d->dim * d->dim + 1) * scalar_bytes;",
+        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "}",
+        "",
+        "static %s size_t %s_total_bytes_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    (void)accumulator_bytes;",
+        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "    const size_t geometry_bytes = n * (size_t)d->dim * (size_t)d->n_shape * scalar_bytes;",
+        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
         "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
         "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
@@ -3044,6 +3140,46 @@ def _sfem_soa_diagnostics_header(
         "    return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
+        "static %s double %s_arithmetic_intensity_affine_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const size_t bytes = %s_total_bytes_affine_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "    return bytes ? %s_total_flops_affine_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "}",
+        "",
+        "static %s double %s_arithmetic_intensity_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "        const %s *const d," % struct_name,
+        "        const ptrdiff_t nelements,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const size_t bytes = %s_total_bytes_isoparametric_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "    return bytes ? %s_total_flops_isoparametric_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "}",
+        "",
+        "static %s void %s_print_rate_with_ai(" % (inline_qualifier, struct_name),
+        "        const char *const name,",
+        "        const %s *const d," % struct_name,
+        "        const double elapsed,",
+        "        const ptrdiff_t nelements,",
+        "        const ptrdiff_t ndofs,",
+        "        const int repeat,",
+        "        const double ai,",
+        "        const double total_flops) {",
+        "    const double seconds_per_call = repeat > 0 ? elapsed / (double)repeat : 0.0;",
+        "    const double element_rate = seconds_per_call > 0.0 ? 1e-6 * (double)nelements / seconds_per_call : 0.0;",
+        "    const double dof_rate = seconds_per_call > 0.0 ? 1e-6 * (double)ndofs / seconds_per_call : 0.0;",
+        "    const double gflops = seconds_per_call > 0.0",
+        "            ? 1e-9 * total_flops / seconds_per_call",
+        "            : 0.0;",
+        '    printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
+        "           name ? name : d->kernel_name,",
+        "           seconds_per_call, element_rate, dof_rate, ai, gflops);",
+        "}",
+        "",
         "static %s void %s_print_rate(" % (inline_qualifier, struct_name),
         "        const char *const name,",
         "        const %s *const d," % struct_name,
@@ -3054,17 +3190,42 @@ def _sfem_soa_diagnostics_header(
         "        const size_t scalar_bytes,",
         "        const size_t real_bytes,",
         "        const size_t accumulator_bytes) {",
-        "    const double seconds_per_call = repeat > 0 ? elapsed / (double)repeat : 0.0;",
-        "    const double element_rate = seconds_per_call > 0.0 ? 1e-6 * (double)nelements / seconds_per_call : 0.0;",
-        "    const double dof_rate = seconds_per_call > 0.0 ? 1e-6 * (double)ndofs / seconds_per_call : 0.0;",
         "    const double ai = %s_arithmetic_intensity(" % struct_name,
         "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
-        "    const double gflops = seconds_per_call > 0.0",
-        "            ? 1e-9 * %s_total_flops(d, nelements) / seconds_per_call" % struct_name,
-        "            : 0.0;",
-        '    printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
-        "           name ? name : d->kernel_name,",
-        "           seconds_per_call, element_rate, dof_rate, ai, gflops);",
+        "    const double total_flops = %s_total_flops(d, nelements);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
+        "}",
+        "",
+        "static %s void %s_print_rate_affine_mesh(" % (inline_qualifier, struct_name),
+        "        const char *const name,",
+        "        const %s *const d," % struct_name,
+        "        const double elapsed,",
+        "        const ptrdiff_t nelements,",
+        "        const ptrdiff_t ndofs,",
+        "        const int repeat,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const double ai = %s_arithmetic_intensity_affine_mesh(" % struct_name,
+        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "    const double total_flops = %s_total_flops_affine_mesh(d, nelements);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
+        "}",
+        "",
+        "static %s void %s_print_rate_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "        const char *const name,",
+        "        const %s *const d," % struct_name,
+        "        const double elapsed,",
+        "        const ptrdiff_t nelements,",
+        "        const ptrdiff_t ndofs,",
+        "        const int repeat,",
+        "        const size_t scalar_bytes,",
+        "        const size_t real_bytes,",
+        "        const size_t accumulator_bytes) {",
+        "    const double ai = %s_arithmetic_intensity_isoparametric_mesh(" % struct_name,
+        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "    const double total_flops = %s_total_flops_isoparametric_mesh(d, nelements);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
         "}",
         "",
         "} // namespace codegen",
@@ -3079,6 +3240,7 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
     function_name,
     variable_name,
     scalar_type,
+    print_rate_helper="KernelDiagnostics_print_rate",
 ):
     suffix = "" if scalar_type == "double" else "_float"
     public_name = "%s%s_print_rate" % (function_name, suffix)
@@ -3088,7 +3250,7 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
         "        const ptrdiff_t nelements,",
         "        const ptrdiff_t ndofs,",
         "        const int repeat) {",
-        "    sfem::codegen::KernelDiagnostics_print_rate(",
+        "    sfem::codegen::%s(" % print_rate_helper,
         '            "%s%s",' % (function_name, suffix),
         "            &sfem::codegen::%s," % variable_name,
         "            elapsed, nelements, ndofs, repeat,",
@@ -3096,6 +3258,84 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
         % (scalar_type, scalar_type, scalar_type),
         "}",
     ]
+
+
+def _tensor_product_field_gradient_flops(dim, n_qp_1d, n_shape_1d):
+    dim = int(dim)
+    q = int(n_qp_1d)
+    s = int(n_shape_1d)
+    if dim == 2:
+        return 4 * q * s * s + 6 * q * q * s
+    if dim == 3:
+        return 4 * q * s * s * s + 6 * q * q * s * s + 6 * q * q * q * s
+    return 0
+
+
+def _tensor_product_test_gradient_flops(dim, n_qp_1d, n_shape_1d):
+    dim = int(dim)
+    q = int(n_qp_1d)
+    s = int(n_shape_1d)
+    if dim == 2:
+        return 6 * q * q * s + 5 * q * s * s
+    if dim == 3:
+        return 6 * q * q * q * s + 6 * q * q * s * s + 5 * q * s * s * s
+    return 0
+
+
+def _adjugate_and_determinant_flops_per_qp(dim):
+    dim = int(dim)
+    if dim == 2:
+        return 11
+    if dim == 3:
+        return 41
+    return 0
+
+
+def _physical_gradient_transform_flops_per_qp(dim):
+    dim = int(dim)
+    if dim <= 0:
+        return 0
+    return 1 + dim * dim * (2 * dim)
+
+
+def _weak_operand_transform_flops_per_qp(dim):
+    dim = int(dim)
+    if dim <= 0:
+        return 0
+    return dim * dim * (2 * dim)
+
+
+def _objective_weight_flops_per_qp():
+    return 3
+
+
+def _tensor_product_mesh_extra_flops_per_element(form, dim, n_qp, quadrature_rule, basis_family):
+    if quadrature_rule is None or str(basis_family) != "tensor_product":
+        return 0, 0
+    n_qp_1d = int(quadrature_rule.tensor_product_n_qp_1d)
+    n_shape_1d = int(quadrature_rule.tensor_product_n_shape_1d)
+    field_gradient = _tensor_product_field_gradient_flops(dim, n_qp_1d, n_shape_1d)
+    test_gradient = _tensor_product_test_gradient_flops(dim, n_qp_1d, n_shape_1d)
+    grad_transform = int(n_qp) * _physical_gradient_transform_flops_per_qp(dim)
+
+    form_name = str(getattr(form, "name", ""))
+    if form_name == "objective":
+        local_extra = dim * field_gradient + grad_transform + int(n_qp) * _objective_weight_flops_per_qp()
+    elif form_name in ("gradient", "apply"):
+        local_extra = (
+            dim * field_gradient
+            + grad_transform
+            + int(n_qp) * _weak_operand_transform_flops_per_qp(dim)
+            + dim * test_gradient
+        )
+    else:
+        local_extra = 0
+
+    geometry_extra = (
+        dim * field_gradient
+        + int(n_qp) * _adjugate_and_determinant_flops_per_qp(dim)
+    )
+    return local_extra, local_extra + geometry_extra
 
 
 def _sfem_soa_diagnostics_lines(
@@ -3117,11 +3357,34 @@ def _sfem_soa_diagnostics_lines(
     if form.expression_graph is not None:
         cost = form.expression_graph.cost
     elif form.weak_form is not None:
+        diagnostic_deformation_substitutions = _weak_form_deformation_gradient_substitutions(
+            form.weak_form,
+            "diag_grad",
+            scalar_temporaries=True,
+        )
+        if form.name == "objective":
+            diagnostic_expressions = (
+                form.weak_form.energy_density.xreplace(
+                    diagnostic_deformation_substitutions
+                ),
+            )
+        else:
+            diagnostic_expressions = tuple(
+                _weak_form_material_expression(
+                    form.weak_form,
+                    form.name,
+                    diagnostic_deformation_substitutions,
+                    tuple(
+                        sp.symbols("diag_trial_grad%d" % i)
+                        for i in range(form.weak_form.dim * form.weak_form.dim)
+                    ),
+                )
+            )
         diagnostic_graph = (
             KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, form.weak_form.diagnostic_expressions(uses_direction))
+            .add(ExpressionRole.OPERATOR_EVALUATION, diagnostic_expressions)
             .build_graph(
-                data_symbols=form.weak_form.deformation_gradient,
+                data_symbols=tuple(diagnostic_deformation_substitutions.values()),
                 temporary_prefix="weak_diag_tmp",
             )
         )
@@ -3147,6 +3410,13 @@ def _sfem_soa_diagnostics_lines(
     h_streams = dim * n_nodes if uses_direction else 0
     element_type = quadrature_rule.element_type if quadrature_rule is not None else "GENERIC"
     quadrature_order = quadrature_rule.order if quadrature_rule is not None else 0
+    affine_extra_flops, isoparametric_extra_flops = _tensor_product_mesh_extra_flops_per_element(
+        form,
+        dim,
+        n_qp,
+        quadrature_rule,
+        basis_family,
+    )
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -3170,6 +3440,8 @@ def _sfem_soa_diagnostics_lines(
         "    %d," % cost.loads,
         "    %d," % cost.stores,
         "    %d," % cost.flops,
+        "    %d," % affine_extra_flops,
+        "    %d," % isoparametric_extra_flops,
         "    %d," % cost.temporaries,
         "    %d," % cost.estimated_registers,
         "    %d," % geometry_streams,
@@ -3212,21 +3484,32 @@ def _sfem_soa_diagnostics_lines(
     if quadrature_rule is not None:
         function_names.extend(
             (
-                _sfem_soa_mesh_public_function_name(
-                    prefix,
-                    form.name,
-                    quadrature_rule,
-                    "affine",
+                (
+                    _sfem_soa_mesh_public_function_name(
+                        prefix,
+                        form.name,
+                        quadrature_rule,
+                        "affine",
+                    ),
+                    "KernelDiagnostics_print_rate_affine_mesh",
                 ),
-                _sfem_soa_mesh_public_function_name(
-                    prefix,
-                    form.name,
-                    quadrature_rule,
-                    "isoparametric",
+                (
+                    _sfem_soa_mesh_public_function_name(
+                        prefix,
+                        form.name,
+                        quadrature_rule,
+                        "isoparametric",
+                    ),
+                    "KernelDiagnostics_print_rate_isoparametric_mesh",
                 ),
             )
         )
-    for function_name in function_names:
+    for function_name_entry in function_names:
+        if isinstance(function_name_entry, tuple):
+            function_name, print_rate_helper = function_name_entry
+        else:
+            function_name = function_name_entry
+            print_rate_helper = "KernelDiagnostics_print_rate"
         for scalar_type in ("double", "float"):
             lines.append("")
             lines.extend(
@@ -3234,6 +3517,7 @@ def _sfem_soa_diagnostics_lines(
                     function_name,
                     variable_name,
                     scalar_type,
+                    print_rate_helper,
                 )
             )
     return lines

@@ -249,13 +249,25 @@ def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=Non
             _element_name(element).lower(),
         )
         performance_cases["value"].append(
-            _performance_case(element, ("%s_objective_soa_diagnostics" % stem,))
+            _performance_case(
+                element,
+                ("%s_objective_soa_diagnostics" % stem,),
+                affine_flags=("objective_uses_affine",),
+            )
         )
         performance_cases["gradient"].append(
-            _performance_case(element, ("%s_gradient_soa_diagnostics" % stem,))
+            _performance_case(
+                element,
+                ("%s_gradient_soa_diagnostics" % stem,),
+                affine_flags=("gradient_uses_affine",),
+            )
         )
         performance_cases["apply"].append(
-            _performance_case(element, ("%s_apply_soa_diagnostics" % stem,))
+            _performance_case(
+                element,
+                ("%s_apply_soa_diagnostics" % stem,),
+                affine_flags=("apply_uses_affine",),
+            )
         )
         components = _components(dim)
         declarations.extend(
@@ -777,10 +789,18 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None):
         residual_dependencies, action_dependencies = dependencies
         stem = "%s_%s" % (material.name, _element_name(element).lower())
         performance_cases["gradient"].append(
-            _performance_case(element, ("%s_residual_element_soa_diagnostics" % stem,))
+            _performance_case(
+                element,
+                ("%s_residual_element_soa_diagnostics" % stem,),
+                affine_flags=("residual_uses_affine",),
+            )
         )
         performance_cases["apply"].append(
-            _performance_case(element, ("%s_jacobian_action_element_soa_diagnostics" % stem,))
+            _performance_case(
+                element,
+                ("%s_jacobian_action_element_soa_diagnostics" % stem,),
+                affine_flags=("jacobian_action_uses_affine",),
+            )
         )
         residual_pointer_params = []
         if residual_dependencies.current:
@@ -2300,7 +2320,11 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         energy_stem = "%s_%s_%s_%s" % (material.name, energy_name, energy_label, energy_label)
         residual_stem = "%s_%s_%s" % (material.name, residual_name, mixed_label)
         cases["performance"]["value"].append(
-            _performance_case(element, ("%s_objective_soa_diagnostics" % energy_stem,))
+            _performance_case(
+                element,
+                ("%s_objective_soa_diagnostics" % energy_stem,),
+                affine_flags=("objective_uses_affine",),
+            )
         )
         cases["performance"]["gradient"].append(
             _performance_case(
@@ -2309,6 +2333,7 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
                     "%s_gradient_soa_diagnostics" % energy_stem,
                     "%s_residual_element_soa_diagnostics" % residual_stem,
                 ),
+                affine_flags=("gradient_uses_affine", "residual_uses_affine"),
             )
         )
         cases["performance"]["apply"].append(
@@ -2318,6 +2343,7 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
                     "%s_apply_soa_diagnostics" % energy_stem,
                     "%s_jacobian_action_element_soa_diagnostics" % residual_stem,
                 ),
+                affine_flags=("apply_uses_affine", "jacobian_action_uses_affine"),
             )
         )
         energy_objective_dependencies = energy_collection.form_metadata(FormOrder.ZERO).dependencies
@@ -2989,11 +3015,26 @@ def _runtime_variant_and_scalar_type(name):
     return None, None
 
 
-def _performance_case(element, diagnostics, count_expression="domain.block->n_elements()"):
-    diagnostics = tuple(dict.fromkeys(diagnostics))
+def _performance_case(
+    element,
+    diagnostics,
+    count_expression="domain.block->n_elements()",
+    affine_flags=None,
+):
+    diagnostics = tuple(diagnostics)
+    if affine_flags is None:
+        affine_flags = (None,) * len(diagnostics)
+    else:
+        affine_flags = tuple(affine_flags)
+    if len(affine_flags) != len(diagnostics):
+        raise ValueError("performance diagnostics and affine flags length mismatch")
+    diagnostic_entries = tuple(
+        {"name": diagnostic, "affine_flag": affine_flag}
+        for diagnostic, affine_flag in dict.fromkeys(zip(diagnostics, affine_flags))
+    )
     return {
         "element": element,
-        "diagnostics": diagnostics,
+        "diagnostics": diagnostic_entries,
         "count": count_expression,
     }
 
@@ -3061,10 +3102,18 @@ def _performance_flops_cases(cases):
         lines.append("                case smesh::%s: {" % _mesh_element_name(case["element"]))
         lines.append("                    const ptrdiff_t nelements = %s;" % case["count"])
         for diagnostic in case["diagnostics"]:
-            lines.append(
-                "                    total += sfem::codegen::KernelDiagnostics_total_flops(%s(), nelements);"
-                % diagnostic
-            )
+            name = diagnostic["name"]
+            affine_flag = diagnostic["affine_flag"]
+            if affine_flag is None:
+                lines.append(
+                    "                    total += sfem::codegen::KernelDiagnostics_total_flops(%s(), nelements);"
+                    % name
+                )
+            else:
+                lines.append(
+                    "                    total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(%s(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(%s(), nelements);"
+                    % (affine_flag, name, name)
+                )
         lines.append("                    break;")
         lines.append("                }")
     return "\n".join(lines)
@@ -3076,10 +3125,18 @@ def _performance_bytes_cases(cases):
         lines.append("                case smesh::%s: {" % _mesh_element_name(case["element"]))
         lines.append("                    const ptrdiff_t nelements = %s;" % case["count"])
         for diagnostic in case["diagnostics"]:
-            lines.append(
-                "                    total += sfem::codegen::KernelDiagnostics_total_bytes(%s(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
-                % diagnostic
-            )
+            name = diagnostic["name"]
+            affine_flag = diagnostic["affine_flag"]
+            if affine_flag is None:
+                lines.append(
+                    "                    total += sfem::codegen::KernelDiagnostics_total_bytes(%s(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
+                    % name
+                )
+            else:
+                lines.append(
+                    "                    total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(%s(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(%s(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
+                    % (affine_flag, name, name)
+                )
         lines.append("                    break;")
         lines.append("                }")
     return "\n".join(lines)
