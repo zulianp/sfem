@@ -239,8 +239,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->gradient_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -248,9 +248,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedLinearElasticity affine gradient requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             switch (domain.element_type) {
@@ -293,8 +293,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -302,9 +302,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedLinearElasticity affine hessian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             switch (domain.element_type) {
@@ -347,8 +347,8 @@ namespace sfem {
         *out = 0;
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const ptrdiff_t nelements = domain.block->n_elements();
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -356,9 +356,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedLinearElasticity affine objective requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             std::fill(impl_->element_values.get(),
@@ -432,8 +432,8 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const ptrdiff_t nelements = domain.block->n_elements();
             const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -441,9 +441,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedLinearElasticity affine objective_steps requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             if (nvalues > impl_->element_capacity) {

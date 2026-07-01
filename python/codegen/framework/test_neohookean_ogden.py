@@ -1509,9 +1509,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("idx_t **const SFEM_RESTRICT elements", operator_source)
-        self.assertIn("const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0", operator_source)
-        self.assertIn("g_jacobian_adjugate0 + evbegin", operator_source)
-        self.assertIn("g_jacobian_determinant0 + evbegin", operator_source)
+        self.assertIn("const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0", operator_source)
+        self.assertIn("std::is_same<jacobian_t, scalar_t>()", operator_source)
+        self.assertIn(
+            "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
+            operator_source,
+        )
         affine_mesh_source = operator_source.split(
             "static SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl" % prefix,
             1,
@@ -1520,7 +1523,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             % prefix,
             1,
         )[0]
-        self.assertNotIn("scalar_t block_jacobian_adjugate0[VECTOR_SIZE]", affine_mesh_source)
+        self.assertIn("scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE]", affine_mesh_source)
         self.assertNotIn("g_jacobian_adjugate[(evbegin + lane)", affine_mesh_source)
         self.assertIn(
             "const geometry_t *const *const SFEM_RESTRICT points",
@@ -1531,7 +1534,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            "template <typename scalar_t>\nstatic SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl"
+            "template <typename scalar_t, typename jacobian_t>\nstatic SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl"
             % prefix,
             operator_source,
         )
@@ -1544,11 +1547,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            "%s_hex8_gradient_affine_mesh_soa_impl<double>" % prefix,
+            "%s_hex8_gradient_affine_mesh_soa_impl<double, geom_t>" % prefix,
             operator_source,
         )
         self.assertIn(
-            "%s_hex8_gradient_affine_mesh_soa_impl<float>" % prefix,
+            "%s_hex8_gradient_affine_mesh_soa_impl<float, geom_t>" % prefix,
             operator_source,
         )
         self.assertIn("#pragma omp atomic update", operator_source)

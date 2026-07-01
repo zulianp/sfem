@@ -1,3 +1,4 @@
+#include <type_traits>
 #include "../neohookean_ogden_d2_tensor_product_local.hpp"
 #include "../../geometry_kernels.hpp"
 #include "../../kernel_diagnostics.hpp"
@@ -10,6 +11,34 @@
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
+SFEM_INLINE const scalar_t *affine_geometry_stream(
+        const int,
+        const jacobian_t *const SFEM_RESTRICT source,
+        scalar_t *const SFEM_RESTRICT,
+        std::true_type) {
+    return source;
+}
+
+template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
+SFEM_INLINE const scalar_t *affine_geometry_stream(
+        const int nelems,
+        const jacobian_t *const SFEM_RESTRICT source,
+        scalar_t *const SFEM_RESTRICT converted,
+        std::false_type) {
+    #pragma omp simd
+    for (int lane = 0; lane < nelems; ++lane) {
+        converted[lane] = scalar_t(source[lane]);
+    }
+    return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 namespace sfem {
 namespace codegen {
@@ -186,16 +215,16 @@ extern "C" void neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa_fl
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t mu,
         const scalar_t lmbda,
         const ptrdiff_t u_stride,
@@ -250,8 +279,23 @@ static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_im
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_u_streams[stream] = block_u_data[stream];
         }
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
@@ -269,11 +313,11 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double mu,
         const double lmbda,
         const ptrdiff_t u_stride,
@@ -281,18 +325,18 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
 }
 
 extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float mu,
         const float lmbda,
         const ptrdiff_t u_stride,
@@ -300,23 +344,23 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t mu,
         const scalar_t lmbda,
         const ptrdiff_t u_stride,
@@ -376,6 +420,21 @@ static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_
                 }
             }
         }
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const scalar_t alpha = steps[step];
@@ -392,7 +451,7 @@ static SFEM_INLINE int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_
                 block_value[lane] = scalar_t(0);
             }
 
-            neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+            neohookean_ogden_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -411,11 +470,11 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double mu,
         const double lmbda,
         const ptrdiff_t u_stride,
@@ -428,18 +487,18 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa(
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 extern "C" int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float mu,
         const float lmbda,
         const ptrdiff_t u_stride,
@@ -452,7 +511,7 @@ extern "C" int neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_floa
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 
@@ -911,16 +970,16 @@ extern "C" void neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa_flo
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t mu,
         const scalar_t lmbda,
         const ptrdiff_t u_stride,
@@ -983,8 +1042,23 @@ static SFEM_INLINE int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_imp
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1010,11 +1084,11 @@ extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double mu,
         const double lmbda,
         const ptrdiff_t u_stride,
@@ -1024,18 +1098,18 @@ extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float mu,
         const float lmbda,
         const ptrdiff_t u_stride,
@@ -1045,7 +1119,7 @@ extern "C" int neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
@@ -1349,16 +1423,16 @@ extern "C" void neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float_
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t mu,
         const scalar_t lmbda,
         const ptrdiff_t u_stride,
@@ -1431,8 +1505,23 @@ static SFEM_INLINE int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl(
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1458,11 +1547,11 @@ extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double mu,
         const double lmbda,
         const ptrdiff_t u_stride,
@@ -1475,18 +1564,18 @@ extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float mu,
         const float lmbda,
         const ptrdiff_t u_stride,
@@ -1499,7 +1588,7 @@ extern "C" int neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_quad4_quad4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 

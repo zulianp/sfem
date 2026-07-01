@@ -195,13 +195,6 @@ int main(int argc, char *argv[]) {
         SFEM_ERROR("SFEM_CODEGEN_GEOMETRY must be affine or isoparametric\n");
     }
     const bool assume_affine = codegen_geometry == "affine";
-    if (assume_affine && sizeof(jacobian_t) != sizeof(real_t)) {
-        SFEM_ERROR(
-                "GeneratedNeoHookeanOgden affine wrapper requires jacobian_t and real_t to have the same size "
-                "(jacobian_t=%zu, real_t=%zu). Use SFEM_CODEGEN_GEOMETRY=isoparametric for this build.\n",
-                sizeof(jacobian_t),
-                sizeof(real_t));
-    }
 
     auto                      fs          = sfem::FunctionSpace::create(mesh, block_size);
     auto                      generated_f = sfem::Function::create(fs);

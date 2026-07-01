@@ -609,6 +609,14 @@ class GenApiTest(unittest.TestCase):
             )
             with open(wrapper, encoding="utf-8") as stream:
                 source = stream.read()
+            operator = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "neohookean_ogden_tri3_operator.cpp",
+            )
+            with open(operator, encoding="utf-8") as stream:
+                operator_source = stream.read()
             header = os.path.join(
                 out_dir,
                 "op",
@@ -619,6 +627,18 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
                 source,
+            )
+            self.assertIn(
+                "const geom_t *const *adjugate = nullptr;",
+                source,
+            )
+            self.assertIn(
+                "template <typename scalar_t, typename jacobian_t>",
+                operator_source,
+            )
+            self.assertIn(
+                "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
+                operator_source,
             )
             self.assertNotIn("generated_neohookean_ogden", source)
             c_abi = os.path.join(
@@ -634,6 +654,10 @@ class GenApiTest(unittest.TestCase):
             )
             self.assertIn(
                 "extern \"C\" int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "const geom_t *const SFEM_RESTRICT g_jacobian_determinant0",
                 declarations,
             )
             manifest = os.path.join(
@@ -893,12 +917,20 @@ class GenApiTest(unittest.TestCase):
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow.cpp")
             with open(wrapper, encoding="utf-8") as stream:
                 source = stream.read()
+            operator = os.path.join(out_dir, "d2", "tri3", "two_phase_flow_tri3_operator.cpp")
+            with open(operator, encoding="utf-8") as stream:
+                operator_source = stream.read()
             self.assertLess(
                 source.index('parameters.require_real_value("C_ka1")'),
                 source.index('parameters.require_real_value("porosity")'),
             )
             self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_soa", source)
             self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_soa", source)
+            self.assertIn("const geom_t *const *adjugate = nullptr;", source)
+            self.assertIn(
+                "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
+                operator_source,
+            )
             self.assertNotIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 2;", source)
             self.assertIn("p_w_data = state + 0", source)
@@ -909,6 +941,10 @@ class GenApiTest(unittest.TestCase):
                 declarations = stream.read()
             self.assertIn(
                 "extern \"C\" int two_phase_flow_tri3_residual_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "const geom_t *const SFEM_RESTRICT g_jacobian_determinant0",
                 declarations,
             )
             self.assertIn(
