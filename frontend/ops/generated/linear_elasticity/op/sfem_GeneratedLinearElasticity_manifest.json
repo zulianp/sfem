@@ -1951,6 +1951,1180 @@
     "operator_name": "GeneratedLinearElasticity",
     "source": "op/sfem_GeneratedLinearElasticity_registration.cpp"
   },
+  "runtime_operations": [
+    {
+      "name": "apply",
+      "variants": [
+        {
+          "function": "linear_elasticity_hex27_hex27_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_apply_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_apply_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "gradient",
+      "variants": [
+        {
+          "function": "linear_elasticity_hex27_hex27_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_gradient_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_gradient_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective",
+      "variants": [
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective_steps",
+      "variants": [
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_steps_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_steps_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "affine"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_steps_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex27_hex27_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex27_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_hex8_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex125_proteus_hex125",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex27_proteus_hex27",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex64_proteus_hex64",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex729_proteus_hex729",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_proteus_hex8_proteus_hex8",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_quad4_quad4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet10_tet10",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tet4_tet4_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tet4_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri3_tri3_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri3_tri3",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "linear_elasticity_tri6_tri6_objective_steps_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity_tri6_tri6",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
   "schema": "sfem.generated_op_manifest.v1",
   "wrapper": {
     "c_abi_header": "op/sfem_GeneratedLinearElasticity_c_abi.hpp",
