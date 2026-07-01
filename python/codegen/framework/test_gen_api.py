@@ -32,6 +32,17 @@ def _relative_sources(result, out_dir):
     return {os.path.relpath(path, out_dir) for path in result.sources}
 
 
+def _manifest_runtime_variants(metadata, operation):
+    for runtime_operation in metadata["runtime_operations"]:
+        if runtime_operation["name"] == operation:
+            return {
+                variant["variant"]
+                for variant in runtime_operation["variants"]
+                if variant["scalar_type"] == "real_t"
+            }
+    return set()
+
+
 def _compiler_vectorization_flags(compiler):
     version = subprocess.run(
         [compiler, "--version"],
@@ -655,6 +666,18 @@ class GenApiTest(unittest.TestCase):
                 "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "objective"),
+                {"affine", "isoparametric"},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "gradient"),
+                {"affine", "isoparametric"},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "apply"),
+                {"affine", "isoparametric"},
+            )
             with open(
                 os.path.join(out_dir, "op", "sfem_GeneratedNeoHookeanOgden_registration.cpp"),
                 encoding="utf-8",
@@ -895,6 +918,17 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "extern \"C\" int two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos",
                 declarations,
+            )
+            manifest = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow_manifest.json")
+            with open(manifest, encoding="utf-8") as stream:
+                metadata = json.load(stream)
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "residual"),
+                {"affine", "isoparametric"},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "jacobian_action"),
+                {"affine", "isoparametric"},
             )
 
     def test_poro_hyperelastic_material_uses_taylor_hood_elements(self):
@@ -2469,6 +2503,18 @@ class GenApiTest(unittest.TestCase):
                 "poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "gradient"),
+                {"affine", "isoparametric"},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "residual"),
+                {"affine", "isoparametric"},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "jacobian_action"),
+                {"affine", "isoparametric"},
+            )
 
     def test_poro_tensor_zero_block_does_not_force_empty_lane_loop(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -3070,6 +3116,10 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
+            )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "boundary_residual"),
+                {"sideset"},
             )
 
     def test_generates_ufl_style_coordinate_neumann_boundary_integral(self):

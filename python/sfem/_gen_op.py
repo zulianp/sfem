@@ -603,18 +603,10 @@ namespace sfem {
 
     void %(op)s::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("%(op)s::set_option");
-        if (name == "assume_affine") {
-            impl_->objective_uses_affine = val;
-            impl_->gradient_uses_affine = val;
-            impl_->apply_uses_affine = val;
-        } else if (name == "objective_assume_affine") {
-            impl_->objective_uses_affine = val;
-        } else if (name == "gradient_assume_affine") {
-            impl_->gradient_uses_affine = val;
-        } else if (name == "hessian_action_assume_affine" ||
-                   name == "apply_assume_affine") {
-            impl_->apply_uses_affine = val;
-        }
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     }
 
     void %(op)s::set_value_in_block(const std::string &block_name,
@@ -651,10 +643,10 @@ namespace sfem {
             set_material(*ret->impl_->domains, top_values);
         }
 
-        read_affine_options(node,
-                            ret->impl_->objective_uses_affine,
-                            ret->impl_->gradient_uses_affine,
-                            ret->impl_->apply_uses_affine);
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -692,6 +684,11 @@ namespace sfem {
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
         "objective_steps_cases": "\n".join(objective_steps_cases),
+        "affine_options": _affine_option_entries(
+            "objective_uses_affine",
+            "gradient_uses_affine",
+            "apply_uses_affine",
+        ),
     }
     return _header(material, False), source
 
@@ -1115,16 +1112,10 @@ namespace sfem {
 
     void %(op)s::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("%(op)s::set_option");
-        if (name == "assume_affine") {
-            impl_->residual_uses_affine = val;
-            impl_->jacobian_action_uses_affine = val;
-        } else if (name == "residual_assume_affine" ||
-                   name == "gradient_assume_affine") {
-            impl_->residual_uses_affine = val;
-        } else if (name == "jacobian_action_assume_affine" ||
-                   name == "apply_assume_affine") {
-            impl_->jacobian_action_uses_affine = val;
-        }
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     }
 
 #ifdef SFEM_ENABLE_RYAML
@@ -1154,9 +1145,10 @@ namespace sfem {
             set_material(*ret->impl_->domains, top_values);
         }
 
-        read_residual_affine_options(node,
-                                     ret->impl_->residual_uses_affine,
-                                     ret->impl_->jacobian_action_uses_affine);
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -1208,6 +1200,10 @@ namespace sfem {
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
+        "affine_options": _affine_option_entries(
+            "residual_uses_affine",
+            "jacobian_action_uses_affine",
+        ),
         "gradient_previous_check": (
             "        if (!impl_->previous) {\n"
             '            SFEM_ERROR("%s requires a previous state\\n");\n'
@@ -1977,24 +1973,10 @@ namespace sfem {
 
     void %(op)s::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("%(op)s::set_option");
-        if (name == "assume_affine") {
-            impl_->objective_uses_affine = val;
-            impl_->gradient_uses_affine = val;
-            impl_->apply_uses_affine = val;
-            impl_->residual_uses_affine = val;
-            impl_->jacobian_action_uses_affine = val;
-        } else if (name == "objective_assume_affine") {
-            impl_->objective_uses_affine = val;
-        } else if (name == "gradient_assume_affine" ||
-                   name == "residual_assume_affine") {
-            impl_->gradient_uses_affine = val;
-            impl_->residual_uses_affine = val;
-        } else if (name == "hessian_action_assume_affine" ||
-                   name == "jacobian_action_assume_affine" ||
-                   name == "apply_assume_affine") {
-            impl_->apply_uses_affine = val;
-            impl_->jacobian_action_uses_affine = val;
-        }
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     }
 
     void %(op)s::set_value_in_block(const std::string &block_name,
@@ -2031,13 +2013,10 @@ namespace sfem {
             set_material(*ret->impl_->domains, top_values);
         }
 
-        read_affine_options(node,
-                            ret->impl_->objective_uses_affine,
-                            ret->impl_->gradient_uses_affine,
-                            ret->impl_->apply_uses_affine);
-        read_residual_affine_options(node,
-                                     ret->impl_->residual_uses_affine,
-                                     ret->impl_->jacobian_action_uses_affine);
+        AffineOption options[] = {
+%(affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -2103,6 +2082,13 @@ namespace sfem {
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
+        "affine_options": _affine_option_entries(
+            "objective_uses_affine",
+            "gradient_uses_affine",
+            "apply_uses_affine",
+            "residual_uses_affine",
+            "jacobian_action_uses_affine",
+        ),
     }
     return _header(material, True), source
 
@@ -2689,6 +2675,7 @@ def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, regis
             "create_from_yaml": "sfem::%s::create_from_yaml" % material.op_name,
         },
         "generated_include_paths": _generated_include_paths(kernel_sources),
+        "runtime_operations": _runtime_operations(c_abi),
         "c_abi": c_abi,
     }
     return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
@@ -2735,6 +2722,117 @@ def _extract_c_abi_declarations(kernel_sources):
 def _c_abi_function_name(declaration):
     match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", declaration)
     return match.group(1) if match else None
+
+
+_RUNTIME_OPERATION_MARKERS = (
+    ("jacobian_action", "_jacobian_action_"),
+    ("boundary_residual", "_boundary_residual_"),
+    ("objective_steps", "_objective_steps_"),
+    ("objective", "_objective_"),
+    ("gradient", "_gradient_"),
+    ("apply", "_apply_"),
+    ("residual", "_residual_"),
+)
+
+_RUNTIME_VARIANT_SUFFIXES = (
+    ("affine", "_affine_mesh_soa"),
+    ("isoparametric", "_isoparametric_mesh_soa"),
+    ("sideset", "_sideset_soa"),
+)
+
+_AFFINE_OPTION_ALIASES = {
+    "objective_uses_affine": (
+        "ASSUME_AFFINE_OBJECTIVE",
+        "objective_assume_affine",
+    ),
+    "gradient_uses_affine": (
+        "ASSUME_AFFINE_GRADIENT",
+        "gradient_assume_affine",
+    ),
+    "apply_uses_affine": (
+        "ASSUME_AFFINE_HESSIAN_ACTION",
+        "hessian_action_assume_affine",
+        "ASSUME_AFFINE_APPLY",
+        "apply_assume_affine",
+    ),
+    "residual_uses_affine": (
+        "ASSUME_AFFINE_RESIDUAL",
+        "residual_assume_affine",
+        "ASSUME_AFFINE_GRADIENT",
+        "gradient_assume_affine",
+    ),
+    "jacobian_action_uses_affine": (
+        "ASSUME_AFFINE_JACOBIAN_ACTION",
+        "jacobian_action_assume_affine",
+        "ASSUME_AFFINE_APPLY",
+        "apply_assume_affine",
+    ),
+}
+
+
+def _runtime_operations(c_abi):
+    variants_by_operation = {}
+    seen = set()
+    for entry in c_abi:
+        name = entry["name"]
+        operation, target = _runtime_operation_and_target(name)
+        variant, scalar_type = _runtime_variant_and_scalar_type(name)
+        if operation is None or variant is None:
+            continue
+        key = (operation, variant, scalar_type, name)
+        if key in seen:
+            continue
+        seen.add(key)
+        variants_by_operation.setdefault(operation, []).append(
+            {
+                "variant": variant,
+                "scalar_type": scalar_type,
+                "target": target,
+                "function": name,
+            }
+        )
+    return tuple(
+        {
+            "name": operation,
+            "variants": tuple(
+                sorted(
+                    variants,
+                    key=lambda item: (
+                        item["variant"],
+                        item["scalar_type"],
+                        item["target"],
+                        item["function"],
+                    ),
+                )
+            ),
+        }
+        for operation, variants in sorted(variants_by_operation.items())
+    )
+
+
+def _runtime_operation_and_target(name):
+    for operation, marker in _RUNTIME_OPERATION_MARKERS:
+        marker_index = name.find(marker)
+        if marker_index >= 0:
+            return operation, name[:marker_index]
+    return None, None
+
+
+def _runtime_variant_and_scalar_type(name):
+    for variant, suffix in _RUNTIME_VARIANT_SUFFIXES:
+        if name.endswith(suffix):
+            return variant, "real_t"
+        if name.endswith("%s_float" % suffix):
+            return variant, "float"
+    return None, None
+
+
+def _affine_option_entries(*flags):
+    lines = []
+    for flag in flags:
+        for alias in _AFFINE_OPTION_ALIASES[flag]:
+            lines.append('            {"%s", &impl_->%s},' % (alias, flag))
+    return "\n".join(lines)
 
 
 def _energy_field_args(dependencies, dim, components, current=None, direction=None):
@@ -2911,7 +3009,32 @@ def _yaml_helpers(defaults):
         default_lines.append("            values[%d] = %.17g;" % (i, value))
     if not default_lines:
         default_lines.append("            values[0] = 0;")
-    return """#ifdef SFEM_ENABLE_RYAML
+    return """        struct AffineOption {
+            const char *name;
+            bool       *flag;
+        };
+
+        inline bool set_affine_option(const std::string &name,
+                                      const bool val,
+                                      const AffineOption *const options,
+                                      const int n_options) {
+            if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = val;
+                }
+                return true;
+            }
+            bool matched = false;
+            for (int i = 0; i < n_options; ++i) {
+                if (name == options[i].name) {
+                    *options[i].flag = val;
+                    matched = true;
+                }
+            }
+            return matched;
+        }
+
+#ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
         constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
         static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
@@ -3004,44 +3127,22 @@ def _yaml_helpers(defaults):
             return true;
         }
 
-        void read_affine_options(const ryml::ConstNodeRef &node,
-                                 bool &objective,
-                                 bool &gradient,
-                                 bool &hessian_action) {
-            bool all = objective && gradient && hessian_action;
+        inline void read_affine_options(const ryml::ConstNodeRef &node,
+                                        const AffineOption *const options,
+                                        const int n_options) {
+            bool all = true;
+            for (int i = 0; i < n_options; ++i) {
+                all = all && *options[i].flag;
+            }
             if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
                 yaml_read_bool(node, "assume_affine", all)) {
-                objective = all;
-                gradient = all;
-                hessian_action = all;
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = all;
+                }
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
-            yaml_read_bool(node, "objective_assume_affine", objective);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
-            yaml_read_bool(node, "gradient_assume_affine", gradient);
-            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
-            yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
-            yaml_read_bool(node, "apply_assume_affine", hessian_action);
-        }
-
-        void read_residual_affine_options(const ryml::ConstNodeRef &node,
-                                          bool &residual,
-                                          bool &jacobian_action) {
-            bool all = residual && jacobian_action;
-            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-                yaml_read_bool(node, "assume_affine", all)) {
-                residual = all;
-                jacobian_action = all;
+            for (int i = 0; i < n_options; ++i) {
+                yaml_read_bool(node, options[i].name, *options[i].flag);
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_RESIDUAL", residual);
-            yaml_read_bool(node, "residual_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", residual);
-            yaml_read_bool(node, "gradient_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_JACOBIAN_ACTION", jacobian_action);
-            yaml_read_bool(node, "jacobian_action_assume_affine", jacobian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", jacobian_action);
-            yaml_read_bool(node, "apply_assume_affine", jacobian_action);
         }
 #endif  // SFEM_ENABLE_RYAML""" % {
         "nparameters": nparameters,

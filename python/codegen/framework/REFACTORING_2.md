@@ -290,10 +290,16 @@ Tasks:
    block-system units and boundary units.
 3. [x] Generate a registration manifest listing wrapper headers, wrapper sources,
    factory names, and required generated include paths.
+   - The manifest now also derives runtime operation variants from generated C
+     ABI declarations (`affine`, `isoparametric`, `sideset`) so wrapper dispatch
+     metadata is produced at the code-generation boundary.
 4. [x] Use the manifest to update or generate SFEM factory registration instead of
    manually editing frontend includes/registration calls.
 5. Make runtime affine/isoparametric options plan-derived for objective,
    gradient, residual, Hessian action, and Jacobian action.
+   - Generated wrappers now use one emitted affine-option table per wrapper for
+     `set_option` and YAML parsing instead of duplicating operation alias logic
+     in each wrapper family.
 6. Align generated boundary-condition support with SFEM condition abstractions;
    keep generated Neumann sideset handling as one condition implementation, not
    a separate runtime design.
