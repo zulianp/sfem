@@ -1703,6 +1703,11 @@ def _coupled_energy_residual_op(material, elements, c_abi_header=None, systems_b
         residual_name,
         parameter_index,
     )
+    dependency_flags = _coupled_dependency_flags(
+        systems_by_dim,
+        energy_name,
+        residual_name,
+    )
     max_parameters = max(1, len(material.parameter_defaults))
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
@@ -1846,10 +1851,7 @@ namespace sfem {
 
     int %(op)s::gradient(const real_t *const state, real_t *const out) {
         SFEM_TRACE_SCOPE("%(op)s::gradient");
-        if (!impl_->previous) {
-            SFEM_ERROR("%(op)s requires a previous state\\n");
-            return SFEM_FAILURE;
-        }
+%(gradient_previous_check)s
         impl_->current = state;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
@@ -1870,7 +1872,7 @@ namespace sfem {
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters, storage);
-            const real_t *const previous = impl_->previous;
+%(gradient_previous_alias)s
             switch (domain.element_type) {
 %(gradient_cases)s
                 default:
@@ -1886,10 +1888,7 @@ namespace sfem {
                       real_t *const out) {
         SFEM_TRACE_SCOPE("%(op)s::apply");
         const real_t *const current = state ? state : impl_->current;
-        if (!current) {
-            SFEM_ERROR("%(op)s requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(apply_state_check)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1909,6 +1908,7 @@ namespace sfem {
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters, storage);
+%(apply_previous_alias)s
             switch (domain.element_type) {
 %(apply_cases)s
                 default:
@@ -1963,7 +1963,6 @@ namespace sfem {
             return SFEM_SUCCESS;
         });
     }
-
     void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
@@ -2078,11 +2077,80 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
+        "gradient_previous_check": (
+            "        if (!impl_->previous) {\n"
+            '            SFEM_ERROR("%s requires a previous state\\n");\n'
+            "            return SFEM_FAILURE;\n"
+            "        }" % material.op_name
+            if dependency_flags["gradient_previous"]
+            else ""
+        ),
+        "gradient_previous_alias": (
+            "            const real_t *const previous = impl_->previous;"
+            if dependency_flags["gradient_previous"]
+            else ""
+        ),
+        "apply_state_check": _coupled_apply_state_check(
+            material.op_name,
+            dependency_flags["apply_current"],
+            dependency_flags["apply_previous"],
+        ),
+        "apply_previous_alias": (
+            "            const real_t *const previous = impl_->previous;"
+            if dependency_flags["apply_previous"]
+            else ""
+        ),
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
     }
     return _header(material, True), source
+
+
+def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
+    from codegen.framework.forms import FormOrder
+
+    flags = {
+        "gradient_previous": False,
+        "apply_current": False,
+        "apply_previous": False,
+    }
+    for system in systems_by_dim.values():
+        energy_equation = next(equation for equation in system.equations if equation.name == energy_name)
+        residual_equation = next(equation for equation in system.equations if equation.name == residual_name)
+        energy_collection = system.form_collection(energy_equation)
+        residual_collection = system.form_collection(residual_equation)
+        energy_apply = energy_collection.form_metadata(FormOrder.TWO).dependencies
+        residual_gradient = residual_collection.form_metadata(FormOrder.ONE).dependencies
+        residual_apply = residual_collection.form_metadata(FormOrder.TWO).dependencies
+        flags["gradient_previous"] |= bool(getattr(residual_gradient, "previous", False))
+        flags["apply_current"] |= bool(getattr(energy_apply, "current", False)) or bool(
+            getattr(residual_apply, "current", False)
+        )
+        flags["apply_previous"] |= bool(getattr(residual_apply, "previous", False))
+    return flags
+
+
+def _coupled_apply_state_check(op_name, uses_current, uses_previous):
+    conditions = []
+    if uses_current:
+        conditions.append("!current")
+    if uses_previous:
+        conditions.append("!impl_->previous")
+    if not conditions:
+        return ""
+    requirement = (
+        "current and previous states"
+        if uses_current and uses_previous
+        else ("a current state" if uses_current else "a previous state")
+    )
+    return (
+        "        if (%s) {\n"
+        '            SFEM_ERROR("%s requires %s\\n");\n'
+        "            return SFEM_FAILURE;\n"
+        "        }"
+        % (" || ".join(conditions), op_name, requirement)
+    )
 
 
 def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_name, parameter_index):
@@ -2104,24 +2172,20 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         mixed_label = _element_name(element).lower()
         energy_stem = "%s_%s_%s_%s" % (material.name, energy_name, energy_label, energy_label)
         residual_stem = "%s_%s_%s" % (material.name, residual_name, mixed_label)
-        energy_params = _metadata_parameter_args(
-            energy_collection.form_metadata(FormOrder.ONE).dependencies,
-            parameter_index,
-        )
-        energy_apply_params = _metadata_parameter_args(
-            energy_collection.form_metadata(FormOrder.TWO).dependencies,
-            parameter_index,
-        )
-        energy_objective_params = _metadata_parameter_args(
-            energy_collection.form_metadata(FormOrder.ZERO).dependencies,
-            parameter_index,
-        )
+        energy_objective_dependencies = energy_collection.form_metadata(FormOrder.ZERO).dependencies
+        energy_gradient_dependencies = energy_collection.form_metadata(FormOrder.ONE).dependencies
+        energy_apply_dependencies = energy_collection.form_metadata(FormOrder.TWO).dependencies
+        residual_dependencies = residual_collection.form_metadata(FormOrder.ONE).dependencies
+        residual_apply_dependencies = residual_collection.form_metadata(FormOrder.TWO).dependencies
+        energy_params = _metadata_parameter_args(energy_gradient_dependencies, parameter_index)
+        energy_apply_params = _metadata_parameter_args(energy_apply_dependencies, parameter_index)
+        energy_objective_params = _metadata_parameter_args(energy_objective_dependencies, parameter_index)
         residual_params = _dependency_parameter_args(
-            residual_collection.form_metadata(FormOrder.ONE).dependencies.parameters,
+            residual_dependencies.parameters,
             parameter_index,
         )
         residual_apply_params = _dependency_parameter_args(
-            residual_collection.form_metadata(FormOrder.TWO).dependencies.parameters,
+            residual_apply_dependencies.parameters,
             parameter_index,
         )
 
@@ -2131,6 +2195,7 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         energy_direction = _component_offsets("direction", field_offsets[energy_field.name], energy_components)
         energy_out = _component_offsets("out", field_offsets[energy_field.name], energy_components)
         residual_state_setup = _residual_soa_view_declarations(residual_fields, "state", "data", "const real_t")
+        residual_current_setup = _residual_soa_view_declarations(residual_fields, "current", "data", "const real_t")
         residual_previous_setup = _residual_soa_view_declarations(residual_fields, "previous", "old_data", "const real_t")
         residual_direction_setup = _residual_soa_view_declarations(residual_fields, "direction", "direction_data", "const real_t")
         residual_out_setup = _residual_soa_view_declarations(residual_fields, "out", "out", "real_t")
@@ -2142,21 +2207,37 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         geometry_affine = _affine_geometry_offsets(dim) + ", determinant"
         common_iso = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points"
         common_affine = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), %s" % geometry_affine
-        energy_grad_affine = "%s_gradient_affine_mesh_soa(%s%s, %d, %s, %d, %s)" % (
-            energy_stem, common_affine, energy_params, block_size, energy_data, block_size, energy_out
+        energy_grad_args = ", ".join(
+            _nonempty(
+                *_coupled_energy_field_args(
+                    energy_gradient_dependencies,
+                    block_size,
+                    current=energy_data,
+                ),
+                block_size,
+                energy_out,
+            )
         )
-        energy_grad_iso = "%s_gradient_isoparametric_mesh_soa(%s%s, %d, %s, %d, %s)" % (
-            energy_stem, common_iso, energy_params, block_size, energy_data, block_size, energy_out
+        energy_grad_affine = "%s_gradient_affine_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_affine, energy_params, energy_grad_args
         )
+        energy_grad_iso = "%s_gradient_isoparametric_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_iso, energy_params, energy_grad_args
+        )
+        residual_gradient_args = []
+        residual_gradient_setup = []
+        if residual_dependencies.current:
+            residual_gradient_setup.extend(residual_state_setup)
+            residual_gradient_args.extend((str(block_size), *residual_state_args))
+        if residual_dependencies.previous:
+            residual_gradient_setup.extend(residual_previous_setup)
+            residual_gradient_args.extend((str(block_size), *residual_previous_args))
+        residual_gradient_setup.extend(residual_out_setup)
+        residual_gradient_args.extend((str(block_size), *residual_out_args))
         residual_args_common = ", ".join(
             _nonempty(
                 residual_params[2:] if residual_params.startswith(", ") else residual_params,
-                str(block_size),
-                *residual_state_args,
-                str(block_size),
-                *residual_previous_args,
-                str(block_size),
-                *residual_out_args,
+                *residual_gradient_args,
             )
         )
         residual_grad_affine = "%s_residual_affine_mesh_soa(%s, %s)" % (
@@ -2169,7 +2250,7 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
             _coupled_case(
                 element,
                 block_size,
-                residual_state_setup + residual_previous_setup + residual_out_setup,
+                residual_gradient_setup,
                 (
                     "                    int status = impl_->gradient_uses_affine ? %s : %s;\n"
                     "                    if (status != SFEM_SUCCESS) return status;\n"
@@ -2178,19 +2259,41 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
             )
         )
 
-        energy_apply_affine = "%s_apply_affine_mesh_soa(%s%s, %d, %s, %d, %s, %d, %s)" % (
-            energy_stem, common_affine, energy_apply_params, block_size, energy_data, block_size, energy_direction, block_size, energy_out
+        energy_apply_args = ", ".join(
+            _nonempty(
+                *_coupled_energy_field_args(
+                    energy_apply_dependencies,
+                    block_size,
+                    current=energy_data,
+                    direction=energy_direction,
+                ),
+                block_size,
+                energy_out,
+            )
         )
-        energy_apply_iso = "%s_apply_isoparametric_mesh_soa(%s%s, %d, %s, %d, %s, %d, %s)" % (
-            energy_stem, common_iso, energy_apply_params, block_size, energy_data, block_size, energy_direction, block_size, energy_out
+        energy_apply_affine = "%s_apply_affine_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_affine, energy_apply_params, energy_apply_args
         )
+        energy_apply_iso = "%s_apply_isoparametric_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_iso, energy_apply_params, energy_apply_args
+        )
+        residual_apply_args = []
+        residual_apply_setup = []
+        if residual_apply_dependencies.current:
+            residual_apply_setup.extend(residual_current_setup)
+            residual_apply_args.extend((str(block_size), *residual_state_args))
+        if residual_apply_dependencies.previous:
+            residual_apply_setup.extend(residual_previous_setup)
+            residual_apply_args.extend((str(block_size), *residual_previous_args))
+        if residual_apply_dependencies.direction:
+            residual_apply_setup.extend(residual_direction_setup)
+            residual_apply_args.extend((str(block_size), *residual_direction_args))
+        residual_apply_setup.extend(residual_out_setup)
+        residual_apply_args.extend((str(block_size), *residual_out_args))
         residual_apply_args_common = ", ".join(
             _nonempty(
                 residual_apply_params[2:] if residual_apply_params.startswith(", ") else residual_apply_params,
-                str(block_size),
-                *residual_direction_args,
-                str(block_size),
-                *residual_out_args,
+                *residual_apply_args,
             )
         )
         residual_apply_affine = "%s_jacobian_action_affine_mesh_soa(%s, %s)" % (
@@ -2203,7 +2306,7 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
             _coupled_case(
                 element,
                 block_size,
-                residual_state_setup + residual_direction_setup + residual_out_setup,
+                residual_apply_setup,
                 (
                     "                    int status = impl_->apply_uses_affine ? %s : %s;\n"
                     "                    if (status != SFEM_SUCCESS) return status;\n"
@@ -2212,11 +2315,21 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
             )
         )
 
-        energy_objective_affine = "%s_objective_affine_mesh_soa(%s%s, %d, %s, impl_->element_values.get())" % (
-            energy_stem, common_affine, energy_objective_params, block_size, energy_data
+        energy_objective_args = ", ".join(
+            _nonempty(
+                *_coupled_energy_field_args(
+                    energy_objective_dependencies,
+                    block_size,
+                    current=energy_data,
+                ),
+                "impl_->element_values.get()",
+            )
         )
-        energy_objective_iso = "%s_objective_isoparametric_mesh_soa(%s%s, %d, %s, impl_->element_values.get())" % (
-            energy_stem, common_iso, energy_objective_params, block_size, energy_data
+        energy_objective_affine = "%s_objective_affine_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_affine, energy_objective_params, energy_objective_args
+        )
+        energy_objective_iso = "%s_objective_isoparametric_mesh_soa(%s%s, %s)" % (
+            energy_stem, common_iso, energy_objective_params, energy_objective_args
         )
         cases["objective"].append(
             """                case smesh::%(element)s:
@@ -2275,6 +2388,15 @@ def _field_offsets(fields):
 
 def _component_offsets(base, offset, components):
     return ", ".join("%s + %d" % (base, offset + component) for component in components)
+
+
+def _coupled_energy_field_args(dependencies, block_size, current=None, direction=None):
+    args = []
+    if current is not None and getattr(dependencies, "current", False):
+        args.extend((str(block_size), current))
+    if direction is not None and getattr(dependencies, "direction", False):
+        args.extend((str(block_size), direction))
+    return tuple(args)
 
 
 def _metadata_parameter_args(parameters, parameter_index):
