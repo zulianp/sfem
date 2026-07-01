@@ -1168,7 +1168,7 @@ def _layout_codegen_files(unit, context, files):
     local_headers = tuple(
         generated.path
         for generated in files
-        if generated.path.endswith("_local.hpp")
+        if _is_codegen_local_header(generated.path)
     )
     return tuple(
         GeneratedKernelFile(
@@ -1216,9 +1216,13 @@ def _layout_codegen_source(unit, context, filename, source, local_headers):
 def _codegen_file_directory(unit, context, filename):
     if filename in _CODEGEN_COMMON_HEADERS:
         return ""
-    if filename.endswith("_local.hpp"):
+    if _is_codegen_local_header(filename):
         return _codegen_dimension_directory(context)
     return _codegen_output_directory(unit, context)
+
+
+def _is_codegen_local_header(filename):
+    return filename.endswith("_local.hpp") or filename.endswith("_local.cuh")
 
 
 def _codegen_dimension_directory(context):
@@ -1235,9 +1239,13 @@ def _codegen_output_directory(unit, context):
 _CODEGEN_COMMON_HEADERS = frozenset(
     (
         "kernel_math.hpp",
+        "kernel_math.cuh",
         "kernel_diagnostics.hpp",
+        "kernel_diagnostics.cuh",
         "tensor_product_kernels.hpp",
+        "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
+        "geometry_kernels.cuh",
     )
 )
 
@@ -1495,34 +1503,50 @@ def _write_files(out_dir, files):
 def _clean_outputs(out_dir, name):
     patterns = (
         "generated_%s*.hpp" % name,
+        "generated_%s*.cuh" % name,
         "generated_%s*.cpp" % name,
+        "generated_%s*.cu" % name,
         "generated_%s*.o" % name,
         "%s*.hpp" % name,
+        "%s*.cuh" % name,
         "%s*.cpp" % name,
+        "%s*.cu" % name,
         "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
         "kernel_math.hpp",
+        "kernel_math.cuh",
         "kernel_diagnostics.hpp",
+        "kernel_diagnostics.cuh",
         "tensor_product_kernels.hpp",
+        "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
+        "geometry_kernels.cuh",
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):
             os.remove(path)
     nested_patterns = (
         "generated_%s*.hpp" % name,
+        "generated_%s*.cuh" % name,
         "generated_%s*.cpp" % name,
+        "generated_%s*.cu" % name,
         "generated_%s*.o" % name,
         "%s*.hpp" % name,
+        "%s*.cuh" % name,
         "%s*.cpp" % name,
+        "%s*.cu" % name,
         "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
         "kernel_math.hpp",
+        "kernel_math.cuh",
         "kernel_diagnostics.hpp",
+        "kernel_diagnostics.cuh",
         "tensor_product_kernels.hpp",
+        "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
+        "geometry_kernels.cuh",
     )
     for pattern in nested_patterns:
         for path in glob.glob(os.path.join(out_dir, "d*", pattern)):
@@ -1530,7 +1554,7 @@ def _clean_outputs(out_dir, name):
     for pattern in nested_patterns:
         for path in glob.glob(os.path.join(out_dir, "d*", "*", pattern)):
             os.remove(path)
-    for pattern in ("sfem_*.hpp", "sfem_*.cpp", "sfem_*.o"):
+    for pattern in ("sfem_*.hpp", "sfem_*.cuh", "sfem_*.cpp", "sfem_*.cu", "sfem_*.o"):
         for path in glob.glob(os.path.join(out_dir, "op", pattern)):
             os.remove(path)
 

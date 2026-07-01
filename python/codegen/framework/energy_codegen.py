@@ -73,6 +73,42 @@ def _default_openmp_energy_source_builder():
     return OpenMPEnergySoASourceBuilder()
 
 
+def _work_item_index(source_builder):
+    if hasattr(source_builder, "work_item_index"):
+        return source_builder.work_item_index()
+    return "lane"
+
+
+def _work_item_loop_lines(source_builder, indent):
+    if hasattr(source_builder, "work_item_loop_lines"):
+        return source_builder.work_item_loop_lines(indent)
+    return tuple("%s%s" % (indent, line) for line in source_builder.simd_lines()) + (
+        "%sfor (ptrdiff_t lane = 0; lane < nelems; ++lane) {" % indent,
+    )
+
+
+def _work_item_name(source_builder, name, component):
+    if hasattr(source_builder, "work_item_name"):
+        return source_builder.work_item_name(name, component)
+    return "%s_%s%d" % (name, _work_item_index(source_builder), component)
+
+
+def _diagnostic_work_item(source_builder):
+    if hasattr(source_builder, "diagnostic_work_item"):
+        return source_builder.diagnostic_work_item()
+    return _work_item_index(source_builder)
+
+
+def _inline_qualifier(source_builder):
+    if hasattr(source_builder, "inline_qualifier"):
+        return source_builder.inline_qualifier()
+    return "SFEM_INLINE"
+
+
+def _defines_sfem_inline(source_builder):
+    return _inline_qualifier(source_builder) == "SFEM_INLINE"
+
+
 def generate_sfem_soa_cpp_files(
     forms,
     *,
@@ -155,16 +191,21 @@ def generate_sfem_soa_cpp_files(
 
     local_prefix = prefix if local_prefix is None else str(local_prefix)
     use_shared_weak_local = local_prefix != prefix
-    local_name = "%s_local.hpp" % local_prefix
-    math_name = "kernel_math.hpp"
-    tensor_product_name = "tensor_product_kernels.hpp"
-    geometry_name = "geometry_kernels.hpp"
-    diagnostics_name = "kernel_diagnostics.hpp"
+    local_name = source_builder.header_name("%s_local" % local_prefix)
+    math_name = source_builder.header_name("kernel_math")
+    tensor_product_name = source_builder.header_name("tensor_product_kernels")
+    geometry_name = source_builder.header_name("geometry_kernels")
+    diagnostics_name = source_builder.header_name("kernel_diagnostics")
+    header_guard_suffix = source_builder.header_guard_suffix()
     operator_name = "%s_operator.%s" % (prefix, source_builder.operator_extension)
     files = [
         GeneratedKernelFile(
             math_name,
-            _sfem_math_header_source(),
+            _sfem_math_header_source(
+                header_guard_suffix,
+                _inline_qualifier(source_builder),
+                _defines_sfem_inline(source_builder),
+            ),
         ),
         GeneratedKernelFile(
             geometry_name,
@@ -172,7 +213,14 @@ def generate_sfem_soa_cpp_files(
         ),
         GeneratedKernelFile(
             diagnostics_name,
-            "\n".join(_sfem_soa_diagnostics_header()),
+            "\n".join(
+                _sfem_soa_diagnostics_header(
+                    _diagnostic_work_item(source_builder),
+                    header_guard_suffix,
+                    _inline_qualifier(source_builder),
+                    _defines_sfem_inline(source_builder),
+                )
+            ),
         ),
     ]
     if source_builder.emits_tensor_product_header(basis_family):
@@ -293,7 +341,7 @@ def _sfem_soa_local_header(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    guard = "%s_LOCAL_HPP" % _cpp_macro_name(prefix)
+    guard = "%s_LOCAL_%s" % (_cpp_macro_name(prefix), source_builder.header_guard_suffix())
     lines = [
         "#ifndef %s" % guard,
         "#define %s" % guard,
@@ -448,7 +496,7 @@ def _sfem_soa_block_function(
 
     lines = [
         "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-        "static SFEM_INLINE void %s(" % name,
+        "static %s void %s(" % (_inline_qualifier(source_builder), name),
     ]
     for idx, param in enumerate(params):
         comma = "," if idx + 1 < len(params) else ""
@@ -669,6 +717,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
+    work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
     h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
@@ -699,28 +748,28 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "        const scalar_t qw = %s;"
         % _tensor_product_quadrature_weight_expr(dim)
     )
-    lines.extend(source_builder.simd_lines())
+    lines.extend(_work_item_loop_lines(source_builder, "        "))
     lines.extend(
         [
-            "        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+            "            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item,
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "            const scalar_t jacobian_adjugate_lane%d = jacobian_adjugate%d[geometry_offset];"
-            % (component, component)
+            "            const scalar_t %s = jacobian_adjugate%d[geometry_offset];"
+            % (_work_item_name(source_builder, "jacobian_adjugate", component), component)
         )
     lines.append(
-        "            const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];"
+        "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
+        % _work_item_name(source_builder, "jacobian_determinant", 0)
     )
     lines.append("            scalar_t grad_u_ref[%d];" % (dim * dim))
     for row in range(dim):
         for col in range(dim):
             component = row * dim + col
             lines.append(
-                "            grad_u_ref[%d] = grad_u_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane];"
-                % (component, row, dim, col)
+                "            grad_u_ref[%d] = grad_u_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s];"
+                % (component, row, dim, col, work_item)
             )
     if form.has_direction:
         lines.append("            scalar_t grad_h_ref[%d];" % (dim * dim))
@@ -728,19 +777,20 @@ def _append_sfem_soa_tensor_weak_form_lines(
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "            grad_h_ref[%d] = grad_h_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane];"
-                    % (component, row, dim, col)
+                    "            grad_h_ref[%d] = grad_h_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s];"
+                    % (component, row, dim, col, work_item)
                 )
 
     def geometry_value(name, component):
-        return "%s_lane%d" % (name, component)
+        return _work_item_name(source_builder, name, component)
 
     lines.append("            scalar_t grad_u[%d];" % (dim * dim))
     if form.has_direction:
         lines.append("            scalar_t trial_grad[%d];" % (dim * dim))
 
     lines.append(
-        "            const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;"
+        "            const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
+        % geometry_value("jacobian_determinant", 0)
     )
     for row in range(dim):
         for col in range(dim):
@@ -778,9 +828,9 @@ def _append_sfem_soa_tensor_weak_form_lines(
         _append_cse_array_assignments(
             lines,
             [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
-            ["value[lane] %s" % ("+=" if form.output_mode == "accumulate" else "=")],
+            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
             "weak_obj_tmp",
-            scale="qw * jacobian_determinant_lane0",
+            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
         )
         lines.extend(["        }", "    }"])
         return
@@ -803,8 +853,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "            loperand_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + lane] = loperand[%d];"
-                % (row, dim, col, row * dim + col)
+                "            loperand_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s] = loperand[%d];"
+                % (row, dim, col, work_item, row * dim + col)
             )
     lines.extend(["        }", "    }"])
     for row in range(dim):
@@ -828,6 +878,7 @@ def _append_sfem_soa_weak_form_lines(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
+    work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
@@ -847,27 +898,28 @@ def _append_sfem_soa_weak_form_lines(
 
     def field_value(field, row):
         stream_prefix = "" if use_stream_arrays else "weak_"
-        return "%s%s_streams[shape * %d + %d][lane]" % (
+        return "%s%s_streams[shape * %d + %d][%s]" % (
             stream_prefix,
             field,
             dim,
             row,
+            work_item,
         )
 
     def geometry_value(name, component):
-        return "%s_lane%d" % (name, component)
+        return _work_item_name(source_builder, name, component)
 
     lines.append("        for (int q = 0; q < N_QP; ++q) {")
-    lines.extend(source_builder.simd_lines())
-    lines.append("            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
-    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
+    lines.extend(_work_item_loop_lines(source_builder, "            "))
+    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const scalar_t jacobian_adjugate_lane%d = jacobian_adjugate%d[geometry_offset];"
-            % (component, component)
+            "            const scalar_t %s = jacobian_adjugate%d[geometry_offset];"
+            % (geometry_value("jacobian_adjugate", component), component)
         )
     lines.append(
-        "            const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];"
+        "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
+        % geometry_value("jacobian_determinant", 0)
     )
     if use_tensor_product_reference:
         lines.extend(_tensor_product_q_index_lines(dim, "            "))
@@ -952,7 +1004,7 @@ def _append_sfem_soa_weak_form_lines(
         _append_cse_array_assignments(
             lines,
             [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
-            ["value[lane] %s" % ("+=" if form.output_mode == "accumulate" else "=")],
+            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
             "weak_obj_tmp",
             scale="qw * %s" % geometry_value("jacobian_determinant", 0),
         )
@@ -984,8 +1036,8 @@ def _append_sfem_soa_weak_form_lines(
         op = "+=" if form.output_mode == "accumulate" else "="
         output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
         lines.append(
-            "                %s[shape * %d + %d][lane] %s %s;"
-            % (output_streams, dim, row, op, " + ".join(terms))
+            "                %s[shape * %d + %d][%s] %s %s;"
+            % (output_streams, dim, row, work_item, op, " + ".join(terms))
         )
     lines.extend(["            }", "            }", "        }"])
 
@@ -1258,6 +1310,7 @@ def _sfem_soa_isoparametric_geometry_lines(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
+    work_item = _work_item_index(source_builder)
     stream_array_name = "block_jacobian_adjugate_streams"
     lines = isoparametric_adjugate_stream_array_lines(
         dim=dim,
@@ -1268,8 +1321,7 @@ def _sfem_soa_isoparametric_geometry_lines(
             for component in range(dim * dim)
         ),
     )
-    lines.extend(source_builder.simd_lines())
-    lines.append("            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+    lines.extend(_work_item_loop_lines(source_builder, "            "))
     for row in range(dim):
         for col in range(dim):
             lines.append("                scalar_t J%d%d = scalar_t(0);" % (row, col))
@@ -1294,11 +1346,11 @@ def _sfem_soa_isoparametric_geometry_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "                    J%d%d += block_coordinate_streams[shape * %d + %d][lane] * g%d;"
-                % (row, col, dim, row, col)
+                "                    J%d%d += block_coordinate_streams[shape * %d + %d][%s] * g%d;"
+                % (row, col, dim, row, work_item, col)
             )
     lines.append("                }")
-    output_index = "q * VECTOR_SIZE + lane" if q_major else "lane"
+    output_index = "q * VECTOR_SIZE + %s" % work_item if q_major else work_item
     lines.extend(
         isoparametric_adjugate_call_lines(
             dim=dim,
@@ -2196,6 +2248,7 @@ def _sfem_soa_mesh_operator_function(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
+    work_item = _work_item_index(source_builder)
     effective_vector_size = source_builder.effective_vector_size(vector_size)
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
@@ -2370,9 +2423,8 @@ def _sfem_soa_mesh_operator_function(
             "",
             "        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {",
             "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
-            *tuple(source_builder.simd_lines()),
-            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];",
+            *_work_item_loop_lines(source_builder, "            "),
+            "                ev[%s * N_SHAPE + element_node] = element_shape[evbegin + %s];" % (work_item, work_item),
             "            }",
             "        }",
         ]
@@ -2392,9 +2444,8 @@ def _sfem_soa_mesh_operator_function(
                         else "shape"
                     ),
                     "            for (int d = 0; d < DIM; ++d) {",
-                    *source_builder.simd_lines(),
-                    "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                    "                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];",
+                    *_work_item_loop_lines(source_builder, "                "),
+                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][ev[%s * N_SHAPE + stream_shape]];" % (work_item, work_item),
                     "                }",
                     "            }",
                     "        }",
@@ -2402,14 +2453,13 @@ def _sfem_soa_mesh_operator_function(
             )
         else:
             lines.extend([""])
-            lines.extend(source_builder.simd_lines())
-            lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
             for shape in range(n_nodes):
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            block_%s[lane] = %s[ev[lane * N_SHAPE + %d]];"
-                        % (stream, _component_name(d), shape)
+                        "            block_%s[%s] = %s[ev[%s * N_SHAPE + %d]];"
+                        % (stream, work_item, _component_name(d), work_item, shape)
                     )
             lines.append("        }")
 
@@ -2428,14 +2478,13 @@ def _sfem_soa_mesh_operator_function(
                     else "shape"
                 ),
                 "            for (int d = 0; d < DIM; ++d) {",
-                *source_builder.simd_lines(),
-                "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                "                    const idx_t node = ev[lane * N_SHAPE + stream_shape];",
-                "                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];",
+                *_work_item_loop_lines(source_builder, "                "),
+                "                    const idx_t node = ev[%s * N_SHAPE + stream_shape];" % work_item,
+                "                    block_u_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item,
             ]
         )
         if form.has_direction:
-            lines.append("                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];")
+            lines.append("                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item)
         lines.extend(
             [
                 "                }",
@@ -2444,37 +2493,35 @@ def _sfem_soa_mesh_operator_function(
             ]
         )
         if form.name == "objective":
-            lines.extend(source_builder.simd_lines())
-            lines.extend(["        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "            block_value[lane] = scalar_t(0);", "        }"])
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
+            lines.extend(["            block_value[%s] = scalar_t(0);" % work_item, "        }"])
         else:
             lines.extend(
                 [
                     "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
-                    *source_builder.simd_lines(),
-                    "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                    "                block_out_data[stream][lane] = scalar_t(0);",
+                    *_work_item_loop_lines(source_builder, "            "),
+                    "                block_out_data[stream][%s] = scalar_t(0);" % work_item,
                     "            }",
                     "        }",
                 ]
             )
     else:
         lines.extend([""])
-        lines.extend(source_builder.simd_lines())
-        lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "            block_u%s%d[lane] = u%s[ev[lane * N_SHAPE + %d] * u_stride];"
-                    % (component, shape, component, shape)
+                    "            block_u%s%d[%s] = u%s[ev[%s * N_SHAPE + %d] * u_stride];"
+                    % (component, shape, work_item, component, work_item, shape)
                 )
                 if form.has_direction:
                     lines.append(
-                        "            block_h%s%d[lane] = h%s[ev[lane * N_SHAPE + %d] * h_stride];"
-                        % (component, shape, component, shape)
+                        "            block_h%s%d[%s] = h%s[ev[%s * N_SHAPE + %d] * h_stride];"
+                        % (component, shape, work_item, component, work_item, shape)
                     )
         for stream in _output_stream_names(form, dim, n_nodes):
-            lines.append("            block_%s[lane] = scalar_t(0);" % stream)
+            lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
         lines.append("        }")
 
     if use_stream_arrays:
@@ -2722,9 +2769,8 @@ def _sfem_soa_mesh_operator_function(
     lines.append("")
 
     if form.name == "objective":
-        lines.extend(source_builder.simd_lines())
-        lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
-        lines.append("            value[evbegin + lane] += block_value[lane];")
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
+        lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
         lines.append("        }")
     else:
         if compact_stream_buffers:
@@ -2739,11 +2785,11 @@ def _sfem_soa_mesh_operator_function(
                         else "shape"
                     ),
                     "            for (int d = 0; d < DIM; ++d) {",
-                    "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-                    "                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;",
+                    *_work_item_loop_lines(source_builder, "                "),
+                    "                    const idx_t node = ev[%s * N_SHAPE + stream_shape] * out_stride;" % work_item,
                     *source_builder.scatter_add_lines(
                         "out_components[d][node]",
-                        "block_out_data[shape * DIM + d][lane]",
+                        "block_out_data[shape * DIM + d][%s]" % work_item,
                         "                    ",
                     ),
                     "                }",
@@ -2752,16 +2798,16 @@ def _sfem_soa_mesh_operator_function(
                 ]
             )
         else:
-            lines.append("        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {")
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
             for shape in range(n_nodes):
                 for d in range(dim):
                     component = _component_name(d)
                     lines.extend(
                         list(
                             source_builder.scatter_add_lines(
-                                "out%s[ev[lane * N_SHAPE + %d] * out_stride]"
-                                % (component, shape),
-                                "block_out%s%d[lane]" % (component, shape),
+                                "out%s[ev[%s * N_SHAPE + %d] * out_stride]"
+                                % (component, work_item, shape),
+                                "block_out%s%d[%s]" % (component, shape, work_item),
                                 "            ",
                             )
                         )
@@ -3338,19 +3384,33 @@ def _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
     )
 
 
-def _sfem_soa_diagnostics_header():
+def _sfem_soa_diagnostics_header(
+    work_item="lane",
+    header_guard_suffix="HPP",
+    inline_qualifier="SFEM_INLINE",
+    define_sfem_inline=True,
+):
     struct_name = _sfem_soa_diagnostics_struct_name()
-    return [
-        "#ifndef SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP",
-        "#define SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP",
+    guard = "SFEM_CODEGEN_KERNEL_DIAGNOSTICS_%s" % header_guard_suffix
+    per_qp = "per_qp_%s" % work_item
+    lines = [
+        "#ifndef %s" % guard,
+        "#define %s" % guard,
         "",
         "#include <stddef.h>",
         "#include <stdio.h>",
         "",
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
-        "",
+    ]
+    if define_sfem_inline:
+        lines.extend(
+            [
+                "#ifndef SFEM_INLINE",
+                "#define SFEM_INLINE inline",
+                "#endif",
+                "",
+            ]
+        )
+    lines.extend([
         "namespace sfem {",
         "namespace codegen {",
         "",
@@ -3362,17 +3422,17 @@ def _sfem_soa_diagnostics_header():
         "    int n_shape;",
         "    int vector_size;",
         "    int quadrature_order;",
-        "    long add_instructions_per_qp_lane;",
-        "    long mul_instructions_per_qp_lane;",
-        "    long div_instructions_per_qp_lane;",
-        "    long sqrt_instructions_per_qp_lane;",
-        "    long pow_instructions_per_qp_lane;",
-        "    long exp_instructions_per_qp_lane;",
-        "    long log_instructions_per_qp_lane;",
-        "    long trig_instructions_per_qp_lane;",
-        "    long load_instructions_per_qp_lane;",
-        "    long store_instructions_per_qp_lane;",
-        "    long flops_per_qp_lane;",
+        "    long add_instructions_%s;" % per_qp,
+        "    long mul_instructions_%s;" % per_qp,
+        "    long div_instructions_%s;" % per_qp,
+        "    long sqrt_instructions_%s;" % per_qp,
+        "    long pow_instructions_%s;" % per_qp,
+        "    long exp_instructions_%s;" % per_qp,
+        "    long log_instructions_%s;" % per_qp,
+        "    long trig_instructions_%s;" % per_qp,
+        "    long load_instructions_%s;" % per_qp,
+        "    long store_instructions_%s;" % per_qp,
+        "    long flops_%s;" % per_qp,
         "    long temporaries;",
         "    long estimated_registers;",
         "    int geometry_streams;",
@@ -3396,14 +3456,14 @@ def _sfem_soa_diagnostics_header():
         "    double store_cpi;",
         "};",
         "",
-        "static SFEM_INLINE double %s_total_flops(" % struct_name,
+        "static %s double %s_total_flops(" % (inline_qualifier, struct_name),
         "        const %s *const d," % struct_name,
         "        const ptrdiff_t nelements) {",
         "    const double n = nelements > 0 ? (double)nelements : 0.0;",
-        "    return n * (double)d->n_qp * (double)d->flops_per_qp_lane;",
+        "    return n * (double)d->n_qp * (double)d->flops_%s;" % per_qp,
         "}",
         "",
-        "static SFEM_INLINE size_t %s_total_bytes(" % struct_name,
+        "static %s size_t %s_total_bytes(" % (inline_qualifier, struct_name),
         "        const %s *const d," % struct_name,
         "        const ptrdiff_t nelements,",
         "        const size_t scalar_bytes,",
@@ -3418,7 +3478,7 @@ def _sfem_soa_diagnostics_header():
         "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
-        "static SFEM_INLINE double %s_arithmetic_intensity(" % struct_name,
+        "static %s double %s_arithmetic_intensity(" % (inline_qualifier, struct_name),
         "        const %s *const d," % struct_name,
         "        const ptrdiff_t nelements,",
         "        const size_t scalar_bytes,",
@@ -3428,7 +3488,7 @@ def _sfem_soa_diagnostics_header():
         "    return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
-        "static SFEM_INLINE void %s_print_rate(" % struct_name,
+        "static %s void %s_print_rate(" % (inline_qualifier, struct_name),
         "        const char *const name,",
         "        const %s *const d," % struct_name,
         "        const double elapsed,",
@@ -3455,7 +3515,8 @@ def _sfem_soa_diagnostics_header():
         "} // namespace sfem",
         "",
         "#endif",
-    ]
+    ])
+    return lines
 
 
 def _sfem_soa_diagnostic_print_wrapper_lines(

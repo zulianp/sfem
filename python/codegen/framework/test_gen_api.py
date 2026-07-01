@@ -1298,7 +1298,7 @@ class GenApiTest(unittest.TestCase):
                 relative,
             )
             self.assertIn(
-                os.path.join("d2", "neohookean_ogden_d2_tensor_product_local.hpp"),
+                os.path.join("d2", "neohookean_ogden_d2_tensor_product_local.cuh"),
                 relative,
             )
             operator_path = os.path.join(
@@ -1313,10 +1313,21 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
-            with open(os.path.join(out_dir, "tensor_product_kernels.hpp"), encoding="utf-8") as input_file:
+            self.assertNotIn("lane", operator_source)
+            self.assertNotIn("const ptrdiff_t thread = 0", operator_source)
+            self.assertNotIn("SFEM_INLINE", operator_source)
+            with open(os.path.join(out_dir, "tensor_product_kernels.cuh"), encoding="utf-8") as input_file:
                 tensor_product_source = input_file.read()
             self.assertIn("__host__ __device__ __forceinline__", tensor_product_source)
             self.assertNotIn("#pragma omp", tensor_product_source)
+            self.assertNotIn("lane", tensor_product_source)
+            self.assertNotIn("const ptrdiff_t thread = 0", tensor_product_source)
+            self.assertNotIn("SFEM_INLINE", tensor_product_source)
+            for source_path in result.sources:
+                with open(source_path, encoding="utf-8") as input_file:
+                    source = input_file.read()
+                self.assertNotIn("const ptrdiff_t thread = 0", source)
+                self.assertNotIn("SFEM_INLINE", source)
 
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)

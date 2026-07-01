@@ -169,13 +169,14 @@ def _sfem_pow_product_expression(exponent):
     return " * ".join("x" for _ in range(exponent))
 
 
-def _sfem_math_function_lines():
+def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
     lines = []
     for exponent in range(2, _SFEM_SPECIALIZED_POW_MAX_EXPONENT + 1):
         lines.extend(
             [
                 "template <typename T>",
-                "static SFEM_INLINE T %s(const T x) {" % _sfem_pow_function_name(exponent),
+                "static %s T %s(const T x) {"
+                % (inline_qualifier, _sfem_pow_function_name(exponent)),
                 "    return %s;" % _sfem_pow_product_expression(exponent),
                 "}",
                 "",
@@ -185,7 +186,8 @@ def _sfem_math_function_lines():
         lines.extend(
             [
                 "template <typename T>",
-                "static SFEM_INLINE T %s(const T x) {" % _sfem_pow_function_name(-exponent),
+                "static %s T %s(const T x) {"
+                % (inline_qualifier, _sfem_pow_function_name(-exponent)),
                 "    return T(1) / %s(x);" % _sfem_pow_function_name(exponent)
                 if exponent > 1
                 else "    return T(1) / x;",
@@ -196,20 +198,28 @@ def _sfem_math_function_lines():
     return lines
 
 
-def _sfem_math_header_source():
+def _sfem_math_header_source(
+    header_guard_suffix="HPP",
+    inline_qualifier="SFEM_INLINE",
+    define_sfem_inline=True,
+):
+    guard = "SFEM_CODEGEN_KERNEL_MATH_%s" % header_guard_suffix
     lines = [
-        "#ifndef SFEM_CODEGEN_KERNEL_MATH_HPP",
-        "#define SFEM_CODEGEN_KERNEL_MATH_HPP",
-        "",
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
-        "",
-        "namespace sfem {",
-        "namespace codegen {",
+        "#ifndef %s" % guard,
+        "#define %s" % guard,
         "",
     ]
-    lines.extend(_sfem_math_function_lines())
+    if define_sfem_inline:
+        lines.extend(
+            [
+                "#ifndef SFEM_INLINE",
+                "#define SFEM_INLINE inline",
+                "#endif",
+                "",
+            ]
+        )
+    lines.extend(["namespace sfem {", "namespace codegen {", ""])
+    lines.extend(_sfem_math_function_lines(inline_qualifier))
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
 
