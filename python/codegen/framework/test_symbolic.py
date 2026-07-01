@@ -48,6 +48,7 @@ from symbolic import (
     transformed_first_piola,
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
+    _prune_dead_cse_intermediates,
 )
 from forms import (
     FormKind,
@@ -219,6 +220,22 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertTrue(graph.graph.has_edge(y, graph.intermediates[0][0]))
         self.assertGreaterEqual(graph.cost.temporaries, 1)
         self.assertGreaterEqual(graph.cost.estimated_registers, graph.cost.temporaries)
+
+    def test_prunes_dead_cse_intermediates_by_output_reachability(self):
+        x, y = sp.symbols("x y")
+        t0, t1, t2, t3 = sp.symbols("t0 t1 t2 t3")
+
+        intermediates = (
+            (t0, x + y),
+            (t1, x - y),
+            (t2, t0 * t0),
+            (t3, t1 * t1),
+        )
+
+        self.assertEqual(
+            _prune_dead_cse_intermediates(intermediates, (t2 + 1,)),
+            ((t0, x + y), (t2, t0 * t0)),
+        )
 
     def test_preserves_assignment_outputs(self):
         x, y = sp.symbols("x y")

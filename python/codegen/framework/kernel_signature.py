@@ -231,7 +231,7 @@ def _mesh_field_arguments(unit, kind):
     dependencies = _merged_dependencies(unit.expression_plans)
     n_components = _field_component_count(unit)
     arguments = []
-    if kind == "energy_soa" or getattr(dependencies, "current", False):
+    if _dependencies_use_current(dependencies, default=False):
         arguments.append(
             KernelArgument(
                 "current",
@@ -247,7 +247,7 @@ def _mesh_field_arguments(unit, kind):
                 "previous",
             )
         )
-    if kind == "energy_soa" or getattr(dependencies, "direction", False):
+    if _dependencies_use_direction(dependencies, default=False):
         arguments.append(
             KernelArgument(
                 "direction",
@@ -335,14 +335,16 @@ def _boundary_reference_arguments():
 def _field_arguments(unit, kind, expression_plan, dependencies):
     if kind == "energy_soa":
         dim = int(unit.dim)
-        arguments = [
-            KernelArgument(
-                "u_streams",
-                "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
-                "field",
+        arguments = []
+        if _dependencies_use_current(dependencies, default=True):
+            arguments.append(
+                KernelArgument(
+                    "u_streams",
+                    "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
+                    "field",
+                )
             )
-        ]
-        if expression_plan.has_direction:
+        if _dependencies_use_direction(dependencies, default=expression_plan.has_direction):
             arguments.append(
                 KernelArgument(
                     "h_streams",
@@ -461,3 +463,15 @@ def _uses_reference_gradients(dependencies):
         getattr(dependencies, "direction_symbols", ())
     )
     return bool(symbols)
+
+
+def _dependencies_use_current(dependencies, default):
+    if dependencies is None:
+        return bool(default)
+    return bool(getattr(dependencies, "current", False))
+
+
+def _dependencies_use_direction(dependencies, default):
+    if dependencies is None:
+        return bool(default)
+    return bool(getattr(dependencies, "direction", False))

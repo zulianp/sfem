@@ -11,6 +11,7 @@ try:
         _component_name,
         _cpp_argument_name,
         _cpp_macro_name,
+        _prune_dead_cse_intermediates,
         _sfem_ccode,
         _sfem_math_header_source,
         _validate_diagnostics_plan_names,
@@ -41,6 +42,7 @@ except ImportError:
         _component_name,
         _cpp_argument_name,
         _cpp_macro_name,
+        _prune_dead_cse_intermediates,
         _sfem_ccode,
         _sfem_math_header_source,
         _validate_diagnostics_plan_names,
@@ -457,6 +459,8 @@ def _sfem_soa_block_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
     stream_shape_order = (
         _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
@@ -496,12 +500,13 @@ def _sfem_soa_block_function(
         params.append("const scalar_t qw")
     params.extend(("const scalar_t mu", "const scalar_t lmbda"))
     if use_stream_arrays:
-        params.extend(
-            (
-                "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
+        if uses_current:
+            params.extend(
+                (
+                    "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
+                )
             )
-        )
-        if form.has_direction:
+        if uses_direction:
             params.extend(
                 (
                     "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]"
@@ -518,11 +523,12 @@ def _sfem_soa_block_function(
                 )
             )
     else:
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % name
-            for name in _field_stream_names("u", dim, n_nodes)
-        )
-        if form.has_direction:
+        if uses_current:
+            params.extend(
+                "const scalar_t *const SFEM_RESTRICT %s" % name
+                for name in _field_stream_names("u", dim, n_nodes)
+            )
+        if uses_direction:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s" % name
                 for name in _field_stream_names("h", dim, n_nodes)
@@ -576,7 +582,7 @@ def _sfem_soa_block_function(
             )
         if form.weak_form is None:
             lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
-    if form.weak_form is not None and not use_stream_arrays:
+    if form.weak_form is not None and not use_stream_arrays and uses_current:
         lines.append(
             "    const scalar_t *const weak_u_streams[N_SHAPE * %d] = {%s};"
             % (
@@ -590,34 +596,34 @@ def _sfem_soa_block_function(
                 ),
             )
         )
-        if form.has_direction:
-            lines.append(
-                "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        streams_in_shape_order(
-                            _field_stream_names("h", dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
-                    ),
-                )
+    if form.weak_form is not None and not use_stream_arrays and uses_direction:
+        lines.append(
+            "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
+            % (
+                dim,
+                ", ".join(
+                    streams_in_shape_order(
+                        _field_stream_names("h", dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
+                ),
             )
-        if form.name != "objective":
-            lines.append(
-                "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        streams_in_shape_order(
-                            _output_stream_names(form, dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
-                    ),
-                )
+        )
+    if form.weak_form is not None and not use_stream_arrays and form.name != "objective":
+        lines.append(
+            "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
+            % (
+                dim,
+                ", ".join(
+                    streams_in_shape_order(
+                        _output_stream_names(form, dim, n_nodes),
+                        dim,
+                        stream_shape_order,
+                    )
+                ),
             )
+        )
     if form.weak_form is not None and use_tensor_product_reference:
         _append_sfem_soa_tensor_weak_form_lines(
             lines,
@@ -756,24 +762,28 @@ def _append_sfem_soa_tensor_weak_form_lines(
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
     u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
     h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
     out_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     block_extent = "N_QP * %d * VECTOR_SIZE" % (dim * dim)
 
-    lines.append("    scalar_t grad_u_ref_q[%s];" % block_extent)
-    if form.has_direction:
+    if uses_current:
+        lines.append("    scalar_t grad_u_ref_q[%s];" % block_extent)
+    if uses_direction:
         lines.append("    scalar_t grad_h_ref_q[%s];" % block_extent)
     if form.name != "objective":
         lines.append("    scalar_t loperand_q[%s];" % block_extent)
 
     for row in range(dim):
         output_offset = "%d * N_QP * %d * VECTOR_SIZE" % (row, dim)
-        lines.append(
-            "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
-            % (dim, u_streams, row, output_offset)
-        )
-        if form.has_direction:
+        if uses_current:
+            lines.append(
+                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
+                % (dim, u_streams, row, output_offset)
+            )
+        if uses_direction:
             lines.append(
                 "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
                 % (dim, h_streams, row, output_offset)
@@ -800,15 +810,16 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
         % _work_item_name(source_builder, "jacobian_determinant", 0)
     )
-    lines.append("            scalar_t grad_u_ref[%d];" % (dim * dim))
-    for row in range(dim):
-        for col in range(dim):
-            component = row * dim + col
-            lines.append(
-                "            grad_u_ref[%d] = grad_u_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s];"
-                % (component, row, dim, col, work_item)
-            )
-    if form.has_direction:
+    if uses_current:
+        lines.append("            scalar_t grad_u_ref[%d];" % (dim * dim))
+        for row in range(dim):
+            for col in range(dim):
+                component = row * dim + col
+                lines.append(
+                    "            grad_u_ref[%d] = grad_u_ref_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s];"
+                    % (component, row, dim, col, work_item)
+                )
+    if uses_direction:
         lines.append("            scalar_t grad_h_ref[%d];" % (dim * dim))
         for row in range(dim):
             for col in range(dim):
@@ -821,8 +832,9 @@ def _append_sfem_soa_tensor_weak_form_lines(
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
-    lines.append("            scalar_t grad_u[%d];" % (dim * dim))
-    if form.has_direction:
+    if uses_current:
+        lines.append("            scalar_t grad_u[%d];" % (dim * dim))
+    if uses_direction:
         lines.append("            scalar_t trial_grad[%d];" % (dim * dim))
 
     lines.append(
@@ -831,19 +843,20 @@ def _append_sfem_soa_tensor_weak_form_lines(
     )
     for row in range(dim):
         for col in range(dim):
-            terms = [
-                "grad_u_ref[%d] * %s"
-                % (
-                    row * dim + k,
-                    geometry_value("jacobian_adjugate", k * dim + col),
+            if uses_current:
+                terms = [
+                    "grad_u_ref[%d] * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "            grad_u[%d] = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
                 )
-                for k in range(dim)
-            ]
-            lines.append(
-                "            grad_u[%d] = (%s) * inv_jacobian_determinant;"
-                % (row * dim + col, " + ".join(terms))
-            )
-            if form.has_direction:
+            if uses_direction:
                 terms = [
                     "grad_h_ref[%d] * %s"
                     % (
@@ -917,6 +930,8 @@ def _append_sfem_soa_weak_form_lines(
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
     if form.name not in ("objective", "gradient", "apply"):
@@ -961,8 +976,9 @@ def _append_sfem_soa_weak_form_lines(
     for row in range(dim):
         for col in range(dim):
             idx = row * dim + col
-            lines.append("            scalar_t grad_u_ref%d_values[VECTOR_SIZE];" % idx)
-            if form.has_direction:
+            if uses_current:
+                lines.append("            scalar_t grad_u_ref%d_values[VECTOR_SIZE];" % idx)
+            if uses_direction:
                 lines.append("            scalar_t grad_h_ref%d_values[VECTOR_SIZE];" % idx)
     if form.name != "objective":
         for component in range(dim * dim):
@@ -971,8 +987,9 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             lines.extend(_work_item_loop_lines(source_builder, "            "))
-            lines.append("                grad_u_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
-            if form.has_direction:
+            if uses_current:
+                lines.append("                grad_u_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
+            if uses_direction:
                 lines.append("                grad_h_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
             lines.append("            }")
     lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
@@ -980,11 +997,12 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             lines.extend(_work_item_loop_lines(source_builder, "                "))
-            lines.append(
-                "                    grad_u_ref%d_values[%s] += %s * %s;"
-                % (idx, work_item, field_value("u", row), reference_gradient(col))
-            )
-            if form.has_direction:
+            if uses_current:
+                lines.append(
+                    "                    grad_u_ref%d_values[%s] += %s * %s;"
+                    % (idx, work_item, field_value("u", row), reference_gradient(col))
+                )
+            if uses_direction:
                 lines.append(
                     "                    grad_h_ref%d_values[%s] += %s * %s;"
                     % (idx, work_item, field_value("h", row), reference_gradient(col))
@@ -1005,8 +1023,9 @@ def _append_sfem_soa_weak_form_lines(
     for row in range(dim):
         for col in range(dim):
             idx = row * dim + col
-            lines.append("            const scalar_t grad_u_ref%d = grad_u_ref%d_values[%s];" % (idx, idx, work_item))
-            if form.has_direction:
+            if uses_current:
+                lines.append("            const scalar_t grad_u_ref%d = grad_u_ref%d_values[%s];" % (idx, idx, work_item))
+            if uses_direction:
                 lines.append("            const scalar_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
     lines.append(
         "        const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
@@ -1014,19 +1033,20 @@ def _append_sfem_soa_weak_form_lines(
     )
     for row in range(dim):
         for col in range(dim):
-            terms = [
-                "grad_u_ref%d * %s"
-                % (
-                    row * dim + k,
-                    geometry_value("jacobian_adjugate", k * dim + col),
+            if uses_current:
+                terms = [
+                    "grad_u_ref%d * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "        const scalar_t grad_u%d = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
                 )
-                for k in range(dim)
-            ]
-            lines.append(
-                "        const scalar_t grad_u%d = (%s) * inv_jacobian_determinant;"
-                % (row * dim + col, " + ".join(terms))
-            )
-            if form.has_direction:
+            if uses_direction:
                 terms = [
                     "grad_h_ref%d * %s"
                     % (
@@ -1150,6 +1170,7 @@ def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix,
         tuple(expressions),
         symbols=sp.numbered_symbols("%s" % temporary_prefix),
     )
+    temps = _prune_dead_cse_intermediates(temps, reduced)
     for symbol, expression in temps:
         lines.append("        const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression)))
     for target, expression in zip(targets, reduced):
@@ -1157,6 +1178,24 @@ def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix,
             lines.append("        %s %s * (%s);" % (target, scale, _sfem_ccode(expression)))
         else:
             lines.append("        %s %s;" % (target, _sfem_ccode(expression)))
+
+
+def _form_dependencies(form):
+    return getattr(form, "dependencies", None)
+
+
+def _form_uses_current(form, default):
+    dependencies = _form_dependencies(form)
+    if dependencies is None:
+        return bool(default)
+    return bool(getattr(dependencies, "current", False))
+
+
+def _form_uses_direction(form, default):
+    dependencies = _form_dependencies(form)
+    if dependencies is None:
+        return bool(default)
+    return bool(getattr(dependencies, "direction", False))
 
 
 def _append_sfem_soa_statement_lines(lines, expression_graph, output_name):
@@ -1688,6 +1727,8 @@ def _sfem_soa_mesh_operator_function(
         and reference_inputs[0].name == "grad_ref"
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
     stream_shape_order = (
         _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
@@ -1709,12 +1750,14 @@ def _sfem_soa_mesh_operator_function(
         base_params.append("const geometry_t *const *const SFEM_RESTRICT points")
 
     material_params = ("const scalar_t mu", "const scalar_t lmbda")
-    field_params = ["const ptrdiff_t u_stride"]
-    field_params.extend(
-        "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
-        for d in range(dim)
-    )
-    if form.has_direction:
+    field_params = []
+    if uses_current:
+        field_params.append("const ptrdiff_t u_stride")
+        field_params.extend(
+            "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
+            for d in range(dim)
+        )
+    if uses_direction:
         field_params.append("const ptrdiff_t h_stride")
         field_params.extend(
             "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
@@ -1795,8 +1838,9 @@ def _sfem_soa_mesh_operator_function(
 
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
-        lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        if form.has_direction:
+        if uses_current:
+            lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if uses_direction:
             lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
         if form.name != "objective":
             lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
@@ -1818,9 +1862,10 @@ def _sfem_soa_mesh_operator_function(
                 extent = "N_QP * VECTOR_SIZE" if form.weak_form is not None else "VECTOR_SIZE"
                 lines.append("        scalar_t block_%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
-        for stream in _field_stream_names("u", dim, n_nodes):
-            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-        if form.has_direction:
+        if uses_current:
+            for stream in _field_stream_names("u", dim, n_nodes):
+                lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+        if uses_direction:
             for stream in _field_stream_names("h", dim, n_nodes):
                 lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
         for stream in _output_stream_names(form, dim, n_nodes):
@@ -1872,8 +1917,9 @@ def _sfem_soa_mesh_operator_function(
             lines.append("        }")
 
     if compact_stream_buffers:
-        lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
-        if form.has_direction:
+        if uses_current:
+            lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
+        if uses_direction:
             lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
         lines.extend(
             [
@@ -1888,10 +1934,11 @@ def _sfem_soa_mesh_operator_function(
                 "            for (int d = 0; d < DIM; ++d) {",
                 *_work_item_loop_lines(source_builder, "                "),
                 "                    const idx_t node = ev[%s * N_SHAPE + stream_shape];" % work_item,
-                "                    block_u_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item,
             ]
         )
-        if form.has_direction:
+        if uses_current:
+            lines.append("                    block_u_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item)
+        if uses_direction:
             lines.append("                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item)
         lines.extend(
             [
@@ -1919,11 +1966,12 @@ def _sfem_soa_mesh_operator_function(
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
-                lines.append(
-                    "            block_u%s%d[%s] = u%s[ev[%s * N_SHAPE + %d] * u_stride];"
-                    % (component, shape, work_item, component, work_item, shape)
-                )
-                if form.has_direction:
+                if uses_current:
+                    lines.append(
+                        "            block_u%s%d[%s] = u%s[ev[%s * N_SHAPE + %d] * u_stride];"
+                        % (component, shape, work_item, component, work_item, shape)
+                    )
+                if uses_direction:
                     lines.append(
                         "            block_h%s%d[%s] = h%s[ev[%s * N_SHAPE + %d] * h_stride];"
                         % (component, shape, work_item, component, work_item, shape)
@@ -1934,7 +1982,7 @@ def _sfem_soa_mesh_operator_function(
 
     if use_stream_arrays:
         lines.append("")
-        if compact_stream_buffers:
+        if uses_current and compact_stream_buffers:
             lines.extend(
                 [
                     "        const scalar_t *block_u_streams[N_SHAPE * DIM];",
@@ -1943,7 +1991,7 @@ def _sfem_soa_mesh_operator_function(
                     "        }",
                 ]
             )
-        else:
+        elif uses_current:
             lines.append(
                 "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
                 % (
@@ -1958,7 +2006,7 @@ def _sfem_soa_mesh_operator_function(
                     ),
                 )
             )
-        if form.has_direction:
+        if uses_direction:
             if compact_stream_buffers:
                 lines.extend(
                     [
@@ -2152,16 +2200,18 @@ def _sfem_soa_mesh_operator_function(
     else:
         call_args.extend(("%s[q]" % scalar_weight_name, "mu", "lmbda"))
     if use_stream_arrays:
-        call_args.append("block_u_streams")
-        if form.has_direction:
+        if uses_current:
+            call_args.append("block_u_streams")
+        if uses_direction:
             call_args.append("block_h_streams")
         if form.name == "objective":
             call_args.append("block_value")
         else:
             call_args.append("block_out_streams")
     else:
-        call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
-        if form.has_direction:
+        if uses_current:
+            call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
+        if uses_direction:
             call_args.extend("block_%s" % stream for stream in _field_stream_names("h", dim, n_nodes))
         call_args.extend("block_%s" % stream for stream in _output_stream_names(form, dim, n_nodes))
     call_indent = "        " if form.weak_form is not None else "            "
@@ -2971,12 +3021,14 @@ def _sfem_soa_diagnostics_lines(
     public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
     struct_name = _sfem_soa_diagnostics_struct_name()
     variable_name = "%s_diagnostics_data" % public_name
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
     if form.expression_graph is not None:
         cost = form.expression_graph.cost
     elif form.weak_form is not None:
         diagnostic_graph = (
             KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, form.weak_form.diagnostic_expressions(form.has_direction))
+            .add(ExpressionRole.OPERATOR_EVALUATION, form.weak_form.diagnostic_expressions(uses_direction))
             .build_graph(
                 data_symbols=form.weak_form.deformation_gradient,
                 temporary_prefix="weak_diag_tmp",
@@ -3000,8 +3052,8 @@ def _sfem_soa_diagnostics_lines(
     output_streams = len(_output_stream_names(form, dim, n_nodes))
     output_reads = output_streams if form.output_mode == "accumulate" else 0
     output_writes = output_streams
-    u_streams = dim * n_nodes
-    h_streams = dim * n_nodes if form.has_direction else 0
+    u_streams = dim * n_nodes if uses_current else 0
+    h_streams = dim * n_nodes if uses_direction else 0
     element_type = quadrature_rule.element_type if quadrature_rule is not None else "GENERIC"
     quadrature_order = quadrature_rule.order if quadrature_rule is not None else 0
     lines = [

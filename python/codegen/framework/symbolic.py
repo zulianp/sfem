@@ -155,6 +155,22 @@ def _sfem_ccode(expression, scalar_type="scalar_t"):
     return printer.doprint(expression)
 
 
+def _prune_dead_cse_intermediates(intermediates, outputs):
+    required_symbols = set()
+    for output in outputs:
+        required_symbols.update(_rhs(output).free_symbols)
+
+    retained = []
+    for symbol, expression in reversed(tuple(intermediates)):
+        if symbol not in required_symbols:
+            continue
+        required_symbols.remove(symbol)
+        required_symbols.update(expression.free_symbols)
+        retained.append((symbol, expression))
+
+    return tuple(reversed(retained))
+
+
 def _sfem_pow_function_name(exponent):
     exponent = int(exponent)
     if exponent < 0:
@@ -997,6 +1013,7 @@ class SfemSoAKernelForm:
     has_direction: bool = False
     output_mode: str = "accumulate"
     weak_form: Optional["SfemSoAWeakForm"] = None
+    dependencies: object = None
 
     def __post_init__(self):
         if self.output_mode not in ("assign", "accumulate"):
@@ -1011,8 +1028,9 @@ def sfem_soa_kernel_form(
     has_direction=False,
     output_mode="accumulate",
     weak_form=None,
+    dependencies=None,
 ):
-    return SfemSoAKernelForm(name, expression_graph, has_direction, output_mode, weak_form)
+    return SfemSoAKernelForm(name, expression_graph, has_direction, output_mode, weak_form, dependencies)
 
 
 @dataclass(frozen=True)
@@ -1331,6 +1349,7 @@ def build_expression_graph(
         optimizations=optimizations,
     )
     reduced_outputs = _reattach_lhs(outputs, reduced_rhs)
+    intermediates = _prune_dead_cse_intermediates(intermediates, reduced_outputs)
 
     graph = nx.DiGraph()
     data_symbol_set = set(data_symbols or ())
