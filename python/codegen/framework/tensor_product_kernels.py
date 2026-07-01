@@ -7,13 +7,20 @@ except ImportError:
 def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     if single_work_item:
         return "%s{" % indent
-    return "%s\n%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {" % (
+    return "%s\n%sfor (int %s = 0; %s < nelems; ++%s) {" % (
         "\n".join("%s%s" % (indent, line) for line in simd_lines),
         indent,
         index_name,
         index_name,
         index_name,
     )
+
+
+def _restrict_define_line(restrict_definition):
+    restrict_definition = str(restrict_definition)
+    if restrict_definition:
+        return "#define SFEM_RESTRICT %s" % restrict_definition
+    return "#define SFEM_RESTRICT"
 
 
 def sfem_tensor_product_kernels_header_source(
@@ -42,7 +49,7 @@ def sfem_tensor_product_kernels_header_source(
         ),
         "inline_qualifier": inline_qualifier,
         "inline_definition": inline_definition,
-        "restrict_definition": restrict_definition,
+        "restrict_definition_line": _restrict_define_line(restrict_definition),
         "work_item": work_item_index,
     }
     for indent_size in (12, 16, 20):
@@ -63,7 +70,7 @@ _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNE
 
 %(sfem_inline_block)s
 #ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT %(restrict_definition)s
+%(restrict_definition_line)s
 #endif
 
 namespace sfem {
@@ -87,7 +94,7 @@ struct TensorProductWeakOps;
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     static %(inline_qualifier)s void gradient(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],
@@ -133,7 +140,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     }
 
     static %(inline_qualifier)s void test(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
             const scalar_t *const SFEM_RESTRICT flux,
@@ -179,7 +186,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
     static %(inline_qualifier)s void gradient(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],
@@ -256,7 +263,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
     }
 
     static %(inline_qualifier)s void test(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
             const scalar_t *const SFEM_RESTRICT flux,
@@ -333,7 +340,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM>
 static %(inline_qualifier)s void tensor_gradient(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * DIM],
@@ -345,7 +352,7 @@ static %(inline_qualifier)s void tensor_gradient(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM>
 static %(inline_qualifier)s void tensor_test(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT flux,
@@ -362,7 +369,7 @@ template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     template <int N_FIELDS>
     static %(inline_qualifier)s void evaluate(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -408,7 +415,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void evaluate_value(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
             scalar_t *const value) {
@@ -439,7 +446,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void integrate(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const value_coeff,
@@ -479,7 +486,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void integrate_value(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
             scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
@@ -513,7 +520,7 @@ template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
     template <int N_FIELDS>
     static %(inline_qualifier)s void evaluate(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -582,7 +589,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void evaluate_value(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
             scalar_t *const value) {
@@ -623,7 +630,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void integrate(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const value_coeff,
@@ -683,7 +690,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 
     template <int N_FIELDS>
     static %(inline_qualifier)s void integrate_value(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
             scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
@@ -725,7 +732,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_evaluate(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const grad_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -737,7 +744,7 @@ static %(inline_qualifier)s void tensor_evaluate(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_evaluate_value(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
         scalar_t *const value) {
@@ -747,7 +754,7 @@ static %(inline_qualifier)s void tensor_evaluate_value(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_integrate(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const grad_1d,
         const scalar_t *const value_coeff,
@@ -759,7 +766,7 @@ static %(inline_qualifier)s void tensor_integrate(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_integrate_value(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const value_coeff,
         scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {

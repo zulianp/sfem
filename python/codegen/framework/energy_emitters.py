@@ -77,7 +77,7 @@ def _cuda_geometry_header_source():
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {",
             "    static __host__ __device__ __forceinline__ void eval(",
-            "            const ptrdiff_t nelems,",
+            "            const int nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
@@ -98,7 +98,7 @@ def _cuda_geometry_header_source():
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {",
             "    static __host__ __device__ __forceinline__ void eval(",
-            "            const ptrdiff_t nelems,",
+            "            const int nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
@@ -124,7 +124,7 @@ def _cuda_geometry_header_source():
             "",
             "template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>",
             "static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant(",
-            "        const ptrdiff_t nelems,",
+            "        const int nelems,",
             "        const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "        scalar_t *const *const SFEM_RESTRICT adjugate,",
             "        scalar_t *const SFEM_RESTRICT determinant) {",
@@ -223,7 +223,7 @@ class OpenMPEnergySoASourceBuilder:
     def mesh_loop_lines(self):
         return (
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
         )
 
     def mesh_template_line(self, geometry_mode):
@@ -333,7 +333,7 @@ class CUDAEnergySoASourceBuilder:
     def mesh_loop_lines(self):
         return (
             "    for (ptrdiff_t evbegin = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evbegin < nelements; evbegin += (ptrdiff_t)blockDim.x * gridDim.x) {",
-            "        const ptrdiff_t nelems = 1;",
+            "        const int nelems = 1;",
         )
 
     def mesh_template_line(self, geometry_mode):

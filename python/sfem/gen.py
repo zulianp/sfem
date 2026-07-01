@@ -8,7 +8,7 @@ from enum import Enum
 
 import sympy as sp
 
-from ._gen_op import generate_op_files
+from ._gen_op import generate_op_files, generate_op_registration_files
 import codegen.framework as _framework_public
 from codegen.framework import (
     CodegenQualifier,
@@ -1554,7 +1554,7 @@ def _clean_outputs(out_dir, name):
     for pattern in nested_patterns:
         for path in glob.glob(os.path.join(out_dir, "d*", "*", pattern)):
             os.remove(path)
-    for pattern in ("sfem_*.hpp", "sfem_*.cuh", "sfem_*.cpp", "sfem_*.cu", "sfem_*.o"):
+    for pattern in ("sfem_*.hpp", "sfem_*.cuh", "sfem_*.cpp", "sfem_*.cu", "sfem_*.o", "sfem_*_manifest.json"):
         for path in glob.glob(os.path.join(out_dir, "op", pattern)):
             os.remove(path)
 
@@ -1715,6 +1715,7 @@ __all__ = [
     "field_basis_plan_for_fem_policy",
     "field_basis_plans_for_fem_policy",
     "generate",
+    "generate_op_registration_files",
     "geometry_plans_for_fem_policy",
     "grad",
     "inner",

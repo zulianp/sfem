@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 
 from .forms import FormOrder
 from .energy_plan import energy_soa_kernel_emission_plan
@@ -113,3 +114,5 @@ def _validate_cuda_source_contract(files):
             raise RuntimeError("CUDA file '%s' contains fake thread lowering" % file.path)
         if "SFEM_INLINE" in file.source:
             raise RuntimeError("CUDA file '%s' contains SFEM_INLINE macro usage" % file.path)
+        if re.search(r"(?<![A-Za-z0-9_])pow\s*\(", file.source):
+            raise RuntimeError("CUDA file '%s' contains generic pow usage" % file.path)

@@ -220,7 +220,17 @@ atomics, work-item naming, and target includes are routed through
 `OpenMPTarget`/`CUDATarget`. Residual, boundary, tensor-product kernel, and
 tensor-product geometry generators now route OpenMP parallel/vector/atomic
 pragmas, inline qualifiers, and residual vector-lane loop headers through
-`OpenMPTarget` instead of embedding raw OpenMP strings.
+`OpenMPTarget` instead of embedding raw OpenMP strings. Generated OpenMP compile
+coverage exists for representative emitted operators, and generated CUDA energy
+operators now have an `nvcc`-gated compile test for the emitted `.cu` artifact.
+OpenMP compiler-report diagnostics now cover simplex energy, tensor-product
+energy, simplex residual, tensor-product residual, and mixed Taylor-Hood local
+SIMD loops. Boundary residual local accumulation loops now get target-routed
+OpenMP SIMD pragmas, with source-level coverage; they are not part of the
+compiler-report table because the boundary emitter is still scalar element
+oriented rather than vector-lane SoA oriented. Energy and residual mesh
+operators route every OpenMP vector-lane loop through target SIMD lowering so
+generated `lane` loops cannot silently become scalar loops.
 
 Tasks:
 
@@ -236,11 +246,11 @@ Tasks:
    and into `OpenMPTarget`.
 - [x] Implement a CUDA backend skeleton that consumes the same kernel plans and
    emits CUDA-safe local/device code for at least one simple residual kernel.
-- [ ] Ensure CUDA emission uses `kernel_math.hpp` helpers including specialized
+- [x] Ensure CUDA emission uses `kernel_math.hpp` helpers including specialized
    `pow_y(x)` instead of generic `pow` where possible.
-- [ ] Add compile tests for generated OpenMP and generated CUDA code when the CUDA
+- [x] Add compile tests for generated OpenMP and generated CUDA code when the CUDA
    compiler is available.
-- [ ] Extend vectorization diagnostics tests to all OpenMP hot-loop families:
+- [x] Extend vectorization diagnostics tests to all OpenMP hot-loop families:
    simplex energy, tensor-product energy, simplex residual, tensor-product
    residual, mixed Taylor-Hood, and boundary residual.
 
@@ -255,15 +265,27 @@ Acceptance criteria:
 Goal: generate runtime integration from plan metadata without manual frontend
 maintenance.
 
+Status: in progress. Generated OpenMP `sfem::Op` wrappers now emit a structured
+`op/sfem_<Op>_manifest.json` next to the wrapper header/source and C ABI header.
+The manifest records wrapper paths, C ABI header path, generated include roots,
+factory entry-point names, and extracted C ABI declarations for energy,
+residual/block, mixed Taylor-Hood, poro-hyperelastic, and boundary wrappers.
+Each wrapper also emits a generated registration source with a single
+`Factory::register_op(...)` entry point named in the manifest. Manifests can now
+be fed to `sfem.gen.generate_op_registration_files(...)` to emit an aggregate
+factory-registration translation unit, and
+`generate_op_registration_files.py` provides the same manifest-driven path for
+scripts; build/frontend consumption remains open.
+
 Tasks:
 
 1. Generate C ABI declarations for every emitted monolithic and block kernel
    from the same plan data used by the backend.
 2. Generate `sfem::Op` wrappers from `CodeGenerationPlan` metadata, including
    block-system units and boundary units.
-3. Generate a registration manifest listing wrapper headers, wrapper sources,
+3. [x] Generate a registration manifest listing wrapper headers, wrapper sources,
    factory names, and required generated include paths.
-4. Use the manifest to update or generate SFEM factory registration instead of
+4. [x] Use the manifest to update or generate SFEM factory registration instead of
    manually editing frontend includes/registration calls.
 5. Make runtime affine/isoparametric options plan-derived for objective,
    gradient, residual, Hessian action, and Jacobian action.

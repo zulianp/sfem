@@ -26,6 +26,10 @@ def _parallel_for_pragma(schedule=None):
     return _target().parallel_for_pragma(schedule)
 
 
+def _vectorize_pragma():
+    return _target().vectorize_pragma()
+
+
 def _atomic_update_pragma():
     return _target().atomic_update_pragma()
 
@@ -406,6 +410,7 @@ template <typename scalar_t>
         const scalar_t dS = {function}_measure<scalar_t>(q, ev, points);
         const scalar_t qw = weight[q] * dS;
 {qp_coeff_lines}
+{vectorize_pragma}
         for (int i = 0; i < n_shape; ++i) {{
             const scalar_t test = shape[q * n_shape + i] * qw;
 {accum_lines}
@@ -534,6 +539,7 @@ extern "C" int {sideset_function}_float(
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
+        vectorize_pragma=_vectorize_pragma(),
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_qp=n_qp,
@@ -881,6 +887,7 @@ template <typename scalar_t>
 {qp_coeff_lines}
             for (int sy = 0; sy < S; ++sy) {{
                 const scalar_t vy = shape_1d[qy * S + sy];
+{vectorize_pragma}
                 for (int sx = 0; sx < S; ++sx) {{
                     const int i = shape_index[sy * S + sx];
                     const scalar_t test = shape_1d[qx * S + sx] * vy * qw;
@@ -1012,6 +1019,7 @@ extern "C" int {sideset_function}_float(
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
+        vectorize_pragma=_vectorize_pragma(),
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_shape_1d=n_shape_1d,

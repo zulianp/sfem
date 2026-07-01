@@ -34,9 +34,16 @@ def _work_item_loop_lines(indent, *, work_item_index=None, simd_lines=None, sing
         return ("%s{" % indent,)
     work_item = _target_work_item_index(work_item_index)
     return tuple("%s%s" % (indent, line) for line in _target_simd_lines(simd_lines)) + (
-        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
+        "%sfor (int %s = 0; %s < nelems; ++%s) {"
         % (indent, work_item, work_item, work_item),
     )
+
+
+def _restrict_define_line(restrict_definition):
+    restrict_definition = str(restrict_definition)
+    if restrict_definition:
+        return "#define SFEM_RESTRICT %s" % restrict_definition
+    return "#define SFEM_RESTRICT"
 
 
 def isoparametric_adjugate_lines(
@@ -115,7 +122,7 @@ def sfem_geometry_kernels_header_source(
             "",
             *inline_block,
             "#ifndef SFEM_RESTRICT",
-            "#define SFEM_RESTRICT %s" % restrict_definition,
+            _restrict_define_line(restrict_definition),
             "#endif",
             "",
             "namespace sfem {",
@@ -171,7 +178,7 @@ def sfem_geometry_kernels_header_source(
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {",
             "    static %s void eval(" % inline_qualifier,
-            "            const ptrdiff_t nelems,",
+            "            const int nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
@@ -192,7 +199,7 @@ def sfem_geometry_kernels_header_source(
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {",
             "    static %s void eval(" % inline_qualifier,
-            "            const ptrdiff_t nelems,",
+            "            const int nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
@@ -218,7 +225,7 @@ def sfem_geometry_kernels_header_source(
             "",
             "template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>",
             "static %s void geometry_jacobian_adjugate_and_determinant(" % inline_qualifier,
-            "        const ptrdiff_t nelems,",
+            "        const int nelems,",
             "        const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "        scalar_t *const *const SFEM_RESTRICT adjugate,",
             "        scalar_t *const SFEM_RESTRICT determinant) {",

@@ -1051,11 +1051,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_weak_neohookean_isoparametric_reference_data<scalar_t>::grad_ref_x()", operator_source)
         self.assertIn("generated_weak_neohookean_isoparametric_reference_data<scalar_t>::grad_ref_y()", operator_source)
         self.assertIn(
-            "grad_u_ref0 += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_u_ref0_values[lane] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
         self.assertIn(
-            "grad_h_ref0 += weak_h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
+            "grad_h_ref0_values[lane] += weak_h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];",
             local_source,
         )
         self.assertIn("const scalar_t trial_grad0", local_source)
@@ -1067,7 +1067,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("scalar_t du[N_SHAPE", local_source)
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
         self.assertIn(
-            "weak_out_streams[shape * 2 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape]",
+            "weak_out_streams[shape * 2 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * N_SHAPE + shape]",
             local_source,
         )
         self.assertNotIn("generated_weak_neohookean_tri3_apply_soa_impl", operator_source)
@@ -1137,7 +1137,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn('#include "tensor_product_kernels.hpp"', local_source)
         self.assertIn("scalar_t value_x[Q * S * VECTOR_SIZE]", tensor_source)
         self.assertIn("scalar_t stage_x[Q * S * VECTOR_SIZE]", tensor_source)
-        self.assertIn("for (ptrdiff_t lane = 0; lane < nelems; ++lane)", local_source)
+        self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
             "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
@@ -1261,7 +1261,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("scalar_t value_x[Q * S * S * VECTOR_SIZE]", tensor_source)
         self.assertIn("scalar_t value_xy[Q * Q * S * VECTOR_SIZE]", tensor_source)
         self.assertIn("scalar_t stage_xy_x[Q * S * S * VECTOR_SIZE]", tensor_source)
-        self.assertIn("for (ptrdiff_t lane = 0; lane < nelems; ++lane)", local_source)
+        self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
             "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",

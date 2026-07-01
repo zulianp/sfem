@@ -285,11 +285,11 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertNotIn("pow(x", generated.source)
         self.assertNotIn("pow(y", generated.source)
 
-    def test_generated_cuda_kernel_uses_simt_grid_stride_lowering(self):
+    def test_generated_cuda_kernel_uses_simt_grid_stride_lowering_and_pow_helpers(self):
         x, y = sp.symbols("x[0] y[0]")
         graph = (
             KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2)
+            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2)
             .build_graph(data_symbols=(x, y))
         )
 
@@ -306,7 +306,14 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", generated.source)
         self.assertIn("e += blockDim.x * gridDim.x", generated.source)
         self.assertIn("cuda_plan_kernel_global<<<grid_size, block_size>>>", generated.source)
+        self.assertIn("static __host__ __device__ __forceinline__ T pow_2", generated.source)
+        self.assertIn("static __host__ __device__ __forceinline__ T pow_3", generated.source)
+        self.assertIn("static __host__ __device__ __forceinline__ T pow_m2", generated.source)
         self.assertIn("pow_2(", generated.source)
+        self.assertIn("pow_3(", generated.source)
+        self.assertIn("pow_m2(", generated.source)
+        self.assertNotIn("pow(x", generated.source)
+        self.assertNotIn("pow(y", generated.source)
         self.assertNotIn("#pragma omp", generated.source)
         self.assertNotIn("ptrdiff_t lane", generated.source)
 
