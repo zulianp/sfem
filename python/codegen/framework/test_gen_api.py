@@ -15,7 +15,8 @@ import codegen.framework as framework
 from sfem import gen
 from codegen.framework.cuda_backend import CUDASoABackend
 from codegen.framework.diagnostics_plan import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
-from codegen.framework.generation_plan import mesh_kernel_plan_from_context
+from codegen.framework.emission_plan import ElementEmissionPlan
+from codegen.framework.generation_plan import GenerationPlan, mesh_kernel_plan_from_context
 from codegen.framework.kernel_signature import (
     LocalKernelSignature,
     MeshKernelSignature,
@@ -175,6 +176,8 @@ class GenApiTest(unittest.TestCase):
             "CUDASoAEmission",
             "CodeGenerationStage",
             "CUDA_SOA_BACKEND",
+            "CoupledResidualKernels",
+            "CoupledResidualSystem",
             "EnergySoAKernelEmissionPlan",
             "ElementEmissionPlan",
             "GenerationPlan",
@@ -182,13 +185,37 @@ class GenApiTest(unittest.TestCase):
             "OpenMPSoABackend",
             "OpenMPSoAEmission",
             "OPENMP_SOA_BACKEND",
+            "ResidualField",
+            "ResidualJacobianBlock",
+            "TwoPhaseFlowImplicitEulerModel",
+            "TwoPhaseFlowImplicitEulerState",
+            "TwoPhaseFlowJacobianAction",
             "UserInputStage",
+            "WeakResidualCoefficients",
+            "coupled_residual_system",
+            "coupled_residual_weak_coefficients",
             "generate_cpp_kernel",
             "generate_cuda_kernel",
             "generate_openmp_cpp_kernel",
+            "weak_residual_coefficients",
         }
         self.assertFalse(low_level_names.intersection(gen.__all__))
         self.assertFalse(low_level_names.intersection(framework.__all__))
+        removed_package_root_names = low_level_names.difference(
+            {
+                "CodeGenerationStage",
+                "CUDA_SOA_BACKEND",
+                "OPENMP_SOA_BACKEND",
+                "UserInputStage",
+            }
+        )
+        self.assertFalse(
+            {
+                name
+                for name in removed_package_root_names
+                if hasattr(framework, name) or hasattr(gen, name)
+            }
+        )
 
     def test_symbolic_scalar_field_is_sympy_compatible(self):
         p = gen.scalar_field("p", family="pressure")
@@ -654,9 +681,21 @@ class GenApiTest(unittest.TestCase):
                 "sfem_GeneratedNeoHookeanOgden.hpp",
             )
             with open(header, encoding="utf-8") as stream:
-                self.assertIn("public Op", stream.read())
+                header_source = stream.read()
+            self.assertIn("public Op", header_source)
+            self.assertIn("double flops_gradient() const override;", header_source)
+            self.assertIn("size_t memory_traffic_bytes_apply() const override;", header_source)
             self.assertIn(
                 "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                source,
+            )
+            self.assertIn("double GeneratedNeoHookeanOgden::flops_gradient() const", source)
+            self.assertIn(
+                "KernelDiagnostics_total_flops(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics()",
+                source,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes(neohookean_ogden_tri3_tri3_apply_soa_diagnostics()",
                 source,
             )
             self.assertIn(
@@ -814,6 +853,15 @@ class GenApiTest(unittest.TestCase):
                 self.assertNotIn("ux", declaration)
 
             wrapper = read_generated("sfem_GeneratedLinearElasticity.cpp")
+            self.assertIn("double GeneratedLinearElasticity::flops_apply() const", wrapper)
+            self.assertIn(
+                "KernelDiagnostics_total_flops(linear_elasticity_tet4_tet4_apply_soa_diagnostics()",
+                wrapper,
+            )
+            self.assertIn(
+                "KernelDiagnostics_total_bytes(linear_elasticity_tet4_tet4_gradient_soa_diagnostics()",
+                wrapper,
+            )
             apply_calls = re.findall(
                 r"linear_elasticity_tet4_tet4_apply_[^(]+\([^;\n]+\)",
                 wrapper,
@@ -928,7 +976,7 @@ class GenApiTest(unittest.TestCase):
                     plan_path,
                 ),
             )
-            self.assertIsInstance(result.plan, gen.GenerationPlan)
+            self.assertIsInstance(result.plan, GenerationPlan)
             self.assertEqual(result.plan_dump, plan_path)
             self.assertTrue(os.path.exists(plan_path))
             with open(plan_path, encoding="utf-8") as stream:
@@ -1622,7 +1670,7 @@ class GenApiTest(unittest.TestCase):
             (stream,),
             expression_plans=(expression_plan,),
         )
-        plan = gen.GenerationPlan((kernel,))
+        plan = GenerationPlan((kernel,))
 
         self.assertEqual(plan.stage, gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION)
         self.assertEqual(plan.units_for_context(context), (kernel,))
@@ -2135,7 +2183,7 @@ class GenApiTest(unittest.TestCase):
             energy_input,
             gen._evaluate_forms(energy_input),
         ).run()
-        self.assertIsInstance(energy_plan, gen.GenerationPlan)
+        self.assertIsInstance(energy_plan, GenerationPlan)
         self.assertTrue(all(isinstance(unit, gen.KernelPlan) for unit in energy_plan.units))
         self.assertEqual(
             energy_plan.units[0].mesh_phases,
@@ -2176,7 +2224,7 @@ class GenApiTest(unittest.TestCase):
             residual_input,
             gen._evaluate_forms(residual_input),
         ).run()
-        self.assertIsInstance(residual_plan, gen.GenerationPlan)
+        self.assertIsInstance(residual_plan, GenerationPlan)
         self.assertEqual(
             residual_plan.units[0].mesh_phases,
             (
@@ -2299,7 +2347,7 @@ class GenApiTest(unittest.TestCase):
             hex_unit,
             hex_input.element_contexts[0],
         )
-        self.assertIsInstance(hex_emission_plan, gen.ElementEmissionPlan)
+        self.assertIsInstance(hex_emission_plan, ElementEmissionPlan)
         self.assertEqual(hex_emission_plan.family, "tensor_product")
         self.assertEqual(hex_emission_plan.basis_family, "tensor_product")
         self.assertEqual(hex_emission_plan.geometry_family, "tensor_product")
@@ -2308,11 +2356,11 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(hex_emission_plan.affine_geometry, affine_geometry)
         self.assertEqual(hex_emission_plan.isoparametric_geometry, iso_geometry)
         direct_hex_emission_plan = gen.emission_plan_for_element("HEX8", 16)
-        self.assertIsInstance(direct_hex_emission_plan, gen.ElementEmissionPlan)
+        self.assertIsInstance(direct_hex_emission_plan, ElementEmissionPlan)
         self.assertEqual(direct_hex_emission_plan.family, "tensor_product")
         self.assertTrue(direct_hex_emission_plan.uses_tensor_product_geometry)
         self.assertTrue(direct_hex_emission_plan.uses_tensor_product_basis)
-        mixed_policy_plan = gen.ElementEmissionPlan(
+        mixed_policy_plan = ElementEmissionPlan(
             direct_hex_emission_plan.element_type,
             direct_hex_emission_plan.label,
             direct_hex_emission_plan.family,
@@ -2380,7 +2428,7 @@ class GenApiTest(unittest.TestCase):
         form_collection = gen._evaluate_forms(user_input).by_dim[2].units[0].form_evaluation
 
         with self.assertRaisesRegex(ValueError, "target 'cuda' is not supported"):
-            gen.GenerationPlan((
+            GenerationPlan((
                 gen.KernelPlan(
                     "cuda_kernel",
                     "energy",
@@ -2392,7 +2440,7 @@ class GenApiTest(unittest.TestCase):
             )).validate_for_context(context)
 
         with self.assertRaisesRegex(ValueError, "mesh phases are not in canonical order"):
-            gen.GenerationPlan((
+            GenerationPlan((
                 gen.KernelPlan(
                     "bad_order",
                     "energy",
@@ -2413,7 +2461,7 @@ class GenApiTest(unittest.TestCase):
             (gen.LocalPhase.EVALUATE_TRIAL,),
         )
         with self.assertRaisesRegex(ValueError, "row field 'missing'"):
-            gen.GenerationPlan((
+            GenerationPlan((
                 gen.KernelPlan(
                     "bad_block",
                     "energy",
@@ -2658,7 +2706,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("op/sfem_GeneratedStokes_c_abi.hpp", names)
             self.assertIn("op/sfem_GeneratedStokes_manifest.json", names)
             self.assertIn("op/sfem_GeneratedStokes_registration.cpp", names)
-            self.assertIsInstance(result.plan, gen.GenerationPlan)
+            self.assertIsInstance(result.plan, GenerationPlan)
             self.assertEqual(result.plan.units[0].name, "stokes")
             self.assertTrue(result.plan.units[0].is_complete_system)
             self.assertEqual(result.plan.complete_system_kernels, result.plan.units)

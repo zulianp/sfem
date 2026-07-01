@@ -122,6 +122,16 @@ namespace sfem {
 
         std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
 
+        double flops() const;
+        double flops_value() const;
+        double flops_gradient() const;
+        double flops_apply() const;
+
+        size_t memory_traffic_bytes() const;
+        size_t memory_traffic_bytes_value() const;
+        size_t memory_traffic_bytes_gradient() const;
+        size_t memory_traffic_bytes_apply() const;
+
         void describe(std::ostream &os) const;
 
     private:

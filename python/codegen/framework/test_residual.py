@@ -8,6 +8,8 @@ import unittest
 
 import sympy as sp
 
+from sfem import gen
+
 from .residual import CoupledResidualSystem
 from .residual_codegen import (
     coupled_residual_weak_coefficients,
@@ -365,34 +367,52 @@ class CoupledResidualSystemTest(unittest.TestCase):
             (("u", "u"), ("u", "v"), ("v", "u"), ("v", "v")),
         )
 
-    def test_generates_and_compiles_material_agnostic_kernels(self):
+    def test_generates_material_agnostic_kernels_through_unified_backend(self):
         compiler = shutil.which("c++")
         if compiler is None:
             self.skipTest("c++ compiler is not available")
 
-        system, _, _ = two_field_diffusion_system()
-        kernels = system.generate_cpp_kernels("coupled_diffusion")
-        self.assertIn('extern "C" void coupled_diffusion_residual', kernels.residual.source)
-        self.assertIn(
-            'extern "C" void coupled_diffusion_jacobian_action',
-            kernels.jacobian_action.source,
+        builder = gen.EquationSystemBuilder(2)
+        u = builder.scalar_field("u")
+        v = builder.scalar_field("v")
+        u_test = gen.test_function(u)
+        v_test = gen.test_function(v)
+        dt, k_u, k_v, coupling = sp.symbols("dt k_u k_v coupling")
+        form = (
+            (u - gen.old(u)) * u_test / dt
+            + k_u * gen.inner(gen.grad(u), gen.grad(u_test))
+            + coupling * (u - v) * u_test
+            + (v - gen.old(v)) * v_test / dt
+            + k_v * gen.inner(gen.grad(v), gen.grad(v_test))
+            + coupling * (v - u) * v_test
         )
-        self.assertNotIn("two_phase", kernels.residual.source)
-        self.assertNotIn("two_phase", kernels.jacobian_action.source)
+        builder.add_residual("coupled_diffusion", form, fields=(u, v))
+        material = gen.CodeGenerator(
+            "coupled_diffusion",
+            gen.EquationSystems(builder.build()),
+            elements=("TRI3",),
+            parameter_defaults=(
+                ("dt", 1.0),
+                ("k_u", 1.0),
+                ("k_v", 1.0),
+                ("coupling", 0.0),
+            ),
+        )
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
-            for generated in (kernels.residual, kernels.jacobian_action):
-                source = os.path.join(tmpdir, "%s.cpp" % generated.function_name)
-                output = os.path.join(tmpdir, "%s.o" % generated.function_name)
-                with open(source, "w", encoding="utf-8") as stream:
-                    stream.write(generated.source)
-                subprocess.run(
-                    [compiler, "-std=c++11", "-O3", "-c", source, "-o", output],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
+            result = gen.generate(material, tmpdir, elements=("TRI3",), compile=True)
+            sources = {}
+            for path in result.sources:
+                if not path.endswith(".cpp"):
+                    continue
+                with open(path, encoding="utf-8") as source_file:
+                    sources[os.path.relpath(path, tmpdir)] = source_file.read()
+            combined = "\n".join(sources.values())
+            self.assertIn("coupled_diffusion_tri3", combined)
+            self.assertIn("jacobian_action_element_soa", combined)
+            self.assertIn("jacobian_action_affine_mesh_soa", combined)
+            self.assertNotIn("two_phase", combined)
+            self.assertGreater(len(result.objects), 0)
 
     def test_generates_vectorized_element_local_residual_kernels(self):
         compiler = shutil.which("c++")

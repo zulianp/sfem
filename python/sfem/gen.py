@@ -11,7 +11,6 @@ import sympy as sp
 from ._gen_op import generate_op_files, generate_op_registration_files
 from codegen.framework import (
     CodegenQualifier,
-    CoupledResidualSystem,
     DEFORMATION_GRADIENT,
     DISPLACEMENT,
     BasisDataLayout,
@@ -67,10 +66,8 @@ from codegen.framework import (
     Measure,
     dx,
     ds,
-    ElementEmissionPlan,
     emission_plan_for_element,
     emission_plan_from_unit_context,
-    GenerationPlan,
     GeometryEvaluation,
     GeometryInputLayout,
     GeometryMode,
@@ -139,6 +136,8 @@ from codegen.framework import (
     variable,
     value,
 )
+from codegen.framework.emission_plan import ElementEmissionPlan as _ElementEmissionPlan
+from codegen.framework.generation_plan import GenerationPlan as _GenerationPlan
 from codegen.framework.fem import (
     SfemCompatibleElement,
     SfemElementBasisPolicy,
@@ -169,13 +168,13 @@ from codegen.framework.fem import (
     sfem_tensor_product_hex_order,
     sfem_tensor_hex_shape_index,
 )
-from codegen.framework.cuda_backend import CUDASoABackend
-from codegen.framework.openmp_backend import OpenMPSoABackend
+from codegen.framework.cuda_backend import CUDASoABackend as _CUDASoABackend
+from codegen.framework.openmp_backend import OpenMPSoABackend as _OpenMPSoABackend
 
 
 DEFAULT_VECTOR_SIZE = 16
-OPENMP_SOA_BACKEND = OpenMPSoABackend()
-CUDA_SOA_BACKEND = CUDASoABackend()
+OPENMP_SOA_BACKEND = _OpenMPSoABackend()
+CUDA_SOA_BACKEND = _CUDASoABackend()
 BACKENDS_BY_TARGET = {
     KernelTarget.OPENMP: OPENMP_SOA_BACKEND,
     KernelTarget.CUDA: CUDA_SOA_BACKEND,
@@ -591,7 +590,7 @@ class CodeGenerationUnit(KernelPlan):
     unit_name: str = ""
 
 
-CodeGenerationPlan = GenerationPlan
+CodeGenerationPlan = _GenerationPlan
 
 
 @dataclass(frozen=True)
@@ -812,7 +811,7 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
                 raise TypeError(
                     "unsupported evaluated form unit %s" % type(evaluated).__name__
                 )
-    return GenerationPlan(tuple(units))
+    return _GenerationPlan(tuple(units))
 
 
 def _energy_codegen_unit(material_name, dim, evaluated):
@@ -1605,7 +1604,6 @@ def _validate_op(op_name, parameter_defaults):
 
 
 __all__ = [
-    "CoupledResidualSystem",
     "CodegenQualifier",
     "DEFAULT_VECTOR_SIZE",
     "DEFORMATION_GRADIENT",

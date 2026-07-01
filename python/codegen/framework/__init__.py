@@ -37,9 +37,6 @@ from .symbolic import (
     displacement_gradient_from_reference,
     directional_derivative,
     execution_scope,
-    generate_cpp_kernel,
-    generate_cuda_kernel,
-    generate_openmp_cpp_kernel,
     gradient_from_energy,
     hessian_action_from_energy,
     jacobian_action_from_residual,
@@ -147,7 +144,6 @@ from .generation_plan import (
     DataStreamLayout,
     DataStreamPlan,
     DataStreamRole,
-    GenerationPlan,
     GeometryPlan,
     KernelCoupling,
     KernelPlan,
@@ -163,7 +159,6 @@ from .generation_plan import (
     mesh_kernel_plan_from_context,
 )
 from .emission_plan import (
-    ElementEmissionPlan,
     emission_plan_for_element,
     emission_plan_from_unit_context,
 )
@@ -187,10 +182,6 @@ from .reference_data_plan import (
     ReferenceDataSetPlan,
     reference_data_plan_from_emission_plan,
 )
-from .energy_plan import EnergySoAKernelEmissionPlan
-from .energy_emitters import CUDAEnergySoAEmitter, OpenMPEnergySoAEmitter
-from .cuda_backend import CUDASoABackend, CUDASoAEmission
-from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (
     GeometryEvaluation,
     GeometryInputLayout,
@@ -283,23 +274,6 @@ from .constitutive import (
     TwoPhaseFlowConstitutiveModel,
     TwoPhaseFlowConstitutiveState,
     TwoPhaseFlowParameters,
-)
-from .twophaseflow import (
-    TwoPhaseFlowImplicitEulerModel,
-    TwoPhaseFlowImplicitEulerState,
-    TwoPhaseFlowJacobianAction,
-)
-from .residual import (
-    CoupledResidualKernels,
-    CoupledResidualSystem,
-    ResidualField,
-    ResidualJacobianBlock,
-    coupled_residual_system,
-)
-from .residual_codegen import (
-    WeakResidualCoefficients,
-    coupled_residual_weak_coefficients,
-    weak_residual_coefficients,
 )
 
 __all__ = [
@@ -544,12 +518,4 @@ __all__ = [
     "TwoPhaseFlowConstitutiveModel",
     "TwoPhaseFlowConstitutiveState",
     "TwoPhaseFlowParameters",
-    "CoupledResidualKernels",
-    "CoupledResidualSystem",
-    "ResidualField",
-    "ResidualJacobianBlock",
-    "coupled_residual_system",
-    "WeakResidualCoefficients",
-    "coupled_residual_weak_coefficients",
-    "weak_residual_coefficients",
 ]
