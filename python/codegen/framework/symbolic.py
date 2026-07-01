@@ -224,14 +224,22 @@ def _sfem_math_header_source(
     return "\n".join(lines)
 
 
-def _sfem_math_inline_source_lines():
+def _sfem_math_inline_source_lines(
+    inline_qualifier="SFEM_INLINE",
+    define_sfem_inline=True,
+):
     lines = [
-        "#ifndef SFEM_INLINE",
-        "#define SFEM_INLINE inline",
-        "#endif",
-        "",
     ]
-    lines.extend(_sfem_math_function_lines())
+    if define_sfem_inline:
+        lines.extend(
+            [
+                "#ifndef SFEM_INLINE",
+                "#define SFEM_INLINE inline",
+                "#endif",
+                "",
+            ]
+        )
+    lines.extend(_sfem_math_function_lines(inline_qualifier))
     return lines
 
 
@@ -1558,16 +1566,13 @@ def generate_cuda_kernel(
 
     lines = ["#include <stddef.h>"]
     lines.extend(target.includes())
+    lines.append("")
     lines.extend(
-        [
-            "",
-            "#ifndef SFEM_INLINE",
-            "#define SFEM_INLINE __host__ __device__ __forceinline__",
-            "#endif",
-            "",
-        ]
+        _sfem_math_inline_source_lines(
+            target.function_qualifier(),
+            define_sfem_inline=False,
+        )
     )
-    lines.extend(_sfem_math_inline_source_lines())
     lines.extend(
         [
             "",

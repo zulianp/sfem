@@ -136,7 +136,7 @@ class CUDATarget(TargetPlatform):
         return ("#include <cuda_runtime.h>",)
 
     def function_qualifier(self):
-        return "__device__ __forceinline__"
+        return "__host__ __device__ __forceinline__"
 
     def restrict_qualifier(self):
         return "__restrict__"
