@@ -747,6 +747,38 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("register_GeneratedNeoHookeanOgden_generated_op();", generated_source)
             self.assertIn("register_GeneratedTwoPhaseFlow_generated_op();", generated_source)
 
+    def test_frontend_factory_consumes_generated_op_registration_aggregate(self):
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        factory_path = os.path.join(repo_root, "frontend", "ops", "sfem_OpFactory.cpp")
+        with open(factory_path, encoding="utf-8") as input_file:
+            factory_source = input_file.read()
+
+        self.assertIn('#include "generated/sfem_generated_ops_registration.hpp"', factory_source)
+        self.assertIn("register_generated_ops();", factory_source)
+        self.assertNotIn('#include "sfem_GeneratedNeoHookeanOgden.hpp"', factory_source)
+        self.assertNotIn('#include "sfem_GeneratedTwoPhaseFlow.hpp"', factory_source)
+        self.assertNotIn(
+            '#include "generated/poro_hyperelasticity/op/sfem_GeneratedPoroHyperelasticity.hpp"',
+            factory_source,
+        )
+        self.assertNotIn(
+            '#include "generated/stokes/op/sfem_GeneratedStokes.hpp"',
+            factory_source,
+        )
+        self.assertNotIn(
+            'private_register_op("GeneratedNeoHookeanOgden"',
+            factory_source,
+        )
+        self.assertNotIn(
+            'private_register_op("GeneratedTwoPhaseFlow"',
+            factory_source,
+        )
+        self.assertNotIn(
+            'private_register_op("GeneratedPoroHyperelasticity"',
+            factory_source,
+        )
+        self.assertNotIn('private_register_op("GeneratedStokes"', factory_source)
+
     def test_material_runner_writes_generation_plan_dump(self):
         with tempfile.TemporaryDirectory() as out_dir:
             plan_path = os.path.join(out_dir, "inspect", "neo_plan.json")

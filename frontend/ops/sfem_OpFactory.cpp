@@ -4,12 +4,9 @@
 #include "sfem_BoundaryMass.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
-#include "sfem_GeneratedNeoHookeanOgden.hpp"
+#include "generated/sfem_generated_ops_registration.hpp"
 #include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
-#include "generated/poro_hyperelasticity/op/sfem_GeneratedPoroHyperelasticity.hpp"
-#include "generated/stokes/op/sfem_GeneratedStokes.hpp"
-#include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
@@ -61,11 +58,8 @@ namespace sfem {
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("NeoHookeanOgdenPacked", NeoHookeanOgdenPacked::create);
-            instance_.private_register_op("GeneratedNeoHookeanOgden", GeneratedNeoHookeanOgden::create);
             instance_.private_register_op("GeneratedNeumann", GeneratedNeumann::create);
             instance_.private_register_op("GeneratedNeumannGeneral", GeneratedNeumannGeneral::create);
-            instance_.private_register_op("GeneratedPoroHyperelasticity", GeneratedPoroHyperelasticity::create);
-            instance_.private_register_op("GeneratedStokes", GeneratedStokes::create);
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
@@ -74,7 +68,7 @@ namespace sfem {
             instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);
-            instance_.private_register_op("GeneratedTwoPhaseFlow", GeneratedTwoPhaseFlow::create);
+            register_generated_ops();
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 
