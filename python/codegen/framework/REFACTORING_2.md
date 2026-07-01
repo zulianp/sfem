@@ -278,6 +278,9 @@ factory-registration translation unit, and
 scripts. The frontend factory now consumes the generated aggregate registration
 unit, so maintained generated material wrappers no longer require
 hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
+Energy-only and coupled energy/residual wrappers now assemble generated kernel
+calls from form dependency metadata, so unused current, previous, direction, and
+parameter inputs are not forwarded through the wrapper layer.
 
 Tasks:
 
