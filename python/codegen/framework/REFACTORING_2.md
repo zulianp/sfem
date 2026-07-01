@@ -331,19 +331,31 @@ Acceptance criteria:
 
 Goal: leave one public user-facing framework path.
 
+Status: in progress. The public `__all__` surfaces for `codegen.framework` and
+`sfem.gen` no longer export backend emitters, backend instances, old direct
+kernel string generators, generation-plan internals, or historical two-phase
+implicit-Euler helper classes. Backend-focused tests now import signature,
+diagnostics, reference-data, and mesh-plan helpers from their internal modules
+instead of treating them as `sfem.gen` API. Public examples and docs have been
+updated to show `sfem.gen.CodeGenerator` plus `gen.generate(...)` or
+`gen.run(...)`.
+
 Tasks:
 
-1. Audit `codegen.framework.__all__` and `sfem.gen.__all__` for low-level
+1. [x] Audit `codegen.framework.__all__` and `sfem.gen.__all__` for low-level
    generator functions that should no longer be public.
-2. Stop exporting legacy low-level generator APIs once backend traversal covers
+2. [x] Stop exporting legacy low-level generator APIs once backend traversal covers
    maintained materials.
-3. Move tests that need low-level helpers to internal test modules or update
+3. [x] Move tests that need low-level helpers to internal test modules or update
    them to generate through `sfem.gen.CodeGenerator`.
-4. Audit `python/codegen/framework/twophaseflow.py` and other historical files
+4. [x] Audit `python/codegen/framework/twophaseflow.py` and other historical files
    for standalone pipeline logic.
+   - `materials/two_phase_flow.py` is the maintained generation path and uses
+     `sfem.gen.CodeGenerator`; `twophaseflow.py` remains only as an internal
+     symbolic helper covered by focused tests.
 5. Remove or convert historical helpers that do not use:
    `EquationSystem` -> `FormCollection` -> `GenerationPlan` -> backend.
-6. Ensure all scripts under `python/codegen/framework` and
+6. [x] Ensure all scripts under `python/codegen/framework` and
    `python/codegen/framework/docs` call `sfem.gen.run(...)` or
    `sfem.gen.generate(...)`.
 
