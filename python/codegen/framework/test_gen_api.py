@@ -15,6 +15,7 @@ import codegen.framework as framework
 from sfem import gen
 
 from .materials.neohookean_ogden import material as neohookean_ogden
+from .materials.linear_elasticity import material as linear_elasticity
 from .materials.neumann import material as neumann
 from .materials.poro_hyperelasticity import material as poro_hyperelasticity
 from .materials.stokes import material as stokes
@@ -698,11 +699,46 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("const scalar_t mu", generated)
         self.assertNotIn("unused", generated)
 
+    def test_linear_elasticity_hessian_apply_prunes_current_state(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(linear_elasticity, out_dir, elements=("TET4",))
+
+            def read_generated(suffix):
+                path = next(path for path in result.sources if path.endswith(suffix))
+                with open(path, encoding="utf-8") as input_file:
+                    return input_file.read()
+
+            local = read_generated("linear_elasticity_d3_simplex_local.hpp")
+            apply_block = local[local.index("linear_elasticity_d3_simplex_apply_block") :]
+            self.assertNotIn("grad_u", apply_block)
+            self.assertNotIn("u_streams", apply_block)
+
+            c_abi = read_generated("sfem_GeneratedLinearElasticity_c_abi.hpp")
+            apply_declarations = re.findall(
+                r'extern "C" int linear_elasticity_tet4_tet4_apply_[^;]+;',
+                c_abi,
+                flags=re.S,
+            )
+            self.assertTrue(apply_declarations)
+            for declaration in apply_declarations:
+                self.assertNotIn("u_stride", declaration)
+                self.assertNotIn("ux", declaration)
+
+            wrapper = read_generated("sfem_GeneratedLinearElasticity.cpp")
+            apply_calls = re.findall(
+                r"linear_elasticity_tet4_tet4_apply_[^(]+\([^;\n]+\)",
+                wrapper,
+            )
+            self.assertTrue(apply_calls)
+            for call in apply_calls:
+                self.assertNotIn("x +", call)
+
     def test_generates_factory_registration_aggregate_from_op_manifests(self):
         manifests = []
         manifest_paths = []
         with tempfile.TemporaryDirectory() as out_dir:
             for material, element in (
+                (linear_elasticity, "TET4"),
                 (neohookean_ogden, "TRI3"),
                 (two_phase_flow, "TRI3"),
             ):
@@ -727,8 +763,13 @@ class GenApiTest(unittest.TestCase):
             header = files["sfem_generated_ops_registration.hpp"]
             source = files["sfem_generated_ops_registration.cpp"]
             self.assertIn("void register_generated_ops();", header)
+            self.assertIn("void register_GeneratedLinearElasticity_generated_op();", source)
             self.assertIn("void register_GeneratedNeoHookeanOgden_generated_op();", source)
             self.assertIn("void register_GeneratedTwoPhaseFlow_generated_op();", source)
+            self.assertLess(
+                source.index("register_GeneratedLinearElasticity_generated_op();"),
+                source.index("register_GeneratedNeoHookeanOgden_generated_op();"),
+            )
             self.assertLess(
                 source.index("register_GeneratedNeoHookeanOgden_generated_op();"),
                 source.index("register_GeneratedTwoPhaseFlow_generated_op();"),
@@ -744,6 +785,7 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as input_file:
                 generated_source = input_file.read()
+            self.assertIn("register_GeneratedLinearElasticity_generated_op();", generated_source)
             self.assertIn("register_GeneratedNeoHookeanOgden_generated_op();", generated_source)
             self.assertIn("register_GeneratedTwoPhaseFlow_generated_op();", generated_source)
 
@@ -755,6 +797,7 @@ class GenApiTest(unittest.TestCase):
 
         self.assertIn('#include "generated/sfem_generated_ops_registration.hpp"', factory_source)
         self.assertIn("register_generated_ops();", factory_source)
+        self.assertNotIn('#include "generated/linear_elasticity/op/sfem_GeneratedLinearElasticity.hpp"', factory_source)
         self.assertNotIn('#include "sfem_GeneratedNeoHookeanOgden.hpp"', factory_source)
         self.assertNotIn('#include "sfem_GeneratedTwoPhaseFlow.hpp"', factory_source)
         self.assertNotIn(
@@ -767,6 +810,10 @@ class GenApiTest(unittest.TestCase):
         )
         self.assertNotIn(
             'private_register_op("GeneratedNeoHookeanOgden"',
+            factory_source,
+        )
+        self.assertNotIn(
+            'private_register_op("GeneratedLinearElasticity"',
             factory_source,
         )
         self.assertNotIn(

@@ -3,7 +3,7 @@ import glob
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 import sympy as sp
@@ -927,6 +927,8 @@ def _energy_expression_plans(kernel_forms, diagnostic_graph, collection):
     plans = []
     for kernel_form in kernel_forms:
         form_order = _form_order_for_kernel_name(kernel_form.name)
+        dependencies = _metadata_dependencies(collection, form_order)
+        source = replace(kernel_form, dependencies=dependencies)
         plans.append(
             KernelExpressionPlan(
                 name=kernel_form.name,
@@ -935,11 +937,11 @@ def _energy_expression_plans(kernel_forms, diagnostic_graph, collection):
                 expression_graph=kernel_form.expression_graph,
                 weak_form=kernel_form.weak_form,
                 coefficients=collection.coefficients,
-                dependencies=_metadata_dependencies(collection, form_order),
+                dependencies=dependencies,
                 diagnostics=diagnostic_graph if kernel_form.name == "apply" else None,
                 fields=collection.fields,
                 blocks=_metadata_blocks(collection, form_order),
-                source=kernel_form,
+                source=source,
                 output_mode=kernel_form.output_mode,
                 has_direction=kernel_form.has_direction,
             )
@@ -1495,7 +1497,7 @@ def _write_files(out_dir, files):
         path = os.path.join(out_dir, filename)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as output:
-            output.write(source)
+            output.write(source.rstrip() + "\n")
         paths.append(path)
     return tuple(paths)
 

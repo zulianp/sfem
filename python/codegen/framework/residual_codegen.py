@@ -36,6 +36,7 @@ from .diagnostics_plan import validate_diagnostics_plan_names
 from .symbolic import (
     GeneratedKernelFile,
     KernelExpressions,
+    _prune_dead_cse_intermediates,
     _sfem_ccode,
     _sfem_math_header_source,
 )
@@ -1890,6 +1891,7 @@ def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependen
         expressions,
         symbols=sp.numbered_symbols("residual_tmp"),
     )
+    temporaries = _prune_dead_cse_intermediates(temporaries, reduced)
     lines = [
         "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in temporaries

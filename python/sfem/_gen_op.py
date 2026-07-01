@@ -26,7 +26,8 @@ def generate_op_files(material, elements, kernel_sources=None):
     elif equations[0].name:
         raise ValueError("single-equation generated Op wrappers require an unnamed equation")
     elif equations[0].is_energy:
-        header, source = _hyperelastic_op(material, elements, c_abi_header)
+        form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
+        header, source = _hyperelastic_op(material, elements, c_abi_header, form_collections)
     elif equations[0].is_residual:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         measures = {collection.measure for collection in form_collections.values()}
@@ -211,7 +212,9 @@ namespace sfem {
 """ % {"op": material.op_name, "extra": extra, "value_steps": value_steps}
 
 
-def _hyperelastic_op(material, elements, c_abi_header=None):
+def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=None):
+    if form_collections is None:
+        raise ValueError("energy generated Op requires form collections")
     parameters = tuple(str(name) for name, _ in material.parameter_defaults)
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
@@ -219,8 +222,19 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
     apply_cases = []
     objective_cases = []
     objective_steps_cases = []
+    dependencies_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
+        dependencies = dependencies_by_dim.get(dim)
+        if dependencies is None:
+            collection = form_collections[dim]
+            dependencies = (
+                collection.form_metadata(_form_order_zero()).dependencies,
+                collection.form_metadata(_form_order_one()).dependencies,
+                collection.form_metadata(_form_order_two()).dependencies,
+            )
+            dependencies_by_dim[dim] = dependencies
+        objective_dependencies, gradient_dependencies, apply_dependencies = dependencies
         stem = "%s_%s_%s" % (
             material.name,
             _element_name(element).lower(),
@@ -228,7 +242,7 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
         )
         components = _components(dim)
         declarations.extend(
-            _hyperelastic_declarations(stem, dim, parameters)
+            _hyperelastic_declarations(stem, dim, parameters, dependencies)
         )
         args = _parameter_args(parameters)
         common_isoparametric_args = (
@@ -245,23 +259,17 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
                 element,
                 "gradient_uses_affine",
                 "%s_gradient_affine_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s"
-                % (
+                ", ".join(_nonempty(
                     common_affine_args,
-                    dim,
-                    _offsets("x", components),
-                    dim,
-                    _offsets("out", components),
-                ),
+                    *_energy_field_args(gradient_dependencies, dim, components, current="x"),
+                    *_energy_output_args(dim, components),
+                )),
                 "%s_gradient_isoparametric_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s"
-                % (
+                ", ".join(_nonempty(
                     common_isoparametric_args,
-                    dim,
-                    _offsets("x", components),
-                    dim,
-                    _offsets("out", components),
-                ),
+                    *_energy_field_args(gradient_dependencies, dim, components, current="x"),
+                    *_energy_output_args(dim, components),
+                )),
             )
         )
         apply_cases.append(
@@ -269,48 +277,36 @@ def _hyperelastic_op(material, elements, c_abi_header=None):
                 element,
                 "apply_uses_affine",
                 "%s_apply_affine_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s, %d, %s"
-                % (
+                ", ".join(_nonempty(
                     common_affine_args,
-                    dim,
-                    _offsets("x", components),
-                    dim,
-                    _offsets("h", components),
-                    dim,
-                    _offsets("out", components),
-                ),
+                    *_energy_field_args(apply_dependencies, dim, components, current="x", direction="h"),
+                    *_energy_output_args(dim, components),
+                )),
                 "%s_apply_isoparametric_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s, %d, %s"
-                % (
+                ", ".join(_nonempty(
                     common_isoparametric_args,
-                    dim,
-                    _offsets("x", components),
-                    dim,
-                    _offsets("h", components),
-                    dim,
-                    _offsets("out", components),
-                ),
+                    *_energy_field_args(apply_dependencies, dim, components, current="x", direction="h"),
+                    *_energy_output_args(dim, components),
+                )),
             )
         )
         objective_cases.append(
             _dual_status_case(
                 element,
                 "%s_objective_affine_mesh_soa" % stem,
-                "%s, %d, %s, impl_->element_values.get()"
-                % (
+                ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
                     % (_affine_geometry_offsets(dim), args),
-                    dim,
-                    _offsets("x", components),
-                ),
+                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    "impl_->element_values.get()",
+                )),
                 "%s_objective_isoparametric_mesh_soa" % stem,
-                "%s, %d, %s, impl_->element_values.get()"
-                % (
+                ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
                     % args,
-                    dim,
-                    _offsets("x", components),
-                ),
+                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    "impl_->element_values.get()",
+                )),
             )
         )
         objective_steps_cases.append(
@@ -2619,8 +2615,42 @@ def _c_abi_function_name(declaration):
     return match.group(1) if match else None
 
 
-def _hyperelastic_declarations(stem, dim, parameters):
+def _energy_field_args(dependencies, dim, components, current=None, direction=None):
+    args = []
+    if current is not None and (
+        getattr(dependencies, "current", False) if dependencies is not None else True
+    ):
+        args.extend((dim, _offsets(current, components)))
+    if direction is not None and (
+        getattr(dependencies, "direction", False) if dependencies is not None else True
+    ):
+        args.extend((dim, _offsets(direction, components)))
+    return tuple(args)
+
+
+def _energy_output_args(dim, components):
+    return (dim, _offsets("out", components))
+
+
+def _energy_declaration_field_args(dependencies, dim, components, current=False, direction=False):
+    args = []
+    vectors = "".join(", const real_t *" for _ in components)
+    if current and (
+        getattr(dependencies, "current", False) if dependencies is not None else True
+    ):
+        args.append("ptrdiff_t%s" % vectors)
+    if direction and (
+        getattr(dependencies, "direction", False) if dependencies is not None else True
+    ):
+        args.append("ptrdiff_t%s" % vectors)
+    return "".join(", %s" % arg for arg in args)
+
+
+def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
     components = _components(dim)
+    if dependencies is None:
+        dependencies = (None, None, None)
+    objective_dependencies, gradient_dependencies, apply_dependencies = dependencies
     parameter_decl = "".join(", const real_t %s" % name for name in parameters)
     vectors = "".join(", const real_t *" for _ in components)
     outputs = "".join(", real_t *" for _ in components)
@@ -2635,18 +2665,78 @@ def _hyperelastic_declarations(stem, dim, parameters):
         + parameter_decl
     )
     return (
-        "int %s_objective_isoparametric_mesh_soa(%s, ptrdiff_t%s, real_t *);"
-        % (stem, isoparametric_common, vectors),
-        "int %s_gradient_isoparametric_mesh_soa(%s, ptrdiff_t%s, ptrdiff_t%s);"
-        % (stem, isoparametric_common, vectors, outputs),
-        "int %s_apply_isoparametric_mesh_soa(%s, ptrdiff_t%s, ptrdiff_t%s, ptrdiff_t%s);"
-        % (stem, isoparametric_common, vectors, vectors, outputs),
-        "int %s_objective_affine_mesh_soa(%s, ptrdiff_t%s, real_t *);"
-        % (stem, affine_common, vectors),
-        "int %s_gradient_affine_mesh_soa(%s, ptrdiff_t%s, ptrdiff_t%s);"
-        % (stem, affine_common, vectors, outputs),
-        "int %s_apply_affine_mesh_soa(%s, ptrdiff_t%s, ptrdiff_t%s, ptrdiff_t%s);"
-        % (stem, affine_common, vectors, vectors, outputs),
+        "int %s_objective_isoparametric_mesh_soa(%s%s, real_t *);"
+        % (
+            stem,
+            isoparametric_common,
+            _energy_declaration_field_args(
+                objective_dependencies,
+                dim,
+                components,
+                current=True,
+            ),
+        ),
+        "int %s_gradient_isoparametric_mesh_soa(%s%s, ptrdiff_t%s);"
+        % (
+            stem,
+            isoparametric_common,
+            _energy_declaration_field_args(
+                gradient_dependencies,
+                dim,
+                components,
+                current=True,
+            ),
+            outputs,
+        ),
+        "int %s_apply_isoparametric_mesh_soa(%s%s, ptrdiff_t%s);"
+        % (
+            stem,
+            isoparametric_common,
+            _energy_declaration_field_args(
+                apply_dependencies,
+                dim,
+                components,
+                current=True,
+                direction=True,
+            ),
+            outputs,
+        ),
+        "int %s_objective_affine_mesh_soa(%s%s, real_t *);"
+        % (
+            stem,
+            affine_common,
+            _energy_declaration_field_args(
+                objective_dependencies,
+                dim,
+                components,
+                current=True,
+            ),
+        ),
+        "int %s_gradient_affine_mesh_soa(%s%s, ptrdiff_t%s);"
+        % (
+            stem,
+            affine_common,
+            _energy_declaration_field_args(
+                gradient_dependencies,
+                dim,
+                components,
+                current=True,
+            ),
+            outputs,
+        ),
+        "int %s_apply_affine_mesh_soa(%s%s, ptrdiff_t%s);"
+        % (
+            stem,
+            affine_common,
+            _energy_declaration_field_args(
+                apply_dependencies,
+                dim,
+                components,
+                current=True,
+                direction=True,
+            ),
+            outputs,
+        ),
     )
 
 
