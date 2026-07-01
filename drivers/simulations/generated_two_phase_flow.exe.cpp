@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <string>
 
 extern "C" {
 #define DECLARE_DIAGNOSTICS(element)                                                                                     \
@@ -209,6 +210,11 @@ int main(int argc, char *argv[]) {
     const real_t initial_co2_pressure   = smesh::Env::read("SFEM_INITIAL_CO2_PRESSURE", 15.1);
     const real_t injection_co2_pressure = smesh::Env::read("SFEM_INJECTION_CO2_PRESSURE", 20);
     const real_t ramp_duration          = smesh::Env::read("SFEM_RAMP_DURATION", 1.0);
+    const std::string codegen_geometry  = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
+    if (codegen_geometry != "affine" && codegen_geometry != "isoparametric") {
+        SFEM_ERROR("SFEM_CODEGEN_GEOMETRY must be affine or isoparametric\n");
+    }
+    const bool assume_affine = codegen_geometry == "affine";
     auto         space                  = sfem::FunctionSpace::create(mesh, 2);
     auto         initial_state          = sfem::create_host_buffer<real_t>(space->n_dofs());
     for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
@@ -250,9 +256,10 @@ int main(int argc, char *argv[]) {
         time_integration.initialize();
     }
 
-    auto base_op = sfem::Factory::create_op(space, "GeneratedTwoPhaseFlow");
-    auto op      = std::dynamic_pointer_cast<sfem::GeneratedTwoPhaseFlow>(base_op);
-    if (!op) {
+    auto op = std::make_shared<sfem::GeneratedTwoPhaseFlow>(space);
+    op->set_option("assume_affine", assume_affine);
+    op->set_option("ASSUME_AFFINE", assume_affine);
+    if (op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
 
@@ -270,6 +277,7 @@ int main(int argc, char *argv[]) {
     const ptrdiff_t checkpoint_frequency         = smesh::Env::read("SFEM_CHECKPOINT_FREQUENCY", 1);
     const int       benchmark_repeats            = smesh::Env::read("SFEM_BENCHMARK_REPEATS", 10);
     const ptrdiff_t performance_report_frequency = smesh::Env::read("SFEM_PERFORMANCE_REPORT_FREQUENCY", 1);
+    printf("geometry %s\n", codegen_geometry.c_str());
     printf("output nonlinear=%s balance=%s performance=%s\n",
            (output / "nonlinear_history.csv").c_str(),
            (output / "mass_balance.csv").c_str(),
