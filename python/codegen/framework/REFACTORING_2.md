@@ -331,14 +331,17 @@ Acceptance criteria:
 
 Goal: leave one public user-facing framework path.
 
-Status: in progress. The public `__all__` surfaces for `codegen.framework` and
-`sfem.gen` no longer export backend emitters, backend instances, old direct
-kernel string generators, generation-plan internals, or historical two-phase
-implicit-Euler helper classes. Backend-focused tests now import signature,
-diagnostics, reference-data, and mesh-plan helpers from their internal modules
-instead of treating them as `sfem.gen` API. Public examples and docs have been
-updated to show `sfem.gen.CodeGenerator` plus `gen.generate(...)` or
-`gen.run(...)`.
+Status: implemented. The public `__all__` surfaces and package-root exports for
+`codegen.framework` and `sfem.gen` no longer expose backend emitters, backend
+classes, old direct kernel string generators, generation-plan internals,
+residual helper generator APIs, or historical two-phase implicit-Euler helper
+classes. Backend-focused tests now import signature, diagnostics, reference-data,
+and mesh-plan helpers from their internal modules instead of treating them as
+`sfem.gen` API. Public examples and docs show `sfem.gen.CodeGenerator` plus
+`gen.generate(...)` or `gen.run(...)`. The last material-agnostic direct residual
+string-generation path, `CoupledResidualSystem.generate_cpp_kernels(...)`, has
+been removed; its coverage now generates and compiles through
+`EquationSystemBuilder` and the unified backend.
 
 Tasks:
 
@@ -353,8 +356,12 @@ Tasks:
    - `materials/two_phase_flow.py` is the maintained generation path and uses
      `sfem.gen.CodeGenerator`; `twophaseflow.py` remains only as an internal
      symbolic helper covered by focused tests.
-5. Remove or convert historical helpers that do not use:
+5. [x] Remove or convert historical helpers that do not use:
    `EquationSystem` -> `FormCollection` -> `GenerationPlan` -> backend.
+   - Removed `CoupledResidualSystem.generate_cpp_kernels(...)` and its
+     `CoupledResidualKernels` return type. The residual lowering structure
+     remains internal because `EquationSystem` uses it to build
+     `FormCollection` data.
 6. [x] Ensure all scripts under `python/codegen/framework` and
    `python/codegen/framework/docs` call `sfem.gen.run(...)` or
    `sfem.gen.generate(...)`.

@@ -20,12 +20,28 @@ namespace {
         real_t rel_l2{0};
     };
 
-    void print_rate(const char *name, const double elapsed, const ptrdiff_t nelements, const ptrdiff_t ndofs, const int repeat) {
-        const double seconds_per_call = elapsed / repeat;
-        const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
-        const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
+    void print_rate(const char     *name,
+                    const double    elapsed,
+                    const ptrdiff_t nelements,
+                    const ptrdiff_t ndofs,
+                    const int       repeat,
+                    const double    flops,
+                    const size_t    memory_traffic_bytes) {
+        const double seconds_per_call     = elapsed / repeat;
+        const double melements_per_s      = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
+        const double mdofs_per_s          = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
+        const double arithmetic_intensity = memory_traffic_bytes ? flops / static_cast<double>(memory_traffic_bytes) : 0;
+        const double gflops_per_s         = 1e-9 * flops / seconds_per_call;
+        const double gbytes_per_s         = 1e-9 * static_cast<double>(memory_traffic_bytes) / seconds_per_call;
 
-        printf("%-40s %12.6e %16.3f %13.3f\n", name, seconds_per_call, melements_per_s, mdofs_per_s);
+        printf("%-40s %12.6e %16.3f %13.3f %10.3f %13.3f %12.3f\n",
+               name,
+               seconds_per_call,
+               melements_per_s,
+               mdofs_per_s,
+               arithmetic_intensity,
+               gflops_per_s,
+               gbytes_per_s);
     }
 
     bool generated_linear_elasticity_supported(const smesh::ElemType element_type) {
@@ -190,7 +206,7 @@ int main(int argc, char *argv[]) {
 
     auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
-    auto generated_f = sfem::Function::create(fs);
+    auto                      generated_f = sfem::Function::create(fs);
     std::shared_ptr<sfem::Op> generated_op;
     if (generated_operator_name == "GeneratedLinearElasticity") {
         generated_op = std::make_shared<sfem::GeneratedLinearElasticity>(fs);
@@ -295,13 +311,45 @@ int main(int argc, char *argv[]) {
     printf("#elements %ld\n", static_cast<long>(nelements));
     printf("#nodes %ld\n", static_cast<long>(mesh->n_nodes()));
     printf("#dofs %ld\n", static_cast<long>(ndofs));
-    printf("\n%-40s %12s %16s %13s\n", "Operation", "Time [s]", "Rate [MElem/s]", "Rate [MDOF/s]");
-    printf("--------------------------------------------------------------------------------------\n");
-    print_rate("generated_gradient", generated_gradient_elapsed, nelements, ndofs, repeat);
-    print_rate("generated_hessian_apply", generated_apply_elapsed, nelements, ndofs, repeat);
+    printf("\n%-40s %12s %16s %13s %10s %13s %12s\n",
+           "Operation",
+           "Time [s]",
+           "[MElem/s]",
+           "[MDOF/s]",
+           "AI",
+           "[GFLOP/s]",
+           "[GB/s]");
+    printf("---------------------------------------------------------------------------------------------------------------------"
+           "-\n");
+    print_rate("generated_gradient",
+               generated_gradient_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               generated_f->flops_gradient(),
+               generated_f->memory_traffic_bytes_gradient());
+    print_rate("generated_hessian_apply",
+               generated_apply_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               generated_f->flops_apply(),
+               generated_f->memory_traffic_bytes_apply());
     if (baseline_f) {
-        print_rate("baseline_gradient", baseline_gradient_elapsed, nelements, ndofs, repeat);
-        print_rate("baseline_hessian_apply", baseline_apply_elapsed, nelements, ndofs, repeat);
+        print_rate("baseline_gradient",
+                   baseline_gradient_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   baseline_f->flops_gradient(),
+                   baseline_f->memory_traffic_bytes_gradient());
+        print_rate("baseline_hessian_apply",
+                   baseline_apply_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   baseline_f->flops_apply(),
+                   baseline_f->memory_traffic_bytes_apply());
     } else if (run_baseline_requested) {
         printf("baseline_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
@@ -318,9 +366,8 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    if (baseline_f &&
-        (gradient_error.max_abs > compare_atol || gradient_error.rel_l2 > compare_rtol || apply_error.max_abs > compare_atol ||
-         apply_error.rel_l2 > compare_rtol)) {
+    if (baseline_f && (gradient_error.max_abs > compare_atol || gradient_error.rel_l2 > compare_rtol ||
+                       apply_error.max_abs > compare_atol || apply_error.rel_l2 > compare_rtol)) {
         return SFEM_FAILURE;
     }
 

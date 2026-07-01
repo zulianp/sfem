@@ -264,6 +264,210 @@ namespace sfem {
     ptrdiff_t GeneratedPoroHyperelasticity::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t GeneratedPoroHyperelasticity::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+    double GeneratedPoroHyperelasticity::flops_value() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedPoroHyperelasticity::memory_traffic_bytes_value() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tet10_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedPoroHyperelasticity::flops_gradient() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_gradient_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_hex27_hex8_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedPoroHyperelasticity::memory_traffic_bytes_gradient() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tet10_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_hex27_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedPoroHyperelasticity::flops_apply() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_apply_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(), nelements);
+                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedPoroHyperelasticity::memory_traffic_bytes_apply() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_tet10_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(poro_hyperelasticity_poro_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
     int GeneratedPoroHyperelasticity::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);

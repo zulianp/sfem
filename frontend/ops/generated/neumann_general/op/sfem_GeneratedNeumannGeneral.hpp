@@ -19,6 +19,12 @@ namespace sfem {
         bool is_linear() const override { return true; }
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
+        double flops_value() const override;
+        double flops_gradient() const override;
+        double flops_apply() const override;
+        size_t memory_traffic_bytes_value() const override;
+        size_t memory_traffic_bytes_gradient() const override;
+        size_t memory_traffic_bytes_apply() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
         void add_condition(const NeumannConditions::Condition &condition);

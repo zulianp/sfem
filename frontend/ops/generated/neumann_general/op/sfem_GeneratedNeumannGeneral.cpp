@@ -330,6 +330,114 @@ namespace sfem {
     ptrdiff_t GeneratedNeumannGeneral::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t GeneratedNeumannGeneral::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+    double GeneratedNeumannGeneral::flops_value() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeumannGeneral::memory_traffic_bytes_value() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedNeumannGeneral::flops_gradient() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeumannGeneral::memory_traffic_bytes_gradient() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedNeumannGeneral::flops_apply() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeumannGeneral::memory_traffic_bytes_apply() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
     int GeneratedNeumannGeneral::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);

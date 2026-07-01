@@ -226,6 +226,468 @@ namespace sfem {
     ptrdiff_t GeneratedNeoHookeanOgden::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t GeneratedNeoHookeanOgden::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+    double GeneratedNeoHookeanOgden::flops_value() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri3_tri3_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri6_tri6_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet4_tet4_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet10_tet10_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex8_hex8_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex27_hex27_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeoHookeanOgden::memory_traffic_bytes_value() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri3_tri3_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri6_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet4_tet4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet10_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex8_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex27_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedNeoHookeanOgden::flops_gradient() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri6_tri6_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet4_tet4_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet10_tet10_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex8_hex8_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex27_hex27_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeoHookeanOgden::memory_traffic_bytes_gradient() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri3_tri3_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri6_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet4_tet4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet10_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex8_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex27_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedNeoHookeanOgden::flops_apply() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri3_tri3_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tri6_tri6_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet4_tet4_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_tet10_tet10_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex8_hex8_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_hex27_hex27_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedNeoHookeanOgden::memory_traffic_bytes_apply() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri3_tri3_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TRI6: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tri6_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet4_tet4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET10: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_tet10_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex8_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_hex27_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX27: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX64: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX125: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX729: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(neohookean_ogden_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
     int GeneratedNeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);

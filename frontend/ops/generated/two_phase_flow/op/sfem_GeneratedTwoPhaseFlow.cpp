@@ -349,6 +349,190 @@ namespace sfem {
     ptrdiff_t GeneratedTwoPhaseFlow::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t GeneratedTwoPhaseFlow::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+    double GeneratedTwoPhaseFlow::flops_value() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedTwoPhaseFlow::memory_traffic_bytes_value() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedTwoPhaseFlow::flops_gradient() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedTwoPhaseFlow::memory_traffic_bytes_gradient() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    double GeneratedTwoPhaseFlow::flops_apply() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_flops(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
+    size_t GeneratedTwoPhaseFlow::memory_traffic_bytes_apply() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::TET4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += sfem::codegen::KernelDiagnostics_total_bytes(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }
+
     int GeneratedTwoPhaseFlow::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);

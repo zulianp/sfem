@@ -5,10 +5,8 @@ import sympy as sp
 
 from .symbolic import (
     ExpressionRole,
-    GeneratedKernelCode,
     KernelExpressions,
     directional_derivative,
-    generate_cpp_kernel,
 )
 
 
@@ -64,12 +62,6 @@ class ResidualJacobianBlock:
     @property
     def name(self):
         return "jacobian_%s_%s" % (self.row_field, self.column_field)
-
-
-@dataclass(frozen=True)
-class CoupledResidualKernels:
-    residual: GeneratedKernelCode
-    jacobian_action: GeneratedKernelCode
 
 
 @dataclass(frozen=True)
@@ -275,21 +267,6 @@ class CoupledResidualSystem:
         return self.jacobian_action_expressions(include_blocks).build_graph(
             data_symbols=self.jacobian_action_data_symbols(),
             temporary_prefix=temporary_prefix,
-        )
-
-    def generate_cpp_kernels(self, prefix, scalar_type="double"):
-        prefix = str(prefix)
-        return CoupledResidualKernels(
-            residual=generate_cpp_kernel(
-                self.build_residual_graph(),
-                function_name="%s_residual" % prefix,
-                scalar_type=scalar_type,
-            ),
-            jacobian_action=generate_cpp_kernel(
-                self.build_jacobian_action_graph(),
-                function_name="%s_jacobian_action" % prefix,
-                scalar_type=scalar_type,
-            ),
         )
 
     def residual_data_symbols(self):

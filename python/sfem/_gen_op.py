@@ -185,6 +185,12 @@ namespace sfem {
         bool is_linear() const override { return false; }
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
+        double flops_value() const override;
+        double flops_gradient() const override;
+        double flops_apply() const override;
+        size_t memory_traffic_bytes_value() const override;
+        size_t memory_traffic_bytes_gradient() const override;
+        size_t memory_traffic_bytes_apply() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;%(extra)s
         int gradient(const real_t *const x, real_t *const out) override;
@@ -223,6 +229,7 @@ def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=Non
     apply_cases = []
     objective_cases = []
     objective_steps_cases = []
+    performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
@@ -240,6 +247,15 @@ def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=Non
             material.name,
             _element_name(element).lower(),
             _element_name(element).lower(),
+        )
+        performance_cases["value"].append(
+            _performance_case(element, ("%s_objective_soa_diagnostics" % stem,))
+        )
+        performance_cases["gradient"].append(
+            _performance_case(element, ("%s_gradient_soa_diagnostics" % stem,))
+        )
+        performance_cases["apply"].append(
+            _performance_case(element, ("%s_apply_soa_diagnostics" % stem,))
         )
         components = _components(dim)
         declarations.extend(
@@ -426,6 +442,8 @@ namespace sfem {
 
     ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+%(performance_methods)s
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("%(op)s::initialize");
@@ -708,6 +726,7 @@ namespace sfem {
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
         "objective_steps_cases": "\n".join(objective_steps_cases),
+        "performance_methods": _performance_methods(material.op_name, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -736,6 +755,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None):
     declarations = []
     residual_cases = []
     action_cases = []
+    performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     parameter_names_by_dim = {}
     fields_by_dim = {}
@@ -756,6 +776,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None):
             block_size_by_dim[dim] = sum(int(field.components) for field in collection.fields)
         residual_dependencies, action_dependencies = dependencies
         stem = "%s_%s" % (material.name, _element_name(element).lower())
+        performance_cases["gradient"].append(
+            _performance_case(element, ("%s_residual_element_soa_diagnostics" % stem,))
+        )
+        performance_cases["apply"].append(
+            _performance_case(element, ("%s_jacobian_action_element_soa_diagnostics" % stem,))
+        )
         residual_pointer_params = []
         if residual_dependencies.current:
             residual_pointer_params.append("const real_t *")
@@ -1028,6 +1054,8 @@ namespace sfem {
     ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+%(performance_methods)s
+
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("%(op)s::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
@@ -1251,6 +1279,7 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
+        "performance_methods": _performance_methods(material.op_name, performance_cases),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
         "affine_options": _affine_option_entries(
@@ -1519,6 +1548,8 @@ namespace sfem {
     ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+%(performance_methods)s
+
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("%(op)s::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
@@ -1668,6 +1699,7 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
+        "performance_methods": _performance_methods(material.op_name, {}),
         "gradient_cases": "\n".join(gradient_cases),
     }
     return _boundary_header(material), source
@@ -1695,6 +1727,12 @@ namespace sfem {
         bool is_linear() const override { return true; }
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
+        double flops_value() const override;
+        double flops_gradient() const override;
+        double flops_apply() const override;
+        size_t memory_traffic_bytes_value() const override;
+        size_t memory_traffic_bytes_gradient() const override;
+        size_t memory_traffic_bytes_apply() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
         void add_condition(const NeumannConditions::Condition &condition);
@@ -1883,6 +1921,8 @@ namespace sfem {
 
     ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+%(performance_methods)s
 
     int %(op)s::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("%(op)s::initialize");
@@ -2143,6 +2183,7 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
+        "performance_methods": _performance_methods(material.op_name, cases["performance"]),
         "gradient_previous_check": (
             "        if (!impl_->previous) {\n"
             '            SFEM_ERROR("%s requires a previous state\\n");\n'
@@ -2237,7 +2278,12 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
 def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_name, parameter_index):
     from codegen.framework.forms import FormOrder
 
-    cases = {"gradient": [], "apply": [], "objective": []}
+    cases = {
+        "gradient": [],
+        "apply": [],
+        "objective": [],
+        "performance": {"value": [], "gradient": [], "apply": []},
+    }
     for element in elements:
         dim = _element_dim(element)
         system = systems_by_dim[dim]
@@ -2253,6 +2299,27 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         mixed_label = _element_name(element).lower()
         energy_stem = "%s_%s_%s_%s" % (material.name, energy_name, energy_label, energy_label)
         residual_stem = "%s_%s_%s" % (material.name, residual_name, mixed_label)
+        cases["performance"]["value"].append(
+            _performance_case(element, ("%s_objective_soa_diagnostics" % energy_stem,))
+        )
+        cases["performance"]["gradient"].append(
+            _performance_case(
+                element,
+                (
+                    "%s_gradient_soa_diagnostics" % energy_stem,
+                    "%s_residual_element_soa_diagnostics" % residual_stem,
+                ),
+            )
+        )
+        cases["performance"]["apply"].append(
+            _performance_case(
+                element,
+                (
+                    "%s_apply_soa_diagnostics" % energy_stem,
+                    "%s_jacobian_action_element_soa_diagnostics" % residual_stem,
+                ),
+            )
+        )
         energy_objective_dependencies = energy_collection.form_metadata(FormOrder.ZERO).dependencies
         energy_gradient_dependencies = energy_collection.form_metadata(FormOrder.ONE).dependencies
         energy_apply_dependencies = energy_collection.form_metadata(FormOrder.TWO).dependencies
@@ -2920,6 +2987,102 @@ def _runtime_variant_and_scalar_type(name):
         if name.endswith("%s_float" % suffix):
             return variant, "float"
     return None, None
+
+
+def _performance_case(element, diagnostics, count_expression="domain.block->n_elements()"):
+    diagnostics = tuple(dict.fromkeys(diagnostics))
+    return {
+        "element": element,
+        "diagnostics": diagnostics,
+        "count": count_expression,
+    }
+
+
+def _performance_methods(op_name, cases_by_method):
+    methods = []
+    for method in ("value", "gradient", "apply"):
+        cases = tuple(cases_by_method.get(method, ()))
+        methods.append(_performance_flops_method(op_name, method, cases))
+        methods.append(_performance_bytes_method(op_name, method, cases))
+    return "\n\n".join(methods)
+
+
+def _performance_flops_method(op_name, method, cases):
+    return """    double %(op)s::flops_%(method)s() const {
+        double total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(cases)s
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }""" % {
+        "op": op_name,
+        "method": method,
+        "cases": _performance_flops_cases(cases),
+    }
+
+
+def _performance_bytes_method(op_name, method, cases):
+    return """    size_t %(op)s::memory_traffic_bytes_%(method)s() const {
+        size_t total = 0;
+        if (!impl_->domains) {
+            return total;
+        }
+
+        impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(cases)s
+                default:
+                    break;
+            }
+            return SFEM_SUCCESS;
+        });
+
+        return total;
+    }""" % {
+        "op": op_name,
+        "method": method,
+        "cases": _performance_bytes_cases(cases),
+    }
+
+
+def _performance_flops_cases(cases):
+    lines = []
+    for case in cases:
+        lines.append("                case smesh::%s: {" % _mesh_element_name(case["element"]))
+        lines.append("                    const ptrdiff_t nelements = %s;" % case["count"])
+        for diagnostic in case["diagnostics"]:
+            lines.append(
+                "                    total += sfem::codegen::KernelDiagnostics_total_flops(%s(), nelements);"
+                % diagnostic
+            )
+        lines.append("                    break;")
+        lines.append("                }")
+    return "\n".join(lines)
+
+
+def _performance_bytes_cases(cases):
+    lines = []
+    for case in cases:
+        lines.append("                case smesh::%s: {" % _mesh_element_name(case["element"]))
+        lines.append("                    const ptrdiff_t nelements = %s;" % case["count"])
+        for diagnostic in case["diagnostics"]:
+            lines.append(
+                "                    total += sfem::codegen::KernelDiagnostics_total_bytes(%s(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
+                % diagnostic
+            )
+        lines.append("                    break;")
+        lines.append("                }")
+    return "\n".join(lines)
 
 
 def _affine_option_entries(*flags, owner="impl_"):

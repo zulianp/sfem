@@ -265,6 +265,78 @@ namespace sfem {
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
 
+    double Function::flops() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_value() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_value();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_gradient() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_gradient();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_apply() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_apply();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_value() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_value();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_gradient() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_gradient();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_apply() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_apply();
+        }
+
+        return ret;
+    }
+
     int Function::hessian_crs(const real_t *const  x,
                               const count_t *const rowptr,
                               const idx_t *const   colidx,

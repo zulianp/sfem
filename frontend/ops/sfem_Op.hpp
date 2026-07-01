@@ -15,6 +15,8 @@
 #include "sfem_defs.hpp"
 #include "smesh_glob.hpp"
 
+#include <cstddef>
+
 #ifdef SFEM_ENABLE_RYAML
 #include <ryml.hpp>
 #endif  // SFEM_ENABLE_RYAML
@@ -280,6 +282,16 @@ namespace sfem {
         virtual bool is_no_op() const { return false; }
 
         virtual void override_element_types(const std::vector<smesh::ElemType> &element_types) {}
+
+        virtual double flops() const { return flops_apply(); }
+        virtual double flops_value() const { return 0; }
+        virtual double flops_gradient() const { return 0; }
+        virtual double flops_apply() const { return 0; }
+
+        virtual size_t memory_traffic_bytes() const { return memory_traffic_bytes_apply(); }
+        virtual size_t memory_traffic_bytes_value() const { return 0; }
+        virtual size_t memory_traffic_bytes_gradient() const { return 0; }
+        virtual size_t memory_traffic_bytes_apply() const { return 0; }
 
         virtual ptrdiff_t n_dofs_domain() const = 0;
         virtual ptrdiff_t n_dofs_image() const  = 0;

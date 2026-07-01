@@ -65,12 +65,29 @@ namespace {
         return {left, right};
     }
 
-    void print_rate(const char *name, const double elapsed, const ptrdiff_t nelements, const ptrdiff_t ndofs, const int repeat) {
+    void print_rate(const char     *name,
+                    const double    elapsed,
+                    const ptrdiff_t nelements,
+                    const ptrdiff_t ndofs,
+                    const int       repeat,
+                    const double    flops,
+                    const size_t    memory_traffic_bytes) {
         const double seconds_per_call = elapsed / repeat;
         const double melements_per_s  = 1e-6 * static_cast<double>(nelements) / seconds_per_call;
         const double mdofs_per_s      = 1e-6 * static_cast<double>(ndofs) / seconds_per_call;
+        const double arithmetic_intensity =
+                memory_traffic_bytes ? flops / static_cast<double>(memory_traffic_bytes) : 0;
+        const double gflops_per_s = 1e-9 * flops / seconds_per_call;
+        const double gbytes_per_s = 1e-9 * static_cast<double>(memory_traffic_bytes) / seconds_per_call;
 
-        printf("%-72s %12.6e %16.3f %13.3f %10s %13s\n", name, seconds_per_call, melements_per_s, mdofs_per_s, "-", "-");
+        printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f %12.3f\n",
+               name,
+               seconds_per_call,
+               melements_per_s,
+               mdofs_per_s,
+               arithmetic_intensity,
+               gflops_per_s,
+               gbytes_per_s);
     }
 
     bool generated_neohookean_supported(const smesh::ElemType element_type) {
@@ -308,20 +325,45 @@ int main(int argc, char *argv[]) {
     printf("#dofs %ld\n", static_cast<long>(ndofs));
     printf("#left_nodes %ld\n", static_cast<long>(boundary.left->size()));
     printf("#right_nodes %ld\n", static_cast<long>(boundary.right->size()));
-    printf("\n%-72s %12s %16s %13s %10s %13s\n",
+    printf("\n%-72s %12s %16s %13s %10s %13s %12s\n",
            "Operation",
            "Time [s]",
            "Rate [MElem/s]",
            "Rate [MDOF/s]",
            "AI",
-           "Rate [GFLOP/s]");
+           "Rate [GFLOP/s]",
+           "Rate [GB/s]");
     printf("---------------------------------------------------------------------------------------------------------------------"
            "-------------------------\n");
-    print_rate("generated_gradient", generated_gradient_elapsed, nelements, ndofs, repeat);
-    print_rate("generated_hessian_apply", generated_apply_elapsed, nelements, ndofs, repeat);
+    print_rate("generated_gradient",
+               generated_gradient_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               generated_f->flops_gradient(),
+               generated_f->memory_traffic_bytes_gradient());
+    print_rate("generated_hessian_apply",
+               generated_apply_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               generated_f->flops_apply(),
+               generated_f->memory_traffic_bytes_apply());
     if (baseline_f) {
-        print_rate("baseline_gradient", baseline_gradient_elapsed, nelements, ndofs, repeat);
-        print_rate("baseline_hessian_apply", baseline_apply_elapsed, nelements, ndofs, repeat);
+        print_rate("baseline_gradient",
+                   baseline_gradient_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   baseline_f->flops_gradient(),
+                   baseline_f->memory_traffic_bytes_gradient());
+        print_rate("baseline_hessian_apply",
+                   baseline_apply_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   baseline_f->flops_apply(),
+                   baseline_f->memory_traffic_bytes_apply());
     } else if (run_baseline_requested) {
         printf("baseline_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
