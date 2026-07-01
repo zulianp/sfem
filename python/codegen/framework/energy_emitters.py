@@ -170,6 +170,7 @@ class OpenMPEnergySoASourceBuilder:
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
         return (
+            "#include <type_traits>",
             '#include "%s"' % local_name,
             '#include "%s"' % geometry_name,
             '#include "%s"' % diagnostics_name,
@@ -230,7 +231,7 @@ class OpenMPEnergySoASourceBuilder:
         return (
             "template <typename scalar_t, typename geometry_t>"
             if geometry_mode == "isoparametric"
-            else "template <typename scalar_t>"
+            else "template <typename scalar_t, typename jacobian_t>"
         )
 
     def mesh_function_line(self, implementation_name):
@@ -281,6 +282,7 @@ class CUDAEnergySoASourceBuilder:
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
         return (
+            "#include <type_traits>",
             *self.target.includes(),
             '#include "%s"' % local_name,
             '#include "%s"' % geometry_name,
@@ -340,7 +342,7 @@ class CUDAEnergySoASourceBuilder:
         return (
             "template <typename scalar_t, typename geometry_t>"
             if geometry_mode == "isoparametric"
-            else "template <typename scalar_t>"
+            else "template <typename scalar_t, typename jacobian_t>"
         )
 
     def mesh_function_line(self, implementation_name):

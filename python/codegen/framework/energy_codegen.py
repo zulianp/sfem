@@ -89,6 +89,73 @@ def _work_item_loop_lines(source_builder, indent):
     )
 
 
+def _sfem_soa_affine_geometry_stream_lines(source_builder, element_inputs, indent):
+    lines = []
+    for array_input in element_inputs:
+        for stream in _soa_array_stream_names(array_input):
+            lines.extend(
+                [
+                    "%sscalar_t block_%s_data[VECTOR_SIZE];" % (indent, stream),
+                    "%sconst scalar_t *const block_%s = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>("
+                    % (indent, stream),
+                    "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<jacobian_t, scalar_t>());"
+                    % (indent, stream, stream),
+                ]
+            )
+    return lines
+
+
+def _affine_geometry_stream_helper_lines(source_builder):
+    inline_qualifier = source_builder.inline_qualifier()
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>",
+        "%s const scalar_t *affine_geometry_stream(" % inline_qualifier,
+        "        const int,",
+        "        const jacobian_t *const SFEM_RESTRICT source,",
+        "        scalar_t *const SFEM_RESTRICT,",
+        "        std::true_type) {",
+        "    return source;",
+        "}",
+        "",
+        "template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>",
+        "%s const scalar_t *affine_geometry_stream(" % inline_qualifier,
+        "        const int nelems,",
+        "        const jacobian_t *const SFEM_RESTRICT source,",
+        "        scalar_t *const SFEM_RESTRICT converted,",
+        "        std::false_type) {",
+    ]
+    if _emits_vector_lane_loop(source_builder):
+        lines.extend("    %s" % line for line in source_builder.simd_lines())
+        lines.extend(
+            [
+                "    for (int lane = 0; lane < nelems; ++lane) {",
+                "        converted[lane] = scalar_t(source[lane]);",
+                "    }",
+            ]
+        )
+    else:
+        index = _work_item_index(source_builder)
+        lines.extend(
+            [
+                "    (void)nelems;",
+                "    converted[%s] = scalar_t(source[%s]);" % (index, index),
+            ]
+        )
+    lines.extend(
+        [
+            "    return converted;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+        ]
+    )
+    return lines
+
+
 def _emits_vector_lane_loop(source_builder):
     target = getattr(source_builder, "target", None)
     if target is not None and hasattr(target, "loop_lowering_policy"):
@@ -1553,6 +1620,12 @@ def _sfem_soa_operator_source(
     ]
     lines = [line for line in lines if line != ""]
     lines.append("")
+    lines.extend(
+        _affine_geometry_stream_helper_lines(
+            source_builder,
+        )
+    )
+    lines.append("")
     if quadrature_rule is not None:
         lines.extend(["namespace sfem {", "namespace codegen {", ""])
         if affine_quadrature_rule is not None:
@@ -1742,7 +1815,7 @@ def _sfem_soa_mesh_operator_function(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const scalar_t *const SFEM_RESTRICT g_%s" % stream
+            "const jacobian_t *const SFEM_RESTRICT g_%s" % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -1778,7 +1851,8 @@ def _sfem_soa_mesh_operator_function(
         + tuple(output_params)
     )
     wrapper_params = tuple(
-        param.replace("geometry_t", "geom_t") for param in impl_params
+        param.replace("geometry_t", "geom_t").replace("jacobian_t", "geom_t")
+        for param in impl_params
     )
 
     lines = [
@@ -2165,6 +2239,14 @@ def _sfem_soa_mesh_operator_function(
                 source_builder=source_builder,
             )
         )
+    elif geometry_mode == "affine":
+        lines.extend(
+            _sfem_soa_affine_geometry_stream_lines(
+                source_builder,
+                element_inputs,
+                "        ",
+            )
+        )
 
     call_args = ["nelems"]
     if form.weak_form is not None:
@@ -2173,7 +2255,7 @@ def _sfem_soa_mesh_operator_function(
         call_args.append("q")
     if geometry_mode == "affine":
         call_args.extend(
-            "g_%s + evbegin" % stream
+            "block_%s" % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -2300,7 +2382,7 @@ def _sfem_soa_mesh_operator_function(
             *source_builder.wrapper_call_lines(
                 implementation_name,
                 scalar_type,
-                ", geom_t" if geometry_mode == "isoparametric" else "",
+                ", geom_t",
                 wrapper_args,
             ),
             "}",
@@ -2374,7 +2456,7 @@ def _sfem_soa_mesh_objective_steps_function(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const scalar_t *const SFEM_RESTRICT g_%s" % stream
+            "const jacobian_t *const SFEM_RESTRICT g_%s" % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -2406,7 +2488,8 @@ def _sfem_soa_mesh_objective_steps_function(
         + tuple(output_params)
     )
     wrapper_params = tuple(
-        param.replace("geometry_t", "geom_t") for param in impl_params
+        param.replace("geometry_t", "geom_t").replace("jacobian_t", "geom_t")
+        for param in impl_params
     )
 
     reference_prefix = "%s_" % geometry_mode
@@ -2685,12 +2768,20 @@ def _sfem_soa_mesh_objective_steps_function(
             )
         )
         lines.append("        }")
+    elif geometry_mode == "affine":
+        lines.extend(
+            _sfem_soa_affine_geometry_stream_lines(
+                source_builder,
+                element_inputs,
+                "        ",
+            )
+        )
 
     call_args = ["nelems"]
     call_args.append("0" if geometry_mode == "affine" else "VECTOR_SIZE")
     if geometry_mode == "affine":
         call_args.extend(
-            "g_%s + evbegin" % stream
+            "block_%s" % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -2798,7 +2889,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 *source_builder.wrapper_call_lines(
                     implementation_name,
                     scalar_type,
-                    ", geom_t" if geometry_mode == "isoparametric" else "",
+                    ", geom_t",
                     wrapper_args,
                 ),
                 "}",

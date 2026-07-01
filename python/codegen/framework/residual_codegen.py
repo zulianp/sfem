@@ -82,6 +82,61 @@ def _work_item_loop_lines(indent):
     return _target().work_item_loop_lines(indent)
 
 
+def _affine_geometry_stream_conversion_lines(adjugate_streams, determinant_stream, indent):
+    streams = tuple(adjugate_streams) + (determinant_stream,)
+    lines = []
+    for stream in streams:
+        lines.extend(
+            [
+                "%sscalar_t block_%s_data[VECTOR_SIZE];" % (indent, stream),
+                "%sconst scalar_t *const block_%s = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>("
+                % (indent, stream),
+                "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<jacobian_t, scalar_t>());"
+                % (indent, stream, stream),
+            ]
+        )
+    return lines
+
+
+def _affine_geometry_stream_helper_lines():
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>",
+        "%s const scalar_t *affine_geometry_stream(" % _inline_qualifier(),
+        "        const int,",
+        "        const jacobian_t *const SFEM_RESTRICT source,",
+        "        scalar_t *const SFEM_RESTRICT,",
+        "        std::true_type) {",
+        "    return source;",
+        "}",
+        "",
+        "template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>",
+        "%s const scalar_t *affine_geometry_stream(" % _inline_qualifier(),
+        "        const int nelems,",
+        "        const jacobian_t *const SFEM_RESTRICT source,",
+        "        scalar_t *const SFEM_RESTRICT converted,",
+        "        std::false_type) {",
+    ]
+    pragma = _vectorize_pragma()
+    if pragma:
+        lines.append("    %s" % pragma)
+    lines.extend(
+        [
+            "    for (int lane = 0; lane < nelems; ++lane) {",
+            "        converted[lane] = scalar_t(source[lane]);",
+            "    }",
+            "    return converted;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+        ]
+    )
+    return lines
+
+
 def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
     lines = [
         "%s{" % indent,
@@ -1925,6 +1980,7 @@ def _operator_source(
     element = rule.element_type.lower()
     tensor_product = _is_tensor_product_family(rule, basis_family)
     lines = [
+        "#include <type_traits>",
         '#include "%s"' % local_name,
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
@@ -1939,10 +1995,16 @@ def _operator_source(
         "#include <omp.h>",
         "#endif",
         "",
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
     ]
+    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(
+        [
+            "",
+            "namespace sfem {",
+            "namespace codegen {",
+            "",
+        ]
+    )
     lines.extend(
         quadrature_reference_struct_lines(
             prefix,
@@ -2118,6 +2180,7 @@ def _mixed_operator_source(
     rule = cell_specialization.quadrature_rule
     element = compatible_element.name.lower()
     lines = [
+        "#include <type_traits>",
         '#include "%s"' % local_name,
         '#include "kernel_math.hpp"',
         '#include "geometry_kernels.hpp"',
@@ -2143,10 +2206,16 @@ def _mixed_operator_source(
         "#include <omp.h>",
         "#endif",
         "",
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
     ]
+    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(
+        [
+            "",
+            "namespace sfem {",
+            "namespace codegen {",
+            "",
+        ]
+    )
     lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types, basis_family))
     lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types, basis_family))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
@@ -2343,10 +2412,10 @@ def _mixed_affine_function(
     ]
     if dependencies.uses_adjugate:
         params.extend(
-            "const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
             for i in range(dim * dim)
         )
-    params.append("const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0")
+    params.append("const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0")
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(_mixed_mesh_dependency_params(layout, dependencies))
     params.append("const ptrdiff_t out_stride")
@@ -2366,7 +2435,7 @@ def _mixed_affine_function(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "template <typename scalar_t>",
+        "template <typename scalar_t, typename jacobian_t>",
         "%s int %s(" % (_function_qualifier(), impl),
     ]
     for index, param in enumerate(params):
@@ -2456,16 +2525,25 @@ def _mixed_affine_function(
     if dependency_groups:
         lines.append("        }")
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
+    lines.extend(
+        _affine_geometry_stream_conversion_lines(
+            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            if dependencies.uses_adjugate
+            else (),
+            "jacobian_determinant0",
+            "        ",
+        )
+    )
     if dependencies.uses_adjugate:
         lines.append(
             "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
-            % ", ".join("g_jacobian_adjugate%d + evbegin" % i for i in range(dim * dim))
+            % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim))
         )
     lines.extend(_mixed_block_stream_pointer_lines(layout, dependencies, "        "))
     call_args = [
         "nelems",
         "0",
-        "g_jacobian_determinant0 + evbegin",
+        "block_jacobian_determinant0",
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
@@ -2509,7 +2587,10 @@ def _mixed_affine_function(
 
     function = "%s_%s_%s_affine_mesh_soa" % (prefix, element, form)
     for scalar_type, suffix in (("double", ""), ("float", "_float")):
-        typed_params = [param.replace("scalar_t", scalar_type) for param in params]
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(typed_params):
             lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
@@ -2524,7 +2605,7 @@ def _mixed_affine_function(
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s<%s>(%s);"
+                "    return sfem::codegen::%s<%s, geom_t>(%s);"
                 % (impl, scalar_type, ", ".join(call_args)),
                 "}",
                 "",
@@ -3118,7 +3199,7 @@ def _mesh_operator_source(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "template <typename scalar_t>",
+        "template <typename scalar_t, typename jacobian_t>",
         "%s int %s(" % (_function_qualifier(), impl),
     ]
     params = [
@@ -3128,11 +3209,11 @@ def _mesh_operator_source(
     ]
     if dependencies.uses_adjugate:
         params.extend(
-            "const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
             for i in range(dim * dim)
         )
     params.append(
-        "const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0"
+        "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
     )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
@@ -3255,13 +3336,22 @@ def _mesh_operator_source(
         "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
         % ", ".join("block_output[%d]" % i for i in field_stream_order)
     )
+    lines.extend(
+        _affine_geometry_stream_conversion_lines(
+            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            if dependencies.uses_adjugate
+            else (),
+            "jacobian_determinant0",
+            "        ",
+        )
+    )
     if dependencies.uses_adjugate:
         lines.append(
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
                 dim * dim,
                 ", ".join(
-                    "g_jacobian_adjugate%d + evbegin" % i
+                    "block_jacobian_adjugate%d" % i
                     for i in range(dim * dim)
                 ),
             )
@@ -3269,7 +3359,7 @@ def _mesh_operator_source(
     call_args = [
         "nelems",
         "0",
-        "g_jacobian_determinant0 + evbegin",
+        "block_jacobian_determinant0",
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
@@ -3331,7 +3421,8 @@ def _mesh_operator_source(
     function = "%s_%s_affine_mesh_soa" % (prefix, form)
     for scalar_type, suffix in (("double", ""), ("float", "_float")):
         typed_params = [
-            param.replace("scalar_t", scalar_type) for param in params
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
         ]
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(typed_params):
@@ -3362,7 +3453,7 @@ def _mesh_operator_source(
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s<%s>(%s);"
+                "    return sfem::codegen::%s<%s, geom_t>(%s);"
                 % (impl, scalar_type, ", ".join(call_args)),
                 "}",
                 "",
