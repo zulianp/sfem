@@ -1681,4 +1681,3 @@ extern "C" int neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_float(
 ) {
     return sfem::codegen::neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
-

@@ -1825,4 +1825,3 @@ extern "C" int neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_float(
 ) {
     return sfem::codegen::neohookean_ogden_hex8_hex8_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
-

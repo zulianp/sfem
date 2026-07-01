@@ -26,7 +26,7 @@ struct neohookean_ogden_proteus_hex729_affine_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[9] = {scalar_t(0.040637194180786838), scalar_t(0.090324080347428712), scalar_t(0.13030534820146777), scalar_t(0.1561735385200016), scalar_t(0.16511967750063006), scalar_t(0.1561735385200016), scalar_t(0.13030534820146777), scalar_t(0.090324080347428712), scalar_t(0.040637194180786838)};
+        static const scalar_t data[9] = {scalar_t(0.040637194180787095), scalar_t(0.09032408034742867), scalar_t(0.13030534820146775), scalar_t(0.15617353852000149), scalar_t(0.16511967750062995), scalar_t(0.15617353852000149), scalar_t(0.13030534820146775), scalar_t(0.09032408034742867), scalar_t(0.040637194180787095)};
         return data;
     }
 };
@@ -42,7 +42,7 @@ struct neohookean_ogden_proteus_hex729_isoparametric_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[10] = {scalar_t(0.033335672154343646), scalar_t(0.074725674575290252), scalar_t(0.10954318125799113), scalar_t(0.13463335965499842), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499842), scalar_t(0.10954318125799113), scalar_t(0.074725674575290252), scalar_t(0.033335672154343646)};
+        static const scalar_t data[10] = {scalar_t(0.03333567215434368), scalar_t(0.074725674575290224), scalar_t(0.10954318125799124), scalar_t(0.13463335965499829), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499829), scalar_t(0.10954318125799124), scalar_t(0.074725674575290224), scalar_t(0.03333567215434368)};
         return data;
     }
 };
@@ -1817,4 +1817,3 @@ extern "C" int neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametri
 ) {
     return sfem::codegen::neohookean_ogden_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
-

@@ -27,6 +27,31 @@ namespace sfem {
             }
         }
 
+        struct AffineOption {
+            const char *name;
+            bool       *flag;
+        };
+
+        inline bool set_affine_option(const std::string &name,
+                                      const bool val,
+                                      const AffineOption *const options,
+                                      const int n_options) {
+            if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = val;
+                }
+                return true;
+            }
+            bool matched = false;
+            for (int i = 0; i < n_options; ++i) {
+                if (name == options[i].name) {
+                    *options[i].flag = val;
+                    matched = true;
+                }
+            }
+            return matched;
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = 2;
         constexpr int N_MATERIAL_PARAMETERS = 2;
@@ -121,44 +146,22 @@ namespace sfem {
             return true;
         }
 
-        void read_affine_options(const ryml::ConstNodeRef &node,
-                                 bool &objective,
-                                 bool &gradient,
-                                 bool &hessian_action) {
-            bool all = objective && gradient && hessian_action;
+        inline void read_affine_options(const ryml::ConstNodeRef &node,
+                                        const AffineOption *const options,
+                                        const int n_options) {
+            bool all = true;
+            for (int i = 0; i < n_options; ++i) {
+                all = all && *options[i].flag;
+            }
             if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
                 yaml_read_bool(node, "assume_affine", all)) {
-                objective = all;
-                gradient = all;
-                hessian_action = all;
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = all;
+                }
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
-            yaml_read_bool(node, "objective_assume_affine", objective);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
-            yaml_read_bool(node, "gradient_assume_affine", gradient);
-            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
-            yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
-            yaml_read_bool(node, "apply_assume_affine", hessian_action);
-        }
-
-        void read_residual_affine_options(const ryml::ConstNodeRef &node,
-                                          bool &residual,
-                                          bool &jacobian_action) {
-            bool all = residual && jacobian_action;
-            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-                yaml_read_bool(node, "assume_affine", all)) {
-                residual = all;
-                jacobian_action = all;
+            for (int i = 0; i < n_options; ++i) {
+                yaml_read_bool(node, options[i].name, *options[i].flag);
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_RESIDUAL", residual);
-            yaml_read_bool(node, "residual_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", residual);
-            yaml_read_bool(node, "gradient_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_JACOBIAN_ACTION", jacobian_action);
-            yaml_read_bool(node, "jacobian_action_assume_affine", jacobian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", jacobian_action);
-            yaml_read_bool(node, "apply_assume_affine", jacobian_action);
         }
 #endif  // SFEM_ENABLE_RYAML
 
@@ -516,18 +519,17 @@ namespace sfem {
 
     void GeneratedNeoHookeanOgden::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::set_option");
-        if (name == "assume_affine") {
-            impl_->objective_uses_affine = val;
-            impl_->gradient_uses_affine = val;
-            impl_->apply_uses_affine = val;
-        } else if (name == "objective_assume_affine") {
-            impl_->objective_uses_affine = val;
-        } else if (name == "gradient_assume_affine") {
-            impl_->gradient_uses_affine = val;
-        } else if (name == "hessian_action_assume_affine" ||
-                   name == "apply_assume_affine") {
-            impl_->apply_uses_affine = val;
-        }
+        AffineOption options[] = {
+            {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
+            {"objective_assume_affine", &impl_->objective_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->gradient_uses_affine},
+            {"gradient_assume_affine", &impl_->gradient_uses_affine},
+            {"ASSUME_AFFINE_HESSIAN_ACTION", &impl_->apply_uses_affine},
+            {"hessian_action_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->apply_uses_affine},
+            {"apply_assume_affine", &impl_->apply_uses_affine},
+        };
+        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     }
 
     void GeneratedNeoHookeanOgden::set_value_in_block(const std::string &block_name,
@@ -564,10 +566,17 @@ namespace sfem {
             set_material(*ret->impl_->domains, top_values);
         }
 
-        read_affine_options(node,
-                            ret->impl_->objective_uses_affine,
-                            ret->impl_->gradient_uses_affine,
-                            ret->impl_->apply_uses_affine);
+        AffineOption options[] = {
+            {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
+            {"objective_assume_affine", &impl_->objective_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->gradient_uses_affine},
+            {"gradient_assume_affine", &impl_->gradient_uses_affine},
+            {"ASSUME_AFFINE_HESSIAN_ACTION", &impl_->apply_uses_affine},
+            {"hessian_action_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->apply_uses_affine},
+            {"apply_assume_affine", &impl_->apply_uses_affine},
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
