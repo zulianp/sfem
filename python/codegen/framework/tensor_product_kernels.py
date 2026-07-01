@@ -1,15 +1,58 @@
-def sfem_tensor_product_kernels_header_source():
-    return r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_HPP
-#define SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_HPP
+def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
+    if single_work_item:
+        return "%s{" % indent
+    return "%s\n%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {" % (
+        "\n".join("%s%s" % (indent, line) for line in simd_lines),
+        indent,
+        index_name,
+        index_name,
+        index_name,
+    )
+
+
+def sfem_tensor_product_kernels_header_source(
+    *,
+    inline_qualifier="SFEM_INLINE",
+    inline_definition="inline",
+    define_sfem_inline=True,
+    restrict_definition="",
+    work_item_index="lane",
+    simd_lines=("#pragma omp simd",),
+    single_work_item=False,
+    header_guard_suffix="HPP",
+):
+    values = {
+        "header_guard_suffix": header_guard_suffix,
+        "sfem_inline_block": (
+            "#ifndef SFEM_INLINE\n#define SFEM_INLINE %s\n#endif\n\n"
+            % inline_definition
+            if define_sfem_inline
+            else ""
+        ),
+        "inline_qualifier": inline_qualifier,
+        "inline_definition": inline_definition,
+        "restrict_definition": restrict_definition,
+        "work_item": work_item_index,
+    }
+    for indent_size in (12, 16, 20):
+        indent = " " * indent_size
+        values["work_item_loop_%d" % indent_size] = _work_item_loop_text(
+            indent,
+            work_item_index,
+            simd_lines,
+            single_work_item,
+        )
+    return _TENSOR_PRODUCT_KERNELS_TEMPLATE % values
+
+
+_TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
+#define SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 
 #include <stddef.h>
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline
-#endif
-
+%(sfem_inline_block)s
 #ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT
+#define SFEM_RESTRICT %(restrict_definition)s
 #endif
 
 namespace sfem {
@@ -32,7 +75,7 @@ struct TensorProductWeakOps;
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
-    static SFEM_INLINE void gradient(
+    static %(inline_qualifier)s void gradient(
             const ptrdiff_t nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -45,17 +88,16 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t grad_x[Q * S * VECTOR_SIZE];
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_16)s
                     scalar_t v = scalar_t(0);
                     scalar_t gx = scalar_t(0);
                     for (int sx = 0; sx < S; ++sx) {
                         const int shape = sx + S * sy;
-                        const scalar_t u = streams[shape * 2 + component][lane];
+                        const scalar_t u = streams[shape * 2 + component][%(work_item)s];
                         v += u * shape_1d[qx * S + sx];
                         gx += u * grad_1d[qx * S + sx];
                     }
-                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;
+                    const int i = (qx * S + sy) * VECTOR_SIZE + %(work_item)s;
                     value_x[i] = v;
                     grad_x[i] = gx;
                 }
@@ -64,23 +106,22 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         for (int qy = 0; qy < Q; ++qy) {
             for (int qx = 0; qx < Q; ++qx) {
                 const int q = qx + Q * qy;
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_16)s
                     scalar_t gx = scalar_t(0);
                     scalar_t gy = scalar_t(0);
                     for (int sy = 0; sy < S; ++sy) {
-                        const int i = (qx * S + sy) * VECTOR_SIZE + lane;
+                        const int i = (qx * S + sy) * VECTOR_SIZE + %(work_item)s;
                         gx += grad_x[i] * shape_1d[qy * S + sy];
                         gy += value_x[i] * grad_1d[qy * S + sy];
                     }
-                    gradient[(q * 2 + 0) * VECTOR_SIZE + lane] = gx;
-                    gradient[(q * 2 + 1) * VECTOR_SIZE + lane] = gy;
+                    gradient[(q * 2 + 0) * VECTOR_SIZE + %(work_item)s] = gx;
+                    gradient[(q * 2 + 1) * VECTOR_SIZE + %(work_item)s] = gy;
                 }
             }
         }
     }
 
-    static SFEM_INLINE void test(
+    static %(inline_qualifier)s void test(
             const ptrdiff_t nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -93,16 +134,15 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t stage_y[Q * S * VECTOR_SIZE];
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_16)s
                     scalar_t tx = scalar_t(0);
                     scalar_t ty = scalar_t(0);
                     for (int qy = 0; qy < Q; ++qy) {
                         const int q = qx + Q * qy;
-                        tx += flux[(q * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
-                        ty += flux[(q * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];
+                        tx += flux[(q * 2 + 0) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
+                        ty += flux[(q * 2 + 1) * VECTOR_SIZE + %(work_item)s] * grad_1d[qy * S + sy];
                     }
-                    const int i = (qx * S + sy) * VECTOR_SIZE + lane;
+                    const int i = (qx * S + sy) * VECTOR_SIZE + %(work_item)s;
                     stage_x[i] = tx;
                     stage_y[i] = ty;
                 }
@@ -111,15 +151,14 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         for (int sy = 0; sy < S; ++sy) {
             for (int sx = 0; sx < S; ++sx) {
                 const int shape = sx + S * sy;
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_16)s
                     scalar_t value = scalar_t(0);
                     for (int qx = 0; qx < Q; ++qx) {
-                        const int i = (qx * S + sy) * VECTOR_SIZE + lane;
+                        const int i = (qx * S + sy) * VECTOR_SIZE + %(work_item)s;
                         value += stage_x[i] * grad_1d[qx * S + sx]
                                + stage_y[i] * shape_1d[qx * S + sx];
                     }
-                    out_streams[shape * 2 + component][lane] += value;
+                    out_streams[shape * 2 + component][%(work_item)s] += value;
                 }
             }
         }
@@ -128,7 +167,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
-    static SFEM_INLINE void gradient(
+    static %(inline_qualifier)s void gradient(
             const ptrdiff_t nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -145,17 +184,16 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t v = scalar_t(0);
                         scalar_t gx = scalar_t(0);
                         for (int sx = 0; sx < S; ++sx) {
                             const int shape = sx + S * (sy + S * sz);
-                            const scalar_t u = streams[shape * 3 + component][lane];
+                            const scalar_t u = streams[shape * 3 + component][%(work_item)s];
                             v += u * shape_1d[qx * S + sx];
                             gx += u * grad_1d[qx * S + sx];
                         }
-                        const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                        const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                         value_x[i] = v;
                         grad_x[i] = gx;
                     }
@@ -165,18 +203,17 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t v = scalar_t(0);
                         scalar_t gx = scalar_t(0);
                         scalar_t gy = scalar_t(0);
                         for (int sy = 0; sy < S; ++sy) {
-                            const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                            const int i = ((qx * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                             v += value_x[i] * shape_1d[qy * S + sy];
                             gx += grad_x[i] * shape_1d[qy * S + sy];
                             gy += value_x[i] * grad_1d[qy * S + sy];
                         }
-                        const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                        const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                         value_xy[j] = v;
                         grad_x_xy[j] = gx;
                         grad_y_xy[j] = gy;
@@ -188,27 +225,26 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int qx = 0; qx < Q; ++qx) {
                     const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t gx = scalar_t(0);
                         scalar_t gy = scalar_t(0);
                         scalar_t gz = scalar_t(0);
                         for (int sz = 0; sz < S; ++sz) {
-                            const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                            const int j = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                             gx += grad_x_xy[j] * shape_1d[qz * S + sz];
                             gy += grad_y_xy[j] * shape_1d[qz * S + sz];
                             gz += value_xy[j] * grad_1d[qz * S + sz];
                         }
-                        gradient[(q * 3 + 0) * VECTOR_SIZE + lane] = gx;
-                        gradient[(q * 3 + 1) * VECTOR_SIZE + lane] = gy;
-                        gradient[(q * 3 + 2) * VECTOR_SIZE + lane] = gz;
+                        gradient[(q * 3 + 0) * VECTOR_SIZE + %(work_item)s] = gx;
+                        gradient[(q * 3 + 1) * VECTOR_SIZE + %(work_item)s] = gy;
+                        gradient[(q * 3 + 2) * VECTOR_SIZE + %(work_item)s] = gz;
                     }
                 }
             }
         }
     }
 
-    static SFEM_INLINE void test(
+    static %(inline_qualifier)s void test(
             const ptrdiff_t nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -226,18 +262,17 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t tx = scalar_t(0);
                         scalar_t ty = scalar_t(0);
                         scalar_t tz = scalar_t(0);
                         for (int qz = 0; qz < Q; ++qz) {
                             const int q = qx + Q * (qy + Q * qz);
-                            tx += flux[(q * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
-                            ty += flux[(q * 3 + 1) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
-                            tz += flux[(q * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];
+                            tx += flux[(q * 3 + 0) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
+                            ty += flux[(q * 3 + 1) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
+                            tz += flux[(q * 3 + 2) * VECTOR_SIZE + %(work_item)s] * grad_1d[qz * S + sz];
                         }
-                        const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                        const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                         stage_x[i] = tx;
                         stage_y[i] = ty;
                         stage_z[i] = tz;
@@ -248,18 +283,17 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t tx = scalar_t(0);
                         scalar_t ty = scalar_t(0);
                         scalar_t tz = scalar_t(0);
                         for (int qy = 0; qy < Q; ++qy) {
-                            const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                            const int i = ((qx * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                             tx += stage_x[i] * shape_1d[qy * S + sy];
                             ty += stage_y[i] * grad_1d[qy * S + sy];
                             tz += stage_z[i] * shape_1d[qy * S + sy];
                         }
-                        const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                        const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                         stage_xy_x[j] = tx;
                         stage_xy_y[j] = ty;
                         stage_xy_z[j] = tz;
@@ -271,15 +305,14 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sx = 0; sx < S; ++sx) {
                     const int shape = sx + S * (sy + S * sz);
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_20)s
                         scalar_t value = scalar_t(0);
                         for (int qx = 0; qx < Q; ++qx) {
-                            const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                            const int j = ((qx * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                             value += stage_xy_x[j] * grad_1d[qx * S + sx]
                                    + (stage_xy_y[j] + stage_xy_z[j]) * shape_1d[qx * S + sx];
                         }
-                        out_streams[shape * 3 + component][lane] += value;
+                        out_streams[shape * 3 + component][%(work_item)s] += value;
                     }
                 }
             }
@@ -288,7 +321,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
 };
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM>
-static SFEM_INLINE void tensor_gradient(
+static %(inline_qualifier)s void tensor_gradient(
         const ptrdiff_t nelems,
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -300,7 +333,7 @@ static SFEM_INLINE void tensor_gradient(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM>
-static SFEM_INLINE void tensor_test(
+static %(inline_qualifier)s void tensor_test(
         const ptrdiff_t nelems,
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
@@ -317,7 +350,7 @@ struct TensorProductResidualOps;
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     template <int N_FIELDS>
-    static SFEM_INLINE void evaluate(
+    static %(inline_qualifier)s void evaluate(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
@@ -329,43 +362,41 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
         scalar_t gx[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 scalar_t g = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
                     const int s = sx + S * sy;
-                    const scalar_t u = streams[s * N_FIELDS + f][lane];
+                    const scalar_t u = streams[s * N_FIELDS + f][%(work_item)s];
                     v += u * shape_1d[qx * S + sx];
                     g += u * grad_1d[qx * S + sx];
                 }
-                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s;
                 vx[i] = v;
                 gx[i] = g;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * qy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
                 scalar_t g1 = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
-                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s;
                     v += vx[i] * shape_1d[qy * S + sy];
                     g0 += gx[i] * shape_1d[qy * S + sy];
                     g1 += vx[i] * grad_1d[qy * S + sy];
                 }
-                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
-                gradient[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] = g0;
-                gradient[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = g1;
+                value[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] = v;
+                gradient[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + %(work_item)s] = g0;
+                gradient[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + %(work_item)s] = g1;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void evaluate_value(
+    static %(inline_qualifier)s void evaluate_value(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -374,31 +405,29 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
                     const int s = sx + S * sy;
-                    v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];
+                    v += streams[s * N_FIELDS + f][%(work_item)s] * shape_1d[qx * S + sx];
                 }
-                vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = v;
+                vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s] = v;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * qy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
-                    v += vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                    v += vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
                 }
-                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+                value[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] = v;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void integrate(
+    static %(inline_qualifier)s void integrate(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
@@ -410,37 +439,35 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
         scalar_t sg[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
                     const int q = qx + Q * qy;
-                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy]
-                       + grad_coeff[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];
-                    b += grad_coeff[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy]
+                       + grad_coeff[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + %(work_item)s] * grad_1d[qy * S + sy];
+                    b += grad_coeff[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
                 }
-                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s;
                 sv[i] = a;
                 sg[i] = b;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * sy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
-                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s;
                     v += sv[i] * shape_1d[qx * S + sx] + sg[i] * grad_1d[qx * S + sx];
                 }
-                output[s * N_FIELDS + f][lane] += v;
+                output[s * N_FIELDS + f][%(work_item)s] += v;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void integrate_value(
+    static %(inline_qualifier)s void integrate_value(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
@@ -449,25 +476,23 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
                     const int q = qx + Q * qy;
-                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
                 }
-                sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = a;
+                sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s] = a;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * sy;
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
-                    v += sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];
+                    v += sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + %(work_item)s] * shape_1d[qx * S + sx];
                 }
-                output[s * N_FIELDS + f][lane] += v;
+                output[s * N_FIELDS + f][%(work_item)s] += v;
             }
         }
     }
@@ -476,7 +501,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
     template <int N_FIELDS>
-    static SFEM_INLINE void evaluate(
+    static %(inline_qualifier)s void evaluate(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
@@ -491,34 +516,32 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t g0xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         scalar_t g1xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 scalar_t g = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
                     const int s = sx + S * (sy + S * sz);
-                    const scalar_t u = streams[s * N_FIELDS + f][lane];
+                    const scalar_t u = streams[s * N_FIELDS + f][%(work_item)s];
                     v += u * shape_1d[qx * S + sx];
                     g += u * grad_1d[qx * S + sx];
                 }
-                const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                 vx[i] = v;
                 gx[i] = g;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
                 scalar_t g1 = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
-                    const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                    const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                     v += vx[i] * shape_1d[qy * S + sy];
                     g0 += gx[i] * shape_1d[qy * S + sy];
                     g1 += vx[i] * grad_1d[qy * S + sy];
                 }
-                const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                 vxy[j] = v;
                 g0xy[j] = g0;
                 g1xy[j] = g1;
@@ -526,29 +549,28 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
                 scalar_t g1 = scalar_t(0);
                 scalar_t g2 = scalar_t(0);
                 for (int sz = 0; sz < S; ++sz) {
-                    const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                    const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                     v += vxy[j] * shape_1d[qz * S + sz];
                     g0 += g0xy[j] * shape_1d[qz * S + sz];
                     g1 += g1xy[j] * shape_1d[qz * S + sz];
                     g2 += vxy[j] * grad_1d[qz * S + sz];
                 }
-                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
-                gradient[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane] = g0;
-                gradient[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane] = g1;
-                gradient[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] = g2;
+                value[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] = v;
+                gradient[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + %(work_item)s] = g0;
+                gradient[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + %(work_item)s] = g1;
+                gradient[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + %(work_item)s] = g2;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void evaluate_value(
+    static %(inline_qualifier)s void evaluate_value(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -558,41 +580,38 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE];
         scalar_t vxy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
                     const int s = sx + S * (sy + S * sz);
-                    v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];
+                    v += streams[s * N_FIELDS + f][%(work_item)s] * shape_1d[qx * S + sx];
                 }
-                vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = v;
+                vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s] = v;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
-                    v += vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                    v += vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
                 }
-                vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = v;
+                vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s] = v;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int sz = 0; sz < S; ++sz) {
-                    v += vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                    v += vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
                 }
-                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+                value[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] = v;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void integrate(
+    static %(inline_qualifier)s void integrate(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
@@ -607,55 +626,52 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
         scalar_t yz1[N_FIELDS * Q * S * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
                 scalar_t c = scalar_t(0);
                 for (int qz = 0; qz < Q; ++qz) {
                     const int q = qx + Q * (qy + Q * qz);
-                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz]
-                       + grad_coeff[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];
-                    b += grad_coeff[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
-                    c += grad_coeff[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz]
+                       + grad_coeff[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + %(work_item)s] * grad_1d[qz * S + sz];
+                    b += grad_coeff[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
+                    c += grad_coeff[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
                 }
-                const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                 z0[i] = a;
                 z1[i] = b;
                 z2[i] = c;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
-                    const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                    const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                     a += z0[i] * shape_1d[qy * S + sy] + z2[i] * grad_1d[qy * S + sy];
                     b += z1[i] * shape_1d[qy * S + sy];
                 }
-                const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                 yz0[j] = a;
                 yz1[j] = b;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * (sy + S * sz);
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
-                    const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                    const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s;
                     v += yz0[j] * shape_1d[qx * S + sx] + yz1[j] * grad_1d[qx * S + sx];
                 }
-                output[s * N_FIELDS + f][lane] += v;
+                output[s * N_FIELDS + f][%(work_item)s] += v;
             }
         }
     }
 
     template <int N_FIELDS>
-    static SFEM_INLINE void integrate_value(
+    static %(inline_qualifier)s void integrate_value(
             const ptrdiff_t nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
@@ -665,42 +681,39 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 for (int qz = 0; qz < Q; ++qz) {
                     const int q = qx + Q * (qy + Q * qz);
-                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + %(work_item)s] * shape_1d[qz * S + sz];
                 }
-                z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = a;
+                z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s] = a;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t a = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
-                    a += z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                    a += z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + %(work_item)s] * shape_1d[qy * S + sy];
                 }
-                yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = a;
+                yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s] = a;
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * (sy + S * sz);
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+%(work_item_loop_12)s
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
-                    v += yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];
+                    v += yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + %(work_item)s] * shape_1d[qx * S + sx];
                 }
-                output[s * N_FIELDS + f][lane] += v;
+                output[s * N_FIELDS + f][%(work_item)s] += v;
             }
         }
     }
 };
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
-static SFEM_INLINE void tensor_evaluate(
+static %(inline_qualifier)s void tensor_evaluate(
         const ptrdiff_t nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const grad_1d,
@@ -712,7 +725,7 @@ static SFEM_INLINE void tensor_evaluate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
-static SFEM_INLINE void tensor_evaluate_value(
+static %(inline_qualifier)s void tensor_evaluate_value(
         const ptrdiff_t nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
@@ -722,7 +735,7 @@ static SFEM_INLINE void tensor_evaluate_value(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
-static SFEM_INLINE void tensor_integrate(
+static %(inline_qualifier)s void tensor_integrate(
         const ptrdiff_t nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const grad_1d,
@@ -734,7 +747,7 @@ static SFEM_INLINE void tensor_integrate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
-static SFEM_INLINE void tensor_integrate_value(
+static %(inline_qualifier)s void tensor_integrate_value(
         const ptrdiff_t nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const value_coeff,

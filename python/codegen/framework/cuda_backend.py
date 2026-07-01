@@ -106,3 +106,9 @@ def _validate_cuda_source_contract(files):
     for file in files:
         if "#pragma omp" in file.source:
             raise RuntimeError("CUDA file '%s' contains OpenMP pragmas" % file.path)
+        if "lane" in file.source:
+            raise RuntimeError("CUDA file '%s' contains vector-lane lowering" % file.path)
+        if "const ptrdiff_t thread = 0" in file.source:
+            raise RuntimeError("CUDA file '%s' contains fake thread lowering" % file.path)
+        if "SFEM_INLINE" in file.source:
+            raise RuntimeError("CUDA file '%s' contains SFEM_INLINE macro usage" % file.path)

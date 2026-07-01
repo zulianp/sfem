@@ -10,17 +10,24 @@ def _join_lines(lines):
     return "\n".join(line for line in lines if line != "")
 
 
+def _simd_lane_loop_lines(indent, index_name, simd_lines):
+    return tuple("%s%s" % (indent, line) for line in simd_lines) + (
+        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
+        % (indent, index_name, index_name, index_name),
+    )
+
+
+def _single_work_item_lines(indent):
+    return ("%s{" % indent,)
+
+
 def _cuda_geometry_header_source():
     return _join_lines(
         [
-            "#ifndef SFEM_CODEGEN_GEOMETRY_KERNELS_HPP",
-            "#define SFEM_CODEGEN_GEOMETRY_KERNELS_HPP",
+            "#ifndef SFEM_CODEGEN_GEOMETRY_KERNELS_CUH",
+            "#define SFEM_CODEGEN_GEOMETRY_KERNELS_CUH",
             "",
             "#include <stddef.h>",
-            "",
-            "#ifndef SFEM_INLINE",
-            "#define SFEM_INLINE __host__ __device__ __forceinline__",
-            "#endif",
             "",
             "#ifndef SFEM_RESTRICT",
             "#define SFEM_RESTRICT __restrict__",
@@ -33,7 +40,7 @@ def _cuda_geometry_header_source():
             "struct GeometryJacobianAdjugateDeterminant;",
             "",
             "template <typename scalar_t>",
-            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_2(",
+            "static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant_2(",
             "        const scalar_t J00,",
             "        const scalar_t J01,",
             "        const scalar_t J10,",
@@ -49,7 +56,7 @@ def _cuda_geometry_header_source():
             "}",
             "",
             "template <typename scalar_t>",
-            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(",
+            "static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant_3(",
             "        const scalar_t J00,",
             "        const scalar_t J01,",
             "        const scalar_t J02,",
@@ -78,18 +85,18 @@ def _cuda_geometry_header_source():
             "",
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {",
-            "    static SFEM_INLINE void eval(",
+            "    static __host__ __device__ __forceinline__ void eval(",
             "            const ptrdiff_t nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
             "        for (int q = 0; q < N_QP; ++q) {",
-            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
-            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];",
-            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane];",
-            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];",
-            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane];",
+            "            {",
+            "                const ptrdiff_t offset = q * VECTOR_SIZE;",
+            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE];",
+            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 1) * VECTOR_SIZE];",
+            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 0) * VECTOR_SIZE];",
+            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 2 + 1) * VECTOR_SIZE];",
             "                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(",
             "                        J00, J01, J10, J11, adjugate, determinant, offset);",
             "            }",
@@ -99,23 +106,23 @@ def _cuda_geometry_header_source():
             "",
             "template <typename scalar_t, int N_QP, int VECTOR_SIZE>",
             "struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {",
-            "    static SFEM_INLINE void eval(",
+            "    static __host__ __device__ __forceinline__ void eval(",
             "            const ptrdiff_t nelems,",
             "            const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "            scalar_t *const *const SFEM_RESTRICT adjugate,",
             "            scalar_t *const SFEM_RESTRICT determinant) {",
             "        for (int q = 0; q < N_QP; ++q) {",
-            "            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
-            "                const ptrdiff_t offset = q * VECTOR_SIZE + lane;",
-            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
-            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
-            "                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
-            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
-            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
-            "                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
-            "                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];",
-            "                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];",
-            "                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane];",
+            "            {",
+            "                const ptrdiff_t offset = q * VECTOR_SIZE;",
+            "                const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE];",
+            "                const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 1) * VECTOR_SIZE];",
+            "                const scalar_t J02 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 2) * VECTOR_SIZE];",
+            "                const scalar_t J10 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 0) * VECTOR_SIZE];",
+            "                const scalar_t J11 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 1) * VECTOR_SIZE];",
+            "                const scalar_t J12 = coordinate_grad_ref[((1 * N_QP + q) * 3 + 2) * VECTOR_SIZE];",
+            "                const scalar_t J20 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 0) * VECTOR_SIZE];",
+            "                const scalar_t J21 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 1) * VECTOR_SIZE];",
+            "                const scalar_t J22 = coordinate_grad_ref[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE];",
             "                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(",
             "                        J00, J01, J02, J10, J11, J12, J20, J21, J22,",
             "                        adjugate, determinant, offset);",
@@ -125,7 +132,7 @@ def _cuda_geometry_header_source():
             "};",
             "",
             "template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>",
-            "static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(",
+            "static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant(",
             "        const ptrdiff_t nelems,",
             "        const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,",
             "        scalar_t *const *const SFEM_RESTRICT adjugate,",
@@ -263,6 +270,15 @@ class OpenMPEnergySoASourceBuilder:
     operator_extension: str = "cpp"
     emit_objective_steps: bool = True
 
+    def header_name(self, stem):
+        return "%s.hpp" % stem
+
+    def header_guard_suffix(self):
+        return "HPP"
+
+    def inline_qualifier(self):
+        return "SFEM_INLINE"
+
     def local_header_preamble_lines(self, math_name, tensor_product_name, basis_family):
         return (
             '#include "%s"' % math_name,
@@ -294,12 +310,27 @@ class OpenMPEnergySoASourceBuilder:
         return True
 
     def tensor_product_header_source(self):
-        from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        try:
+            from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        except ImportError:
+            from tensor_product_kernels import sfem_tensor_product_kernels_header_source
 
         return sfem_tensor_product_kernels_header_source()
 
     def simd_lines(self):
         return ("#pragma omp simd",)
+
+    def work_item_index(self):
+        return "lane"
+
+    def work_item_name(self, name, component):
+        return "%s_lane%d" % (name, component)
+
+    def diagnostic_work_item(self):
+        return "lane"
+
+    def work_item_loop_lines(self, indent):
+        return _simd_lane_loop_lines(indent, self.work_item_index(), self.simd_lines())
 
     def parallel_for_lines(self):
         return ("#pragma omp parallel for schedule(static)",)
@@ -344,6 +375,15 @@ class CUDAEnergySoASourceBuilder:
     operator_extension: str = "cu"
     emit_objective_steps: bool = False
 
+    def header_name(self, stem):
+        return "%s.cuh" % stem
+
+    def header_guard_suffix(self):
+        return "CUH"
+
+    def inline_qualifier(self):
+        return "__host__ __device__ __forceinline__"
+
     def local_header_preamble_lines(self, math_name, tensor_product_name, basis_family):
         tensor_include = (
             ('#include "%s"' % tensor_product_name,)
@@ -353,10 +393,6 @@ class CUDAEnergySoASourceBuilder:
         return (
             '#include "%s"' % math_name,
             *tensor_include,
-            "",
-            "#ifndef SFEM_INLINE",
-            "#define SFEM_INLINE __host__ __device__ __forceinline__",
-            "#endif",
             "",
             "#ifndef SFEM_RESTRICT",
             "#define SFEM_RESTRICT __restrict__",
@@ -378,18 +414,35 @@ class CUDAEnergySoASourceBuilder:
         return str(basis_family) == "tensor_product"
 
     def tensor_product_header_source(self):
-        from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        try:
+            from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        except ImportError:
+            from tensor_product_kernels import sfem_tensor_product_kernels_header_source
 
-        source = sfem_tensor_product_kernels_header_source()
-        source = source.replace(
-            "#define SFEM_INLINE inline",
-            "#define SFEM_INLINE __host__ __device__ __forceinline__",
+        return sfem_tensor_product_kernels_header_source(
+            inline_qualifier=self.inline_qualifier(),
+            define_sfem_inline=False,
+            restrict_definition="__restrict__",
+            work_item_index=self.work_item_index(),
+            simd_lines=(),
+            single_work_item=True,
+            header_guard_suffix=self.header_guard_suffix(),
         )
-        source = source.replace("#define SFEM_RESTRICT", "#define SFEM_RESTRICT __restrict__")
-        return "\n".join(line for line in source.splitlines() if "#pragma omp" not in line)
 
     def simd_lines(self):
         return ()
+
+    def work_item_index(self):
+        return "0"
+
+    def work_item_name(self, name, component):
+        return "%s_value%d" % (name, component)
+
+    def diagnostic_work_item(self):
+        return "scalar"
+
+    def work_item_loop_lines(self, indent):
+        return _single_work_item_lines(indent)
 
     def parallel_for_lines(self):
         return ()
