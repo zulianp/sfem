@@ -33,6 +33,31 @@ namespace sfem {
             }
         }
 
+        struct AffineOption {
+            const char *name;
+            bool       *flag;
+        };
+
+        inline bool set_affine_option(const std::string &name,
+                                      const bool val,
+                                      const AffineOption *const options,
+                                      const int n_options) {
+            if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = val;
+                }
+                return true;
+            }
+            bool matched = false;
+            for (int i = 0; i < n_options; ++i) {
+                if (name == options[i].name) {
+                    *options[i].flag = val;
+                    matched = true;
+                }
+            }
+            return matched;
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = 6;
         constexpr int N_MATERIAL_PARAMETERS = 6;
@@ -131,44 +156,22 @@ namespace sfem {
             return true;
         }
 
-        void read_affine_options(const ryml::ConstNodeRef &node,
-                                 bool &objective,
-                                 bool &gradient,
-                                 bool &hessian_action) {
-            bool all = objective && gradient && hessian_action;
+        inline void read_affine_options(const ryml::ConstNodeRef &node,
+                                        const AffineOption *const options,
+                                        const int n_options) {
+            bool all = true;
+            for (int i = 0; i < n_options; ++i) {
+                all = all && *options[i].flag;
+            }
             if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
                 yaml_read_bool(node, "assume_affine", all)) {
-                objective = all;
-                gradient = all;
-                hessian_action = all;
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = all;
+                }
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
-            yaml_read_bool(node, "objective_assume_affine", objective);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
-            yaml_read_bool(node, "gradient_assume_affine", gradient);
-            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
-            yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
-            yaml_read_bool(node, "apply_assume_affine", hessian_action);
-        }
-
-        void read_residual_affine_options(const ryml::ConstNodeRef &node,
-                                          bool &residual,
-                                          bool &jacobian_action) {
-            bool all = residual && jacobian_action;
-            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-                yaml_read_bool(node, "assume_affine", all)) {
-                residual = all;
-                jacobian_action = all;
+            for (int i = 0; i < n_options; ++i) {
+                yaml_read_bool(node, options[i].name, *options[i].flag);
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_RESIDUAL", residual);
-            yaml_read_bool(node, "residual_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", residual);
-            yaml_read_bool(node, "gradient_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_JACOBIAN_ACTION", jacobian_action);
-            yaml_read_bool(node, "jacobian_action_assume_affine", jacobian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", jacobian_action);
-            yaml_read_bool(node, "apply_assume_affine", jacobian_action);
         }
 #endif  // SFEM_ENABLE_RYAML
 
@@ -296,8 +299,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->gradient_uses_affine || impl_->residual_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -305,9 +308,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedPoroHyperelasticity affine gradient/residual requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             real_t storage[MAX_PARAMETERS];
@@ -370,8 +373,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine || impl_->jacobian_action_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -379,18 +382,17 @@ namespace sfem {
                     SFEM_ERROR("GeneratedPoroHyperelasticity affine hessian/jacobian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters, storage);
+
             switch (domain.element_type) {
                 case smesh::TRI6: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                    const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
-                    const real_t *const SFEM_RESTRICT p_data = state + 2;
                     const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
                     const real_t *const SFEM_RESTRICT p_direction_data = direction + 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
@@ -401,8 +403,6 @@ namespace sfem {
                 }
                 case smesh::TET10: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT p_data = state + 3;
                     const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
                     const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
@@ -413,8 +413,6 @@ namespace sfem {
                 }
                 case smesh::HEX27: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT p_data = state + 3;
                     const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
                     const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
@@ -438,8 +436,8 @@ namespace sfem {
         *out = 0;
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const ptrdiff_t nelements = domain.block->n_elements();
-            const real_t *const *adjugate = nullptr;
-            const real_t *determinant = nullptr;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
                 auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
                         domain.user_data);
@@ -447,9 +445,9 @@ namespace sfem {
                     SFEM_ERROR("GeneratedPoroHyperelasticity affine objective requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const real_t *const *>(
+                adjugate = reinterpret_cast<const geom_t *const *>(
                         jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const real_t *>(
+                determinant = reinterpret_cast<const geom_t *>(
                         jacobian->jacobian_determinant()->data());
             }
             std::fill(impl_->element_values.get(),
@@ -483,7 +481,6 @@ namespace sfem {
             return SFEM_SUCCESS;
         });
     }
-
     void GeneratedPoroHyperelasticity::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
@@ -498,24 +495,25 @@ namespace sfem {
 
     void GeneratedPoroHyperelasticity::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::set_option");
-        if (name == "assume_affine") {
-            impl_->objective_uses_affine = val;
-            impl_->gradient_uses_affine = val;
-            impl_->apply_uses_affine = val;
-            impl_->residual_uses_affine = val;
-            impl_->jacobian_action_uses_affine = val;
-        } else if (name == "objective_assume_affine") {
-            impl_->objective_uses_affine = val;
-        } else if (name == "gradient_assume_affine" ||
-                   name == "residual_assume_affine") {
-            impl_->gradient_uses_affine = val;
-            impl_->residual_uses_affine = val;
-        } else if (name == "hessian_action_assume_affine" ||
-                   name == "jacobian_action_assume_affine" ||
-                   name == "apply_assume_affine") {
-            impl_->apply_uses_affine = val;
-            impl_->jacobian_action_uses_affine = val;
-        }
+        AffineOption options[] = {
+            {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
+            {"objective_assume_affine", &impl_->objective_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->gradient_uses_affine},
+            {"gradient_assume_affine", &impl_->gradient_uses_affine},
+            {"ASSUME_AFFINE_HESSIAN_ACTION", &impl_->apply_uses_affine},
+            {"hessian_action_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->apply_uses_affine},
+            {"apply_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_RESIDUAL", &impl_->residual_uses_affine},
+            {"residual_assume_affine", &impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->residual_uses_affine},
+            {"gradient_assume_affine", &impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_JACOBIAN_ACTION", &impl_->jacobian_action_uses_affine},
+            {"jacobian_action_assume_affine", &impl_->jacobian_action_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->jacobian_action_uses_affine},
+            {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
+        };
+        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     }
 
     void GeneratedPoroHyperelasticity::set_value_in_block(const std::string &block_name,
@@ -552,13 +550,25 @@ namespace sfem {
             set_material(*ret->impl_->domains, top_values);
         }
 
-        read_affine_options(node,
-                            ret->impl_->objective_uses_affine,
-                            ret->impl_->gradient_uses_affine,
-                            ret->impl_->apply_uses_affine);
-        read_residual_affine_options(node,
-                                     ret->impl_->residual_uses_affine,
-                                     ret->impl_->jacobian_action_uses_affine);
+        AffineOption options[] = {
+            {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
+            {"objective_assume_affine", &impl_->objective_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->gradient_uses_affine},
+            {"gradient_assume_affine", &impl_->gradient_uses_affine},
+            {"ASSUME_AFFINE_HESSIAN_ACTION", &impl_->apply_uses_affine},
+            {"hessian_action_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->apply_uses_affine},
+            {"apply_assume_affine", &impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_RESIDUAL", &impl_->residual_uses_affine},
+            {"residual_assume_affine", &impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &impl_->residual_uses_affine},
+            {"gradient_assume_affine", &impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_JACOBIAN_ACTION", &impl_->jacobian_action_uses_affine},
+            {"jacobian_action_assume_affine", &impl_->jacobian_action_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &impl_->jacobian_action_uses_affine},
+            {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {

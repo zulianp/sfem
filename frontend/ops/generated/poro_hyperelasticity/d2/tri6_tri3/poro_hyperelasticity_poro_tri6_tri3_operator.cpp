@@ -1,3 +1,4 @@
+#include <type_traits>
 #include "../poro_hyperelasticity_poro_d2_simplex_mixed_local.hpp"
 #include "../../kernel_math.hpp"
 #include "../../geometry_kernels.hpp"
@@ -24,6 +25,34 @@ typedef double geom_t;
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
+SFEM_INLINE const scalar_t *affine_geometry_stream(
+        const int,
+        const jacobian_t *const SFEM_RESTRICT source,
+        scalar_t *const SFEM_RESTRICT,
+        std::true_type) {
+    return source;
+}
+
+template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
+SFEM_INLINE const scalar_t *affine_geometry_stream(
+        const int nelems,
+        const jacobian_t *const SFEM_RESTRICT source,
+        scalar_t *const SFEM_RESTRICT converted,
+        std::false_type) {
+    #pragma omp simd
+    for (int lane = 0; lane < nelems; ++lane) {
+        converted[lane] = scalar_t(source[lane]);
+    }
+    return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 namespace sfem {
 namespace codegen {
@@ -367,16 +396,16 @@ extern "C" void poro_hyperelasticity_poro_tri6_tri3_jacobian_action_isoparametri
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t alpha,
         const scalar_t dt,
         const scalar_t hydraulic_conductivity,
@@ -472,12 +501,27 @@ static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_
             block_output[13][lane] = scalar_t(0);
             block_output[14][lane] = scalar_t(0);
         }
-        const scalar_t *const block_adjugate[DIM * DIM] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin};
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
         const scalar_t *const block_current_streams[N_FIELD_STREAMS] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[4], block_current[5], block_current[6], block_current[7], block_current[8], block_current[9], block_current[10], block_current[11], block_current[12], block_current[13], block_current[14]};
         const scalar_t *const block_previous_streams[N_FIELD_STREAMS] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[4], block_previous[5], block_previous[6], block_previous[7], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[12], block_previous[13], block_previous[14]};
         scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7], block_output[8], block_output[9], block_output[10], block_output[11], block_output[12], block_output[13], block_output[14]};
 
-        poro_hyperelasticity_poro_d2_simplex_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_affine_reference_data<scalar_t>::q_weight(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
+        poro_hyperelasticity_poro_d2_simplex_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_affine_reference_data<scalar_t>::q_weight(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -580,11 +624,11 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double alpha,
         const double dt,
         const double hydraulic_conductivity,
@@ -599,18 +643,18 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa(
         double *const SFEM_RESTRICT u_out[2],
         double *const SFEM_RESTRICT p_out
 ) {
-    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_mixed_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
+    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
 
 extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float alpha,
         const float dt,
         const float hydraulic_conductivity,
@@ -625,7 +669,7 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa_floa
         float *const SFEM_RESTRICT u_out[2],
         float *const SFEM_RESTRICT p_out
 ) {
-    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_mixed_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
+    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
 
 namespace sfem {
@@ -913,16 +957,16 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_isoparametric_mesh_s
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const scalar_t alpha,
         const scalar_t dt,
         const scalar_t hydraulic_conductivity,
@@ -999,11 +1043,26 @@ static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affin
             block_output[13][lane] = scalar_t(0);
             block_output[14][lane] = scalar_t(0);
         }
-        const scalar_t *const block_adjugate[DIM * DIM] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin};
+        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
         const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3], block_direction[4], block_direction[5], block_direction[6], block_direction[7], block_direction[8], block_direction[9], block_direction[10], block_direction[11], block_direction[12], block_direction[13], block_direction[14]};
         scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[4], block_output[5], block_output[6], block_output[7], block_output[8], block_output[9], block_output[10], block_output[11], block_output[12], block_output[13], block_output[14]};
 
-        poro_hyperelasticity_poro_d2_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_affine_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
+        poro_hyperelasticity_poro_d2_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_affine_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -1106,11 +1165,11 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_s
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const double *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const double *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const double alpha,
         const double dt,
         const double hydraulic_conductivity,
@@ -1122,18 +1181,18 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_s
         double *const SFEM_RESTRICT u_out[2],
         double *const SFEM_RESTRICT p_out
 ) {
-    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
 }
 
 extern "C" int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const float *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const float *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float alpha,
         const float dt,
         const float hydraulic_conductivity,
@@ -1145,7 +1204,7 @@ extern "C" int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_s
         float *const SFEM_RESTRICT u_out[2],
         float *const SFEM_RESTRICT p_out
 ) {
-    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    return sfem::codegen::poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, alpha, dt, hydraulic_conductivity, storage, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
 }
 
 namespace sfem {
