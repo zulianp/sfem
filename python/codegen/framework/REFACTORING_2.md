@@ -212,6 +212,14 @@ CUDA SIMT execution so CUDA backends do not inherit host `lane` loop assumptions
 The first CUDA backend skeleton lowers a generic `ExpressionGraph` through the
 same evaluation plan used by the C++/OpenMP path into a grid-stride SIMT kernel
 with a host launcher.
+Current energy-SoA progress: `EnergySoAKernelEmissionPlan` construction now
+lives in the planning layer, OpenMP/CUDA backends build that full plan before
+emission, and the energy emitters only consume the plan to generate code.
+Energy-SoA OpenMP pragmas, lane-loop lowering, parallel-loop lowering, scatter
+atomics, work-item naming, and target includes are routed through
+`OpenMPTarget`/`CUDATarget`. Remaining M5 cleanup still needs the residual,
+boundary, and tensor-product helper emitters to route their OpenMP literals
+through the same target hooks.
 
 Tasks:
 
@@ -352,5 +360,4 @@ Acceptance criteria:
    functional.
 7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
-
 

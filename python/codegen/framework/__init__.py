@@ -187,11 +187,8 @@ from .reference_data_plan import (
     ReferenceDataSetPlan,
     reference_data_plan_from_emission_plan,
 )
-from .energy_emitters import (
-    CUDAEnergySoAEmitter,
-    EnergySoAKernelEmissionPlan,
-    OpenMPEnergySoAEmitter,
-)
+from .energy_plan import EnergySoAKernelEmissionPlan
+from .energy_emitters import CUDAEnergySoAEmitter, OpenMPEnergySoAEmitter
 from .cuda_backend import CUDASoABackend, CUDASoAEmission
 from .openmp_backend import OpenMPSoABackend, OpenMPSoAEmission
 from .geometry import (

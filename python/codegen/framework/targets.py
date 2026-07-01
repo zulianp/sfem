@@ -44,6 +44,9 @@ class TargetPlatform:
     def function_qualifier(self):
         return "static inline"
 
+    def inline_qualifier(self):
+        return "inline"
+
     def restrict_qualifier(self):
         return ""
 
@@ -83,6 +86,43 @@ class TargetPlatform:
     def loop_lowering_policy(self):
         return LoopLoweringPolicy()
 
+    def work_item_index(self):
+        policy = self.loop_lowering_policy()
+        return policy.lane_index if policy.emits_lane_loop else "0"
+
+    def work_item_name(self, name, component):
+        return "%s_%s%d" % (str(name), self.work_item_index(), int(component))
+
+    def diagnostic_work_item(self):
+        return self.work_item_index()
+
+    def work_item_loop_lines(self, indent):
+        policy = self.loop_lowering_policy()
+        if not policy.emits_lane_loop:
+            return ("%s{" % indent,)
+        lines = []
+        pragma = self.vectorize_pragma() if policy.vectorize_lane_loop else None
+        if pragma:
+            lines.append("%s%s" % (indent, pragma))
+        index = policy.lane_index
+        lines.append(
+            "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
+            % (indent, index, index, index)
+        )
+        return tuple(lines)
+
+    def parallel_element_loop_lines(self, schedule=None):
+        pragma = self.parallel_for_pragma(schedule)
+        return () if pragma is None else (pragma,)
+
+    def scatter_add_lines(self, lhs, rhs, indent):
+        pragma = self.atomic_update_pragma()
+        lines = []
+        if pragma:
+            lines.append("%s%s" % (indent, pragma))
+        lines.append("%s%s += %s;" % (indent, lhs, rhs))
+        return tuple(lines)
+
     @property
     def supports_device_kernels(self):
         return False
@@ -94,8 +134,18 @@ class OpenMPTarget(TargetPlatform):
     language: TargetLanguage = TargetLanguage.CPP
     default_alignment: int = 64
 
+    def includes(self):
+        return (
+            "#ifdef _OPENMP",
+            "#include <omp.h>",
+            "#endif",
+        )
+
     def function_qualifier(self):
         return "static SFEM_INLINE"
+
+    def inline_qualifier(self):
+        return "SFEM_INLINE"
 
     def restrict_qualifier(self):
         return "SFEM_RESTRICT"
@@ -125,6 +175,9 @@ class OpenMPTarget(TargetPlatform):
             supports_shared_memory=False,
         )
 
+    def work_item_name(self, name, component):
+        return "%s_lane%d" % (str(name), int(component))
+
 
 @dataclass(frozen=True)
 class CUDATarget(TargetPlatform):
@@ -136,6 +189,9 @@ class CUDATarget(TargetPlatform):
         return ("#include <cuda_runtime.h>",)
 
     def function_qualifier(self):
+        return "__host__ __device__ __forceinline__"
+
+    def inline_qualifier(self):
         return "__host__ __device__ __forceinline__"
 
     def restrict_qualifier(self):
@@ -166,6 +222,15 @@ class CUDATarget(TargetPlatform):
             parallel_element_loop=False,
             supports_shared_memory=True,
         )
+
+    def work_item_name(self, name, component):
+        return "%s_value%d" % (str(name), int(component))
+
+    def diagnostic_work_item(self):
+        return "scalar"
+
+    def scatter_add_lines(self, lhs, rhs, indent):
+        return ("%satomicAdd(&(%s), %s);" % (indent, lhs, rhs),)
 
     @property
     def supports_device_kernels(self):

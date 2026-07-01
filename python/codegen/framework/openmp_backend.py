@@ -11,6 +11,7 @@ from .kernel_signature import (
     mesh_kernel_signature_from_plan,
 )
 from .diagnostics_plan import kernel_diagnostics_plan_from_plan
+from .energy_plan import energy_soa_kernel_emission_plan
 from .energy_emitters import OpenMPEnergySoAEmitter
 from .reference_data_plan import reference_data_plan_from_emission_plan
 from .boundary_codegen import generate_boundary_residual_sfem_files
@@ -100,7 +101,7 @@ class OpenMPSoABackend:
 
     def _energy_traversal(self, unit, context):
         self._validate_energy_plan(unit)
-        energy_plan = self.emitter.plan(unit, context)
+        energy_plan = energy_soa_kernel_emission_plan(unit, context)
         return _OpenMPTraversal(
             "energy_soa",
             unit,
