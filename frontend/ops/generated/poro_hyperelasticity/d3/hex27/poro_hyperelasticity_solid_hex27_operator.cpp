@@ -1,17 +1,14 @@
 #include "../poro_hyperelasticity_solid_d3_tensor_product_local.hpp"
 #include "../../geometry_kernels.hpp"
 #include "../../kernel_diagnostics.hpp"
-
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
 #endif
-
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifdef _OPENMP
-#include <omp.h>
 #endif
 
 namespace sfem {
@@ -225,7 +222,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_affine_m
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
@@ -233,8 +230,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_affine_m
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -243,15 +240,15 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_affine_m
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_value[lane] = scalar_t(0);
         }
 
@@ -262,8 +259,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_affine_m
 
         poro_hyperelasticity_solid_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             value[evbegin + lane] += block_value[lane];
         }
     }
@@ -370,7 +367,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_af
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -380,8 +377,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_af
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -396,8 +393,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_af
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
@@ -409,21 +406,21 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_af
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
                 for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    #pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
                         block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_value[lane] = scalar_t(0);
             }
 
             poro_hyperelasticity_solid_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
             }
         }
@@ -531,7 +528,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_isoparam
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_value[VECTOR_SIZE];
@@ -550,8 +547,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_isoparam
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -560,8 +557,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_isoparam
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
             }
@@ -571,15 +568,15 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_isoparam
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_value[lane] = scalar_t(0);
         }
 
@@ -609,8 +606,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_isoparam
 
         poro_hyperelasticity_solid_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             value[evbegin + lane] += block_value[lane];
         }
     }
@@ -693,7 +690,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_is
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -714,8 +711,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_is
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -724,8 +721,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_is
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
             }
@@ -741,8 +738,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_is
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
@@ -773,21 +770,21 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_objective_steps_is
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
                 for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                    for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    #pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
                         block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_value[lane] = scalar_t(0);
             }
 
             poro_hyperelasticity_solid_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
             }
         }
@@ -1019,7 +1016,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_me
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -1027,8 +1024,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_me
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -1037,16 +1034,16 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_me
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
         }
@@ -1066,10 +1063,11 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_me
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
-                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                {
+                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                        #pragma omp atomic update
+                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                    }
                 }
             }
         }
@@ -1174,7 +1172,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparame
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -1193,8 +1191,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparame
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -1203,8 +1201,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparame
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
             }
@@ -1214,16 +1212,16 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparame
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
         }
@@ -1262,10 +1260,11 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparame
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
-                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                {
+                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                        #pragma omp atomic update
+                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                    }
                 }
             }
         }
@@ -1495,7 +1494,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -1504,8 +1503,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -1515,8 +1514,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
@@ -1524,8 +1523,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
         }
@@ -1549,10 +1548,11 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
-                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                {
+                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                        #pragma omp atomic update
+                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                    }
                 }
             }
         }
@@ -1669,7 +1669,7 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
         scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
@@ -1689,8 +1689,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
         }
@@ -1699,8 +1699,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
             }
@@ -1711,8 +1711,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
@@ -1720,8 +1720,8 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
         }
@@ -1764,10 +1764,11 @@ static SFEM_INLINE int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametri
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
-#pragma omp atomic update
-                    out_components[d][node] += block_out_data[shape * DIM + d][lane];
+                {
+                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                        #pragma omp atomic update
+                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                    }
                 }
             }
         }

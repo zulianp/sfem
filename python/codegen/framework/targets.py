@@ -21,6 +21,7 @@ class LoopLoweringPolicy:
     parallel_element_loop: bool = False
     supports_shared_memory: bool = False
     lane_index: str = "lane"
+    lane_index_type: str = "int"
     vector_size_symbol: str = "VECTOR_SIZE"
     thread_index: str = "threadIdx.x"
     block_index: str = "blockIdx.x"
@@ -109,8 +110,8 @@ class TargetPlatform:
             lines.append("%s%s" % (indent, pragma))
         index = policy.lane_index
         lines.append(
-            "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
-            % (indent, index, index, index)
+            "%sfor (%s %s = 0; %s < nelems; ++%s) {"
+            % (indent, policy.lane_index_type, index, index, index)
         )
         return tuple(lines)
 

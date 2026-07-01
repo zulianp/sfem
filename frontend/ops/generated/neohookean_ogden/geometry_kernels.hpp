@@ -8,7 +8,7 @@
 #endif
 
 #ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT 
+#define SFEM_RESTRICT
 #endif
 
 namespace sfem {
@@ -64,13 +64,13 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(
 template <typename scalar_t, int N_QP, int VECTOR_SIZE>
 struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {
     static SFEM_INLINE void eval(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,
             scalar_t *const *const SFEM_RESTRICT adjugate,
             scalar_t *const SFEM_RESTRICT determinant) {
         for (int q = 0; q < N_QP; ++q) {
             #pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < nelems; ++lane) {
                 const ptrdiff_t offset = q * VECTOR_SIZE + lane;
                 const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];
                 const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane];
@@ -86,13 +86,13 @@ struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {
 template <typename scalar_t, int N_QP, int VECTOR_SIZE>
 struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {
     static SFEM_INLINE void eval(
-            const ptrdiff_t nelems,
+            const int nelems,
             const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,
             scalar_t *const *const SFEM_RESTRICT adjugate,
             scalar_t *const SFEM_RESTRICT determinant) {
         for (int q = 0; q < N_QP; ++q) {
             #pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < nelems; ++lane) {
                 const ptrdiff_t offset = q * VECTOR_SIZE + lane;
                 const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];
                 const scalar_t J01 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane];
@@ -113,7 +113,7 @@ struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {
 
 template <typename scalar_t, int DIM, int N_QP, int VECTOR_SIZE>
 static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(
-        const ptrdiff_t nelems,
+        const int nelems,
         const scalar_t *const SFEM_RESTRICT coordinate_grad_ref,
         scalar_t *const *const SFEM_RESTRICT adjugate,
         scalar_t *const SFEM_RESTRICT determinant) {

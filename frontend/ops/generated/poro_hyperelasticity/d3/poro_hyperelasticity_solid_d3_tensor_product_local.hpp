@@ -1,6 +1,5 @@
 #ifndef PORO_HYPERELASTICITY_SOLID_D3_TENSOR_PRODUCT_LOCAL_HPP
 #define PORO_HYPERELASTICITY_SOLID_D3_TENSOR_PRODUCT_LOCAL_HPP
-
 #include <math.h>
 #include <stddef.h>
 #if defined(__has_include)
@@ -9,31 +8,26 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-
 #include "../kernel_math.hpp"
 #include "../tensor_product_kernels.hpp"
-
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
-
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
-
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
 typedef double geom_t;
 #endif
-
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_objective_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -68,8 +62,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_objective_b
         const int qy = (q / N_QP_1D) % N_QP_1D;
         const int qz = q / (N_QP_1D * N_QP_1D);
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
@@ -113,7 +107,7 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_objective_b
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -149,8 +143,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_bl
         const int qy = (q / N_QP_1D) % N_QP_1D;
         const int qz = q / (N_QP_1D * N_QP_1D);
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
@@ -240,7 +234,7 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_bl
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_apply_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -281,8 +275,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_apply_block
         const int qy = (q / N_QP_1D) % N_QP_1D;
         const int qz = q / (N_QP_1D * N_QP_1D);
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];

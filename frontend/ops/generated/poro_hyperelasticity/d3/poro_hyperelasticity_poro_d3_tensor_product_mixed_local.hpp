@@ -30,7 +30,7 @@ namespace codegen {
 
 template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_poro_d3_tensor_product_mixed_residual_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT determinant,
         const scalar_t *const SFEM_RESTRICT adjugate[9],
@@ -111,7 +111,8 @@ static SFEM_INLINE void poro_hyperelasticity_poro_d3_tensor_product_mixed_residu
         const int qy = (q / N_QP_1D) % N_QP_1D;
         const int qz = q / (N_QP_1D * N_QP_1D);
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t det = determinant[geometry_offset];
             const scalar_t adj0 = adjugate[0][geometry_offset];
@@ -221,7 +222,7 @@ static SFEM_INLINE void poro_hyperelasticity_poro_d3_tensor_product_mixed_residu
 
 template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_poro_d3_tensor_product_mixed_jacobian_action_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT determinant,
         const scalar_t *const SFEM_RESTRICT adjugate[9],
@@ -281,7 +282,8 @@ static SFEM_INLINE void poro_hyperelasticity_poro_d3_tensor_product_mixed_jacobi
         const int qy = (q / N_QP_1D) % N_QP_1D;
         const int qz = q / (N_QP_1D * N_QP_1D);
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t det = determinant[geometry_offset];
             const scalar_t adj0 = adjugate[0][geometry_offset];

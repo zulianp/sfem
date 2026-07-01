@@ -77,14 +77,29 @@ def _work_item_index():
     return _target().work_item_index()
 
 
-def _work_item_loop_lines(indent, *, vectorize):
-    if vectorize:
-        return _target().work_item_loop_lines(indent)
-    work_item = _work_item_index()
-    return (
-        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
-        % (indent, work_item, work_item, work_item),
-    )
+def _work_item_loop_lines(indent):
+    return _target().work_item_loop_lines(indent)
+
+
+def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
+    lines = [
+        "%s{" % indent,
+        "%s    for (int scatter = 0; scatter < nelems; ++scatter) {" % indent,
+        "%s        %s" % (indent, _atomic_update_pragma()),
+        "%s        %s[%s] += %s;"
+        % (indent, pointer, node_expr % "scatter", value_expr % "scatter"),
+        "%s    }" % indent,
+        "%s}" % indent,
+    ]
+    return lines
+
+
+def _zero_block_output_lines(name, n_streams, indent):
+    lines = [*_work_item_loop_lines(indent)]
+    for stream in range(n_streams):
+        lines.append("%s    %s[%d][lane] = scalar_t(0);" % (indent, name, stream))
+    lines.append("%s}" % indent)
+    return lines
 
 
 @dataclass(frozen=True)
@@ -966,7 +981,7 @@ def _mixed_local_function(
     dim = system.dim
     layout = MixedFieldLayout.create(system, rule, field_element_types)
     params = [
-        "const ptrdiff_t nelems",
+        "const int nelems",
         "const ptrdiff_t geometry_stride",
         "const scalar_t *const SFEM_RESTRICT determinant",
     ]
@@ -1033,7 +1048,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     dim = system.dim
     lines = [
         "    for (int q = 0; q < N_QP; ++q) {",
-        *_work_item_loop_lines("        ", vectorize=True),
+        *_work_item_loop_lines("        "),
         "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
         "            const scalar_t det = determinant[geometry_offset];",
     ]
@@ -1205,7 +1220,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         )
     lines.extend(
         [
-            *_work_item_loop_lines("        ", vectorize=False),
+            *_work_item_loop_lines("        "),
         ]
     )
     if uses_geometry_offset:
@@ -1406,7 +1421,7 @@ def _local_function(
     dim = system.dim
     n_fields = len(system.fields)
     params = [
-        "const ptrdiff_t nelems",
+        "const int nelems",
         "const ptrdiff_t geometry_stride",
         "const scalar_t *const SFEM_RESTRICT determinant",
     ]
@@ -1480,19 +1495,100 @@ def _local_function(
 
 def _simplex_local_body(system, coefficients, dependencies):
     dim = system.dim
-    lines = [
-        "    for (int q = 0; q < N_QP; ++q) {",
-        *_work_item_loop_lines("        ", vectorize=True),
-        "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-        "            const scalar_t det = determinant[geometry_offset];",
-    ]
+    groups = _dependency_stream_groups(dependencies)
+    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
+    for field in system.fields:
+        for group in groups:
+            if group.uses_value:
+                lines.append("        scalar_t %s%s_values[VECTOR_SIZE];" % (field.name, group.symbol_suffix))
+            if group.uses_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "        scalar_t %s%s_grad_%d_ref_values[VECTOR_SIZE];"
+                        % (field.name, group.symbol_suffix, d)
+                    )
+    for row, _field in enumerate(system.fields):
+        if dependencies.value_coefficients[row]:
+            lines.append("        scalar_t value_coeff%d_values[VECTOR_SIZE];" % row)
+        for d in range(dim):
+            if dependencies.gradient_coefficients[row][d]:
+                lines.append("        scalar_t grad_coeff%d_%d_values[VECTOR_SIZE];" % (row, d))
+    for field_index, field in enumerate(system.fields):
+        for group in groups:
+            if group.uses_value:
+                lines.extend(_work_item_loop_lines("        "))
+                lines.append("            %s%s_values[lane] = scalar_t(0);" % (field.name, group.symbol_suffix))
+                lines.append("        }")
+            if group.uses_gradient:
+                for d in range(dim):
+                    lines.extend(_work_item_loop_lines("        "))
+                    lines.append(
+                        "            %s%s_grad_%d_ref_values[lane] = scalar_t(0);"
+                        % (field.name, group.symbol_suffix, d)
+                    )
+                    lines.append("        }")
+            lines.append("        for (int trial = 0; trial < N_SHAPE; ++trial) {")
+            lines.extend(_work_item_loop_lines("            "))
+            lines.append(
+                "                const scalar_t coeff = %s[trial * N_FIELDS + %d][lane];"
+                % (group.name, field_index)
+            )
+            if group.uses_value:
+                lines.append(
+                    "                %s%s_values[lane] += coeff * shape[q * N_SHAPE + trial];"
+                    % (field.name, group.symbol_suffix)
+                )
+            if group.uses_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "                %s%s_grad_%d_ref_values[lane] += coeff * %s[q * N_SHAPE + trial];"
+                        % (
+                            field.name,
+                            group.symbol_suffix,
+                            d,
+                            sfem_simplex_grad_ref_name("grad_ref", d),
+                        )
+                    )
+            lines.append("            }")
+            lines.append("        }")
+    lines.extend(_work_item_loop_lines("        "))
+    lines.extend(
+        [
+            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+            "            const scalar_t det = determinant[geometry_offset];",
+        ]
+    )
     if dependencies.uses_adjugate:
         for i in range(dim * dim):
             lines.append(
                 "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
                 % (i, i)
             )
-    lines.extend(_field_evaluation_lines(system, dependencies, "            ", False))
+    for field in system.fields:
+        for group in groups:
+            if group.uses_value:
+                lines.append(
+                    "            const scalar_t %s%s = %s%s_values[lane];"
+                    % (field.name, group.symbol_suffix, field.name, group.symbol_suffix)
+                )
+            if group.uses_gradient:
+                for d in range(dim):
+                    lines.append(
+                        "            const scalar_t %s%s_grad_%d_ref = %s%s_grad_%d_ref_values[lane];"
+                        % (
+                            field.name,
+                            group.symbol_suffix,
+                            d,
+                            field.name,
+                            group.symbol_suffix,
+                            d,
+                        )
+                    )
+                lines.extend(
+                    _physical_gradient_lines(
+                        field.name + group.symbol_suffix, dim, "            "
+                    )
+                )
     lines.extend(
         _coefficient_evaluation_lines(
             system,
@@ -1502,12 +1598,31 @@ def _simplex_local_body(system, coefficients, dependencies):
             dependencies,
         )
     )
+    for row, _field in enumerate(system.fields):
+        if dependencies.value_coefficients[row]:
+            lines.append("            value_coeff%d_values[lane] = value_coeff%d;" % (row, row))
+        for d in range(dim):
+            if dependencies.gradient_coefficients[row][d]:
+                lines.append(
+                    "            grad_coeff%d_%d_values[lane] = grad_coeff%d_%d;"
+                    % (row, d, row, d)
+                )
+    lines.append("        }")
     lines.extend(
         [
-            "            for (int test = 0; test < N_SHAPE; ++test) {",
+            "        for (int test = 0; test < N_SHAPE; ++test) {",
+            *_work_item_loop_lines("            "),
+            "                const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+            "                const scalar_t det = determinant[geometry_offset];",
             "                const scalar_t test_value = shape[q * N_SHAPE + test];",
         ]
     )
+    if dependencies.uses_adjugate:
+        for i in range(dim * dim):
+            lines.append(
+                "                const scalar_t adj%d = adjugate[%d][geometry_offset];"
+                % (i, i)
+            )
     for d in range(dim):
         if not any(row[d] for row in dependencies.gradient_coefficients):
             continue
@@ -1523,9 +1638,9 @@ def _simplex_local_body(system, coefficients, dependencies):
     for row in range(len(system.fields)):
         terms = []
         if dependencies.value_coefficients[row]:
-            terms.append("value_coeff%d * test_value" % row)
+            terms.append("value_coeff%d_values[lane] * test_value" % row)
         terms.extend(
-            "grad_coeff%d_%d * test_grad%d" % (row, d, d)
+            "grad_coeff%d_%d_values[lane] * test_grad%d" % (row, d, d)
             for d in range(dim)
             if dependencies.gradient_coefficients[row][d]
         )
@@ -1607,7 +1722,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
         )
     lines.extend(
         [
-            *_work_item_loop_lines("        ", vectorize=True),
+            *_work_item_loop_lines("        "),
         ]
     )
     if uses_geometry_offset:
@@ -1861,7 +1976,7 @@ def _operator_source(
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in (("double", ""), ("float", "_float")):
             params = [
-                "const ptrdiff_t nelems",
+                "const int nelems",
                 "const ptrdiff_t geometry_stride",
                 "const %s *const SFEM_RESTRICT determinant" % scalar_type,
             ]
@@ -2295,7 +2410,7 @@ def _mixed_affine_function(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
         ]
     )
@@ -2309,7 +2424,7 @@ def _mixed_affine_function(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
             "",
-            *_work_item_loop_lines("        ", vectorize=True),
+            *_work_item_loop_lines("        "),
         ]
     )
     for shape in range(cell_rule.n_shape):
@@ -2317,18 +2432,15 @@ def _mixed_affine_function(
             "            ev[lane * CELL_N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(
-        [
-            "        }",
-            "",
-            *_work_item_loop_lines("        ", vectorize=False),
-        ]
-    )
+    lines.append("        }")
+    dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
+    if dependency_groups:
+        lines.extend(["", *_work_item_loop_lines("        ")])
     for field_index, field in enumerate(system.fields):
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
             node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
-            for group in _dependency_stream_groups(dependencies, mesh=True):
+            for group in dependency_groups:
                 lines.append(
                     "            block_%s[%d][lane] = %s[%s * %s];"
                     % (
@@ -2339,8 +2451,9 @@ def _mixed_affine_function(
                         group.stride,
                     )
                 )
-            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
-    lines.append("        }")
+    if dependency_groups:
+        lines.append("        }")
+    lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     if dependencies.uses_adjugate:
         lines.append(
             "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
@@ -2367,22 +2480,21 @@ def _mixed_affine_function(
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for field_index, field in enumerate(system.fields):
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
             lines.extend(
-                [
-                    _atomic_update_pragma(),
-                    "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (_mixed_mesh_output_pointer(field), local_shape, stream),
-                ]
+                _direct_atomic_scatter_lines(
+                    _mixed_mesh_output_pointer(field),
+                    "ev[%%s * CELL_N_SHAPE + %d] * out_stride" % local_shape,
+                    "block_output[%d][%%s]" % stream,
+                    "        ",
+                )
             )
     lines.extend(
         [
-            "        }",
             "    }",
             "    return SFEM_SUCCESS;",
             "}",
@@ -2500,7 +2612,7 @@ def _mixed_isoparametric_function(
         [
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
             "        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];",
             "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
@@ -2517,7 +2629,7 @@ def _mixed_isoparametric_function(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
             "",
-            *_work_item_loop_lines("        ", vectorize=True),
+            *_work_item_loop_lines("        "),
         ]
     )
     for shape in range(cell_rule.n_shape):
@@ -2525,13 +2637,9 @@ def _mixed_isoparametric_function(
             "            ev[lane * CELL_N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(
-        [
-            "        }",
-            "",
-            *_work_item_loop_lines("        ", vectorize=False),
-        ]
-    )
+    lines.append("        }")
+    dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
+    lines.extend(["", *_work_item_loop_lines("        ")])
     for shape in range(cell_rule.n_shape):
         node = "ev[lane * CELL_N_SHAPE + %d]" % shape
         for d in range(dim):
@@ -2543,7 +2651,7 @@ def _mixed_isoparametric_function(
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
             node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
-            for group in _dependency_stream_groups(dependencies, mesh=True):
+            for group in dependency_groups:
                 lines.append(
                     "            block_%s[%d][lane] = %s[%s * %s];"
                     % (
@@ -2554,8 +2662,8 @@ def _mixed_isoparametric_function(
                         group.stride,
                     )
                 )
-            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.append("        }")
+    lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     if tensor_product_geometry:
         lines.append("")
         lines.extend(
@@ -2598,7 +2706,7 @@ def _mixed_isoparametric_function(
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < N_QP; ++q) {",
-                *_work_item_loop_lines("            ", vectorize=True),
+                *_work_item_loop_lines("            "),
             ]
         )
         for i in range(dim):
@@ -2656,22 +2764,21 @@ def _mixed_isoparametric_function(
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for field_index, field in enumerate(system.fields):
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
             lines.extend(
-                [
-                    _atomic_update_pragma(),
-                    "            %s[ev[lane * CELL_N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (_mixed_mesh_output_pointer(field), local_shape, stream),
-                ]
+                _direct_atomic_scatter_lines(
+                    _mixed_mesh_output_pointer(field),
+                    "ev[%%s * CELL_N_SHAPE + %d] * out_stride" % local_shape,
+                    "block_output[%d][%%s]" % stream,
+                    "        ",
+                )
             )
     lines.extend(
         [
-            "        }",
             "    }",
             "    return SFEM_SUCCESS;",
             "}",
@@ -3072,7 +3179,7 @@ def _mesh_operator_source(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
         ]
     )
@@ -3092,7 +3199,7 @@ def _mesh_operator_source(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
             "",
-            *_work_item_loop_lines("        ", vectorize=True),
+            *_work_item_loop_lines("        "),
         ]
     )
     for shape in range(n_shape):
@@ -3100,28 +3207,30 @@ def _mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", *_work_item_loop_lines("        ", vectorize=False)])
-    for shape in range(n_shape):
-        for field_index, field in enumerate(system.fields):
-            stream = shape * n_fields + field_index
-            node = "ev[lane * N_SHAPE + %d]" % shape
-            if dependencies.current:
-                lines.append(
-                    "            block_current[%d][lane] = %s[%s * current_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.previous:
-                lines.append(
-                    "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.direction:
-                lines.append(
-                    "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
-                    % (stream, field.name, node)
-                )
-            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
-    lines.extend(["        }", ""])
+    lines.append("        }")
+    if dependencies.current or dependencies.previous or dependencies.direction:
+        lines.extend(["", *_work_item_loop_lines("        ")])
+        for shape in range(n_shape):
+            for field_index, field in enumerate(system.fields):
+                stream = shape * n_fields + field_index
+                node = "ev[lane * N_SHAPE + %d]" % shape
+                if dependencies.current:
+                    lines.append(
+                        "            block_current[%d][lane] = %s[%s * current_stride];"
+                        % (stream, field.name, node)
+                    )
+                if dependencies.previous:
+                    lines.append(
+                        "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
+                        % (stream, field.name, node)
+                    )
+                if dependencies.direction:
+                    lines.append(
+                        "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
+                        % (stream, field.name, node)
+                    )
+        lines.append("        }")
+    lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
     if dependencies.current:
         lines.append(
             "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
@@ -3192,22 +3301,21 @@ def _mesh_operator_source(
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for shape in range(n_shape):
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
             lines.extend(
-                [
-                    _atomic_update_pragma(),
-                    "            %s_out[ev[lane * N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (field.name, shape, stream),
-                ]
+                _direct_atomic_scatter_lines(
+                    "%s_out" % field.name,
+                    "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                    "block_output[%d][%%s]" % stream,
+                    "        ",
+                )
             )
     lines.extend(
         [
-            "        }",
             "    }",
             "",
             "    return SFEM_SUCCESS;",
@@ -3433,7 +3541,7 @@ def _isoparametric_mesh_operator_source(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
             "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
             "        scalar_t block_coordinates[%d * N_SHAPE][VECTOR_SIZE];"
             % dim,
@@ -3458,7 +3566,7 @@ def _isoparametric_mesh_operator_source(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
             "",
-            *_work_item_loop_lines("        ", vectorize=True),
+            *_work_item_loop_lines("        "),
         ]
     )
     for shape in range(n_shape):
@@ -3466,7 +3574,7 @@ def _isoparametric_mesh_operator_source(
             "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
-    lines.extend(["        }", "", *_work_item_loop_lines("        ", vectorize=False)])
+    lines.extend(["        }", "", *_work_item_loop_lines("        ")])
     for shape in range(n_shape):
         node = "ev[lane * N_SHAPE + %d]" % shape
         for d in range(dim):
@@ -3491,12 +3599,12 @@ def _isoparametric_mesh_operator_source(
                     "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
                     % (stream, field.name, node)
                 )
-            lines.append("            block_output[%d][lane] = scalar_t(0);" % stream)
     lines.extend(
         [
             "        }",
         ]
     )
+    lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        ")])
     if tensor_product_geometry:
         lines.append("")
         lines.extend(
@@ -3539,7 +3647,7 @@ def _isoparametric_mesh_operator_source(
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < N_QP; ++q) {",
-                *_work_item_loop_lines("            ", vectorize=True),
+                *_work_item_loop_lines("            "),
             ]
         )
         for i in range(dim):
@@ -3632,22 +3740,21 @@ def _isoparametric_mesh_operator_source(
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
             % (block, ", ".join(call_args)),
             "",
-            *_work_item_loop_lines("        ", vectorize=False),
         ]
     )
     for shape in range(n_shape):
         for field_index, field in enumerate(system.fields):
             stream = shape * n_fields + field_index
             lines.extend(
-                [
-                    _atomic_update_pragma(),
-                    "            %s_out[ev[lane * N_SHAPE + %d] * out_stride] += block_output[%d][lane];"
-                    % (field.name, shape, stream),
-                ]
+                _direct_atomic_scatter_lines(
+                    "%s_out" % field.name,
+                    "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                    "block_output[%d][%%s]" % stream,
+                    "        ",
+                )
             )
     lines.extend(
         [
-            "        }",
             "    }",
             "",
             "    return SFEM_SUCCESS;",

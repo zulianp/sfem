@@ -1,4 +1,16 @@
+import json
+import os
 import re
+
+
+def generate_op_registration_files(manifests, function_name="register_generated_ops"):
+    entries = _registration_entries_from_manifests(manifests)
+    header_name = "sfem_generated_ops_registration.hpp"
+    source_name = "sfem_generated_ops_registration.cpp"
+    return {
+        header_name: _registration_aggregate_header(function_name),
+        source_name: _registration_aggregate_source(header_name, function_name, entries),
+    }
 
 
 def generate_op_files(material, elements, kernel_sources=None):
@@ -30,13 +42,74 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
     else:
         raise ValueError("unsupported generated Op equation form")
+    wrapper_header = "op/sfem_%s.hpp" % material.op_name
+    wrapper_source = "op/sfem_%s.cpp" % material.op_name
+    registration_source = "op/sfem_%s_registration.cpp" % material.op_name
     files = {
-        "op/sfem_%s.hpp" % material.op_name: header,
-        "op/sfem_%s.cpp" % material.op_name: source,
+        wrapper_header: header,
+        wrapper_source: source,
+        registration_source: _registration_source(material, wrapper_header),
     }
     if c_abi_header:
-        files["op/%s" % c_abi_header] = _c_abi_header(material, kernel_sources)
+        c_abi_path = "op/%s" % c_abi_header
+        files[c_abi_path] = _c_abi_header(material, kernel_sources)
+        files["op/sfem_%s_manifest.json" % material.op_name] = _op_manifest(
+            material,
+            kernel_sources,
+            wrapper_header,
+            wrapper_source,
+            registration_source,
+            c_abi_path,
+        )
     return files
+
+
+def _registration_entries_from_manifests(manifests):
+    entries = []
+    for manifest in manifests:
+        if isinstance(manifest, str):
+            manifest = json.loads(manifest)
+        registration = manifest["registration"]
+        entries.append(
+            (
+                registration["operator_name"],
+                registration["function"].replace("sfem::", ""),
+            )
+        )
+    return tuple(sorted(dict(entries).items()))
+
+
+def _registration_aggregate_header(function_name):
+    return """#pragma once
+
+namespace sfem {
+    void %(function)s();
+}  // namespace sfem
+""" % {
+        "function": function_name,
+    }
+
+
+def _registration_aggregate_source(header_name, function_name, entries):
+    declarations = "\n".join("    void %s();" % function for _, function in entries)
+    calls = "\n".join("        %s();" % function for _, function in entries)
+    if declarations:
+        declarations += "\n"
+    if calls:
+        calls += "\n"
+    return """#include "%(header)s"
+
+namespace sfem {
+%(declarations)s
+    void %(function)s() {
+%(calls)s    }
+}  // namespace sfem
+""" % {
+        "header": header_name,
+        "declarations": declarations,
+        "function": function_name,
+        "calls": calls,
+    }
 
 
 def _systems_by_dim(material, elements):
@@ -2446,6 +2519,73 @@ typedef double geom_t;
 %(body)s""" % {
         "body": body,
     }
+
+
+def _registration_source(material, wrapper_header):
+    function = _registration_function(material)
+    return """#include "%(header)s"
+#include "sfem_OpFactory.hpp"
+
+namespace sfem {
+    void %(function)s() {
+        Factory::register_op("%(op)s", %(op)s::create);
+    }
+}  // namespace sfem
+""" % {
+        "header": os.path.basename(wrapper_header),
+        "function": function,
+        "op": material.op_name,
+    }
+
+
+def _registration_function(material):
+    return "register_%s_generated_op" % _safe_identifier(material.op_name)
+
+
+def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, registration_source, c_abi_header):
+    declarations = _extract_c_abi_declarations(kernel_sources)
+    c_abi = [
+        {
+            "name": _c_abi_function_name(declaration),
+            "declaration": declaration,
+        }
+        for declaration in declarations
+    ]
+    manifest = {
+        "schema": "sfem.generated_op_manifest.v1",
+        "material": material.name,
+        "op_name": material.op_name,
+        "wrapper": {
+            "header": wrapper_header,
+            "source": wrapper_source,
+            "c_abi_header": c_abi_header,
+        },
+        "registration": {
+            "source": registration_source,
+            "function": "sfem::%s" % _registration_function(material),
+            "operator_name": material.op_name,
+        },
+        "factory": {
+            "class": "sfem::%s" % material.op_name,
+            "create": "sfem::%s::create" % material.op_name,
+            "create_from_yaml": "sfem::%s::create_from_yaml" % material.op_name,
+        },
+        "generated_include_paths": _generated_include_paths(kernel_sources),
+        "c_abi": c_abi,
+    }
+    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+
+
+def _generated_include_paths(kernel_sources):
+    paths = set([".", "op"])
+    for path in kernel_sources:
+        if path.startswith("op/"):
+            continue
+        if not path.endswith((".hpp", ".cuh", ".cpp", ".cu")):
+            continue
+        dirname = os.path.dirname(path)
+        paths.add(dirname if dirname else ".")
+    return tuple(sorted(paths))
 
 
 def _extract_c_abi_declarations(kernel_sources):

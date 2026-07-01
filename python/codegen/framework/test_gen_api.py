@@ -1,9 +1,12 @@
 import json
+import io
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from dataclasses import replace
 
 import sympy as sp
@@ -26,6 +29,116 @@ from .tensor_product_geometry import (
 
 def _relative_sources(result, out_dir):
     return {os.path.relpath(path, out_dir) for path in result.sources}
+
+
+def _compiler_vectorization_flags(compiler):
+    version = subprocess.run(
+        [compiler, "--version"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ).stdout.lower()
+    if "clang" in version:
+        return ["-O3", "-fopenmp-simd", "-Rpass=loop-vectorize", "-Werror=pass-failed"], "clang"
+    if "gcc" in version or "g++" in version:
+        return ["-O3", "-fopenmp-simd", "-fopt-info-vec-optimized"], "gcc"
+    return None, "unknown"
+
+
+def _assert_source_reports_vectorized_loops(
+    test_case,
+    compiler,
+    source_path,
+    object_path,
+    include_dir,
+    expected_report_source,
+    minimum_matches=1,
+):
+    flags, compiler_kind = _compiler_vectorization_flags(compiler)
+    if flags is None:
+        test_case.skipTest("compiler does not expose a supported vectorization report")
+
+    completed = subprocess.run(
+        [
+            compiler,
+            "-std=c++14",
+            *flags,
+            "-c",
+            source_path,
+            "-I",
+            include_dir,
+            "-o",
+            object_path,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report = completed.stdout + completed.stderr
+    if completed.returncode != 0:
+        test_case.fail("generated source did not compile:\n%s" % report)
+
+    if compiler_kind == "clang":
+        pattern = r"%s:\d+:\d+: remark: vectorized loop" % re.escape(expected_report_source)
+    else:
+        pattern = r"%s:.*loop vectorized" % re.escape(expected_report_source)
+    matches = re.findall(pattern, report)
+    test_case.assertGreaterEqual(
+        len(matches),
+        minimum_matches,
+        "expected %s to report vectorized loops; compiler report was:\n%s"
+        % (expected_report_source, report),
+    )
+
+
+def _assert_lane_loops_request_simd(test_case, path):
+    with open(path, encoding="utf-8") as input_file:
+        lines = input_file.read().splitlines()
+    allow_nested_lane_loops = os.path.basename(path) in (
+        "tensor_product_kernels.hpp",
+        "tensor_product_kernels.cuh",
+    )
+    lane_loop_count = 0
+    for index, line in enumerate(lines):
+        if "for (int lane = 0; lane < nelems; ++lane) {" not in line:
+            continue
+        lane_loop_count += 1
+        previous = index - 1
+        while previous >= 0 and lines[previous].strip() == "":
+            previous -= 1
+        test_case.assertGreaterEqual(previous, 0)
+        test_case.assertEqual(
+            lines[previous].strip(),
+            "#pragma omp simd",
+            "%s:%d lane loop is not guarded by target SIMD pragma" % (path, index + 1),
+        )
+        depth = line.count("{") - line.count("}")
+        body = index + 1
+        while body < len(lines) and depth > 0:
+            stripped = lines[body].strip()
+            if stripped.startswith("#pragma omp atomic"):
+                test_case.fail(
+                    "%s:%d lane loop body contains an atomic pragma at line %d"
+                    % (path, index + 1, body + 1)
+                )
+            if not allow_nested_lane_loops and re.search(r"\bfor\s*\(", stripped):
+                test_case.fail(
+                    "%s:%d lane loop body contains nested loop at line %d"
+                    % (path, index + 1, body + 1)
+                )
+            depth += lines[body].count("{") - lines[body].count("}")
+            body += 1
+    return lane_loop_count
+
+
+def _assert_generated_lane_loops_request_simd(test_case, result):
+    lane_loop_count = 0
+    for path in result.sources:
+        if not path.endswith((".cpp", ".hpp")):
+            continue
+        lane_loop_count += _assert_lane_loops_request_simd(test_case, path)
+    test_case.assertGreater(lane_loop_count, 0)
 
 
 class GenApiTest(unittest.TestCase):
@@ -475,6 +588,8 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden.cpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_manifest.json", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_registration.cpp", names)
             wrapper = os.path.join(
                 out_dir,
                 "op",
@@ -509,6 +624,42 @@ class GenApiTest(unittest.TestCase):
                 "extern \"C\" int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa",
                 declarations,
             )
+            manifest = os.path.join(
+                out_dir,
+                "op",
+                "sfem_GeneratedNeoHookeanOgden_manifest.json",
+            )
+            with open(manifest, encoding="utf-8") as stream:
+                metadata = json.load(stream)
+            self.assertEqual(metadata["schema"], "sfem.generated_op_manifest.v1")
+            self.assertEqual(metadata["material"], "neohookean_ogden")
+            self.assertEqual(metadata["op_name"], "GeneratedNeoHookeanOgden")
+            self.assertEqual(metadata["wrapper"]["header"], "op/sfem_GeneratedNeoHookeanOgden.hpp")
+            self.assertEqual(metadata["wrapper"]["source"], "op/sfem_GeneratedNeoHookeanOgden.cpp")
+            self.assertEqual(metadata["wrapper"]["c_abi_header"], "op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp")
+            self.assertEqual(
+                metadata["registration"]["source"],
+                "op/sfem_GeneratedNeoHookeanOgden_registration.cpp",
+            )
+            self.assertEqual(
+                metadata["registration"]["function"],
+                "sfem::register_GeneratedNeoHookeanOgden_generated_op",
+            )
+            self.assertEqual(metadata["factory"]["create"], "sfem::GeneratedNeoHookeanOgden::create")
+            self.assertIn(".", metadata["generated_include_paths"])
+            self.assertIn("d2", metadata["generated_include_paths"])
+            self.assertIn("d2/tri3", metadata["generated_include_paths"])
+            self.assertIn("op", metadata["generated_include_paths"])
+            self.assertIn(
+                "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                {entry["name"] for entry in metadata["c_abi"]},
+            )
+            with open(
+                os.path.join(out_dir, "op", "sfem_GeneratedNeoHookeanOgden_registration.cpp"),
+                encoding="utf-8",
+            ) as stream:
+                registration = stream.read()
+            self.assertIn('Factory::register_op("GeneratedNeoHookeanOgden"', registration)
 
     def test_energy_kernel_signatures_prune_unused_material_parameters(self):
         mu = gen.material_parameter("mu")
@@ -546,6 +697,55 @@ class GenApiTest(unittest.TestCase):
 
         self.assertIn("const scalar_t mu", generated)
         self.assertNotIn("unused", generated)
+
+    def test_generates_factory_registration_aggregate_from_op_manifests(self):
+        manifests = []
+        manifest_paths = []
+        with tempfile.TemporaryDirectory() as out_dir:
+            for material, element in (
+                (neohookean_ogden, "TRI3"),
+                (two_phase_flow, "TRI3"),
+            ):
+                result = gen.generate(material, out_dir, elements=(element,), clean=False)
+                manifest_path = next(
+                    path
+                    for path in result.sources
+                    if path.endswith("_manifest.json")
+                )
+                manifest_paths.append(manifest_path)
+                with open(manifest_path, encoding="utf-8") as input_file:
+                    manifests.append(json.load(input_file))
+
+            files = gen.generate_op_registration_files(manifests)
+            self.assertEqual(
+                set(files),
+                {
+                    "sfem_generated_ops_registration.hpp",
+                    "sfem_generated_ops_registration.cpp",
+                },
+            )
+            header = files["sfem_generated_ops_registration.hpp"]
+            source = files["sfem_generated_ops_registration.cpp"]
+            self.assertIn("void register_generated_ops();", header)
+            self.assertIn("void register_GeneratedNeoHookeanOgden_generated_op();", source)
+            self.assertIn("void register_GeneratedTwoPhaseFlow_generated_op();", source)
+            self.assertLess(
+                source.index("register_GeneratedNeoHookeanOgden_generated_op();"),
+                source.index("register_GeneratedTwoPhaseFlow_generated_op();"),
+            )
+
+            from .generate_op_registration_files import main as generate_registration_main
+
+            registration_dir = os.path.join(out_dir, "registration")
+            with redirect_stdout(io.StringIO()):
+                generate_registration_main([*manifest_paths, "--out-dir", registration_dir])
+            with open(
+                os.path.join(registration_dir, "sfem_generated_ops_registration.cpp"),
+                encoding="utf-8",
+            ) as input_file:
+                generated_source = input_file.read()
+            self.assertIn("register_GeneratedNeoHookeanOgden_generated_op();", generated_source)
+            self.assertIn("register_GeneratedTwoPhaseFlow_generated_op();", generated_source)
 
     def test_material_runner_writes_generation_plan_dump(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -1329,6 +1529,124 @@ class GenApiTest(unittest.TestCase):
                 self.assertNotIn("const ptrdiff_t thread = 0", source)
                 self.assertNotIn("SFEM_INLINE", source)
 
+    def test_compiles_generated_cuda_material_energy_kernel_when_nvcc_is_available(self):
+        compiler = shutil.which("nvcc")
+        if compiler is None:
+            self.skipTest("nvcc is not available")
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("QUAD4",),
+                target="cuda",
+            )
+            source = os.path.join(
+                out_dir,
+                "d2",
+                "quad4",
+                "neohookean_ogden_quad4_operator.cu",
+            )
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-c",
+                    source,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "neohookean_ogden_quad4_operator.o"),
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+    def test_openmp_hot_loop_families_report_vectorized_local_loops(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        cases = (
+            (
+                "simplex_energy",
+                neohookean_ogden,
+                ("TRI3",),
+                os.path.join("d2", "tri3", "neohookean_ogden_tri3_operator.cpp"),
+                "neohookean_ogden_d2_simplex_local.hpp",
+                3,
+            ),
+            (
+                "tensor_product_energy",
+                neohookean_ogden,
+                ("QUAD4",),
+                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.cpp"),
+                "neohookean_ogden_d2_tensor_product_local.hpp",
+                3,
+            ),
+            (
+                "simplex_residual",
+                two_phase_flow,
+                ("TRI3",),
+                os.path.join("d2", "tri3", "two_phase_flow_tri3_operator.cpp"),
+                "two_phase_flow_d2_simplex_local.hpp",
+                2,
+            ),
+            (
+                "tensor_product_residual",
+                two_phase_flow,
+                ("QUAD4",),
+                os.path.join("d2", "quad4", "two_phase_flow_quad4_operator.cpp"),
+                "two_phase_flow_d2_tensor_product_local.hpp",
+                2,
+            ),
+            (
+                "mixed_taylor_hood",
+                stokes,
+                ("TRI6_TRI3",),
+                os.path.join("d2", "tri6_tri3", "stokes_tri6_tri3_operator.cpp"),
+                "stokes_d2_simplex_mixed_local.hpp",
+                2,
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            for label, material, elements, source_relpath, report_source, minimum_matches in cases:
+                out_dir = os.path.join(root_dir, label)
+                result = gen.generate(material, out_dir, elements=elements)
+                _assert_generated_lane_loops_request_simd(self, result)
+                source_path = os.path.join(out_dir, source_relpath)
+                _assert_source_reports_vectorized_loops(
+                    self,
+                    compiler,
+                    source_path,
+                    os.path.join(out_dir, "%s.o" % label),
+                    out_dir,
+                    report_source,
+                    minimum_matches=minimum_matches,
+                )
+
+    def test_openmp_energy_hex8_lane_loops_request_target_simd(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(neohookean_ogden, out_dir, elements=("HEX8",))
+            source = os.path.join(
+                out_dir,
+                "d3",
+                "hex8",
+                "neohookean_ogden_hex8_operator.cpp",
+            )
+            with open(source, encoding="utf-8") as input_file:
+                contents = input_file.read()
+            self.assertGreater(_assert_lane_loops_request_simd(self, source), 0)
+        self.assertIn(
+            "#pragma omp simd\n"
+            "        for (int lane = 0; lane < nelems; ++lane) {\n"
+            "            block_value[lane] = scalar_t(0);",
+            contents,
+        )
+
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
         energy_plan = gen.SpecializedFormManipulationStage(
@@ -2030,6 +2348,8 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity.cpp", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity.hpp", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity_c_abi.hpp", names)
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity_manifest.json", names)
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity_registration.cpp", names)
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity.cpp")
             with open(wrapper, encoding="utf-8") as input_file:
                 wrapper_contents = input_file.read()
@@ -2056,6 +2376,19 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "extern \"C\" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
                 declarations,
+            )
+            manifest = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_manifest.json")
+            with open(manifest, encoding="utf-8") as input_file:
+                metadata = json.load(input_file)
+            self.assertEqual(metadata["factory"]["class"], "sfem::GeneratedPoroHyperelasticity")
+            self.assertEqual(
+                metadata["registration"]["function"],
+                "sfem::register_GeneratedPoroHyperelasticity_generated_op",
+            )
+            self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
+            self.assertIn(
+                "poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
+                {entry["name"] for entry in metadata["c_abi"]},
             )
 
     def test_poro_tensor_zero_block_does_not_force_empty_lane_loop(self):
@@ -2088,8 +2421,9 @@ class GenApiTest(unittest.TestCase):
             )
             with open(mesh, encoding="utf-8") as input_file:
                 mesh_contents = input_file.read()
-            self.assertNotIn(
-                "#pragma omp simd\n        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {\n"
+            self.assertGreater(_assert_lane_loops_request_simd(self, mesh), 0)
+            self.assertIn(
+                "#pragma omp simd\n        for (int lane = 0; lane < nelems; ++lane) {\n"
                 "            block_current[0][lane] =",
                 mesh_contents,
             )
@@ -2108,6 +2442,8 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("op/sfem_GeneratedStokes.cpp", names)
             self.assertIn("op/sfem_GeneratedStokes.hpp", names)
             self.assertIn("op/sfem_GeneratedStokes_c_abi.hpp", names)
+            self.assertIn("op/sfem_GeneratedStokes_manifest.json", names)
+            self.assertIn("op/sfem_GeneratedStokes_registration.cpp", names)
             self.assertIsInstance(result.plan, gen.GenerationPlan)
             self.assertEqual(result.plan.units[0].name, "stokes")
             self.assertTrue(result.plan.units[0].is_complete_system)
@@ -2177,6 +2513,19 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "extern \"C\" int stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa",
                 declarations,
+            )
+            manifest = os.path.join(out_dir, "op", "sfem_GeneratedStokes_manifest.json")
+            with open(manifest, encoding="utf-8") as input_file:
+                metadata = json.load(input_file)
+            self.assertEqual(metadata["wrapper"]["source"], "op/sfem_GeneratedStokes.cpp")
+            self.assertEqual(
+                metadata["registration"]["source"],
+                "op/sfem_GeneratedStokes_registration.cpp",
+            )
+            self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
+            self.assertIn(
+                "stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa",
+                {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertIn(
                 "d2/tri6_tri3/stokes_form_2_u_p_tri6_tri3_operator.cpp",
@@ -2573,9 +2922,12 @@ class GenApiTest(unittest.TestCase):
                 proteus_source = input_file.read()
             self.assertIn("neumann_quad4_edgeshell2_boundary_residual_soa", quad_source)
             self.assertNotIn("for (int qy = 0; qy < Q; ++qy)", quad_source)
+            self.assertIn("#pragma omp simd", quad_source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
             self.assertIn("neumann_proteus_hex27_proteus_quadshell9_boundary_residual_soa", proteus_source)
+            self.assertIn("#pragma omp simd", source)
+            self.assertIn("#pragma omp simd", proteus_source)
             self.assertIn("static const scalar_t *shape_1d()", source)
             self.assertIn("static const scalar_t *grad_1d()", source)
             self.assertIn("static const scalar_t *weight_1d()", source)
@@ -2592,6 +2944,14 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("return sqrt(c0 * c0 + c1 * c1 + c2 * c2);", source)
             self.assertIn(
                 os.path.join("op", "sfem_GeneratedNeumann.cpp"),
+                names,
+            )
+            self.assertIn(
+                os.path.join("op", "sfem_GeneratedNeumann_manifest.json"),
+                names,
+            )
+            self.assertIn(
+                os.path.join("op", "sfem_GeneratedNeumann_registration.cpp"),
                 names,
             )
             with open(
@@ -2616,6 +2976,21 @@ class GenApiTest(unittest.TestCase):
             self.assertIn(
                 "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
                 c_abi,
+            )
+            with open(
+                os.path.join(out_dir, "op", "sfem_GeneratedNeumann_manifest.json"),
+                encoding="utf-8",
+            ) as input_file:
+                metadata = json.load(input_file)
+            self.assertEqual(metadata["factory"]["class"], "sfem::GeneratedNeumann")
+            self.assertEqual(
+                metadata["registration"]["function"],
+                "sfem::register_GeneratedNeumann_generated_op",
+            )
+            self.assertIn("d3/hex8", metadata["generated_include_paths"])
+            self.assertIn(
+                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                {entry["name"] for entry in metadata["c_abi"]},
             )
 
     def test_generates_ufl_style_coordinate_neumann_boundary_integral(self):

@@ -56,7 +56,7 @@ extern "C" void two_phase_flow_form_1_p_c_hex8_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -71,7 +71,7 @@ extern "C" double two_phase_flow_form_1_p_c_hex8_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -324,7 +324,7 @@ extern "C" void two_phase_flow_form_1_p_c_hex8_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -363,7 +363,7 @@ extern "C" double two_phase_flow_form_1_p_c_hex8_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -546,7 +546,7 @@ extern "C" void two_phase_flow_form_1_p_c_quad4_jacobian_action_affine_mesh_soa_
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -561,7 +561,7 @@ extern "C" double two_phase_flow_form_1_p_c_quad4_jacobian_action_element_soa_ar
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -794,7 +794,7 @@ extern "C" void two_phase_flow_form_1_p_c_quad4_residual_affine_mesh_soa_print_r
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -828,7 +828,7 @@ extern "C" double two_phase_flow_form_1_p_c_quad4_residual_element_soa_arithmeti
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -996,7 +996,7 @@ extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -1011,7 +1011,7 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -1264,7 +1264,7 @@ extern "C" void two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -1303,7 +1303,7 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -1486,7 +1486,7 @@ extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -1501,7 +1501,7 @@ extern "C" double two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -1734,7 +1734,7 @@ extern "C" void two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_c_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -1768,7 +1768,7 @@ extern "C" double two_phase_flow_form_1_p_c_tri3_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_c_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -1936,7 +1936,7 @@ extern "C" void two_phase_flow_form_1_p_w_hex8_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -1951,7 +1951,7 @@ extern "C" double two_phase_flow_form_1_p_w_hex8_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -2200,7 +2200,7 @@ extern "C" void two_phase_flow_form_1_p_w_hex8_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -2237,7 +2237,7 @@ extern "C" double two_phase_flow_form_1_p_w_hex8_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -2414,7 +2414,7 @@ extern "C" void two_phase_flow_form_1_p_w_quad4_jacobian_action_affine_mesh_soa_
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -2429,7 +2429,7 @@ extern "C" double two_phase_flow_form_1_p_w_quad4_jacobian_action_element_soa_ar
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -2658,7 +2658,7 @@ extern "C" void two_phase_flow_form_1_p_w_quad4_residual_affine_mesh_soa_print_r
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -2690,7 +2690,7 @@ extern "C" double two_phase_flow_form_1_p_w_quad4_residual_element_soa_arithmeti
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -2852,7 +2852,7 @@ extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -2867,7 +2867,7 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -3116,7 +3116,7 @@ extern "C" void two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -3153,7 +3153,7 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -3330,7 +3330,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_jacobian_action_affine_mesh_soa_p
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -3345,7 +3345,7 @@ extern "C" double two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_ari
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -3574,7 +3574,7 @@ extern "C" void two_phase_flow_form_1_p_w_tri3_residual_affine_mesh_soa_print_ra
         const int repeat);
 
 extern "C" int two_phase_flow_form_1_p_w_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -3606,7 +3606,7 @@ extern "C" double two_phase_flow_form_1_p_w_tri3_residual_element_soa_arithmetic
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_1_p_w_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -3840,7 +3840,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -3879,7 +3879,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -4142,7 +4142,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_hex8_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -4157,7 +4157,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_hex8_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -4310,7 +4310,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_affine_mesh_
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -4344,7 +4344,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_element_so
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -4592,7 +4592,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_quad4_residual_affine_mesh_soa_pri
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -4607,7 +4607,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_quad4_residual_element_soa_arith
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -4780,7 +4780,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -4819,7 +4819,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -5082,7 +5082,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_tet4_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -5097,7 +5097,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_tet4_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -5250,7 +5250,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_tri3_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -5284,7 +5284,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_tri3_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -5532,7 +5532,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_c_tri3_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -5547,7 +5547,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_c_tri3_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -5720,7 +5720,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -5759,7 +5759,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -6022,7 +6022,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_hex8_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -6037,7 +6037,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_hex8_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -6190,7 +6190,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_affine_mesh_
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -6224,7 +6224,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_element_so
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -6472,7 +6472,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_quad4_residual_affine_mesh_soa_pri
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -6487,7 +6487,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_quad4_residual_element_soa_arith
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -6660,7 +6660,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -6699,7 +6699,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -6962,7 +6962,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_tet4_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -6977,7 +6977,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_tet4_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -7130,7 +7130,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -7164,7 +7164,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -7412,7 +7412,7 @@ extern "C" void two_phase_flow_form_2_p_c_p_w_tri3_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -7427,7 +7427,7 @@ extern "C" double two_phase_flow_form_2_p_c_p_w_tri3_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -7596,7 +7596,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -7633,7 +7633,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -7890,7 +7890,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_hex8_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -7905,7 +7905,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_hex8_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -8054,7 +8054,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_affine_mesh_
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -8086,7 +8086,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_element_so
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -8328,7 +8328,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_quad4_residual_affine_mesh_soa_pri
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -8343,7 +8343,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_quad4_residual_element_soa_arith
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -8512,7 +8512,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -8549,7 +8549,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -8806,7 +8806,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_tet4_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -8821,7 +8821,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_tet4_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -8970,7 +8970,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -9002,7 +9002,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -9244,7 +9244,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -9259,7 +9259,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -9428,7 +9428,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -9465,7 +9465,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -9722,7 +9722,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_hex8_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[16]
@@ -9737,7 +9737,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_hex8_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[16]
@@ -9886,7 +9886,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affine_mesh_
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -9918,7 +9918,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_so
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -10160,7 +10160,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_soa_pri
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -10175,7 +10175,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa_arith
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -10344,7 +10344,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -10381,7 +10381,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -10638,7 +10638,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_tet4_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -10653,7 +10653,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_tet4_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -10802,7 +10802,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_affine_mesh_s
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -10834,7 +10834,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_element_soa
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -11076,7 +11076,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_tri3_residual_affine_mesh_soa_prin
         const int repeat);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[6]
@@ -11091,7 +11091,7 @@ extern "C" double two_phase_flow_form_2_p_w_p_w_tri3_residual_element_soa_arithm
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[6]
@@ -11274,7 +11274,7 @@ extern "C" void two_phase_flow_hex8_jacobian_action_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_hex8_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -11318,7 +11318,7 @@ extern "C" double two_phase_flow_hex8_jacobian_action_element_soa_arithmetic_int
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_hex8_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -11678,7 +11678,7 @@ extern "C" void two_phase_flow_hex8_residual_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_hex8_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -11722,7 +11722,7 @@ extern "C" double two_phase_flow_hex8_residual_element_soa_arithmetic_intensity(
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_hex8_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_hex8_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -11982,7 +11982,7 @@ extern "C" void two_phase_flow_quad4_jacobian_action_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -12021,7 +12021,7 @@ extern "C" double two_phase_flow_quad4_jacobian_action_element_soa_arithmetic_in
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -12346,7 +12346,7 @@ extern "C" void two_phase_flow_quad4_residual_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -12385,7 +12385,7 @@ extern "C" double two_phase_flow_quad4_residual_element_soa_arithmetic_intensity
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_quad4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -12650,7 +12650,7 @@ extern "C" void two_phase_flow_tet4_jacobian_action_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_tet4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -12694,7 +12694,7 @@ extern "C" double two_phase_flow_tet4_jacobian_action_element_soa_arithmetic_int
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_tet4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -13054,7 +13054,7 @@ extern "C" void two_phase_flow_tet4_residual_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_tet4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[9],
@@ -13098,7 +13098,7 @@ extern "C" double two_phase_flow_tet4_residual_element_soa_arithmetic_intensity(
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_tet4_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_tet4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[9],
@@ -13358,7 +13358,7 @@ extern "C" void two_phase_flow_tri3_jacobian_action_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_tri3_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -13397,7 +13397,7 @@ extern "C" double two_phase_flow_tri3_jacobian_action_element_soa_arithmetic_int
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_tri3_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -13722,7 +13722,7 @@ extern "C" void two_phase_flow_tri3_residual_affine_mesh_soa_print_rate(
         const int repeat);
 
 extern "C" int two_phase_flow_tri3_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -13761,7 +13761,7 @@ extern "C" double two_phase_flow_tri3_residual_element_soa_arithmetic_intensity(
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_tri3_residual_element_soa_diagnostics(void);
 
 extern "C" int two_phase_flow_tri3_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],

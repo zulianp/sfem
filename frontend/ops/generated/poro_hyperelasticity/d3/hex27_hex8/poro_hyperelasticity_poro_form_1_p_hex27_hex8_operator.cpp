@@ -393,14 +393,14 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_af
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
@@ -430,273 +430,278 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_af
             ev[lane * CELL_N_SHAPE + 26] = elements[26][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_current[0][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[0][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[0][lane] = scalar_t(0);
             block_current[1][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[1][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[1][lane] = scalar_t(0);
             block_current[2][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[2][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[2][lane] = scalar_t(0);
             block_current[3][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[3][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[3][lane] = scalar_t(0);
             block_current[4][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[4][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[4][lane] = scalar_t(0);
             block_current[5][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[5][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[5][lane] = scalar_t(0);
             block_current[6][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[6][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[6][lane] = scalar_t(0);
             block_current[7][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[7][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[7][lane] = scalar_t(0);
             block_current[8][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[8][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[8][lane] = scalar_t(0);
             block_current[9][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[9][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[9][lane] = scalar_t(0);
             block_current[10][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[10][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[10][lane] = scalar_t(0);
             block_current[11][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[11][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[11][lane] = scalar_t(0);
             block_current[12][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[12][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[12][lane] = scalar_t(0);
             block_current[13][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[13][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[13][lane] = scalar_t(0);
             block_current[14][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[14][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[14][lane] = scalar_t(0);
             block_current[15][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[15][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[15][lane] = scalar_t(0);
             block_current[16][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[16][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[16][lane] = scalar_t(0);
             block_current[17][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[17][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[17][lane] = scalar_t(0);
             block_current[18][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[18][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[18][lane] = scalar_t(0);
             block_current[19][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[19][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[19][lane] = scalar_t(0);
             block_current[20][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[20][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[20][lane] = scalar_t(0);
             block_current[21][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[21][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[21][lane] = scalar_t(0);
             block_current[22][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[22][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[22][lane] = scalar_t(0);
             block_current[23][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[23][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[23][lane] = scalar_t(0);
             block_current[24][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[24][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[24][lane] = scalar_t(0);
             block_current[25][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[25][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[25][lane] = scalar_t(0);
             block_current[26][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[26][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[26][lane] = scalar_t(0);
             block_current[27][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[27][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[27][lane] = scalar_t(0);
             block_current[28][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[28][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[28][lane] = scalar_t(0);
             block_current[29][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[29][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[29][lane] = scalar_t(0);
             block_current[30][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[30][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[30][lane] = scalar_t(0);
             block_current[31][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[31][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[31][lane] = scalar_t(0);
             block_current[32][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[32][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[32][lane] = scalar_t(0);
             block_current[33][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[33][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[33][lane] = scalar_t(0);
             block_current[34][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[34][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[34][lane] = scalar_t(0);
             block_current[35][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[35][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[35][lane] = scalar_t(0);
             block_current[36][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[36][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[36][lane] = scalar_t(0);
             block_current[37][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[37][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[37][lane] = scalar_t(0);
             block_current[38][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[38][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[38][lane] = scalar_t(0);
             block_current[39][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[39][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[39][lane] = scalar_t(0);
             block_current[40][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[40][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[40][lane] = scalar_t(0);
             block_current[41][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[41][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[41][lane] = scalar_t(0);
             block_current[42][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[42][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[42][lane] = scalar_t(0);
             block_current[43][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[43][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[43][lane] = scalar_t(0);
             block_current[44][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[44][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[44][lane] = scalar_t(0);
             block_current[45][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[45][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[45][lane] = scalar_t(0);
             block_current[46][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[46][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[46][lane] = scalar_t(0);
             block_current[47][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[47][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[47][lane] = scalar_t(0);
             block_current[48][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[48][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[48][lane] = scalar_t(0);
             block_current[49][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[49][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[49][lane] = scalar_t(0);
             block_current[50][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[50][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[50][lane] = scalar_t(0);
             block_current[51][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[51][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[51][lane] = scalar_t(0);
             block_current[52][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[52][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[52][lane] = scalar_t(0);
             block_current[53][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[53][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[53][lane] = scalar_t(0);
             block_current[54][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[54][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[54][lane] = scalar_t(0);
             block_current[55][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[55][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[55][lane] = scalar_t(0);
             block_current[56][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[56][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[56][lane] = scalar_t(0);
             block_current[57][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[57][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[57][lane] = scalar_t(0);
             block_current[58][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[58][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[58][lane] = scalar_t(0);
             block_current[59][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[59][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[59][lane] = scalar_t(0);
             block_current[60][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[60][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[60][lane] = scalar_t(0);
             block_current[61][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[61][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[61][lane] = scalar_t(0);
             block_current[62][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[62][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[62][lane] = scalar_t(0);
             block_current[63][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[63][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[63][lane] = scalar_t(0);
             block_current[64][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[64][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[64][lane] = scalar_t(0);
             block_current[65][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[65][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[65][lane] = scalar_t(0);
             block_current[66][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[66][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[66][lane] = scalar_t(0);
             block_current[67][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[67][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[67][lane] = scalar_t(0);
             block_current[68][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[68][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[68][lane] = scalar_t(0);
             block_current[69][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[69][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[69][lane] = scalar_t(0);
             block_current[70][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[70][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[70][lane] = scalar_t(0);
             block_current[71][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[71][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[71][lane] = scalar_t(0);
             block_current[72][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[72][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[72][lane] = scalar_t(0);
             block_current[73][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[73][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[73][lane] = scalar_t(0);
             block_current[74][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[74][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[74][lane] = scalar_t(0);
             block_current[75][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[75][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[75][lane] = scalar_t(0);
             block_current[76][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[76][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[76][lane] = scalar_t(0);
             block_current[77][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[77][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[77][lane] = scalar_t(0);
             block_current[78][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[78][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[78][lane] = scalar_t(0);
             block_current[79][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[79][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[79][lane] = scalar_t(0);
             block_current[80][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[80][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[80][lane] = scalar_t(0);
             block_current[81][lane] = p_data[ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[81][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[81][lane] = scalar_t(0);
             block_current[82][lane] = p_data[ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[82][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[82][lane] = scalar_t(0);
             block_current[83][lane] = p_data[ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[83][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[83][lane] = scalar_t(0);
             block_current[84][lane] = p_data[ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[84][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[84][lane] = scalar_t(0);
             block_current[85][lane] = p_data[ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[85][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[85][lane] = scalar_t(0);
             block_current[86][lane] = p_data[ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[86][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[86][lane] = scalar_t(0);
             block_current[87][lane] = p_data[ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[87][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[87][lane] = scalar_t(0);
             block_current[88][lane] = p_data[ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[88][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 7] * previous_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
+            block_output[7][lane] = scalar_t(0);
+            block_output[8][lane] = scalar_t(0);
+            block_output[9][lane] = scalar_t(0);
+            block_output[10][lane] = scalar_t(0);
+            block_output[11][lane] = scalar_t(0);
+            block_output[12][lane] = scalar_t(0);
+            block_output[13][lane] = scalar_t(0);
+            block_output[14][lane] = scalar_t(0);
+            block_output[15][lane] = scalar_t(0);
+            block_output[16][lane] = scalar_t(0);
+            block_output[17][lane] = scalar_t(0);
+            block_output[18][lane] = scalar_t(0);
+            block_output[19][lane] = scalar_t(0);
+            block_output[20][lane] = scalar_t(0);
+            block_output[21][lane] = scalar_t(0);
+            block_output[22][lane] = scalar_t(0);
+            block_output[23][lane] = scalar_t(0);
+            block_output[24][lane] = scalar_t(0);
+            block_output[25][lane] = scalar_t(0);
+            block_output[26][lane] = scalar_t(0);
+            block_output[27][lane] = scalar_t(0);
+            block_output[28][lane] = scalar_t(0);
+            block_output[29][lane] = scalar_t(0);
+            block_output[30][lane] = scalar_t(0);
+            block_output[31][lane] = scalar_t(0);
+            block_output[32][lane] = scalar_t(0);
+            block_output[33][lane] = scalar_t(0);
+            block_output[34][lane] = scalar_t(0);
+            block_output[35][lane] = scalar_t(0);
+            block_output[36][lane] = scalar_t(0);
+            block_output[37][lane] = scalar_t(0);
+            block_output[38][lane] = scalar_t(0);
+            block_output[39][lane] = scalar_t(0);
+            block_output[40][lane] = scalar_t(0);
+            block_output[41][lane] = scalar_t(0);
+            block_output[42][lane] = scalar_t(0);
+            block_output[43][lane] = scalar_t(0);
+            block_output[44][lane] = scalar_t(0);
+            block_output[45][lane] = scalar_t(0);
+            block_output[46][lane] = scalar_t(0);
+            block_output[47][lane] = scalar_t(0);
+            block_output[48][lane] = scalar_t(0);
+            block_output[49][lane] = scalar_t(0);
+            block_output[50][lane] = scalar_t(0);
+            block_output[51][lane] = scalar_t(0);
+            block_output[52][lane] = scalar_t(0);
+            block_output[53][lane] = scalar_t(0);
+            block_output[54][lane] = scalar_t(0);
+            block_output[55][lane] = scalar_t(0);
+            block_output[56][lane] = scalar_t(0);
+            block_output[57][lane] = scalar_t(0);
+            block_output[58][lane] = scalar_t(0);
+            block_output[59][lane] = scalar_t(0);
+            block_output[60][lane] = scalar_t(0);
+            block_output[61][lane] = scalar_t(0);
+            block_output[62][lane] = scalar_t(0);
+            block_output[63][lane] = scalar_t(0);
+            block_output[64][lane] = scalar_t(0);
+            block_output[65][lane] = scalar_t(0);
+            block_output[66][lane] = scalar_t(0);
+            block_output[67][lane] = scalar_t(0);
+            block_output[68][lane] = scalar_t(0);
+            block_output[69][lane] = scalar_t(0);
+            block_output[70][lane] = scalar_t(0);
+            block_output[71][lane] = scalar_t(0);
+            block_output[72][lane] = scalar_t(0);
+            block_output[73][lane] = scalar_t(0);
+            block_output[74][lane] = scalar_t(0);
+            block_output[75][lane] = scalar_t(0);
+            block_output[76][lane] = scalar_t(0);
+            block_output[77][lane] = scalar_t(0);
+            block_output[78][lane] = scalar_t(0);
+            block_output[79][lane] = scalar_t(0);
+            block_output[80][lane] = scalar_t(0);
+            block_output[81][lane] = scalar_t(0);
+            block_output[82][lane] = scalar_t(0);
+            block_output[83][lane] = scalar_t(0);
+            block_output[84][lane] = scalar_t(0);
+            block_output[85][lane] = scalar_t(0);
+            block_output[86][lane] = scalar_t(0);
+            block_output[87][lane] = scalar_t(0);
             block_output[88][lane] = scalar_t(0);
         }
         const scalar_t *const block_adjugate[DIM * DIM] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin};
@@ -706,185 +711,539 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_af
 
         poro_hyperelasticity_poro_form_1_p_d3_tensor_product_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::poro_hyperelasticity_poro_form_1_p_affine_reference_data<scalar_t>::q_weight_1d(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[7][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[8][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[9][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[10][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[11][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[12][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[13][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[14][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[15][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[16][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[17][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[18][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[19][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[20][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[21][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[22][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[23][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[24][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[25][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[26][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[27][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[28][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[29][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[30][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[31][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[32][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[33][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[34][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[35][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[36][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[37][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[38][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[39][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[40][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[41][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[42][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[43][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[44][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[45][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[46][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[47][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[48][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[49][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[50][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[51][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[52][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[53][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[54][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[55][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[56][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[57][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[58][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[59][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[60][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[61][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[62][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[63][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[64][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[65][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[66][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[67][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[68][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[69][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[70][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[71][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[72][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[73][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[74][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[75][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[76][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[77][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[78][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[79][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[80][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[81][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[82][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[83][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[84][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[85][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[86][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[87][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[88][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[7][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[8][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[9][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[10][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[11][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[12][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[13][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[14][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[15][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[16][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[17][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[18][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[19][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[20][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[21][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[22][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[23][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[24][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[25][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[26][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[27][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[28][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[29][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[30][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[31][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[32][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[33][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[34][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[35][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[36][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[37][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[38][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[39][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[40][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[41][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[42][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[43][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[44][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[45][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[46][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[47][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[48][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[49][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[50][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[51][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[52][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[53][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[54][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[55][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[56][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[57][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[58][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[59][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[60][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[61][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[62][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[63][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[64][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[65][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[66][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[67][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[68][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[69][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[70][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[71][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[72][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[73][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[74][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[75][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[76][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[77][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[78][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[79][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[80][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[81][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[82][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[83][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[84][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[85][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[86][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[87][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[88][scatter];
+            }
         }
     }
     return SFEM_SUCCESS;
@@ -990,7 +1349,7 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_is
     const scalar_t *const isoparametric_grad_1d = sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::hex27_grad_1d();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
@@ -999,8 +1358,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_is
         scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
@@ -1030,7 +1389,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_is
             ev[lane * CELL_N_SHAPE + 26] = elements[26][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_coordinates[0][lane] = points[0][ev[lane * CELL_N_SHAPE + 0]];
             block_coordinates[1][lane] = points[1][ev[lane * CELL_N_SHAPE + 0]];
             block_coordinates[2][lane] = points[2][ev[lane * CELL_N_SHAPE + 0]];
@@ -1114,270 +1474,274 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_is
             block_coordinates[80][lane] = points[2][ev[lane * CELL_N_SHAPE + 26]];
             block_current[0][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[0][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[0][lane] = scalar_t(0);
             block_current[1][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[1][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[1][lane] = scalar_t(0);
             block_current[2][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[2][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[2][lane] = scalar_t(0);
             block_current[3][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[3][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[3][lane] = scalar_t(0);
             block_current[4][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[4][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[4][lane] = scalar_t(0);
             block_current[5][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[5][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[5][lane] = scalar_t(0);
             block_current[6][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[6][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[6][lane] = scalar_t(0);
             block_current[7][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[7][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[7][lane] = scalar_t(0);
             block_current[8][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[8][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[8][lane] = scalar_t(0);
             block_current[9][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[9][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[9][lane] = scalar_t(0);
             block_current[10][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[10][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[10][lane] = scalar_t(0);
             block_current[11][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[11][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[11][lane] = scalar_t(0);
             block_current[12][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[12][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[12][lane] = scalar_t(0);
             block_current[13][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[13][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[13][lane] = scalar_t(0);
             block_current[14][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[14][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[14][lane] = scalar_t(0);
             block_current[15][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[15][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[15][lane] = scalar_t(0);
             block_current[16][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[16][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[16][lane] = scalar_t(0);
             block_current[17][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[17][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[17][lane] = scalar_t(0);
             block_current[18][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[18][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[18][lane] = scalar_t(0);
             block_current[19][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[19][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[19][lane] = scalar_t(0);
             block_current[20][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[20][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[20][lane] = scalar_t(0);
             block_current[21][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[21][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[21][lane] = scalar_t(0);
             block_current[22][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[22][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[22][lane] = scalar_t(0);
             block_current[23][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[23][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[23][lane] = scalar_t(0);
             block_current[24][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[24][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[24][lane] = scalar_t(0);
             block_current[25][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[25][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[25][lane] = scalar_t(0);
             block_current[26][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[26][lane] = u_old_data[0][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[26][lane] = scalar_t(0);
             block_current[27][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[27][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[27][lane] = scalar_t(0);
             block_current[28][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[28][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[28][lane] = scalar_t(0);
             block_current[29][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[29][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[29][lane] = scalar_t(0);
             block_current[30][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[30][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[30][lane] = scalar_t(0);
             block_current[31][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[31][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[31][lane] = scalar_t(0);
             block_current[32][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[32][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[32][lane] = scalar_t(0);
             block_current[33][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[33][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[33][lane] = scalar_t(0);
             block_current[34][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[34][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[34][lane] = scalar_t(0);
             block_current[35][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[35][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[35][lane] = scalar_t(0);
             block_current[36][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[36][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[36][lane] = scalar_t(0);
             block_current[37][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[37][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[37][lane] = scalar_t(0);
             block_current[38][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[38][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[38][lane] = scalar_t(0);
             block_current[39][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[39][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[39][lane] = scalar_t(0);
             block_current[40][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[40][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[40][lane] = scalar_t(0);
             block_current[41][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[41][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[41][lane] = scalar_t(0);
             block_current[42][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[42][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[42][lane] = scalar_t(0);
             block_current[43][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[43][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[43][lane] = scalar_t(0);
             block_current[44][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[44][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[44][lane] = scalar_t(0);
             block_current[45][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[45][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[45][lane] = scalar_t(0);
             block_current[46][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[46][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[46][lane] = scalar_t(0);
             block_current[47][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[47][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[47][lane] = scalar_t(0);
             block_current[48][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[48][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[48][lane] = scalar_t(0);
             block_current[49][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[49][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[49][lane] = scalar_t(0);
             block_current[50][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[50][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[50][lane] = scalar_t(0);
             block_current[51][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[51][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[51][lane] = scalar_t(0);
             block_current[52][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[52][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[52][lane] = scalar_t(0);
             block_current[53][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[53][lane] = u_old_data[1][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[53][lane] = scalar_t(0);
             block_current[54][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[54][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[54][lane] = scalar_t(0);
             block_current[55][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[55][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[55][lane] = scalar_t(0);
             block_current[56][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[56][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[56][lane] = scalar_t(0);
             block_current[57][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[57][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[57][lane] = scalar_t(0);
             block_current[58][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[58][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[58][lane] = scalar_t(0);
             block_current[59][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[59][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[59][lane] = scalar_t(0);
             block_current[60][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[60][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[60][lane] = scalar_t(0);
             block_current[61][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[61][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 7] * previous_stride];
-            block_output[61][lane] = scalar_t(0);
             block_current[62][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 8] * current_stride];
             block_previous[62][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 8] * previous_stride];
-            block_output[62][lane] = scalar_t(0);
             block_current[63][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 9] * current_stride];
             block_previous[63][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 9] * previous_stride];
-            block_output[63][lane] = scalar_t(0);
             block_current[64][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 10] * current_stride];
             block_previous[64][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 10] * previous_stride];
-            block_output[64][lane] = scalar_t(0);
             block_current[65][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 11] * current_stride];
             block_previous[65][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 11] * previous_stride];
-            block_output[65][lane] = scalar_t(0);
             block_current[66][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 12] * current_stride];
             block_previous[66][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 12] * previous_stride];
-            block_output[66][lane] = scalar_t(0);
             block_current[67][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 13] * current_stride];
             block_previous[67][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 13] * previous_stride];
-            block_output[67][lane] = scalar_t(0);
             block_current[68][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 14] * current_stride];
             block_previous[68][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 14] * previous_stride];
-            block_output[68][lane] = scalar_t(0);
             block_current[69][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 15] * current_stride];
             block_previous[69][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 15] * previous_stride];
-            block_output[69][lane] = scalar_t(0);
             block_current[70][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 16] * current_stride];
             block_previous[70][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 16] * previous_stride];
-            block_output[70][lane] = scalar_t(0);
             block_current[71][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 17] * current_stride];
             block_previous[71][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 17] * previous_stride];
-            block_output[71][lane] = scalar_t(0);
             block_current[72][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 18] * current_stride];
             block_previous[72][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 18] * previous_stride];
-            block_output[72][lane] = scalar_t(0);
             block_current[73][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 19] * current_stride];
             block_previous[73][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 19] * previous_stride];
-            block_output[73][lane] = scalar_t(0);
             block_current[74][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 20] * current_stride];
             block_previous[74][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 20] * previous_stride];
-            block_output[74][lane] = scalar_t(0);
             block_current[75][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 21] * current_stride];
             block_previous[75][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 21] * previous_stride];
-            block_output[75][lane] = scalar_t(0);
             block_current[76][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 22] * current_stride];
             block_previous[76][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 22] * previous_stride];
-            block_output[76][lane] = scalar_t(0);
             block_current[77][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 23] * current_stride];
             block_previous[77][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 23] * previous_stride];
-            block_output[77][lane] = scalar_t(0);
             block_current[78][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 24] * current_stride];
             block_previous[78][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 24] * previous_stride];
-            block_output[78][lane] = scalar_t(0);
             block_current[79][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 25] * current_stride];
             block_previous[79][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 25] * previous_stride];
-            block_output[79][lane] = scalar_t(0);
             block_current[80][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 26] * current_stride];
             block_previous[80][lane] = u_old_data[2][ev[lane * CELL_N_SHAPE + 26] * previous_stride];
-            block_output[80][lane] = scalar_t(0);
             block_current[81][lane] = p_data[ev[lane * CELL_N_SHAPE + 0] * current_stride];
             block_previous[81][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 0] * previous_stride];
-            block_output[81][lane] = scalar_t(0);
             block_current[82][lane] = p_data[ev[lane * CELL_N_SHAPE + 1] * current_stride];
             block_previous[82][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 1] * previous_stride];
-            block_output[82][lane] = scalar_t(0);
             block_current[83][lane] = p_data[ev[lane * CELL_N_SHAPE + 2] * current_stride];
             block_previous[83][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 2] * previous_stride];
-            block_output[83][lane] = scalar_t(0);
             block_current[84][lane] = p_data[ev[lane * CELL_N_SHAPE + 3] * current_stride];
             block_previous[84][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 3] * previous_stride];
-            block_output[84][lane] = scalar_t(0);
             block_current[85][lane] = p_data[ev[lane * CELL_N_SHAPE + 4] * current_stride];
             block_previous[85][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 4] * previous_stride];
-            block_output[85][lane] = scalar_t(0);
             block_current[86][lane] = p_data[ev[lane * CELL_N_SHAPE + 5] * current_stride];
             block_previous[86][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 5] * previous_stride];
-            block_output[86][lane] = scalar_t(0);
             block_current[87][lane] = p_data[ev[lane * CELL_N_SHAPE + 6] * current_stride];
             block_previous[87][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 6] * previous_stride];
-            block_output[87][lane] = scalar_t(0);
             block_current[88][lane] = p_data[ev[lane * CELL_N_SHAPE + 7] * current_stride];
             block_previous[88][lane] = p_old_data[ev[lane * CELL_N_SHAPE + 7] * previous_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
+            block_output[7][lane] = scalar_t(0);
+            block_output[8][lane] = scalar_t(0);
+            block_output[9][lane] = scalar_t(0);
+            block_output[10][lane] = scalar_t(0);
+            block_output[11][lane] = scalar_t(0);
+            block_output[12][lane] = scalar_t(0);
+            block_output[13][lane] = scalar_t(0);
+            block_output[14][lane] = scalar_t(0);
+            block_output[15][lane] = scalar_t(0);
+            block_output[16][lane] = scalar_t(0);
+            block_output[17][lane] = scalar_t(0);
+            block_output[18][lane] = scalar_t(0);
+            block_output[19][lane] = scalar_t(0);
+            block_output[20][lane] = scalar_t(0);
+            block_output[21][lane] = scalar_t(0);
+            block_output[22][lane] = scalar_t(0);
+            block_output[23][lane] = scalar_t(0);
+            block_output[24][lane] = scalar_t(0);
+            block_output[25][lane] = scalar_t(0);
+            block_output[26][lane] = scalar_t(0);
+            block_output[27][lane] = scalar_t(0);
+            block_output[28][lane] = scalar_t(0);
+            block_output[29][lane] = scalar_t(0);
+            block_output[30][lane] = scalar_t(0);
+            block_output[31][lane] = scalar_t(0);
+            block_output[32][lane] = scalar_t(0);
+            block_output[33][lane] = scalar_t(0);
+            block_output[34][lane] = scalar_t(0);
+            block_output[35][lane] = scalar_t(0);
+            block_output[36][lane] = scalar_t(0);
+            block_output[37][lane] = scalar_t(0);
+            block_output[38][lane] = scalar_t(0);
+            block_output[39][lane] = scalar_t(0);
+            block_output[40][lane] = scalar_t(0);
+            block_output[41][lane] = scalar_t(0);
+            block_output[42][lane] = scalar_t(0);
+            block_output[43][lane] = scalar_t(0);
+            block_output[44][lane] = scalar_t(0);
+            block_output[45][lane] = scalar_t(0);
+            block_output[46][lane] = scalar_t(0);
+            block_output[47][lane] = scalar_t(0);
+            block_output[48][lane] = scalar_t(0);
+            block_output[49][lane] = scalar_t(0);
+            block_output[50][lane] = scalar_t(0);
+            block_output[51][lane] = scalar_t(0);
+            block_output[52][lane] = scalar_t(0);
+            block_output[53][lane] = scalar_t(0);
+            block_output[54][lane] = scalar_t(0);
+            block_output[55][lane] = scalar_t(0);
+            block_output[56][lane] = scalar_t(0);
+            block_output[57][lane] = scalar_t(0);
+            block_output[58][lane] = scalar_t(0);
+            block_output[59][lane] = scalar_t(0);
+            block_output[60][lane] = scalar_t(0);
+            block_output[61][lane] = scalar_t(0);
+            block_output[62][lane] = scalar_t(0);
+            block_output[63][lane] = scalar_t(0);
+            block_output[64][lane] = scalar_t(0);
+            block_output[65][lane] = scalar_t(0);
+            block_output[66][lane] = scalar_t(0);
+            block_output[67][lane] = scalar_t(0);
+            block_output[68][lane] = scalar_t(0);
+            block_output[69][lane] = scalar_t(0);
+            block_output[70][lane] = scalar_t(0);
+            block_output[71][lane] = scalar_t(0);
+            block_output[72][lane] = scalar_t(0);
+            block_output[73][lane] = scalar_t(0);
+            block_output[74][lane] = scalar_t(0);
+            block_output[75][lane] = scalar_t(0);
+            block_output[76][lane] = scalar_t(0);
+            block_output[77][lane] = scalar_t(0);
+            block_output[78][lane] = scalar_t(0);
+            block_output[79][lane] = scalar_t(0);
+            block_output[80][lane] = scalar_t(0);
+            block_output[81][lane] = scalar_t(0);
+            block_output[82][lane] = scalar_t(0);
+            block_output[83][lane] = scalar_t(0);
+            block_output[84][lane] = scalar_t(0);
+            block_output[85][lane] = scalar_t(0);
+            block_output[86][lane] = scalar_t(0);
+            block_output[87][lane] = scalar_t(0);
             block_output[88][lane] = scalar_t(0);
         }
 
@@ -1401,185 +1765,539 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_is
 
         poro_hyperelasticity_poro_form_1_p_d3_tensor_product_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[7][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[8][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[9][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[10][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[11][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[12][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[13][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[14][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[15][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[16][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[17][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[18][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[19][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[20][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[21][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[22][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[23][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[24][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[25][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[26][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[27][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[28][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[29][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[30][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[31][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[32][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[33][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[34][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[35][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[36][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[37][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[38][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[39][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[40][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[41][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[42][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[43][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[44][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[45][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[46][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[47][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[48][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[49][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[50][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[51][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[52][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[53][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[54][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[55][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[56][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[57][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[58][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[59][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[60][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[61][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 8] * out_stride] += block_output[62][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 9] * out_stride] += block_output[63][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 10] * out_stride] += block_output[64][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 11] * out_stride] += block_output[65][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 12] * out_stride] += block_output[66][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 13] * out_stride] += block_output[67][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 14] * out_stride] += block_output[68][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 15] * out_stride] += block_output[69][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 16] * out_stride] += block_output[70][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 17] * out_stride] += block_output[71][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 18] * out_stride] += block_output[72][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 19] * out_stride] += block_output[73][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 20] * out_stride] += block_output[74][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 21] * out_stride] += block_output[75][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 22] * out_stride] += block_output[76][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 23] * out_stride] += block_output[77][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 24] * out_stride] += block_output[78][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 25] * out_stride] += block_output[79][lane];
-#pragma omp atomic update
-            u_out[2][ev[lane * CELL_N_SHAPE + 26] * out_stride] += block_output[80][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[81][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[82][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[83][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[84][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[85][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[86][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 6] * out_stride] += block_output[87][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 7] * out_stride] += block_output[88][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[7][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[8][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[9][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[10][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[11][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[12][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[13][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[14][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[15][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[16][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[17][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[18][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[19][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[20][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[21][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[22][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[23][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[24][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[25][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[26][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[27][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[28][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[29][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[30][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[31][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[32][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[33][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[34][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[35][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[36][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[37][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[38][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[39][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[40][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[41][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[42][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[43][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[44][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[45][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[46][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[47][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[48][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[49][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[50][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[51][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[52][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[53][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[54][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[55][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[56][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[57][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[58][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[59][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[60][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[61][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[62][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[63][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 10] * out_stride] += block_output[64][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 11] * out_stride] += block_output[65][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 12] * out_stride] += block_output[66][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 13] * out_stride] += block_output[67][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 14] * out_stride] += block_output[68][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 15] * out_stride] += block_output[69][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 16] * out_stride] += block_output[70][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 17] * out_stride] += block_output[71][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 18] * out_stride] += block_output[72][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 19] * out_stride] += block_output[73][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 20] * out_stride] += block_output[74][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 21] * out_stride] += block_output[75][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 22] * out_stride] += block_output[76][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 23] * out_stride] += block_output[77][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 24] * out_stride] += block_output[78][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 25] * out_stride] += block_output[79][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[2][ev[scatter * CELL_N_SHAPE + 26] * out_stride] += block_output[80][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[81][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[82][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[83][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[84][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[85][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[86][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[87][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[88][scatter];
+            }
         }
     }
     return SFEM_SUCCESS;

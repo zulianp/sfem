@@ -452,13 +452,13 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
@@ -467,36 +467,41 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
             ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_direction[0][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[0][lane] = scalar_t(0);
             block_direction[1][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[1][lane] = scalar_t(0);
             block_direction[2][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 2] * direction_stride];
-            block_output[2][lane] = scalar_t(0);
             block_direction[3][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 3] * direction_stride];
-            block_output[3][lane] = scalar_t(0);
             block_direction[4][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 4] * direction_stride];
-            block_output[4][lane] = scalar_t(0);
             block_direction[5][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 5] * direction_stride];
-            block_output[5][lane] = scalar_t(0);
             block_direction[6][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[6][lane] = scalar_t(0);
             block_direction[7][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[7][lane] = scalar_t(0);
             block_direction[8][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 2] * direction_stride];
-            block_output[8][lane] = scalar_t(0);
             block_direction[9][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 3] * direction_stride];
-            block_output[9][lane] = scalar_t(0);
             block_direction[10][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 4] * direction_stride];
-            block_output[10][lane] = scalar_t(0);
             block_direction[11][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 5] * direction_stride];
-            block_output[11][lane] = scalar_t(0);
             block_direction[12][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[12][lane] = scalar_t(0);
             block_direction[13][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[13][lane] = scalar_t(0);
             block_direction[14][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 2] * direction_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
+            block_output[7][lane] = scalar_t(0);
+            block_output[8][lane] = scalar_t(0);
+            block_output[9][lane] = scalar_t(0);
+            block_output[10][lane] = scalar_t(0);
+            block_output[11][lane] = scalar_t(0);
+            block_output[12][lane] = scalar_t(0);
+            block_output[13][lane] = scalar_t(0);
             block_output[14][lane] = scalar_t(0);
         }
         const scalar_t *const block_adjugate[DIM * DIM] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin};
@@ -505,37 +510,95 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
 
         poro_hyperelasticity_poro_form_2_u_p_d2_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_affine_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[7][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[8][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[9][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[10][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[11][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[12][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[13][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[14][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[7][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[8][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[9][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[10][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[11][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[12][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[13][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[14][scatter];
+            }
         }
     }
     return SFEM_SUCCESS;
@@ -613,7 +676,7 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
     const scalar_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tri6_grad_ref_y();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
@@ -621,8 +684,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
         scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
@@ -631,7 +694,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
             ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_coordinates[0][lane] = points[0][ev[lane * CELL_N_SHAPE + 0]];
             block_coordinates[1][lane] = points[1][ev[lane * CELL_N_SHAPE + 0]];
             block_coordinates[2][lane] = points[0][ev[lane * CELL_N_SHAPE + 1]];
@@ -645,41 +709,45 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
             block_coordinates[10][lane] = points[0][ev[lane * CELL_N_SHAPE + 5]];
             block_coordinates[11][lane] = points[1][ev[lane * CELL_N_SHAPE + 5]];
             block_direction[0][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[0][lane] = scalar_t(0);
             block_direction[1][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[1][lane] = scalar_t(0);
             block_direction[2][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 2] * direction_stride];
-            block_output[2][lane] = scalar_t(0);
             block_direction[3][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 3] * direction_stride];
-            block_output[3][lane] = scalar_t(0);
             block_direction[4][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 4] * direction_stride];
-            block_output[4][lane] = scalar_t(0);
             block_direction[5][lane] = u_direction_data[0][ev[lane * CELL_N_SHAPE + 5] * direction_stride];
-            block_output[5][lane] = scalar_t(0);
             block_direction[6][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[6][lane] = scalar_t(0);
             block_direction[7][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[7][lane] = scalar_t(0);
             block_direction[8][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 2] * direction_stride];
-            block_output[8][lane] = scalar_t(0);
             block_direction[9][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 3] * direction_stride];
-            block_output[9][lane] = scalar_t(0);
             block_direction[10][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 4] * direction_stride];
-            block_output[10][lane] = scalar_t(0);
             block_direction[11][lane] = u_direction_data[1][ev[lane * CELL_N_SHAPE + 5] * direction_stride];
-            block_output[11][lane] = scalar_t(0);
             block_direction[12][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 0] * direction_stride];
-            block_output[12][lane] = scalar_t(0);
             block_direction[13][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 1] * direction_stride];
-            block_output[13][lane] = scalar_t(0);
             block_direction[14][lane] = p_direction_data[ev[lane * CELL_N_SHAPE + 2] * direction_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
+            block_output[7][lane] = scalar_t(0);
+            block_output[8][lane] = scalar_t(0);
+            block_output[9][lane] = scalar_t(0);
+            block_output[10][lane] = scalar_t(0);
+            block_output[11][lane] = scalar_t(0);
+            block_output[12][lane] = scalar_t(0);
+            block_output[13][lane] = scalar_t(0);
             block_output[14][lane] = scalar_t(0);
         }
 
         scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
                 const scalar_t J00 = block_coordinates[0][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 2] + block_coordinates[6][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 3] + block_coordinates[8][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 4] + block_coordinates[10][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 5];
                 const scalar_t J01 = block_coordinates[0][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 2] + block_coordinates[6][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 3] + block_coordinates[8][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 4] + block_coordinates[10][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 5];
                 const scalar_t J10 = block_coordinates[1][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 1] + block_coordinates[5][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 2] + block_coordinates[7][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 3] + block_coordinates[9][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 4] + block_coordinates[11][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 5];
@@ -697,37 +765,95 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_a
 
         poro_hyperelasticity_poro_form_2_u_p_d2_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            u_out[0][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[7][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[8][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 3] * out_stride] += block_output[9][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 4] * out_stride] += block_output[10][lane];
-#pragma omp atomic update
-            u_out[1][ev[lane * CELL_N_SHAPE + 5] * out_stride] += block_output[11][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 0] * out_stride] += block_output[12][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 1] * out_stride] += block_output[13][lane];
-#pragma omp atomic update
-            p_out[ev[lane * CELL_N_SHAPE + 2] * out_stride] += block_output[14][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[7][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[8][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[9][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[10][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[11][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[12][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[13][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[14][scatter];
+            }
         }
     }
     return SFEM_SUCCESS;

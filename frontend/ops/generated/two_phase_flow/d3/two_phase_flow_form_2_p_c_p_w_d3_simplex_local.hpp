@@ -30,7 +30,7 @@ namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_residual_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT determinant,
         const scalar_t *const SFEM_RESTRICT shape,
@@ -40,11 +40,16 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_residual_block(
     static constexpr int DIM = 3;
     static constexpr int N_FIELDS = 2;
     for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t det = determinant[geometry_offset];
-            for (int test = 0; test < N_SHAPE; ++test) {
+        }
+        for (int test = 0; test < N_SHAPE; ++test) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const ptrdiff_t geometry_offset = q * geometry_stride + lane;
+                const scalar_t det = determinant[geometry_offset];
                 const scalar_t test_value = shape[q * N_SHAPE + test];
             }
         }
@@ -53,7 +58,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_residual_block(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT determinant,
         const scalar_t *const SFEM_RESTRICT adjugate[9],
@@ -90,8 +95,96 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action
     static constexpr int DIM = 3;
     static constexpr int N_FIELDS = 2;
     for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        scalar_t p_w_values[VECTOR_SIZE];
+        scalar_t p_w_grad_0_ref_values[VECTOR_SIZE];
+        scalar_t p_w_grad_1_ref_values[VECTOR_SIZE];
+        scalar_t p_w_grad_2_ref_values[VECTOR_SIZE];
+        scalar_t p_w_direction_values[VECTOR_SIZE];
+        scalar_t p_c_values[VECTOR_SIZE];
+        scalar_t p_c_grad_0_ref_values[VECTOR_SIZE];
+        scalar_t p_c_grad_1_ref_values[VECTOR_SIZE];
+        scalar_t p_c_grad_2_ref_values[VECTOR_SIZE];
+        scalar_t p_c_direction_values[VECTOR_SIZE];
+        scalar_t value_coeff1_values[VECTOR_SIZE];
+        scalar_t grad_coeff1_0_values[VECTOR_SIZE];
+        scalar_t grad_coeff1_1_values[VECTOR_SIZE];
+        scalar_t grad_coeff1_2_values[VECTOR_SIZE];
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_w_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_w_grad_0_ref_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_w_grad_1_ref_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_w_grad_2_ref_values[lane] = scalar_t(0);
+        }
+        for (int trial = 0; trial < N_SHAPE; ++trial) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const scalar_t coeff = current[trial * N_FIELDS + 0][lane];
+                p_w_values[lane] += coeff * shape[q * N_SHAPE + trial];
+                p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * N_SHAPE + trial];
+                p_w_grad_1_ref_values[lane] += coeff * grad_ref_y[q * N_SHAPE + trial];
+                p_w_grad_2_ref_values[lane] += coeff * grad_ref_z[q * N_SHAPE + trial];
+            }
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_w_direction_values[lane] = scalar_t(0);
+        }
+        for (int trial = 0; trial < N_SHAPE; ++trial) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const scalar_t coeff = direction[trial * N_FIELDS + 0][lane];
+                p_w_direction_values[lane] += coeff * shape[q * N_SHAPE + trial];
+            }
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_c_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_c_grad_0_ref_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_c_grad_1_ref_values[lane] = scalar_t(0);
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_c_grad_2_ref_values[lane] = scalar_t(0);
+        }
+        for (int trial = 0; trial < N_SHAPE; ++trial) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const scalar_t coeff = current[trial * N_FIELDS + 1][lane];
+                p_c_values[lane] += coeff * shape[q * N_SHAPE + trial];
+                p_c_grad_0_ref_values[lane] += coeff * grad_ref_x[q * N_SHAPE + trial];
+                p_c_grad_1_ref_values[lane] += coeff * grad_ref_y[q * N_SHAPE + trial];
+                p_c_grad_2_ref_values[lane] += coeff * grad_ref_z[q * N_SHAPE + trial];
+            }
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            p_c_direction_values[lane] = scalar_t(0);
+        }
+        for (int trial = 0; trial < N_SHAPE; ++trial) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const scalar_t coeff = direction[trial * N_FIELDS + 1][lane];
+                p_c_direction_values[lane] += coeff * shape[q * N_SHAPE + trial];
+            }
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t det = determinant[geometry_offset];
             const scalar_t adj0 = adjugate[0][geometry_offset];
@@ -103,44 +196,22 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action
             const scalar_t adj6 = adjugate[6][geometry_offset];
             const scalar_t adj7 = adjugate[7][geometry_offset];
             const scalar_t adj8 = adjugate[8][geometry_offset];
-            scalar_t p_w = scalar_t(0);
-            scalar_t p_w_grad_0_ref = scalar_t(0);
-            scalar_t p_w_grad_1_ref = scalar_t(0);
-            scalar_t p_w_grad_2_ref = scalar_t(0);
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = current[trial * N_FIELDS + 0][lane];
-                p_w += coeff * shape[q * N_SHAPE + trial];
-                p_w_grad_0_ref += coeff * grad_ref_x[q * N_SHAPE + trial];
-                p_w_grad_1_ref += coeff * grad_ref_y[q * N_SHAPE + trial];
-                p_w_grad_2_ref += coeff * grad_ref_z[q * N_SHAPE + trial];
-            }
+            const scalar_t p_w = p_w_values[lane];
+            const scalar_t p_w_grad_0_ref = p_w_grad_0_ref_values[lane];
+            const scalar_t p_w_grad_1_ref = p_w_grad_1_ref_values[lane];
+            const scalar_t p_w_grad_2_ref = p_w_grad_2_ref_values[lane];
             const scalar_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
             const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
             const scalar_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-            scalar_t p_w_direction = scalar_t(0);
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = direction[trial * N_FIELDS + 0][lane];
-                p_w_direction += coeff * shape[q * N_SHAPE + trial];
-            }
-            scalar_t p_c = scalar_t(0);
-            scalar_t p_c_grad_0_ref = scalar_t(0);
-            scalar_t p_c_grad_1_ref = scalar_t(0);
-            scalar_t p_c_grad_2_ref = scalar_t(0);
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = current[trial * N_FIELDS + 1][lane];
-                p_c += coeff * shape[q * N_SHAPE + trial];
-                p_c_grad_0_ref += coeff * grad_ref_x[q * N_SHAPE + trial];
-                p_c_grad_1_ref += coeff * grad_ref_y[q * N_SHAPE + trial];
-                p_c_grad_2_ref += coeff * grad_ref_z[q * N_SHAPE + trial];
-            }
+            const scalar_t p_w_direction = p_w_direction_values[lane];
+            const scalar_t p_c = p_c_values[lane];
+            const scalar_t p_c_grad_0_ref = p_c_grad_0_ref_values[lane];
+            const scalar_t p_c_grad_1_ref = p_c_grad_1_ref_values[lane];
+            const scalar_t p_c_grad_2_ref = p_c_grad_2_ref_values[lane];
             const scalar_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
             const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
             const scalar_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-            scalar_t p_c_direction = scalar_t(0);
-            for (int trial = 0; trial < N_SHAPE; ++trial) {
-                const scalar_t coeff = direction[trial * N_FIELDS + 1][lane];
-                p_c_direction += coeff * shape[q * N_SHAPE + trial];
-            }
+            const scalar_t p_c_direction = p_c_direction_values[lane];
             const scalar_t residual_tmp0 = p_c - p_w;
             const scalar_t residual_tmp1 = pow(residual_tmp0/P_r, m);
             const scalar_t residual_tmp2 = residual_tmp1 + scalar_t(1);
@@ -163,12 +234,30 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action
             const scalar_t grad_coeff1_0 = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
             const scalar_t grad_coeff1_1 = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
             const scalar_t grad_coeff1_2 = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
-            for (int test = 0; test < N_SHAPE; ++test) {
+            value_coeff1_values[lane] = value_coeff1;
+            grad_coeff1_0_values[lane] = grad_coeff1_0;
+            grad_coeff1_1_values[lane] = grad_coeff1_1;
+            grad_coeff1_2_values[lane] = grad_coeff1_2;
+        }
+        for (int test = 0; test < N_SHAPE; ++test) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const ptrdiff_t geometry_offset = q * geometry_stride + lane;
+                const scalar_t det = determinant[geometry_offset];
                 const scalar_t test_value = shape[q * N_SHAPE + test];
+                const scalar_t adj0 = adjugate[0][geometry_offset];
+                const scalar_t adj1 = adjugate[1][geometry_offset];
+                const scalar_t adj2 = adjugate[2][geometry_offset];
+                const scalar_t adj3 = adjugate[3][geometry_offset];
+                const scalar_t adj4 = adjugate[4][geometry_offset];
+                const scalar_t adj5 = adjugate[5][geometry_offset];
+                const scalar_t adj6 = adjugate[6][geometry_offset];
+                const scalar_t adj7 = adjugate[7][geometry_offset];
+                const scalar_t adj8 = adjugate[8][geometry_offset];
                 const scalar_t test_grad0 = (grad_ref_x[q * N_SHAPE + test] * adj0 + grad_ref_y[q * N_SHAPE + test] * adj3 + grad_ref_z[q * N_SHAPE + test] * adj6) / det;
                 const scalar_t test_grad1 = (grad_ref_x[q * N_SHAPE + test] * adj1 + grad_ref_y[q * N_SHAPE + test] * adj4 + grad_ref_z[q * N_SHAPE + test] * adj7) / det;
                 const scalar_t test_grad2 = (grad_ref_x[q * N_SHAPE + test] * adj2 + grad_ref_y[q * N_SHAPE + test] * adj5 + grad_ref_z[q * N_SHAPE + test] * adj8) / det;
-                output[test * N_FIELDS + 1][lane] += q_weight[q] * det * (value_coeff1 * test_value + grad_coeff1_0 * test_grad0 + grad_coeff1_1 * test_grad1 + grad_coeff1_2 * test_grad2);
+                output[test * N_FIELDS + 1][lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value + grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
             }
         }
     }

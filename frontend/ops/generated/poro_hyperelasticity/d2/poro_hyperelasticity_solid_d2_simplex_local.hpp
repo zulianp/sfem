@@ -1,6 +1,5 @@
 #ifndef PORO_HYPERELASTICITY_SOLID_D2_SIMPLEX_LOCAL_HPP
 #define PORO_HYPERELASTICITY_SOLID_D2_SIMPLEX_LOCAL_HPP
-
 #include <math.h>
 #include <stddef.h>
 #if defined(__has_include)
@@ -9,31 +8,26 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-
 #include "../kernel_math.hpp"
 #include "../tensor_product_kernels.hpp"
-
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
-
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
-
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
 typedef double geom_t;
 #endif
-
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_objective_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -51,25 +45,57 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_objective_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
             const scalar_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
             const scalar_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
         const scalar_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane3) * inv_jacobian_determinant;
@@ -85,7 +111,7 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_objective_block(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_gradient_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -103,25 +129,61 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_gradient_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            scalar_t loperand0_values[VECTOR_SIZE];
+            scalar_t loperand1_values[VECTOR_SIZE];
+            scalar_t loperand2_values[VECTOR_SIZE];
+            scalar_t loperand3_values[VECTOR_SIZE];
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
             const scalar_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
             const scalar_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
         const scalar_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane3) * inv_jacobian_determinant;
@@ -144,17 +206,27 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_gradient_block(
         const scalar_t loperand1 = qw * (material0 * jacobian_adjugate_lane2 + material1 * jacobian_adjugate_lane3);
         const scalar_t loperand2 = qw * (material2 * jacobian_adjugate_lane0 + material3 * jacobian_adjugate_lane1);
         const scalar_t loperand3 = qw * (material2 * jacobian_adjugate_lane2 + material3 * jacobian_adjugate_lane3);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                out_streams[shape * 2 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape] + loperand1 * grad_ref_y[q * N_SHAPE + shape];
-                out_streams[shape * 2 + 1][lane] += loperand2 * grad_ref_x[q * N_SHAPE + shape] + loperand3 * grad_ref_y[q * N_SHAPE + shape];
+            loperand0_values[lane] = loperand0;
+            loperand1_values[lane] = loperand1;
+            loperand2_values[lane] = loperand2;
+            loperand3_values[lane] = loperand3;
             }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 2 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand1_values[lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 2 + 1][lane] += loperand2_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand3_values[lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
             }
         }
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_apply_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -173,33 +245,77 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_apply_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_h_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_h_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_h_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            scalar_t grad_h_ref3_values[VECTOR_SIZE];
+            scalar_t loperand0_values[VECTOR_SIZE];
+            scalar_t loperand1_values[VECTOR_SIZE];
+            scalar_t loperand2_values[VECTOR_SIZE];
+            scalar_t loperand3_values[VECTOR_SIZE];
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+                grad_h_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+                grad_h_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+                grad_h_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+                grad_h_ref3_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                    grad_h_ref0_values[lane] += h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                    grad_h_ref1_values[lane] += h_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                    grad_h_ref2_values[lane] += h_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                    grad_h_ref3_values[lane] += h_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
             const scalar_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
             const scalar_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_h_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_h_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_h_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            scalar_t grad_h_ref3 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_h_ref0 += h_streams[shape * 2 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_h_ref1 += h_streams[shape * 2 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_h_ref2 += h_streams[shape * 2 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_h_ref3 += h_streams[shape * 2 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_h_ref0 = grad_h_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_h_ref1 = grad_h_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_h_ref2 = grad_h_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
+            const scalar_t grad_h_ref3 = grad_h_ref3_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
         const scalar_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
@@ -246,10 +362,20 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d2_simplex_apply_block(
         const scalar_t loperand1 = qw * (material0 * jacobian_adjugate_lane2 + material1 * jacobian_adjugate_lane3);
         const scalar_t loperand2 = qw * (material2 * jacobian_adjugate_lane0 + material3 * jacobian_adjugate_lane1);
         const scalar_t loperand3 = qw * (material2 * jacobian_adjugate_lane2 + material3 * jacobian_adjugate_lane3);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                out_streams[shape * 2 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape] + loperand1 * grad_ref_y[q * N_SHAPE + shape];
-                out_streams[shape * 2 + 1][lane] += loperand2 * grad_ref_x[q * N_SHAPE + shape] + loperand3 * grad_ref_y[q * N_SHAPE + shape];
+            loperand0_values[lane] = loperand0;
+            loperand1_values[lane] = loperand1;
+            loperand2_values[lane] = loperand2;
+            loperand3_values[lane] = loperand3;
             }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 2 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand1_values[lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 2 + 1][lane] += loperand2_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand3_values[lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
             }
         }
 }

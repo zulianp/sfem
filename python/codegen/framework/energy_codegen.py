@@ -82,9 +82,46 @@ def _work_item_loop_lines(source_builder, indent):
         return source_builder.work_item_loop_lines(indent)
     index = _work_item_index(source_builder)
     return tuple("%s%s" % (indent, line) for line in source_builder.simd_lines()) + (
-        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
+        "%sfor (int %s = 0; %s < nelems; ++%s) {"
         % (indent, index, index, index),
     )
+
+
+def _emits_vector_lane_loop(source_builder):
+    target = getattr(source_builder, "target", None)
+    if target is not None and hasattr(target, "loop_lowering_policy"):
+        policy = target.loop_lowering_policy()
+        return bool(policy.emits_lane_loop and policy.vectorize_lane_loop)
+    return True
+
+
+def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
+    work_item = _work_item_index(source_builder)
+    if not _emits_vector_lane_loop(source_builder):
+        return source_builder.scatter_add_lines(
+            "%s[%s]" % (pointer, node_expr % work_item),
+            value_expr % work_item,
+            indent,
+        )
+
+    lines = [
+        "%s{" % indent,
+        "%s    for (int scatter = 0; scatter < nelems; ++scatter) {" % indent,
+    ]
+    lines.extend(
+        source_builder.scatter_add_lines(
+            "%s[%s]" % (pointer, node_expr % "scatter"),
+            value_expr % "scatter",
+            "%s        " % indent,
+        )
+    )
+    lines.extend(
+        [
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return tuple(lines)
 
 
 def _work_item_name(source_builder, name, component):
@@ -425,7 +462,7 @@ def _sfem_soa_block_function(
         if use_tensor_product_reference
         else tuple(range(n_nodes))
     )
-    params = ["const ptrdiff_t nelems"]
+    params = ["const int nelems"]
     if form.weak_form is not None:
         params.append("const ptrdiff_t geometry_stride")
     else:
@@ -891,16 +928,20 @@ def _append_sfem_soa_weak_form_lines(
     if use_tensor_product_reference:
         raise AssertionError("tensor-product weak forms must use the SoA tensor weak-form source_builder")
 
-    def reference_gradient(component):
+    def reference_gradient(component, shape="shape"):
         if use_tensor_product_reference:
             return _tensor_product_dynamic_reference_gradient_expr(dim, component)
-        return "%s[q * N_SHAPE + shape]" % _sfem_reference_gradient_vector_name(component)
+        return "%s[q * N_SHAPE + %s]" % (
+            _sfem_reference_gradient_vector_name(component),
+            shape,
+        )
 
-    def field_value(field, row):
+    def field_value(field, row, shape="shape"):
         stream_prefix = "" if use_stream_arrays else "weak_"
-        return "%s%s_streams[shape * %d + %d][%s]" % (
+        return "%s%s_streams[%s * %d + %d][%s]" % (
             stream_prefix,
             field,
+            shape,
             dim,
             row,
             work_item,
@@ -909,7 +950,47 @@ def _append_sfem_soa_weak_form_lines(
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
+    deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
+        weak_form,
+        "grad_u",
+        scalar_temporaries=True,
+    )
+
     lines.append("        for (int q = 0; q < N_QP; ++q) {")
+    lines.append("            const scalar_t qw = q_weight[q];")
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            lines.append("            scalar_t grad_u_ref%d_values[VECTOR_SIZE];" % idx)
+            if form.has_direction:
+                lines.append("            scalar_t grad_h_ref%d_values[VECTOR_SIZE];" % idx)
+    if form.name != "objective":
+        for component in range(dim * dim):
+            lines.append("            scalar_t loperand%d_values[VECTOR_SIZE];" % component)
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            lines.extend(_work_item_loop_lines(source_builder, "            "))
+            lines.append("                grad_u_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
+            if form.has_direction:
+                lines.append("                grad_h_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
+            lines.append("            }")
+    lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            lines.extend(_work_item_loop_lines(source_builder, "                "))
+            lines.append(
+                "                    grad_u_ref%d_values[%s] += %s * %s;"
+                % (idx, work_item, field_value("u", row), reference_gradient(col))
+            )
+            if form.has_direction:
+                lines.append(
+                    "                    grad_h_ref%d_values[%s] += %s * %s;"
+                    % (idx, work_item, field_value("h", row), reference_gradient(col))
+                )
+            lines.append("                }")
+    lines.append("            }")
     lines.extend(_work_item_loop_lines(source_builder, "            "))
     lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
@@ -921,47 +1002,12 @@ def _append_sfem_soa_weak_form_lines(
         "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
         % geometry_value("jacobian_determinant", 0)
     )
-    if use_tensor_product_reference:
-        lines.extend(_tensor_product_q_index_lines(dim, "            "))
-        lines.append(
-            "            const scalar_t qw = %s;"
-            % _tensor_product_quadrature_weight_expr(dim)
-        )
-        for row in range(dim):
-            for col in range(dim):
-                lines.append(
-                    "            const scalar_t grad_u_ref%d = grad_u_ref_q[(%d * N_QP + q) * %d + %d];"
-                    % (row * dim + col, row, dim, col)
-                )
-        if form.has_direction:
-            for row in range(dim):
-                for col in range(dim):
-                    lines.append(
-                        "            const scalar_t grad_h_ref%d = grad_h_ref_q[(%d * N_QP + q) * %d + %d];"
-                        % (row * dim + col, row, dim, col)
-                    )
-    else:
-        lines.append("            const scalar_t qw = q_weight[q];")
-        for row in range(dim):
-            for col in range(dim):
-                idx = row * dim + col
-                lines.append("            scalar_t grad_u_ref%d = scalar_t(0);" % idx)
-                if form.has_direction:
-                    lines.append("            scalar_t grad_h_ref%d = scalar_t(0);" % idx)
-        lines.extend(["            for (int shape = 0; shape < N_SHAPE; ++shape) {"])
-        for row in range(dim):
-            for col in range(dim):
-                lines.append(
-                    "                grad_u_ref%d += %s * %s;"
-                    % (row * dim + col, field_value("u", row), reference_gradient(col))
-                )
-                if form.has_direction:
-                    lines.append(
-                        "                grad_h_ref%d += %s * %s;"
-                        % (row * dim + col, field_value("h", row), reference_gradient(col))
-                    )
-        lines.append("            }")
-
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            lines.append("            const scalar_t grad_u_ref%d = grad_u_ref%d_values[%s];" % (idx, idx, work_item))
+            if form.has_direction:
+                lines.append("            const scalar_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
     lines.append(
         "        const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
@@ -994,12 +1040,6 @@ def _append_sfem_soa_weak_form_lines(
                     % (row * dim + col, " + ".join(terms))
                 )
 
-    deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
-        weak_form,
-        "grad_u",
-        scalar_temporaries=True,
-    )
-
     if form.name == "objective":
         _append_cse_array_assignments(
             lines,
@@ -1018,6 +1058,7 @@ def _append_sfem_soa_weak_form_lines(
         if form.name == "apply"
         else weak_form.first_piola()
     ).xreplace(deformation_gradient_substitutions)
+
     _append_transformed_loperand_lines(
         lines,
         material,
@@ -1026,20 +1067,24 @@ def _append_sfem_soa_weak_form_lines(
         geometry_value,
         scalar_temporaries=True,
     )
-
-    lines.extend(["            for (int shape = 0; shape < N_SHAPE; ++shape) {"])
+    for component in range(dim * dim):
+        lines.append("            loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
+    lines.append("            }")
+    lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
     for row in range(dim):
         terms = [
-            "loperand%d * %s" % (row * dim + col, reference_gradient(col))
+            "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
             for col in range(dim)
         ]
         op = "+=" if form.output_mode == "accumulate" else "="
         output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+        lines.extend(_work_item_loop_lines(source_builder, "                "))
         lines.append(
-            "                %s[shape * %d + %d][%s] %s %s;"
+            "                    %s[shape * %d + %d][%s] %s %s;"
             % (output_streams, dim, row, work_item, op, " + ".join(terms))
         )
-    lines.extend(["            }", "            }", "        }"])
+        lines.append("                }")
+    lines.extend(["            }", "        }"])
 
 
 def _append_transformed_loperand_lines(
@@ -1321,16 +1366,24 @@ def _sfem_soa_isoparametric_geometry_lines(
             for component in range(dim * dim)
         ),
     )
-    lines.extend(_work_item_loop_lines(source_builder, "            "))
     for row in range(dim):
         for col in range(dim):
-            lines.append("                scalar_t J%d%d = scalar_t(0);" % (row, col))
-    lines.append("                for (int shape = 0; shape < N_SHAPE; ++shape) {")
+            lines.append("            scalar_t J%d%d_values[VECTOR_SIZE];" % (row, col))
+    for row in range(dim):
+        for col in range(dim):
+            lines.extend(_work_item_loop_lines(source_builder, "            "))
+            lines.extend(
+                [
+                    "                J%d%d_values[%s] = scalar_t(0);" % (row, col, work_item),
+                    "            }",
+                ]
+            )
+    lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
     if use_tensor_product_reference:
-        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "                    "))
+        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "                "))
     for col in range(dim):
         lines.append(
-            "                    const scalar_t g%d = %s;"
+            "                const scalar_t g%d = %s;"
             % (
                 col,
                 _sfem_soa_isoparametric_reference_gradient_expr(
@@ -1345,11 +1398,22 @@ def _sfem_soa_isoparametric_geometry_lines(
         )
     for row in range(dim):
         for col in range(dim):
-            lines.append(
-                "                    J%d%d += block_coordinate_streams[shape * %d + %d][%s] * g%d;"
-                % (row, col, dim, row, work_item, col)
+            lines.extend(
+                [
+                    *_work_item_loop_lines(source_builder, "                "),
+                    "                    J%d%d_values[%s] += block_coordinate_streams[shape * %d + %d][%s] * g%d;"
+                    % (row, col, work_item, dim, row, work_item, col),
+                    "                }",
+                ]
             )
-    lines.append("                }")
+    lines.append("            }")
+    lines.extend(_work_item_loop_lines(source_builder, "            "))
+    for row in range(dim):
+        for col in range(dim):
+            lines.append(
+                "                const scalar_t J%d%d = J%d%d_values[%s];"
+                % (row, col, row, col, work_item)
+            )
     output_index = "q * VECTOR_SIZE + %s" % work_item if q_major else work_item
     lines.extend(
         isoparametric_adjugate_call_lines(
@@ -2129,35 +2193,33 @@ def _sfem_soa_mesh_operator_function(
                         else "shape"
                     ),
                     "            for (int d = 0; d < DIM; ++d) {",
-                    *_work_item_loop_lines(source_builder, "                "),
-                    "                    const idx_t node = ev[%s * N_SHAPE + stream_shape] * out_stride;" % work_item,
-                    *source_builder.scatter_add_lines(
-                        "out_components[d][node]",
-                        "block_out_data[shape * DIM + d][%s]" % work_item,
-                        "                    ",
+                    *_scatter_add_lines(
+                        source_builder,
+                        "out_components[d]",
+                        "ev[%s * N_SHAPE + stream_shape] * out_stride",
+                        "block_out_data[shape * DIM + d][%s]",
+                        "                ",
                     ),
-                    "                }",
                     "            }",
                     "        }",
                 ]
             )
         else:
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
             for shape in range(n_nodes):
                 for d in range(dim):
                     component = _component_name(d)
                     lines.extend(
                         list(
-                            source_builder.scatter_add_lines(
-                                "out%s[ev[%s * N_SHAPE + %d] * out_stride]"
-                                % (component, work_item, shape),
-                                "block_out%s%d[%s]" % (component, shape, work_item),
-                                "            ",
+                            _scatter_add_lines(
+                                source_builder,
+                                "out%s" % component,
+                                "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                                "block_out%s%d[%%s]" % (component, shape),
+                                "        ",
                             )
                         )
                         + [""]
                     )
-            lines.append("        }")
 
     lines.extend(
         [

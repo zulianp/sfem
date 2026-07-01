@@ -664,7 +664,7 @@ extern "C" void two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametri
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         double *const SFEM_RESTRICT output[8]
@@ -674,7 +674,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa(
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         float *const SFEM_RESTRICT output[8]
@@ -708,19 +708,20 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
             ev[lane * N_SHAPE + 3] = elements[3][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_output[0][lane] = scalar_t(0);
             block_output[1][lane] = scalar_t(0);
             block_output[2][lane] = scalar_t(0);
@@ -735,23 +736,53 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_
 
         two_phase_flow_form_2_p_w_p_w_d2_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_q_weight_1d, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[7][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[7][scatter];
+            }
         }
     }
 
@@ -810,36 +841,41 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametri
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_coordinates[2 * N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[4][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
             ev[lane * N_SHAPE + 3] = elements[3][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_coordinates[0][lane] = points[0][ev[lane * N_SHAPE + 0]];
             block_coordinates[1][lane] = points[1][ev[lane * N_SHAPE + 0]];
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
             block_coordinates[2][lane] = points[0][ev[lane * N_SHAPE + 1]];
             block_coordinates[3][lane] = points[1][ev[lane * N_SHAPE + 1]];
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
             block_coordinates[4][lane] = points[0][ev[lane * N_SHAPE + 2]];
             block_coordinates[5][lane] = points[1][ev[lane * N_SHAPE + 2]];
-            block_output[4][lane] = scalar_t(0);
-            block_output[5][lane] = scalar_t(0);
             block_coordinates[6][lane] = points[0][ev[lane * N_SHAPE + 3]];
             block_coordinates[7][lane] = points[1][ev[lane * N_SHAPE + 3]];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
             block_output[6][lane] = scalar_t(0);
             block_output[7][lane] = scalar_t(0);
         }
@@ -859,23 +895,53 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametri
 
         two_phase_flow_form_2_p_w_p_w_d2_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape_1d, isoparametric_q_weight_1d, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[7][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[7][scatter];
+            }
         }
     }
 
@@ -932,7 +998,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametric_mesh_a
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const double *const SFEM_RESTRICT determinant,
         const double *const SFEM_RESTRICT adjugate[4],
@@ -959,7 +1025,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa(
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_element_soa_float(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const float *const SFEM_RESTRICT determinant,
         const float *const SFEM_RESTRICT adjugate[4],
@@ -1034,44 +1100,49 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affin
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
             ev[lane * N_SHAPE + 3] = elements[3][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_current[0][lane] = p_w[ev[lane * N_SHAPE + 0] * current_stride];
             block_direction[0][lane] = p_w_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_output[0][lane] = scalar_t(0);
             block_current[1][lane] = p_c[ev[lane * N_SHAPE + 0] * current_stride];
             block_direction[1][lane] = p_c_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_output[1][lane] = scalar_t(0);
             block_current[2][lane] = p_w[ev[lane * N_SHAPE + 1] * current_stride];
             block_direction[2][lane] = p_w_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_output[2][lane] = scalar_t(0);
             block_current[3][lane] = p_c[ev[lane * N_SHAPE + 1] * current_stride];
             block_direction[3][lane] = p_c_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_output[3][lane] = scalar_t(0);
             block_current[4][lane] = p_w[ev[lane * N_SHAPE + 2] * current_stride];
             block_direction[4][lane] = p_w_direction[ev[lane * N_SHAPE + 2] * direction_stride];
-            block_output[4][lane] = scalar_t(0);
             block_current[5][lane] = p_c[ev[lane * N_SHAPE + 2] * current_stride];
             block_direction[5][lane] = p_c_direction[ev[lane * N_SHAPE + 2] * direction_stride];
-            block_output[5][lane] = scalar_t(0);
             block_current[6][lane] = p_w[ev[lane * N_SHAPE + 3] * current_stride];
             block_direction[6][lane] = p_w_direction[ev[lane * N_SHAPE + 3] * direction_stride];
-            block_output[6][lane] = scalar_t(0);
             block_current[7][lane] = p_c[ev[lane * N_SHAPE + 3] * current_stride];
             block_direction[7][lane] = p_c_direction[ev[lane * N_SHAPE + 3] * direction_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
             block_output[7][lane] = scalar_t(0);
         }
 
@@ -1082,23 +1153,53 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affin
 
         two_phase_flow_form_2_p_w_p_w_d2_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_determinant0 + evbegin, block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current_streams, block_direction_streams, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[7][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[7][scatter];
+            }
         }
     }
 
@@ -1225,7 +1326,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isopa
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
+        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_coordinates[2 * N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[4][N_QP * VECTOR_SIZE];
@@ -1234,46 +1335,51 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isopa
         scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-#pragma omp simd
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
             ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
             ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
             ev[lane * N_SHAPE + 3] = elements[3][evbegin + lane];
         }
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
             block_coordinates[0][lane] = points[0][ev[lane * N_SHAPE + 0]];
             block_coordinates[1][lane] = points[1][ev[lane * N_SHAPE + 0]];
             block_current[0][lane] = p_w[ev[lane * N_SHAPE + 0] * current_stride];
             block_direction[0][lane] = p_w_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_output[0][lane] = scalar_t(0);
             block_current[1][lane] = p_c[ev[lane * N_SHAPE + 0] * current_stride];
             block_direction[1][lane] = p_c_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_output[1][lane] = scalar_t(0);
             block_coordinates[2][lane] = points[0][ev[lane * N_SHAPE + 1]];
             block_coordinates[3][lane] = points[1][ev[lane * N_SHAPE + 1]];
             block_current[2][lane] = p_w[ev[lane * N_SHAPE + 1] * current_stride];
             block_direction[2][lane] = p_w_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_output[2][lane] = scalar_t(0);
             block_current[3][lane] = p_c[ev[lane * N_SHAPE + 1] * current_stride];
             block_direction[3][lane] = p_c_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_output[3][lane] = scalar_t(0);
             block_coordinates[4][lane] = points[0][ev[lane * N_SHAPE + 2]];
             block_coordinates[5][lane] = points[1][ev[lane * N_SHAPE + 2]];
             block_current[4][lane] = p_w[ev[lane * N_SHAPE + 2] * current_stride];
             block_direction[4][lane] = p_w_direction[ev[lane * N_SHAPE + 2] * direction_stride];
-            block_output[4][lane] = scalar_t(0);
             block_current[5][lane] = p_c[ev[lane * N_SHAPE + 2] * current_stride];
             block_direction[5][lane] = p_c_direction[ev[lane * N_SHAPE + 2] * direction_stride];
-            block_output[5][lane] = scalar_t(0);
             block_coordinates[6][lane] = points[0][ev[lane * N_SHAPE + 3]];
             block_coordinates[7][lane] = points[1][ev[lane * N_SHAPE + 3]];
             block_current[6][lane] = p_w[ev[lane * N_SHAPE + 3] * current_stride];
             block_direction[6][lane] = p_w_direction[ev[lane * N_SHAPE + 3] * direction_stride];
-            block_output[6][lane] = scalar_t(0);
             block_current[7][lane] = p_c[ev[lane * N_SHAPE + 3] * current_stride];
             block_direction[7][lane] = p_c_direction[ev[lane * N_SHAPE + 3] * direction_stride];
+        }
+
+        #pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            block_output[0][lane] = scalar_t(0);
+            block_output[1][lane] = scalar_t(0);
+            block_output[2][lane] = scalar_t(0);
+            block_output[3][lane] = scalar_t(0);
+            block_output[4][lane] = scalar_t(0);
+            block_output[5][lane] = scalar_t(0);
+            block_output[6][lane] = scalar_t(0);
             block_output[7][lane] = scalar_t(0);
         }
 
@@ -1295,23 +1401,53 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isopa
 
         two_phase_flow_form_2_p_w_p_w_d2_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current_streams, block_direction_streams, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
-        for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[0][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 0] * out_stride] += block_output[1][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[2][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 1] * out_stride] += block_output[3][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[4][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 2] * out_stride] += block_output[5][lane];
-#pragma omp atomic update
-            p_w_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[6][lane];
-#pragma omp atomic update
-            p_c_out[ev[lane * N_SHAPE + 3] * out_stride] += block_output[7][lane];
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[1][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[2][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[3][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[4][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[5][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_w_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[6][scatter];
+            }
+        }
+        {
+            for (int scatter = 0; scatter < nelems; ++scatter) {
+                #pragma omp atomic update
+                p_c_out[ev[scatter * N_SHAPE + 3] * out_stride] += block_output[7][scatter];
+            }
         }
     }
 

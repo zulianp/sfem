@@ -27,7 +27,7 @@ namespace codegen {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -51,8 +51,92 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            scalar_t grad_u_ref4_values[VECTOR_SIZE];
+            scalar_t grad_u_ref5_values[VECTOR_SIZE];
+            scalar_t grad_u_ref6_values[VECTOR_SIZE];
+            scalar_t grad_u_ref7_values[VECTOR_SIZE];
+            scalar_t grad_u_ref8_values[VECTOR_SIZE];
             #pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref4_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref5_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref6_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref7_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref8_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
@@ -64,27 +148,15 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
             const scalar_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
             const scalar_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            scalar_t grad_u_ref4 = scalar_t(0);
-            scalar_t grad_u_ref5 = scalar_t(0);
-            scalar_t grad_u_ref6 = scalar_t(0);
-            scalar_t grad_u_ref7 = scalar_t(0);
-            scalar_t grad_u_ref8 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref4 += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref5 += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref6 += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref7 += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref8 += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
+            const scalar_t grad_u_ref4 = grad_u_ref4_values[lane];
+            const scalar_t grad_u_ref5 = grad_u_ref5_values[lane];
+            const scalar_t grad_u_ref6 = grad_u_ref6_values[lane];
+            const scalar_t grad_u_ref7 = grad_u_ref7_values[lane];
+            const scalar_t grad_u_ref8 = grad_u_ref8_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
         const scalar_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
@@ -106,7 +178,7 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -130,8 +202,101 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            scalar_t grad_u_ref4_values[VECTOR_SIZE];
+            scalar_t grad_u_ref5_values[VECTOR_SIZE];
+            scalar_t grad_u_ref6_values[VECTOR_SIZE];
+            scalar_t grad_u_ref7_values[VECTOR_SIZE];
+            scalar_t grad_u_ref8_values[VECTOR_SIZE];
+            scalar_t loperand0_values[VECTOR_SIZE];
+            scalar_t loperand1_values[VECTOR_SIZE];
+            scalar_t loperand2_values[VECTOR_SIZE];
+            scalar_t loperand3_values[VECTOR_SIZE];
+            scalar_t loperand4_values[VECTOR_SIZE];
+            scalar_t loperand5_values[VECTOR_SIZE];
+            scalar_t loperand6_values[VECTOR_SIZE];
+            scalar_t loperand7_values[VECTOR_SIZE];
+            scalar_t loperand8_values[VECTOR_SIZE];
             #pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref4_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref5_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref6_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref7_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref8_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
@@ -143,27 +308,15 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
             const scalar_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
             const scalar_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            scalar_t grad_u_ref4 = scalar_t(0);
-            scalar_t grad_u_ref5 = scalar_t(0);
-            scalar_t grad_u_ref6 = scalar_t(0);
-            scalar_t grad_u_ref7 = scalar_t(0);
-            scalar_t grad_u_ref8 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref4 += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref5 += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref6 += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref7 += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref8 += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
+            const scalar_t grad_u_ref4 = grad_u_ref4_values[lane];
+            const scalar_t grad_u_ref5 = grad_u_ref5_values[lane];
+            const scalar_t grad_u_ref6 = grad_u_ref6_values[lane];
+            const scalar_t grad_u_ref7 = grad_u_ref7_values[lane];
+            const scalar_t grad_u_ref8 = grad_u_ref8_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
         const scalar_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
@@ -211,18 +364,36 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
         const scalar_t loperand6 = qw * (material6 * jacobian_adjugate_lane0 + material7 * jacobian_adjugate_lane1 + material8 * jacobian_adjugate_lane2);
         const scalar_t loperand7 = qw * (material6 * jacobian_adjugate_lane3 + material7 * jacobian_adjugate_lane4 + material8 * jacobian_adjugate_lane5);
         const scalar_t loperand8 = qw * (material6 * jacobian_adjugate_lane6 + material7 * jacobian_adjugate_lane7 + material8 * jacobian_adjugate_lane8);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                out_streams[shape * 3 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape] + loperand1 * grad_ref_y[q * N_SHAPE + shape] + loperand2 * grad_ref_z[q * N_SHAPE + shape];
-                out_streams[shape * 3 + 1][lane] += loperand3 * grad_ref_x[q * N_SHAPE + shape] + loperand4 * grad_ref_y[q * N_SHAPE + shape] + loperand5 * grad_ref_z[q * N_SHAPE + shape];
-                out_streams[shape * 3 + 2][lane] += loperand6 * grad_ref_x[q * N_SHAPE + shape] + loperand7 * grad_ref_y[q * N_SHAPE + shape] + loperand8 * grad_ref_z[q * N_SHAPE + shape];
+            loperand0_values[lane] = loperand0;
+            loperand1_values[lane] = loperand1;
+            loperand2_values[lane] = loperand2;
+            loperand3_values[lane] = loperand3;
+            loperand4_values[lane] = loperand4;
+            loperand5_values[lane] = loperand5;
+            loperand6_values[lane] = loperand6;
+            loperand7_values[lane] = loperand7;
+            loperand8_values[lane] = loperand8;
             }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand1_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand2_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 1][lane] += loperand3_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand4_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand5_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 2][lane] += loperand6_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand7_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand8_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
             }
         }
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
-        const ptrdiff_t nelems,
+        const int nelems,
         const ptrdiff_t geometry_stride,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate0,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate1,
@@ -247,8 +418,128 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
+            const scalar_t qw = q_weight[q];
+            scalar_t grad_u_ref0_values[VECTOR_SIZE];
+            scalar_t grad_h_ref0_values[VECTOR_SIZE];
+            scalar_t grad_u_ref1_values[VECTOR_SIZE];
+            scalar_t grad_h_ref1_values[VECTOR_SIZE];
+            scalar_t grad_u_ref2_values[VECTOR_SIZE];
+            scalar_t grad_h_ref2_values[VECTOR_SIZE];
+            scalar_t grad_u_ref3_values[VECTOR_SIZE];
+            scalar_t grad_h_ref3_values[VECTOR_SIZE];
+            scalar_t grad_u_ref4_values[VECTOR_SIZE];
+            scalar_t grad_h_ref4_values[VECTOR_SIZE];
+            scalar_t grad_u_ref5_values[VECTOR_SIZE];
+            scalar_t grad_h_ref5_values[VECTOR_SIZE];
+            scalar_t grad_u_ref6_values[VECTOR_SIZE];
+            scalar_t grad_h_ref6_values[VECTOR_SIZE];
+            scalar_t grad_u_ref7_values[VECTOR_SIZE];
+            scalar_t grad_h_ref7_values[VECTOR_SIZE];
+            scalar_t grad_u_ref8_values[VECTOR_SIZE];
+            scalar_t grad_h_ref8_values[VECTOR_SIZE];
+            scalar_t loperand0_values[VECTOR_SIZE];
+            scalar_t loperand1_values[VECTOR_SIZE];
+            scalar_t loperand2_values[VECTOR_SIZE];
+            scalar_t loperand3_values[VECTOR_SIZE];
+            scalar_t loperand4_values[VECTOR_SIZE];
+            scalar_t loperand5_values[VECTOR_SIZE];
+            scalar_t loperand6_values[VECTOR_SIZE];
+            scalar_t loperand7_values[VECTOR_SIZE];
+            scalar_t loperand8_values[VECTOR_SIZE];
             #pragma omp simd
-            for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref0_values[lane] = scalar_t(0);
+                grad_h_ref0_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref1_values[lane] = scalar_t(0);
+                grad_h_ref1_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref2_values[lane] = scalar_t(0);
+                grad_h_ref2_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref3_values[lane] = scalar_t(0);
+                grad_h_ref3_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref4_values[lane] = scalar_t(0);
+                grad_h_ref4_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref5_values[lane] = scalar_t(0);
+                grad_h_ref5_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref6_values[lane] = scalar_t(0);
+                grad_h_ref6_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref7_values[lane] = scalar_t(0);
+                grad_h_ref7_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                grad_u_ref8_values[lane] = scalar_t(0);
+                grad_h_ref8_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                    grad_h_ref0_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                    grad_h_ref1_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
+                    grad_h_ref2_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                    grad_h_ref3_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                    grad_h_ref4_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
+                    grad_h_ref5_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
+                    grad_h_ref6_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
+                    grad_h_ref7_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    grad_u_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
+                    grad_h_ref8_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
             const scalar_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
@@ -260,45 +551,24 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
             const scalar_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
             const scalar_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
             const scalar_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const scalar_t qw = q_weight[q];
-            scalar_t grad_u_ref0 = scalar_t(0);
-            scalar_t grad_h_ref0 = scalar_t(0);
-            scalar_t grad_u_ref1 = scalar_t(0);
-            scalar_t grad_h_ref1 = scalar_t(0);
-            scalar_t grad_u_ref2 = scalar_t(0);
-            scalar_t grad_h_ref2 = scalar_t(0);
-            scalar_t grad_u_ref3 = scalar_t(0);
-            scalar_t grad_h_ref3 = scalar_t(0);
-            scalar_t grad_u_ref4 = scalar_t(0);
-            scalar_t grad_h_ref4 = scalar_t(0);
-            scalar_t grad_u_ref5 = scalar_t(0);
-            scalar_t grad_h_ref5 = scalar_t(0);
-            scalar_t grad_u_ref6 = scalar_t(0);
-            scalar_t grad_h_ref6 = scalar_t(0);
-            scalar_t grad_u_ref7 = scalar_t(0);
-            scalar_t grad_h_ref7 = scalar_t(0);
-            scalar_t grad_u_ref8 = scalar_t(0);
-            scalar_t grad_h_ref8 = scalar_t(0);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                grad_u_ref0 += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_h_ref0 += h_streams[shape * 3 + 0][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref1 += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_h_ref1 += h_streams[shape * 3 + 0][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref2 += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_h_ref2 += h_streams[shape * 3 + 0][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref3 += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_h_ref3 += h_streams[shape * 3 + 1][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref4 += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_h_ref4 += h_streams[shape * 3 + 1][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref5 += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_h_ref5 += h_streams[shape * 3 + 1][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_u_ref6 += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_h_ref6 += h_streams[shape * 3 + 2][lane] * grad_ref_x[q * N_SHAPE + shape];
-                grad_u_ref7 += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_h_ref7 += h_streams[shape * 3 + 2][lane] * grad_ref_y[q * N_SHAPE + shape];
-                grad_u_ref8 += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
-                grad_h_ref8 += h_streams[shape * 3 + 2][lane] * grad_ref_z[q * N_SHAPE + shape];
-            }
+            const scalar_t grad_u_ref0 = grad_u_ref0_values[lane];
+            const scalar_t grad_h_ref0 = grad_h_ref0_values[lane];
+            const scalar_t grad_u_ref1 = grad_u_ref1_values[lane];
+            const scalar_t grad_h_ref1 = grad_h_ref1_values[lane];
+            const scalar_t grad_u_ref2 = grad_u_ref2_values[lane];
+            const scalar_t grad_h_ref2 = grad_h_ref2_values[lane];
+            const scalar_t grad_u_ref3 = grad_u_ref3_values[lane];
+            const scalar_t grad_h_ref3 = grad_h_ref3_values[lane];
+            const scalar_t grad_u_ref4 = grad_u_ref4_values[lane];
+            const scalar_t grad_h_ref4 = grad_h_ref4_values[lane];
+            const scalar_t grad_u_ref5 = grad_u_ref5_values[lane];
+            const scalar_t grad_h_ref5 = grad_h_ref5_values[lane];
+            const scalar_t grad_u_ref6 = grad_u_ref6_values[lane];
+            const scalar_t grad_h_ref6 = grad_h_ref6_values[lane];
+            const scalar_t grad_u_ref7 = grad_u_ref7_values[lane];
+            const scalar_t grad_h_ref7 = grad_h_ref7_values[lane];
+            const scalar_t grad_u_ref8 = grad_u_ref8_values[lane];
+            const scalar_t grad_h_ref8 = grad_h_ref8_values[lane];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
         const scalar_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
         const scalar_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
@@ -450,11 +720,29 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
         const scalar_t loperand6 = qw * (material6 * jacobian_adjugate_lane0 + material7 * jacobian_adjugate_lane1 + material8 * jacobian_adjugate_lane2);
         const scalar_t loperand7 = qw * (material6 * jacobian_adjugate_lane3 + material7 * jacobian_adjugate_lane4 + material8 * jacobian_adjugate_lane5);
         const scalar_t loperand8 = qw * (material6 * jacobian_adjugate_lane6 + material7 * jacobian_adjugate_lane7 + material8 * jacobian_adjugate_lane8);
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                out_streams[shape * 3 + 0][lane] += loperand0 * grad_ref_x[q * N_SHAPE + shape] + loperand1 * grad_ref_y[q * N_SHAPE + shape] + loperand2 * grad_ref_z[q * N_SHAPE + shape];
-                out_streams[shape * 3 + 1][lane] += loperand3 * grad_ref_x[q * N_SHAPE + shape] + loperand4 * grad_ref_y[q * N_SHAPE + shape] + loperand5 * grad_ref_z[q * N_SHAPE + shape];
-                out_streams[shape * 3 + 2][lane] += loperand6 * grad_ref_x[q * N_SHAPE + shape] + loperand7 * grad_ref_y[q * N_SHAPE + shape] + loperand8 * grad_ref_z[q * N_SHAPE + shape];
+            loperand0_values[lane] = loperand0;
+            loperand1_values[lane] = loperand1;
+            loperand2_values[lane] = loperand2;
+            loperand3_values[lane] = loperand3;
+            loperand4_values[lane] = loperand4;
+            loperand5_values[lane] = loperand5;
+            loperand6_values[lane] = loperand6;
+            loperand7_values[lane] = loperand7;
+            loperand8_values[lane] = loperand8;
             }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand1_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand2_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 1][lane] += loperand3_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand4_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand5_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    out_streams[shape * 3 + 2][lane] += loperand6_values[lane] * grad_ref_x[q * N_SHAPE + shape] + loperand7_values[lane] * grad_ref_y[q * N_SHAPE + shape] + loperand8_values[lane] * grad_ref_z[q * N_SHAPE + shape];
+                }
             }
         }
 }
