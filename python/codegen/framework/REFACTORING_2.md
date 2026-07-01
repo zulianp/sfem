@@ -275,7 +275,9 @@ Each wrapper also emits a generated registration source with a single
 be fed to `sfem.gen.generate_op_registration_files(...)` to emit an aggregate
 factory-registration translation unit, and
 `generate_op_registration_files.py` provides the same manifest-driven path for
-scripts; build/frontend consumption remains open.
+scripts. The frontend factory now consumes the generated aggregate registration
+unit, so maintained generated material wrappers no longer require
+hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
 
 Tasks:
 
