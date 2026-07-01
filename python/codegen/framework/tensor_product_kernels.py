@@ -1,3 +1,9 @@
+try:
+    from .targets import OpenMPTarget
+except ImportError:
+    from targets import OpenMPTarget
+
+
 def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     if single_work_item:
         return "%s{" % indent
@@ -12,20 +18,25 @@ def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
 
 def sfem_tensor_product_kernels_header_source(
     *,
-    inline_qualifier="SFEM_INLINE",
+    inline_qualifier=None,
     inline_definition="inline",
     define_sfem_inline=True,
     restrict_definition="",
-    work_item_index="lane",
-    simd_lines=("#pragma omp simd",),
+    work_item_index=None,
+    simd_lines=None,
     single_work_item=False,
     header_guard_suffix="HPP",
 ):
+    target = OpenMPTarget()
+    inline_qualifier = target.inline_qualifier() if inline_qualifier is None else inline_qualifier
+    work_item_index = target.work_item_index() if work_item_index is None else work_item_index
+    if simd_lines is None:
+        pragma = target.vectorize_pragma()
+        simd_lines = () if pragma is None else (pragma,)
     values = {
         "header_guard_suffix": header_guard_suffix,
         "sfem_inline_block": (
-            "#ifndef SFEM_INLINE\n#define SFEM_INLINE %s\n#endif\n\n"
-            % inline_definition
+            "%s\n\n" % "\n".join(target.inline_definition_lines(inline_definition))
             if define_sfem_inline
             else ""
         ),

@@ -230,7 +230,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_im
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -240,14 +240,14 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_im
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             block_value[lane] = scalar_t(0);
         }
@@ -259,7 +259,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_im
 
         neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             value[evbegin + lane] += block_value[lane];
         }
@@ -377,7 +377,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -393,7 +393,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -406,20 +406,20 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
                 for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_value[lane] = scalar_t(0);
             }
 
             neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
             }
@@ -547,7 +547,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -557,7 +557,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
@@ -568,14 +568,14 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             block_value[lane] = scalar_t(0);
         }
@@ -606,7 +606,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh
 
         neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             value[evbegin + lane] += block_value[lane];
         }
@@ -711,7 +711,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_isoparametri
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -721,7 +721,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_isoparametri
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
@@ -738,7 +738,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_isoparametri
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -770,20 +770,20 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_objective_steps_isoparametri
             const scalar_t alpha = steps[step];
             for (int shape = 0; shape < N_SHAPE; ++shape) {
                 for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
                     }
                 }
             }
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_value[lane] = scalar_t(0);
             }
 
             neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
 
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
             }
@@ -1024,7 +1024,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_imp
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -1034,7 +1034,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_imp
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -1042,7 +1042,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_imp
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
@@ -1063,6 +1063,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_imp
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
                     #pragma omp atomic update
@@ -1190,7 +1191,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -1200,7 +1201,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
@@ -1211,7 +1212,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -1219,7 +1220,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
@@ -1259,6 +1260,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
                     #pragma omp atomic update
@@ -1501,7 +1503,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_impl(
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -1512,7 +1514,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_impl(
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -1521,7 +1523,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_impl(
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
@@ -1546,6 +1548,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_impl(
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
                     #pragma omp atomic update
@@ -1686,7 +1689,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa
 
         for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
             }
@@ -1696,7 +1699,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
                 }
@@ -1708,7 +1711,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
@@ -1717,7 +1720,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa
             }
         }
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 block_out_data[stream][lane] = scalar_t(0);
             }
@@ -1761,6 +1764,7 @@ static SFEM_INLINE int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const int stream_shape = STREAM_SHAPE_ORDER[shape];
             for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[lane * N_SHAPE + stream_shape] * out_stride;
                     #pragma omp atomic update

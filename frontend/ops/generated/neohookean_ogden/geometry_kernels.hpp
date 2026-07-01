@@ -8,7 +8,7 @@
 #endif
 
 #ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT
+#define SFEM_RESTRICT 
 #endif
 
 namespace sfem {
@@ -69,7 +69,7 @@ struct GeometryJacobianAdjugateDeterminant<scalar_t, 2, N_QP, VECTOR_SIZE> {
             scalar_t *const *const SFEM_RESTRICT adjugate,
             scalar_t *const SFEM_RESTRICT determinant) {
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 const ptrdiff_t offset = q * VECTOR_SIZE + lane;
                 const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane];
@@ -91,7 +91,7 @@ struct GeometryJacobianAdjugateDeterminant<scalar_t, 3, N_QP, VECTOR_SIZE> {
             scalar_t *const *const SFEM_RESTRICT adjugate,
             scalar_t *const SFEM_RESTRICT determinant) {
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 const ptrdiff_t offset = q * VECTOR_SIZE + lane;
                 const scalar_t J00 = coordinate_grad_ref[((0 * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane];

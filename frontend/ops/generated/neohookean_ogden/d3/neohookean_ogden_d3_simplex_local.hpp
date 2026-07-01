@@ -51,7 +51,7 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
@@ -130,7 +130,7 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
@@ -247,7 +247,7 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
         for (int q = 0; q < N_QP; ++q) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];

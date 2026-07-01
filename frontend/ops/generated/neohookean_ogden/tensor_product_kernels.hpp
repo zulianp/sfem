@@ -7,8 +7,9 @@
 #define SFEM_INLINE inline
 #endif
 
+
 #ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT
+#define SFEM_RESTRICT 
 #endif
 
 namespace sfem {
@@ -44,7 +45,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t grad_x[Q * S * VECTOR_SIZE];
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     scalar_t v = scalar_t(0);
                     scalar_t gx = scalar_t(0);
@@ -63,7 +64,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         for (int qy = 0; qy < Q; ++qy) {
             for (int qx = 0; qx < Q; ++qx) {
                 const int q = qx + Q * qy;
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     scalar_t gx = scalar_t(0);
                     scalar_t gy = scalar_t(0);
@@ -92,7 +93,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t stage_y[Q * S * VECTOR_SIZE];
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     scalar_t tx = scalar_t(0);
                     scalar_t ty = scalar_t(0);
@@ -110,7 +111,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         for (int sy = 0; sy < S; ++sy) {
             for (int sx = 0; sx < S; ++sx) {
                 const int shape = sx + S * sy;
-#pragma omp simd
+                #pragma omp simd
                 for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                     scalar_t value = scalar_t(0);
                     for (int qx = 0; qx < Q; ++qx) {
@@ -144,7 +145,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t v = scalar_t(0);
                         scalar_t gx = scalar_t(0);
@@ -164,7 +165,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t v = scalar_t(0);
                         scalar_t gx = scalar_t(0);
@@ -187,7 +188,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int qx = 0; qx < Q; ++qx) {
                     const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t gx = scalar_t(0);
                         scalar_t gy = scalar_t(0);
@@ -225,7 +226,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int qy = 0; qy < Q; ++qy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t tx = scalar_t(0);
                         scalar_t ty = scalar_t(0);
@@ -247,7 +248,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         for (int qx = 0; qx < Q; ++qx) {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t tx = scalar_t(0);
                         scalar_t ty = scalar_t(0);
@@ -270,7 +271,7 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             for (int sy = 0; sy < S; ++sy) {
                 for (int sx = 0; sx < S; ++sx) {
                     const int shape = sx + S * (sy + S * sz);
-#pragma omp simd
+                    #pragma omp simd
                     for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                         scalar_t value = scalar_t(0);
                         for (int qx = 0; qx < Q; ++qx) {
@@ -328,7 +329,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
         scalar_t gx[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 scalar_t g = scalar_t(0);
@@ -345,7 +346,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * qy;
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
@@ -373,7 +374,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
@@ -385,7 +386,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * qy;
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
@@ -409,7 +410,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
         scalar_t sg[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
@@ -426,7 +427,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * sy;
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
@@ -448,7 +449,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
@@ -460,7 +461,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * sy;
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
@@ -490,7 +491,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t g0xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         scalar_t g1xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 scalar_t g = scalar_t(0);
@@ -506,7 +507,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
@@ -525,7 +526,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 scalar_t g0 = scalar_t(0);
@@ -557,7 +558,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE];
         scalar_t vxy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int sx = 0; sx < S; ++sx) {
@@ -568,7 +569,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int sy = 0; sy < S; ++sy) {
@@ -579,7 +580,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
             const int q = qx + Q * (qy + Q * qz);
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int sz = 0; sz < S; ++sz) {
@@ -606,7 +607,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
         scalar_t yz1[N_FIELDS * Q * S * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
@@ -625,7 +626,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 scalar_t b = scalar_t(0);
@@ -641,7 +642,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * (sy + S * sz);
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {
@@ -664,7 +665,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
         scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 for (int qz = 0; qz < Q; ++qz) {
@@ -675,7 +676,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             }
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t a = scalar_t(0);
                 for (int qy = 0; qy < Q; ++qy) {
@@ -686,7 +687,7 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
         for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
             const int s = sx + S * (sy + S * sz);
-#pragma omp simd
+            #pragma omp simd
             for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
                 scalar_t v = scalar_t(0);
                 for (int qx = 0; qx < Q; ++qx) {

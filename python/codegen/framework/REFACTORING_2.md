@@ -217,9 +217,10 @@ lives in the planning layer, OpenMP/CUDA backends build that full plan before
 emission, and the energy emitters only consume the plan to generate code.
 Energy-SoA OpenMP pragmas, lane-loop lowering, parallel-loop lowering, scatter
 atomics, work-item naming, and target includes are routed through
-`OpenMPTarget`/`CUDATarget`. Remaining M5 cleanup still needs the residual,
-boundary, and tensor-product helper emitters to route their OpenMP literals
-through the same target hooks.
+`OpenMPTarget`/`CUDATarget`. Residual, boundary, tensor-product kernel, and
+tensor-product geometry generators now route OpenMP parallel/vector/atomic
+pragmas, inline qualifiers, and residual vector-lane loop headers through
+`OpenMPTarget` instead of embedding raw OpenMP strings.
 
 Tasks:
 
@@ -231,7 +232,7 @@ Tasks:
    - math helper names
    - diagnostic/profiling emission
    - kernel launch/wrapper style
-- [ ] Move OpenMP-specific pragmas and vectorization assumptions out of emitters
+- [x] Move OpenMP-specific pragmas and vectorization assumptions out of emitters
    and into `OpenMPTarget`.
 - [x] Implement a CUDA backend skeleton that consumes the same kernel plans and
    emits CUDA-safe local/device code for at least one simple residual kernel.
@@ -360,4 +361,3 @@ Acceptance criteria:
    functional.
 7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
-

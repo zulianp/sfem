@@ -11,6 +11,23 @@ from .fem import (
     _sfem_unit_interval_gauss_rule,
     _tri6_reference_gradients,
 )
+from .targets import OpenMPTarget
+
+
+def _target():
+    return OpenMPTarget()
+
+
+def _function_qualifier():
+    return _target().function_qualifier()
+
+
+def _parallel_for_pragma(schedule=None):
+    return _target().parallel_for_pragma(schedule)
+
+
+def _atomic_update_pragma():
+    return _target().atomic_update_pragma()
 
 
 _CELL_TO_SURFACE = {
@@ -345,7 +362,7 @@ struct {function}_reference_data {{
 }};
 
 template <typename scalar_t>
-static SFEM_INLINE scalar_t {function}_measure(
+{function_qualifier} scalar_t {function}_measure(
         const int q,
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points) {{
@@ -354,14 +371,14 @@ static SFEM_INLINE scalar_t {function}_measure(
 {measure_body}
 }}
 
-static SFEM_INLINE const int *{function}_side_nodes() {{
+{function_qualifier} const int *{function}_side_nodes() {{
     static const int data[{side_node_count}] = {{
 {side_node_values}
     }};
     return data;
 }}
 
-static SFEM_INLINE void {function}_gather_sideset_element(
+{function_qualifier} void {function}_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
         idx_t **const SFEM_RESTRICT elements,
@@ -374,7 +391,7 @@ static SFEM_INLINE void {function}_gather_sideset_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE void {function}_element(
+{function_qualifier} void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         scalar_t element_vector[{components}][{n_shape}]) {{
@@ -397,7 +414,7 @@ static SFEM_INLINE void {function}_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE void {function}_scatter_element(
+{function_qualifier} void {function}_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
         const scalar_t element_vector[{components}][{n_shape}],
         const int out_stride,
@@ -410,14 +427,14 @@ static SFEM_INLINE void {function}_scatter_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE int {function}_impl(
+{function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
-#pragma omp parallel for
+{parallel_for_pragma}
     for (ptrdiff_t e = 0; e < nelements; ++e) {{
         idx_t ev[{n_shape}];
         scalar_t element_vector[{components}][{n_shape}];
@@ -437,7 +454,7 @@ static SFEM_INLINE int {function}_impl(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE int {sideset_function}_impl(
+{function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
@@ -446,7 +463,7 @@ static SFEM_INLINE int {sideset_function}_impl(
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
-#pragma omp parallel for
+{parallel_for_pragma}
     for (ptrdiff_t s = 0; s < nsides; ++s) {{
         idx_t ev[{n_shape}];
         scalar_t element_vector[{components}][{n_shape}];
@@ -515,6 +532,8 @@ extern "C" int {sideset_function}_float(
 }}
 """.format(
         function=function,
+        function_qualifier=_function_qualifier(),
+        parallel_for_pragma=_parallel_for_pragma(),
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_qp=n_qp,
@@ -548,7 +567,10 @@ extern "C" int {sideset_function}_float(
             for c in range(components)
         ),
         scatter_lines="\n".join(
-            "#pragma omp atomic update\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(c=c)
+            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
+                atomic_update_pragma=_atomic_update_pragma(),
+                c=c,
+            )
             for c in range(components)
         ),
         scatter_streams=scatter_streams,
@@ -778,7 +800,7 @@ struct {function}_reference_data {{
 }};
 
 template <typename scalar_t>
-static SFEM_INLINE scalar_t {function}_measure(
+{function_qualifier} scalar_t {function}_measure(
         const int qx,
         const int qy,
         const idx_t *const SFEM_RESTRICT ev,
@@ -820,14 +842,14 @@ static SFEM_INLINE scalar_t {function}_measure(
     return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }}
 
-static SFEM_INLINE const int *{function}_side_nodes() {{
+{function_qualifier} const int *{function}_side_nodes() {{
     static const int data[{side_node_count}] = {{
 {side_node_values}
     }};
     return data;
 }}
 
-static SFEM_INLINE void {function}_gather_sideset_element(
+{function_qualifier} void {function}_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
         idx_t **const SFEM_RESTRICT elements,
@@ -840,7 +862,7 @@ static SFEM_INLINE void {function}_gather_sideset_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE void {function}_element(
+{function_qualifier} void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         scalar_t element_vector[{components}][{n_shape}]) {{
@@ -870,7 +892,7 @@ static SFEM_INLINE void {function}_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE void {function}_scatter_element(
+{function_qualifier} void {function}_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
         const scalar_t element_vector[{components}][{n_shape}],
         const int out_stride,
@@ -883,14 +905,14 @@ static SFEM_INLINE void {function}_scatter_element(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE int {function}_impl(
+{function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
-#pragma omp parallel for
+{parallel_for_pragma}
     for (ptrdiff_t e = 0; e < nelements; ++e) {{
         idx_t ev[{n_shape}];
         scalar_t element_vector[{components}][{n_shape}];
@@ -910,7 +932,7 @@ static SFEM_INLINE int {function}_impl(
 }}
 
 template <typename scalar_t>
-static SFEM_INLINE int {sideset_function}_impl(
+{function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
@@ -919,7 +941,7 @@ static SFEM_INLINE int {sideset_function}_impl(
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
-#pragma omp parallel for
+{parallel_for_pragma}
     for (ptrdiff_t s = 0; s < nsides; ++s) {{
         idx_t ev[{n_shape}];
         scalar_t element_vector[{components}][{n_shape}];
@@ -988,6 +1010,8 @@ extern "C" int {sideset_function}_float(
 }}
 """.format(
         function=function,
+        function_qualifier=_function_qualifier(),
+        parallel_for_pragma=_parallel_for_pragma(),
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_shape_1d=n_shape_1d,
@@ -1021,7 +1045,10 @@ extern "C" int {sideset_function}_float(
             for c in range(components)
         ),
         scatter_lines="\n".join(
-            "#pragma omp atomic update\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(c=c)
+            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
+                atomic_update_pragma=_atomic_update_pragma(),
+                c=c,
+            )
             for c in range(components)
         ),
         scatter_streams=scatter_streams,

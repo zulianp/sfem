@@ -161,9 +161,7 @@ class OpenMPEnergySoASourceBuilder:
             '#include "%s"' % math_name,
             '#include "%s"' % tensor_product_name,
             "",
-            "#ifndef SFEM_INLINE",
-            "#define SFEM_INLINE inline",
-            "#endif",
+            *self.target.inline_definition_lines(),
             "",
             "#ifndef SFEM_RESTRICT",
             "#define SFEM_RESTRICT",
@@ -179,7 +177,15 @@ class OpenMPEnergySoASourceBuilder:
         )
 
     def geometry_header_source(self):
-        return sfem_geometry_kernels_header_source()
+        return sfem_geometry_kernels_header_source(
+            inline_qualifier=self.inline_qualifier(),
+            define_sfem_inline=True,
+            restrict_definition="",
+            work_item_index=self.work_item_index(),
+            simd_lines=self.simd_lines(),
+            single_work_item=False,
+            header_guard_suffix=self.header_guard_suffix(),
+        )
 
     def emits_tensor_product_header(self, basis_family):
         return True

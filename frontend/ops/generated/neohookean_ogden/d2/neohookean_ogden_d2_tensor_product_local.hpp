@@ -55,7 +55,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
@@ -113,7 +113,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
@@ -196,7 +196,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
         const int qx = q % N_QP_1D;
         const int qy = q / N_QP_1D;
         const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-#pragma omp simd
+        #pragma omp simd
         for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
