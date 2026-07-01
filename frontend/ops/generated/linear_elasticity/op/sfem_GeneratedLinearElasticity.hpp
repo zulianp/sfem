@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sfem_Op.hpp"
+#include "sfem_NeumannConditions.hpp"
 
 namespace sfem {
     class GeneratedLinearElasticity final : public Op {

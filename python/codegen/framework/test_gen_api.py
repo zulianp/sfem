@@ -632,6 +632,17 @@ class GenApiTest(unittest.TestCase):
                 "const geom_t *const *adjugate = nullptr;",
                 source,
             )
+            self.assertIn("int cache_affine_geometry(", source)
+            self.assertIn("const bool matched = set_affine_option", source)
+            self.assertIn(
+                "cache_affine_geometry(impl_->space, *impl_->domains)",
+                source,
+            )
+            self.assertIn("&ret->impl_->gradient_uses_affine", source)
+            self.assertLess(
+                source.index("read_affine_options(node"),
+                source.index("if (ret->initialize(block_names)"),
+            )
             self.assertIn(
                 "template <typename scalar_t, typename jacobian_t>",
                 operator_source,
@@ -927,6 +938,17 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_soa", source)
             self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_soa", source)
             self.assertIn("const geom_t *const *adjugate = nullptr;", source)
+            self.assertIn("int cache_affine_geometry(", source)
+            self.assertIn("const bool matched = set_affine_option", source)
+            self.assertIn(
+                "cache_affine_geometry(impl_->space, *impl_->domains)",
+                source,
+            )
+            self.assertIn("&ret->impl_->residual_uses_affine", source)
+            self.assertLess(
+                source.index("read_affine_options(node"),
+                source.index("if (ret->initialize(block_names)"),
+            )
             self.assertIn(
                 "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
                 operator_source,
@@ -2653,6 +2675,17 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("stokes_tri6_tri3_jacobian_action_affine_mesh_soa", wrapper_contents)
             self.assertIn("residual_uses_affine", wrapper_contents)
             self.assertIn("jacobian_action_uses_affine", wrapper_contents)
+            self.assertIn("int cache_affine_geometry(", wrapper_contents)
+            self.assertIn("const bool matched = set_affine_option", wrapper_contents)
+            self.assertIn(
+                "cache_affine_geometry(impl_->space, *impl_->domains)",
+                wrapper_contents,
+            )
+            self.assertIn("&ret->impl_->jacobian_action_uses_affine", wrapper_contents)
+            self.assertLess(
+                wrapper_contents.index("read_affine_options(node"),
+                wrapper_contents.index("if (ret->initialize(block_names)"),
+            )
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 3;", wrapper_contents)
             self.assertIn("const real_t *const SFEM_RESTRICT u_data[2]", wrapper_contents)
             self.assertIn("real_t *const SFEM_RESTRICT u_out[2]", wrapper_contents)
@@ -3121,6 +3154,12 @@ class GenApiTest(unittest.TestCase):
             ) as input_file:
                 op_source = input_file.read()
             self.assertIn("class GeneratedNeumann::Impl", op_source)
+            self.assertIn('#include "sfem_NeumannConditions.hpp"', op_source)
+            self.assertIn("std::vector<NeumannConditions::Condition> conditions;", op_source)
+            self.assertIn("void GeneratedNeumann::add_condition", op_source)
+            self.assertIn("condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);", op_source)
+            self.assertIn("const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];", op_source)
+            self.assertIn("condition.values->data()[0]", op_source)
             self.assertIn("void GeneratedNeumann::add_sideset", op_source)
             self.assertIn(
                 "neumann_hex8_quadshell4_boundary_residual_sideset_soa",

@@ -47,15 +47,15 @@ namespace codegen {
 template <typename scalar_t>
 struct linear_elasticity_proteus_hex125_affine_reference_data {
     static const scalar_t *shape_1d() {
-        static const scalar_t data[25] = {scalar_t(0.65772788257758863), scalar_t(0.6076926946610145), scalar_t(-0.40858201526174148), scalar_t(0.17553410810741277), scalar_t(-0.032372670084274538), scalar_t(0.022063103295100275), scalar_t(1.0587971821717581), scalar_t(-0.11346384011744702), scalar_t(0.039222340750583846), scalar_t(-0.006618786099995529), scalar_t(0), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(0), scalar_t(-0.006618786099995509), scalar_t(0.039222340750583728), scalar_t(-0.11346384011744673), scalar_t(1.0587971821717581), scalar_t(0.022063103295100202), scalar_t(-0.032372670084274538), scalar_t(0.17553410810741277), scalar_t(-0.40858201526174143), scalar_t(0.60769269466101461), scalar_t(0.65772788257758863)};
+        static const scalar_t data[25] = {scalar_t(0.65772788257758819), scalar_t(0.60769269466101494), scalar_t(-0.40858201526174176), scalar_t(0.17553410810741293), scalar_t(-0.032372670084274559), scalar_t(0.022063103295100275), scalar_t(1.0587971821717581), scalar_t(-0.11346384011744702), scalar_t(0.039222340750583846), scalar_t(-0.006618786099995529), scalar_t(0), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(0), scalar_t(-0.006618786099995509), scalar_t(0.039222340750583728), scalar_t(-0.11346384011744673), scalar_t(1.0587971821717581), scalar_t(0.022063103295100202), scalar_t(-0.03237267008427458), scalar_t(0.17553410810741304), scalar_t(-0.40858201526174215), scalar_t(0.60769269466101572), scalar_t(0.65772788257758796)};
         return data;
     }
     static const scalar_t *grad_1d() {
-        static const scalar_t data[25] = {scalar_t(-6.3158364273482457), scalar_t(10.111278303066971), scalar_t(-5.6882551126207481), scalar_t(2.306021025433568), scalar_t(-0.41320778853154499), scalar_t(-1.3001705560202661), scalar_t(-2.759999173503255), scalar_t(5.7732663757858971), scalar_t(-2.0658530069809662), scalar_t(0.35275636071858923), scalar_t(0.33333333333333331), scalar_t(-2.6666666666666665), scalar_t(0), scalar_t(2.6666666666666665), scalar_t(-0.33333333333333331), scalar_t(-0.35275636071858935), scalar_t(2.0658530069809657), scalar_t(-5.7732663757858997), scalar_t(2.7599991735032567), scalar_t(1.3001705560202657), scalar_t(0.41320778853154499), scalar_t(-2.3060210254335685), scalar_t(5.6882551126207463), scalar_t(-10.111278303066971), scalar_t(6.3158364273482457)};
+        static const scalar_t data[25] = {scalar_t(-6.315836427348243), scalar_t(10.11127830306696), scalar_t(-5.6882551126207392), scalar_t(2.3060210254335645), scalar_t(-0.41320778853154438), scalar_t(-1.3001705560202661), scalar_t(-2.759999173503255), scalar_t(5.7732663757858971), scalar_t(-2.0658530069809662), scalar_t(0.35275636071858923), scalar_t(0.33333333333333331), scalar_t(-2.6666666666666665), scalar_t(0), scalar_t(2.6666666666666665), scalar_t(-0.33333333333333331), scalar_t(-0.35275636071858935), scalar_t(2.0658530069809657), scalar_t(-5.7732663757858997), scalar_t(2.7599991735032567), scalar_t(1.3001705560202657), scalar_t(0.41320778853154383), scalar_t(-2.3060210254335618), scalar_t(5.6882551126207348), scalar_t(-10.111278303066957), scalar_t(6.3158364273482412)};
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[5] = {scalar_t(0.11846344252809454), scalar_t(0.23931433524968312), scalar_t(0.2844444444444445), scalar_t(0.23931433524968312), scalar_t(0.11846344252809454)};
+        static const scalar_t data[5] = {scalar_t(0.1184634425280947), scalar_t(0.23931433524968312), scalar_t(0.28444444444444428), scalar_t(0.23931433524968312), scalar_t(0.1184634425280947)};
         return data;
     }
 };
@@ -71,7 +71,7 @@ struct linear_elasticity_proteus_hex125_isoparametric_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[6] = {scalar_t(0.085662246189585178), scalar_t(0.18038078652406936), scalar_t(0.23395696728634555), scalar_t(0.23395696728634555), scalar_t(0.18038078652406936), scalar_t(0.085662246189585178)};
+        static const scalar_t data[6] = {scalar_t(0.085662246189585192), scalar_t(0.18038078652406936), scalar_t(0.23395696728634552), scalar_t(0.23395696728634552), scalar_t(0.18038078652406936), scalar_t(0.085662246189585192)};
         return data;
     }
 };

@@ -186,6 +186,25 @@ namespace sfem {
             return 0;
         }
 
+        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+            auto mesh = space->mesh_ptr();
+            for (auto &entry : domains.domains()) {
+                if (entry.second.user_data) {
+                    continue;
+                }
+                const smesh::block_idx_t block_id =
+                        block_id_for_domain(*mesh, *entry.second.block);
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+            }
+            return SFEM_SUCCESS;
+        }
+
         void parameter_array(const Parameters &parameters,
                              real_t *const values) {
             values[0] = parameters.require_real_value("mu");
@@ -513,7 +532,11 @@ namespace sfem {
             {"ASSUME_AFFINE_APPLY", &impl_->jacobian_action_uses_affine},
             {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
         };
-        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        if (matched && val && impl_->domains &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            SFEM_ERROR("GeneratedPoroHyperelasticity failed to cache affine geometry\n");
+        }
     }
 
     void GeneratedPoroHyperelasticity::set_value_in_block(const std::string &block_name,
@@ -538,6 +561,26 @@ namespace sfem {
             }
         }
 
+        AffineOption options[] = {
+            {"ASSUME_AFFINE_OBJECTIVE", &ret->impl_->objective_uses_affine},
+            {"objective_assume_affine", &ret->impl_->objective_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &ret->impl_->gradient_uses_affine},
+            {"gradient_assume_affine", &ret->impl_->gradient_uses_affine},
+            {"ASSUME_AFFINE_HESSIAN_ACTION", &ret->impl_->apply_uses_affine},
+            {"hessian_action_assume_affine", &ret->impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &ret->impl_->apply_uses_affine},
+            {"apply_assume_affine", &ret->impl_->apply_uses_affine},
+            {"ASSUME_AFFINE_RESIDUAL", &ret->impl_->residual_uses_affine},
+            {"residual_assume_affine", &ret->impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_GRADIENT", &ret->impl_->residual_uses_affine},
+            {"gradient_assume_affine", &ret->impl_->residual_uses_affine},
+            {"ASSUME_AFFINE_JACOBIAN_ACTION", &ret->impl_->jacobian_action_uses_affine},
+            {"jacobian_action_assume_affine", &ret->impl_->jacobian_action_uses_affine},
+            {"ASSUME_AFFINE_APPLY", &ret->impl_->jacobian_action_uses_affine},
+            {"apply_assume_affine", &ret->impl_->jacobian_action_uses_affine},
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
         if (ret->initialize(block_names) != SFEM_SUCCESS) {
             return nullptr;
         }
@@ -549,26 +592,6 @@ namespace sfem {
         if (material_from_yaml(node, defaults, top_values)) {
             set_material(*ret->impl_->domains, top_values);
         }
-
-        AffineOption options[] = {
-            {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
-            {"objective_assume_affine", &impl_->objective_uses_affine},
-            {"ASSUME_AFFINE_GRADIENT", &impl_->gradient_uses_affine},
-            {"gradient_assume_affine", &impl_->gradient_uses_affine},
-            {"ASSUME_AFFINE_HESSIAN_ACTION", &impl_->apply_uses_affine},
-            {"hessian_action_assume_affine", &impl_->apply_uses_affine},
-            {"ASSUME_AFFINE_APPLY", &impl_->apply_uses_affine},
-            {"apply_assume_affine", &impl_->apply_uses_affine},
-            {"ASSUME_AFFINE_RESIDUAL", &impl_->residual_uses_affine},
-            {"residual_assume_affine", &impl_->residual_uses_affine},
-            {"ASSUME_AFFINE_GRADIENT", &impl_->residual_uses_affine},
-            {"gradient_assume_affine", &impl_->residual_uses_affine},
-            {"ASSUME_AFFINE_JACOBIAN_ACTION", &impl_->jacobian_action_uses_affine},
-            {"jacobian_action_assume_affine", &impl_->jacobian_action_uses_affine},
-            {"ASSUME_AFFINE_APPLY", &impl_->jacobian_action_uses_affine},
-            {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {

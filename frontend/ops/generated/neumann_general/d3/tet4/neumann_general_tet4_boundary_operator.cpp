@@ -155,6 +155,7 @@ static SFEM_INLINE void neumann_general_tet4_trishell3_boundary_residual_soa_ele
         const scalar_t coeff0 = t0 + t0_001*x2 + t0_010*x1 + t0_100*x0;
         const scalar_t coeff1 = t1 + t1_001*x2 + t1_010*x1 + t1_100*x0;
         const scalar_t coeff2 = t2 + t2_001*x2 + t2_010*x1 + t2_100*x0;
+#pragma omp simd
         for (int i = 0; i < n_shape; ++i) {
             const scalar_t test = shape[q * n_shape + i] * qw;
                 element_vector[0][i] += coeff0 * test;

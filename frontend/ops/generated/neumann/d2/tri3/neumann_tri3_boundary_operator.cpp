@@ -103,6 +103,7 @@ static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_element(
         const scalar_t dS = neumann_tri3_edgeshell2_boundary_residual_soa_measure<scalar_t>(q, ev, points);
         const scalar_t qw = weight[q] * dS;
 
+#pragma omp simd
         for (int i = 0; i < n_shape; ++i) {
             const scalar_t test = shape[q * n_shape + i] * qw;
                 element_vector[0][i] += coeff0 * test;

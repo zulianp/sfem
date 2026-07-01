@@ -171,6 +171,7 @@ def _header(material, residual):
     return """#pragma once
 
 #include "sfem_Op.hpp"
+#include "sfem_NeumannConditions.hpp"
 
 namespace sfem {
     class %(op)s final : public Op {
@@ -374,6 +375,25 @@ namespace sfem {
             }
             SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
             return 0;
+        }
+
+        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+            auto mesh = space->mesh_ptr();
+            for (auto &entry : domains.domains()) {
+                if (entry.second.user_data) {
+                    continue;
+                }
+                const smesh::block_idx_t block_id =
+                        block_id_for_domain(*mesh, *entry.second.block);
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+            }
+            return SFEM_SUCCESS;
         }
     }  // namespace
 
@@ -606,7 +626,11 @@ namespace sfem {
         AffineOption options[] = {
 %(affine_options)s
         };
-        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        if (matched && val && impl_->domains &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
+        }
     }
 
     void %(op)s::set_value_in_block(const std::string &block_name,
@@ -631,6 +655,11 @@ namespace sfem {
             }
         }
 
+        AffineOption options[] = {
+%(yaml_affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
         if (ret->initialize(block_names) != SFEM_SUCCESS) {
             return nullptr;
         }
@@ -642,11 +671,6 @@ namespace sfem {
         if (material_from_yaml(node, defaults, top_values)) {
             set_material(*ret->impl_->domains, top_values);
         }
-
-        AffineOption options[] = {
-%(affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -688,6 +712,12 @@ namespace sfem {
             "objective_uses_affine",
             "gradient_uses_affine",
             "apply_uses_affine",
+        ),
+        "yaml_affine_options": _affine_option_entries(
+            "objective_uses_affine",
+            "gradient_uses_affine",
+            "apply_uses_affine",
+            owner="ret->impl_",
         ),
     }
     return _header(material, False), source
@@ -934,6 +964,25 @@ namespace sfem {
             return 0;
         }
 
+        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+            auto mesh = space->mesh_ptr();
+            for (auto &entry : domains.domains()) {
+                if (entry.second.user_data) {
+                    continue;
+                }
+                const smesh::block_idx_t block_id =
+                        block_id_for_domain(*mesh, *entry.second.block);
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+            }
+            return SFEM_SUCCESS;
+        }
+
         void parameter_array(const Parameters &parameters,
                              const int dim,
                              real_t *const values) {
@@ -1115,7 +1164,11 @@ namespace sfem {
         AffineOption options[] = {
 %(affine_options)s
         };
-        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        if (matched && val && impl_->domains &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
+        }
     }
 
 #ifdef SFEM_ENABLE_RYAML
@@ -1133,6 +1186,11 @@ namespace sfem {
             }
         }
 
+        AffineOption options[] = {
+%(yaml_affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
         if (ret->initialize(block_names) != SFEM_SUCCESS) {
             return nullptr;
         }
@@ -1144,11 +1202,6 @@ namespace sfem {
         if (material_from_yaml(node, defaults, top_values)) {
             set_material(*ret->impl_->domains, top_values);
         }
-
-        AffineOption options[] = {
-%(affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -1203,6 +1256,11 @@ namespace sfem {
         "affine_options": _affine_option_entries(
             "residual_uses_affine",
             "jacobian_action_uses_affine",
+        ),
+        "yaml_affine_options": _affine_option_entries(
+            "residual_uses_affine",
+            "jacobian_action_uses_affine",
+            owner="ret->impl_",
         ),
         "gradient_previous_check": (
             "        if (!impl_->previous) {\n"
@@ -1293,16 +1351,16 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
         )
         setup = _residual_soa_view_declarations(fields, "out", "out", "real_t")
         parameter_args = ", ".join(
-            "condition.parameters[%d]" % material_parameter_index[name]
+            "condition.values->data()[%d]" % material_parameter_index[name]
             for name in parameter_names_by_dim[dim]
         )
         output_args = _boundary_soa_component_argument_names(fields, "out")
         call_args = _nonempty(
-            "condition.sideset->size()",
+            "sideset->size()",
             "mesh->n_nodes()",
             "domain.block->elements()->data()",
-            "condition.sideset->parent()->data()",
-            "condition.sideset->lfi()->data()",
+            "sideset->parent()->data()",
+            "sideset->lfi()->data()",
             "points",
             parameter_args,
             "FIELD_STRIDE",
@@ -1324,12 +1382,12 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
 #include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_NeumannConditions.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
 
-#include <array>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -1434,16 +1492,11 @@ namespace sfem {
 
     class %(op)s::Impl {
     public:
-        struct BoundaryCondition {
-            std::shared_ptr<smesh::Sideset> sideset;
-            std::array<real_t, MAX_PARAMETERS> parameters;
-        };
-
         explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
-        std::vector<BoundaryCondition> conditions;
+        std::vector<NeumannConditions::Condition> conditions;
     };
 
     std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1482,11 +1535,19 @@ namespace sfem {
     void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                              const real_t *const parameters) {
         SFEM_TRACE_SCOPE("%(op)s::add_sideset");
-        Impl::BoundaryCondition condition;
-        condition.sideset = sideset;
+        NeumannConditions::Condition condition;
+        condition.sidesets = {sideset};
+        condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);
         for (int i = 0; i < MAX_PARAMETERS; ++i) {
-            condition.parameters[i] = parameters[i];
+            condition.values->data()[i] = parameters[i];
         }
+        condition.value = parameters[0];
+        condition.component = 0;
+        add_condition(condition);
+    }
+
+    void %(op)s::add_condition(const NeumannConditions::Condition &condition) {
+        SFEM_TRACE_SCOPE("%(op)s::add_condition");
         impl_->conditions.push_back(condition);
     }
 
@@ -1501,7 +1562,8 @@ namespace sfem {
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
             int status = SFEM_SUCCESS;
             for (const auto &condition : impl_->conditions) {
-                if (!condition.sideset || condition.sideset->block_id() != block_id) {
+                const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];
+                if (!sideset || !condition.values || sideset->block_id() != block_id) {
                     continue;
                 }
                 switch (domain.element_type) {
@@ -1614,6 +1676,7 @@ namespace sfem {
 def _boundary_header(material):
     return """#pragma once
 
+#include "sfem_NeumannConditions.hpp"
 #include "sfem_Op.hpp"
 
 namespace smesh {
@@ -1634,6 +1697,7 @@ namespace sfem {
         ptrdiff_t n_dofs_image() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
+        void add_condition(const NeumannConditions::Condition &condition);
         void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset);
         void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                          const real_t *parameters);
@@ -1746,6 +1810,25 @@ namespace sfem {
             }
             SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
             return 0;
+        }
+
+        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+            auto mesh = space->mesh_ptr();
+            for (auto &entry : domains.domains()) {
+                if (entry.second.user_data) {
+                    continue;
+                }
+                const smesh::block_idx_t block_id =
+                        block_id_for_domain(*mesh, *entry.second.block);
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+            }
+            return SFEM_SUCCESS;
         }
 
         void parameter_array(const Parameters &parameters,
@@ -1976,7 +2059,11 @@ namespace sfem {
         AffineOption options[] = {
 %(affine_options)s
         };
-        set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+        if (matched && val && impl_->domains &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
+        }
     }
 
     void %(op)s::set_value_in_block(const std::string &block_name,
@@ -2001,6 +2088,11 @@ namespace sfem {
             }
         }
 
+        AffineOption options[] = {
+%(yaml_affine_options)s
+        };
+        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
         if (ret->initialize(block_names) != SFEM_SUCCESS) {
             return nullptr;
         }
@@ -2012,11 +2104,6 @@ namespace sfem {
         if (material_from_yaml(node, defaults, top_values)) {
             set_material(*ret->impl_->domains, top_values);
         }
-
-        AffineOption options[] = {
-%(affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
 
         if (node.has_child("blocks")) {
             for (auto block : node["blocks"].children()) {
@@ -2088,6 +2175,14 @@ namespace sfem {
             "apply_uses_affine",
             "residual_uses_affine",
             "jacobian_action_uses_affine",
+        ),
+        "yaml_affine_options": _affine_option_entries(
+            "objective_uses_affine",
+            "gradient_uses_affine",
+            "apply_uses_affine",
+            "residual_uses_affine",
+            "jacobian_action_uses_affine",
+            owner="ret->impl_",
         ),
     }
     return _header(material, True), source
@@ -2827,11 +2922,11 @@ def _runtime_variant_and_scalar_type(name):
     return None, None
 
 
-def _affine_option_entries(*flags):
+def _affine_option_entries(*flags, owner="impl_"):
     lines = []
     for flag in flags:
         for alias in _AFFINE_OPTION_ALIASES[flag]:
-            lines.append('            {"%s", &impl_->%s},' % (alias, flag))
+            lines.append('            {"%s", &%s->%s},' % (alias, owner, flag))
     return "\n".join(lines)
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sfem_NeumannConditions.hpp"
 #include "sfem_Op.hpp"
 
 namespace smesh {
@@ -20,6 +21,7 @@ namespace sfem {
         ptrdiff_t n_dofs_image() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
+        void add_condition(const NeumannConditions::Condition &condition);
         void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset);
         void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                          const real_t *parameters);

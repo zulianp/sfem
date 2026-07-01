@@ -273,6 +273,7 @@ static SFEM_INLINE void neumann_proteus_hex64_proteus_quadshell16_boundary_resid
 
             for (int sy = 0; sy < S; ++sy) {
                 const scalar_t vy = shape_1d[qy * S + sy];
+#pragma omp simd
                 for (int sx = 0; sx < S; ++sx) {
                     const int i = shape_index[sy * S + sx];
                     const scalar_t test = shape_1d[qx * S + sx] * vy * qw;

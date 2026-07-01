@@ -223,6 +223,7 @@ static SFEM_INLINE void neumann_general_proteus_hex27_proteus_quadshell9_boundar
             const scalar_t coeff2 = t2 + t2_001*x2 + t2_010*x1 + t2_100*x0;
             for (int sy = 0; sy < S; ++sy) {
                 const scalar_t vy = shape_1d[qy * S + sy];
+#pragma omp simd
                 for (int sx = 0; sx < S; ++sx) {
                     const int i = shape_index[sy * S + sx];
                     const scalar_t test = shape_1d[qx * S + sx] * vy * qw;

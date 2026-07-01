@@ -4,12 +4,12 @@
 #include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_NeumannConditions.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
 
-#include <array>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -39,6 +39,31 @@ namespace sfem {
             for (auto &entry : domains.domains()) {
                 seed_parameters(*entry.second.parameters);
             }
+        }
+
+        struct AffineOption {
+            const char *name;
+            bool       *flag;
+        };
+
+        inline bool set_affine_option(const std::string &name,
+                                      const bool val,
+                                      const AffineOption *const options,
+                                      const int n_options) {
+            if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = val;
+                }
+                return true;
+            }
+            bool matched = false;
+            for (int i = 0; i < n_options; ++i) {
+                if (name == options[i].name) {
+                    *options[i].flag = val;
+                    matched = true;
+                }
+            }
+            return matched;
         }
 
 #ifdef SFEM_ENABLE_RYAML
@@ -145,44 +170,22 @@ namespace sfem {
             return true;
         }
 
-        void read_affine_options(const ryml::ConstNodeRef &node,
-                                 bool &objective,
-                                 bool &gradient,
-                                 bool &hessian_action) {
-            bool all = objective && gradient && hessian_action;
+        inline void read_affine_options(const ryml::ConstNodeRef &node,
+                                        const AffineOption *const options,
+                                        const int n_options) {
+            bool all = true;
+            for (int i = 0; i < n_options; ++i) {
+                all = all && *options[i].flag;
+            }
             if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
                 yaml_read_bool(node, "assume_affine", all)) {
-                objective = all;
-                gradient = all;
-                hessian_action = all;
+                for (int i = 0; i < n_options; ++i) {
+                    *options[i].flag = all;
+                }
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_OBJECTIVE", objective);
-            yaml_read_bool(node, "objective_assume_affine", objective);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", gradient);
-            yaml_read_bool(node, "gradient_assume_affine", gradient);
-            yaml_read_bool(node, "ASSUME_AFFINE_HESSIAN_ACTION", hessian_action);
-            yaml_read_bool(node, "hessian_action_assume_affine", hessian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", hessian_action);
-            yaml_read_bool(node, "apply_assume_affine", hessian_action);
-        }
-
-        void read_residual_affine_options(const ryml::ConstNodeRef &node,
-                                          bool &residual,
-                                          bool &jacobian_action) {
-            bool all = residual && jacobian_action;
-            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-                yaml_read_bool(node, "assume_affine", all)) {
-                residual = all;
-                jacobian_action = all;
+            for (int i = 0; i < n_options; ++i) {
+                yaml_read_bool(node, options[i].name, *options[i].flag);
             }
-            yaml_read_bool(node, "ASSUME_AFFINE_RESIDUAL", residual);
-            yaml_read_bool(node, "residual_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_GRADIENT", residual);
-            yaml_read_bool(node, "gradient_assume_affine", residual);
-            yaml_read_bool(node, "ASSUME_AFFINE_JACOBIAN_ACTION", jacobian_action);
-            yaml_read_bool(node, "jacobian_action_assume_affine", jacobian_action);
-            yaml_read_bool(node, "ASSUME_AFFINE_APPLY", jacobian_action);
-            yaml_read_bool(node, "apply_assume_affine", jacobian_action);
         }
 #endif  // SFEM_ENABLE_RYAML
 
@@ -300,16 +303,11 @@ namespace sfem {
 
     class GeneratedNeumannGeneral::Impl {
     public:
-        struct BoundaryCondition {
-            std::shared_ptr<smesh::Sideset> sideset;
-            std::array<real_t, MAX_PARAMETERS> parameters;
-        };
-
         explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
-        std::vector<BoundaryCondition> conditions;
+        std::vector<NeumannConditions::Condition> conditions;
     };
 
     std::unique_ptr<Op> GeneratedNeumannGeneral::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -348,11 +346,19 @@ namespace sfem {
     void GeneratedNeumannGeneral::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                              const real_t *const parameters) {
         SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::add_sideset");
-        Impl::BoundaryCondition condition;
-        condition.sideset = sideset;
+        NeumannConditions::Condition condition;
+        condition.sidesets = {sideset};
+        condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);
         for (int i = 0; i < MAX_PARAMETERS; ++i) {
-            condition.parameters[i] = parameters[i];
+            condition.values->data()[i] = parameters[i];
         }
+        condition.value = parameters[0];
+        condition.component = 0;
+        add_condition(condition);
+    }
+
+    void GeneratedNeumannGeneral::add_condition(const NeumannConditions::Condition &condition) {
+        SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::add_condition");
         impl_->conditions.push_back(condition);
     }
 
@@ -367,68 +373,69 @@ namespace sfem {
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
             int status = SFEM_SUCCESS;
             for (const auto &condition : impl_->conditions) {
-                if (!condition.sideset || condition.sideset->block_id() != block_id) {
+                const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];
+                if (!sideset || !condition.values || sideset->block_id() != block_id) {
                     continue;
                 }
                 switch (domain.element_type) {
                     case smesh::TRI3: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                        status |= neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[6], condition.parameters[7], FIELD_STRIDE, u_out[0], u_out[1]);
+                        status |= neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[6], condition.values->data()[7], FIELD_STRIDE, u_out[0], u_out[1]);
                         break;
                     }
                     case smesh::QUAD4: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                        status |= neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[6], condition.parameters[7], FIELD_STRIDE, u_out[0], u_out[1]);
+                        status |= neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[6], condition.values->data()[7], FIELD_STRIDE, u_out[0], u_out[1]);
                         break;
                     }
                     case smesh::TET4: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_tet4_trishell3_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_tet4_trishell3_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::TET10: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_tet10_trishell6_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_tet10_trishell6_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::HEX8: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_hex8_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_hex8_quadshell4_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::HEX27: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_hex27_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_hex27_quadshell9_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX8: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX27: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX64: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     case smesh::PROTEUS_HEX125: {
                         static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                        status |= neumann_general_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(condition.sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), condition.sideset->parent()->data(), condition.sideset->lfi()->data(), points, condition.parameters[0], condition.parameters[1], condition.parameters[2], condition.parameters[3], condition.parameters[4], condition.parameters[5], condition.parameters[6], condition.parameters[7], condition.parameters[8], condition.parameters[9], condition.parameters[10], condition.parameters[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+                        status |= neumann_general_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], condition.values->data()[3], condition.values->data()[4], condition.values->data()[5], condition.values->data()[6], condition.values->data()[7], condition.values->data()[8], condition.values->data()[9], condition.values->data()[10], condition.values->data()[11], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
                     default:
