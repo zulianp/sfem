@@ -2,23 +2,14 @@ from dataclasses import dataclass
 
 try:
     from .tensor_product_geometry import sfem_geometry_kernels_header_source
+    from .targets import CUDATarget, OpenMPTarget
 except ImportError:
     from tensor_product_geometry import sfem_geometry_kernels_header_source
+    from targets import CUDATarget, OpenMPTarget
 
 
 def _join_lines(lines):
     return "\n".join(line for line in lines if line != "")
-
-
-def _simd_lane_loop_lines(indent, index_name, simd_lines):
-    return tuple("%s%s" % (indent, line) for line in simd_lines) + (
-        "%sfor (ptrdiff_t %s = 0; %s < nelems; ++%s) {"
-        % (indent, index_name, index_name, index_name),
-    )
-
-
-def _single_work_item_lines(indent):
-    return ("%s{" % indent,)
 
 
 def _cuda_geometry_header_source():
@@ -151,124 +142,10 @@ def _cuda_geometry_header_source():
 
 
 @dataclass(frozen=True)
-class EnergySoAKernelEmissionPlan:
-    unit: object
-    context: object
-    forms: tuple
-    prefix: str
-    local_prefix: str
-    local_kernel: object
-    mesh_kernel: object
-    emission_plan: object
-    reference_data_plan: object = None
-    diagnostics_plan: object = None
-    local_signatures: tuple = ()
-    mesh_signature: object = None
-
-
-def energy_soa_kernel_emission_plan(unit, context):
-    from .diagnostics_plan import kernel_diagnostics_plan_from_plan
-    from .emission_plan import emission_plan_from_unit_context
-    from .generation_plan import mesh_kernel_plan_from_context
-    from .kernel_signature import (
-        local_kernel_signatures_from_plan,
-        mesh_kernel_signature_from_plan,
-    )
-    from .reference_data_plan import reference_data_plan_from_emission_plan
-
-    prefix = unit.name
-    local_kernel = unit.local_kernel_plan(context, prefix)
-    mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
-    element_plan = emission_plan_from_unit_context(unit, context)
-    _validate_element_emission_plan(unit.name, element_plan)
-    reference_data_plan = reference_data_plan_from_emission_plan(
-        unit,
-        context,
-        element_plan,
-        mesh_kernel.name,
-    )
-    local_signatures = local_kernel_signatures_from_plan(
-        unit,
-        element_plan,
-        local_kernel.name,
-        "energy_soa",
-    )
-    mesh_signature = mesh_kernel_signature_from_plan(
-        unit,
-        element_plan,
-        mesh_kernel.name,
-        "energy_soa",
-    )
-    diagnostics_plan = kernel_diagnostics_plan_from_plan(
-        unit,
-        element_plan,
-        mesh_kernel.name,
-        "energy_soa",
-        reference_data_plan,
-        mesh_signature,
-        local_signatures,
-    )
-    return EnergySoAKernelEmissionPlan(
-        unit=unit,
-        context=context,
-        forms=_energy_kernel_forms(unit),
-        prefix=mesh_kernel.name,
-        local_prefix=local_kernel.name,
-        local_kernel=local_kernel,
-        mesh_kernel=mesh_kernel,
-        emission_plan=element_plan,
-        reference_data_plan=reference_data_plan,
-        diagnostics_plan=diagnostics_plan,
-        local_signatures=local_signatures,
-        mesh_signature=mesh_signature,
-    )
-
-
-def _energy_kernel_forms(unit):
-    kernel_forms = tuple(
-        expression_plan.source
-        for expression_plan in unit.expression_plans
-        if expression_plan.source is not None
-    )
-    if not kernel_forms:
-        raise ValueError("energy kernel plan '%s' has no expression-plan kernel forms" % unit.name)
-    return kernel_forms
-
-
-def _validate_element_emission_plan(kernel_name, element_plan):
-    _validate_geometry_specialization(
-        kernel_name,
-        element_plan.affine_geometry,
-        element_plan.affine_specialization,
-    )
-    _validate_geometry_specialization(
-        kernel_name,
-        element_plan.isoparametric_geometry,
-        element_plan.isoparametric_specialization,
-    )
-
-
-def _validate_geometry_specialization(kernel_name, geometry, specialization):
-    rule = specialization.quadrature_rule
-    if geometry.node.n_shape != rule.n_shape or geometry.node.n_qp != rule.n_qp:
-        raise ValueError(
-            "kernel plan '%s' geometry mode '%s' has (%d shapes, %d qp), "
-            "but specialization has (%d shapes, %d qp)"
-            % (
-                kernel_name,
-                geometry.mode.value,
-                geometry.node.n_shape,
-                geometry.node.n_qp,
-                rule.n_shape,
-                rule.n_qp,
-            )
-        )
-
-
-@dataclass(frozen=True)
 class OpenMPEnergySoASourceBuilder:
     operator_extension: str = "cpp"
     emit_objective_steps: bool = True
+    target: object = OpenMPTarget()
 
     def header_name(self, stem):
         return "%s.hpp" % stem
@@ -277,7 +154,7 @@ class OpenMPEnergySoASourceBuilder:
         return "HPP"
 
     def inline_qualifier(self):
-        return "SFEM_INLINE"
+        return self.target.inline_qualifier()
 
     def local_header_preamble_lines(self, math_name, tensor_product_name, basis_family):
         return (
@@ -298,9 +175,7 @@ class OpenMPEnergySoASourceBuilder:
             '#include "%s"' % local_name,
             '#include "%s"' % geometry_name,
             '#include "%s"' % diagnostics_name,
-            "#ifdef _OPENMP",
-            "#include <omp.h>",
-            "#endif",
+            *self.target.includes(),
         )
 
     def geometry_header_source(self):
@@ -318,22 +193,23 @@ class OpenMPEnergySoASourceBuilder:
         return sfem_tensor_product_kernels_header_source()
 
     def simd_lines(self):
-        return ("#pragma omp simd",)
+        pragma = self.target.vectorize_pragma()
+        return () if pragma is None else (pragma,)
 
     def work_item_index(self):
-        return "lane"
+        return self.target.work_item_index()
 
     def work_item_name(self, name, component):
-        return "%s_lane%d" % (name, component)
+        return self.target.work_item_name(name, component)
 
     def diagnostic_work_item(self):
-        return "lane"
+        return self.target.diagnostic_work_item()
 
     def work_item_loop_lines(self, indent):
-        return _simd_lane_loop_lines(indent, self.work_item_index(), self.simd_lines())
+        return self.target.work_item_loop_lines(indent)
 
     def parallel_for_lines(self):
-        return ("#pragma omp parallel for schedule(static)",)
+        return self.target.parallel_element_loop_lines("static")
 
     def effective_vector_size(self, vector_size):
         return int(vector_size)
@@ -352,7 +228,7 @@ class OpenMPEnergySoASourceBuilder:
         )
 
     def mesh_function_line(self, implementation_name):
-        return "static SFEM_INLINE int %s(" % implementation_name
+        return "%s int %s(" % (self.target.function_qualifier(), implementation_name)
 
     def success_return_lines(self):
         return ("    return SFEM_SUCCESS;",)
@@ -364,16 +240,14 @@ class OpenMPEnergySoASourceBuilder:
         )
 
     def scatter_add_lines(self, lhs, rhs, indent):
-        return (
-            "%s#pragma omp atomic update" % indent,
-            "%s%s += %s;" % (indent, lhs, rhs),
-        )
+        return self.target.scatter_add_lines(lhs, rhs, indent)
 
 
 @dataclass(frozen=True)
 class CUDAEnergySoASourceBuilder:
     operator_extension: str = "cu"
     emit_objective_steps: bool = False
+    target: object = CUDATarget()
 
     def header_name(self, stem):
         return "%s.cuh" % stem
@@ -382,7 +256,7 @@ class CUDAEnergySoASourceBuilder:
         return "CUH"
 
     def inline_qualifier(self):
-        return "__host__ __device__ __forceinline__"
+        return self.target.inline_qualifier()
 
     def local_header_preamble_lines(self, math_name, tensor_product_name, basis_family):
         tensor_include = (
@@ -401,7 +275,7 @@ class CUDAEnergySoASourceBuilder:
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
         return (
-            "#include <cuda_runtime.h>",
+            *self.target.includes(),
             '#include "%s"' % local_name,
             '#include "%s"' % geometry_name,
             '#include "%s"' % diagnostics_name,
@@ -433,16 +307,16 @@ class CUDAEnergySoASourceBuilder:
         return ()
 
     def work_item_index(self):
-        return "0"
+        return self.target.work_item_index()
 
     def work_item_name(self, name, component):
-        return "%s_value%d" % (name, component)
+        return self.target.work_item_name(name, component)
 
     def diagnostic_work_item(self):
-        return "scalar"
+        return self.target.diagnostic_work_item()
 
     def work_item_loop_lines(self, indent):
-        return _single_work_item_lines(indent)
+        return self.target.work_item_loop_lines(indent)
 
     def parallel_for_lines(self):
         return ()
@@ -480,20 +354,14 @@ class CUDAEnergySoASourceBuilder:
         )
 
     def scatter_add_lines(self, lhs, rhs, indent):
-        return ("%satomicAdd(&(%s), %s);" % (indent, lhs, rhs),)
+        return self.target.scatter_add_lines(lhs, rhs, indent)
 
 
 @dataclass(frozen=True)
 class OpenMPEnergySoAEmitter:
-    """Opaque OpenMP emitter: consume an energy-SoA emission context, emit files."""
+    """Opaque OpenMP emitter: consume an energy-SoA emission plan, emit files."""
 
     supports_op_wrapper: bool = True
-
-    def plan(self, unit, context):
-        return energy_soa_kernel_emission_plan(unit, context)
-
-    def emit(self, unit, context):
-        return self.emit_plan(self.plan(unit, context))
 
     def emit_plan(self, plan):
         from .energy_codegen import generate_sfem_soa_cpp_files_for_element
@@ -511,15 +379,9 @@ class OpenMPEnergySoAEmitter:
 
 @dataclass(frozen=True)
 class CUDAEnergySoAEmitter:
-    """Opaque CUDA emitter: consume an energy-SoA emission context, emit files."""
+    """Opaque CUDA emitter: consume an energy-SoA emission plan, emit files."""
 
     supports_op_wrapper: bool = False
-
-    def plan(self, unit, context):
-        return energy_soa_kernel_emission_plan(unit, context)
-
-    def emit(self, unit, context):
-        return self.emit_plan(self.plan(unit, context))
 
     def emit_plan(self, plan):
         from .energy_codegen import generate_sfem_soa_cpp_files_for_element

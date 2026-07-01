@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .forms import FormOrder
+from .energy_plan import energy_soa_kernel_emission_plan
 from .energy_emitters import CUDAEnergySoAEmitter
 from .generation_plan import MeshPhase
 
@@ -34,7 +35,7 @@ class CUDASoABackend:
 
     def _emit_energy(self, unit, context):
         _validate_energy_plan(unit)
-        return self.emitter.emit(unit, context)
+        return self.emitter.emit_plan(energy_soa_kernel_emission_plan(unit, context))
 
 
 def _kind_value(kind):
