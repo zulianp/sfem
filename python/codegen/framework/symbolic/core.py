@@ -97,13 +97,7 @@ try:
 except ImportError:
     from tensor_product_kernels import sfem_tensor_product_kernels_header_source
 
-try:
-    import networkx as nx
-except ModuleNotFoundError:
-    try:
-        from . import _networkx_compat as nx
-    except ImportError:
-        import _networkx_compat as nx
+import networkx as nx
 
 
 SympyExpr = Union[sp.Expr, ast.Assignment, ast.AddAugmentedAssignment]

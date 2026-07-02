@@ -4,16 +4,13 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
 
 import sympy as sp
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from symbolic import (
+from codegen.framework.symbolic import (
     DeformationGradient,
     DimensionSpecialization,
     ExpressionRole,
@@ -38,8 +35,8 @@ from symbolic import (
     sfem_soa_weak_form,
     vector_symbols,
 )
-from energy_codegen import generate_sfem_soa_cpp_files_for_element
-from fem import sfem_fem_policy, sfem_tensor_hex_shape_index
+from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
+from codegen.framework.fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 
 
 def neohookean_ogden_energy(F, mu, lmbda):

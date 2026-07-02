@@ -37,7 +37,7 @@ PYTHONPATH=python python -m codegen.framework.materials.mooney_rivlin \
 PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
     --out-dir /tmp/two_phase_flow --element HEX8 --compile
 
-PYTHONPATH=python python -m codegen.framework.generate_stokes_files \
+PYTHONPATH=python python -m codegen.framework.generators.stokes \
     --out-dir /tmp/stokes --element TRI6_TRI3 --compile
 ```
 

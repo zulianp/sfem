@@ -1,6 +1,6 @@
 import unittest
 
-from codegen.framework.pystencils_opencl import PystencilsOpenCLFloat32Smoke
+from codegen.framework.backends.pystencils_opencl import PystencilsOpenCLFloat32Smoke
 
 
 class PystencilsOpenCLTest(unittest.TestCase):

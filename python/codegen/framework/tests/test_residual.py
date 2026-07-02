@@ -10,14 +10,14 @@ import sympy as sp
 
 from sfem import gen
 
-from .residual import CoupledResidualSystem
-from .residual_codegen import (
+from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.emitters.residual_codegen import (
     coupled_residual_weak_coefficients,
     generate_coupled_residual_sfem_files,
     weak_residual_coefficients,
 )
-from .emission_plan import emission_plan_for_element
-from .symbolic import ExpressionRole, sfem_element_quadrature_rule
+from codegen.framework.plans.emission import emission_plan_for_element
+from codegen.framework.symbolic import ExpressionRole, sfem_element_quadrature_rule
 
 
 def _element_emission_plan(element, vector_size=16, quadrature_order=None):

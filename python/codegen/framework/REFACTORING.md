@@ -471,7 +471,7 @@ Keep this list focused on acceptance criteria, not general cleanup.
   and backend code. Decide which low-level APIs remain internal implementation
   details, stop exporting them as public framework API, and route examples
   through `sfem.gen.CodeGenerator`.
-- `python/codegen/framework/twophaseflow.py` and other historical helper paths
+- `python/codegen/framework/materials/two_phase_flow_model.py` and other historical helper paths
   should be audited for obsolete standalone pipeline logic. Remove or convert
   anything not using the unified `EquationSystem` -> `FormCollection` ->
   `GenerationPlan` path.

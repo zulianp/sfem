@@ -1,13 +1,9 @@
 import unittest
-import os
-import sys
 
 import sympy as sp
 import sympy.codegen.ast as ast
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from symbolic import (
+from codegen.framework.symbolic.core import (
     DeformationGradient,
     DimensionSpecialization,
     DisplacementGradient,
@@ -50,7 +46,7 @@ from symbolic import (
     weak_hessian_action_from_linearized_transformed_first_piola,
     _prune_dead_cse_intermediates,
 )
-from forms import (
+from codegen.framework.symbolic.forms import (
     FormKind,
     FormOrder,
     PipelineStage,
@@ -58,7 +54,7 @@ from forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from targets import CUDATarget, ExecutionModel, OpenMPTarget, TargetLanguage
+from codegen.framework.backends.targets import CUDATarget, ExecutionModel, OpenMPTarget, TargetLanguage
 
 
 class SymbolicFrameworkTest(unittest.TestCase):

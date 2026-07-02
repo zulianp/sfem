@@ -93,7 +93,7 @@ from .fem import (
     sfem_tensor_product_hex_order,
     sfem_tensor_hex_shape_index,
 )
-from .basis import (
+from .fem.basis import (
     BasisDataLayout,
     BasisEvaluation,
     BasisFamily,
@@ -104,7 +104,7 @@ from .basis import (
     field_basis_plan_for_fem_policy,
     field_basis_plans_for_fem_policy,
 )
-from .tensor_product import (
+from .fem.tensor_product import (
     TensorProductDataLayout,
     TensorProductOperation,
     TensorProductSumFactorizationPlan,
@@ -116,7 +116,7 @@ from .tensor_product import (
     tensor_product_sum_factorization_plan,
     tensor_product_test_contraction_plan,
 )
-from .forms import (
+from .symbolic.forms import (
     FormBlock,
     FormDependencies,
     FormEvaluation,
@@ -132,14 +132,14 @@ from .forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from .expression_plan import KernelExpressionPlan
-from .boundary_forms import (
+from .plans.expression import KernelExpressionPlan
+from .symbolic.boundary_forms import (
     BoundaryIntegral,
     Measure,
     dx,
     ds,
 )
-from .generation_plan import (
+from .plans.generation import (
     BlockPlan,
     DataStreamLayout,
     DataStreamPlan,
@@ -158,11 +158,11 @@ from .generation_plan import (
     MeshPhasePlan,
     mesh_kernel_plan_from_context,
 )
-from .emission_plan import (
+from .plans.emission import (
     emission_plan_for_element,
     emission_plan_from_unit_context,
 )
-from .kernel_signature import (
+from .plans.kernel_signature import (
     KernelArgument,
     LocalKernelSignature,
     MeshKernelSignature,
@@ -170,19 +170,19 @@ from .kernel_signature import (
     local_kernel_suffix_from_plan,
     mesh_kernel_signature_from_plan,
 )
-from .diagnostics_plan import (
+from .plans.diagnostics import (
     KernelDiagnosticsEntryPlan,
     KernelDiagnosticsPlan,
     kernel_diagnostics_plan_from_plan,
     validate_diagnostics_plan_names,
 )
-from .reference_data_plan import (
+from .plans.reference_data import (
     ReferenceBasisDataPlan,
     ReferenceDataPlan,
     ReferenceDataSetPlan,
     reference_data_plan_from_emission_plan,
 )
-from .geometry import (
+from .fem.geometry import (
     GeometryEvaluation,
     GeometryInputLayout,
     GeometryMode,
@@ -191,7 +191,7 @@ from .geometry import (
     geometry_plans_for_fem_policy,
     isoparametric_geometry_plan,
 )
-from .equations import (
+from .symbolic.equations import (
     Equation,
     EquationField,
     EquationForm,
@@ -199,7 +199,7 @@ from .equations import (
     EquationSystemBuilder,
     EquationSystems,
 )
-from .symbolic_fields import (
+from .symbolic.fields import (
     FiniteElement,
     Function,
     FunctionSpace,
@@ -229,7 +229,7 @@ from .symbolic_fields import (
     trial_function,
     vector_field,
 )
-from .symbolic_operators import (
+from .symbolic.operators import (
     Identity,
     adjugate,
     det,
@@ -245,7 +245,7 @@ from .symbolic_operators import (
     sqrt,
     value,
 )
-from .symbolic_qualifiers import (
+from .symbolic.qualifiers import (
     CodegenQualifier,
     DEFORMATION_GRADIENT,
     DISPLACEMENT,
@@ -262,7 +262,7 @@ from .symbolic_qualifiers import (
     qualify,
     variable,
 )
-from .targets import (
+from .backends.targets import (
     CUDATarget,
     ExecutionModel,
     LoopLoweringPolicy,
@@ -270,7 +270,7 @@ from .targets import (
     TargetLanguage,
     TargetPlatform,
 )
-from .constitutive import (
+from .symbolic.constitutive import (
     TwoPhaseFlowConstitutiveModel,
     TwoPhaseFlowConstitutiveState,
     TwoPhaseFlowParameters,

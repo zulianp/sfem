@@ -3,9 +3,9 @@ import unittest
 
 import sympy as sp
 
-from .constitutive import TwoPhaseFlowConstitutiveModel
-from .symbolic import ExpressionRole
-from .twophaseflow import TwoPhaseFlowImplicitEulerModel
+from codegen.framework.symbolic.constitutive import TwoPhaseFlowConstitutiveModel
+from codegen.framework.symbolic import ExpressionRole
+from codegen.framework.materials.two_phase_flow_model import TwoPhaseFlowImplicitEulerModel
 
 
 def parameter_values(model):

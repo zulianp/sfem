@@ -13,17 +13,17 @@ import sympy as sp
 
 import codegen.framework as framework
 from sfem import gen
-from codegen.framework.cuda_backend import CUDASoABackend
-from codegen.framework.diagnostics_plan import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
-from codegen.framework.emission_plan import ElementEmissionPlan
-from codegen.framework.generation_plan import GenerationPlan, mesh_kernel_plan_from_context
-from codegen.framework.kernel_signature import (
+from codegen.framework.backends.cuda import CUDASoABackend
+from codegen.framework.plans.diagnostics import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
+from codegen.framework.plans.emission import ElementEmissionPlan
+from codegen.framework.plans.generation import GenerationPlan, mesh_kernel_plan_from_context
+from codegen.framework.plans.kernel_signature import (
     LocalKernelSignature,
     MeshKernelSignature,
     local_kernel_suffix_from_plan,
 )
-from codegen.framework.energy_emitters import OpenMPEnergySoASourceBuilder
-from codegen.framework.kernel_ast import (
+from codegen.framework.emitters.energy import OpenMPEnergySoASourceBuilder
+from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BufferDeclNode,
     GatherNode,
@@ -44,19 +44,19 @@ from codegen.framework.kernel_ast import (
     pre_increment,
     symbol_ref,
 )
-from codegen.framework.kernel_ast_printer import CLikeKernelASTPrinter
-from codegen.framework.kernel_ast_pystencils import PystencilsKernelASTAdapter
-from codegen.framework.openmp_backend import OpenMPSoABackend
-from codegen.framework.reference_data_plan import ReferenceDataPlan, ReferenceDataSetPlan
+from codegen.framework.emitters.ast_printer import CLikeKernelASTPrinter
+from codegen.framework.ir.pystencils_adapter import PystencilsKernelASTAdapter
+from codegen.framework.backends.openmp import OpenMPSoABackend
+from codegen.framework.plans.reference_data import ReferenceDataPlan, ReferenceDataSetPlan
 
-from .materials.neohookean_ogden import material as neohookean_ogden
-from .materials.linear_elasticity import material as linear_elasticity
-from .materials.neumann import material as neumann
-from .materials.poro_hyperelasticity import material as poro_hyperelasticity
-from .materials.stokes import material as stokes
-from .materials.two_phase_flow import material as two_phase_flow
-from .generate_stokes_files import validate_m6_4 as validate_stokes_m6_4
-from .tensor_product_geometry import (
+from ..materials.neohookean_ogden import material as neohookean_ogden
+from ..materials.linear_elasticity import material as linear_elasticity
+from ..materials.neumann import material as neumann
+from ..materials.poro_hyperelasticity import material as poro_hyperelasticity
+from ..materials.stokes import material as stokes
+from ..materials.two_phase_flow import material as two_phase_flow
+from ..generators.stokes import validate_m6_4 as validate_stokes_m6_4
+from ..fem.tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
     tensor_product_ordered_coordinate_streams,
@@ -927,8 +927,8 @@ class GenApiTest(unittest.TestCase):
         self.assertNotIn(sp.Symbol("u_direction"), matrix[0][1].dependencies.symbols)
 
     def test_backend_rejects_coefficients_not_declared_by_form_metadata(self):
-        from .openmp_backend import _validate_coefficient_dependencies
-        from .residual_codegen import WeakResidualCoefficients
+        from ..backends.openmp import _validate_coefficient_dependencies
+        from ..emitters.residual_codegen import WeakResidualCoefficients
 
         coeffs = (WeakResidualCoefficients("u", sp.Symbol("mu"), (sp.S.Zero, sp.S.Zero)),)
         with self.assertRaisesRegex(ValueError, "undeclared FormMetadata inputs: mu"):
@@ -1224,7 +1224,7 @@ class GenApiTest(unittest.TestCase):
                 source.index("register_GeneratedTwoPhaseFlow_generated_op();"),
             )
 
-            from .generate_op_registration_files import main as generate_registration_main
+            from ..generators.op_registration import main as generate_registration_main
 
             registration_dir = os.path.join(out_dir, "registration")
             with redirect_stdout(io.StringIO()):
@@ -1239,7 +1239,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("register_GeneratedTwoPhaseFlow_generated_op();", generated_source)
 
     def test_frontend_factory_consumes_generated_op_registration_aggregate(self):
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
         factory_path = os.path.join(repo_root, "frontend", "ops", "sfem_OpFactory.cpp")
         with open(factory_path, encoding="utf-8") as input_file:
             factory_source = input_file.read()
@@ -3621,7 +3621,7 @@ class GenApiTest(unittest.TestCase):
         self.assertNotIn("const scalar_t x0,", source)
 
     def test_neumann_general_polynomial_order_controls_coefficients(self):
-        from .materials.neumann_general import create_material
+        from ..materials.neumann_general import create_material
 
         material = create_material(polynomial_order=1)
         parameter_names = tuple(name for name, _ in material.parameter_defaults)
