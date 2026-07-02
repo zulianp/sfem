@@ -1,6 +1,17 @@
 import sympy as sp
 
 try:
+    from .kernel_ast import (
+        LoopKind,
+        LoopNode,
+        ScatterNode,
+        add_assign_increment,
+        expr_ref,
+        iteration_range,
+        iterator,
+        pre_increment,
+    )
+    from .kernel_ast_printer import CLikeKernelASTPrinter, render_kernel_ast_lines
     from .symbolic import (
         ExpressionCost,
         ExpressionRole,
@@ -32,6 +43,17 @@ try:
         validate_reference_data_plan,
     )
 except ImportError:
+    from kernel_ast import (
+        LoopKind,
+        LoopNode,
+        ScatterNode,
+        add_assign_increment,
+        expr_ref,
+        iteration_range,
+        iterator,
+        pre_increment,
+    )
+    from kernel_ast_printer import CLikeKernelASTPrinter, render_kernel_ast_lines
     from symbolic import (
         ExpressionCost,
         ExpressionRole,
@@ -81,11 +103,55 @@ def _work_item_index(source_builder):
 
 def _work_item_loop_lines(source_builder, indent):
     if hasattr(source_builder, "work_item_loop_lines"):
+        target = getattr(source_builder, "target", None)
+        if target is not None and hasattr(target, "loop_lowering_policy"):
+            policy = target.loop_lowering_policy()
+            if policy.emits_lane_loop:
+                pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+                printer = CLikeKernelASTPrinter(vectorize_pragma=pragma or "")
+                lane_iterator = iterator(policy.lane_index, policy.lane_index_type)
+                return tuple(
+                    "%s%s" % (indent, line)
+                    for line in render_kernel_ast_lines(
+                        "work_item_loop_header",
+                        (
+                            LoopNode(
+                                LoopKind.SIMD,
+                                lane_iterator,
+                                iteration_range(0, expr_ref("nelems", "tile_extent")),
+                                pre_increment(lane_iterator),
+                                vectorized=bool(pragma),
+                            ),
+                        ),
+                        printer=printer,
+                    )
+                )
+            return ("%s{" % indent,)
         return source_builder.work_item_loop_lines(indent)
     index = _work_item_index(source_builder)
-    return tuple("%s%s" % (indent, line) for line in source_builder.simd_lines()) + (
-        "%sfor (int %s = 0; %s < nelems; ++%s) {"
-        % (indent, index, index, index),
+    simd_lines = tuple(source_builder.simd_lines())
+    lane_iterator = iterator(index, "int")
+    return tuple(
+        "%s%s"
+        % (
+            indent,
+            line,
+        )
+        for line in render_kernel_ast_lines(
+            "work_item_loop_header",
+            (
+                LoopNode(
+                    LoopKind.SIMD,
+                    lane_iterator,
+                    iteration_range(0, expr_ref("nelems", "tile_extent")),
+                    pre_increment(lane_iterator),
+                    vectorized=bool(simd_lines),
+                ),
+            ),
+            printer=CLikeKernelASTPrinter(
+                vectorize_pragma=simd_lines[0] if simd_lines else ""
+            ),
+        )
     )
 
 
@@ -173,17 +239,53 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
             indent,
         )
 
+    target = getattr(source_builder, "target", None)
+    atomic_pragma = (
+        target.atomic_update_pragma()
+        if target is not None and hasattr(target, "atomic_update_pragma")
+        else None
+    )
     lines = [
         "%s{" % indent,
-        "%s    for (int scatter = 0; scatter < nelems; ++scatter) {" % indent,
+        *(
+            "%s    %s" % (indent, line)
+            for line in render_kernel_ast_lines(
+                "scatter_loop_header",
+                (
+                    LoopNode(
+                        LoopKind.SCATTER,
+                        iterator("scatter", "int"),
+                        iteration_range(0, expr_ref("nelems", "tile_extent")),
+                        pre_increment(iterator("scatter", "int")),
+                    ),
+                ),
+            )
+        ),
     ]
-    lines.extend(
-        source_builder.scatter_add_lines(
-            "%s[%s]" % (pointer, node_expr % "scatter"),
-            value_expr % "scatter",
-            "%s        " % indent,
+    if atomic_pragma is not None:
+        lines.extend(
+            "%s        %s" % (indent, line)
+            for line in render_kernel_ast_lines(
+                "scatter_add",
+                (
+                    ScatterNode(
+                        expr_ref("%s[%s]" % (pointer, node_expr % "scatter"), "scatter_target"),
+                        expr_ref(value_expr % "scatter", "scatter_value"),
+                        "+=",
+                        atomic=True,
+                    ),
+                ),
+                printer=CLikeKernelASTPrinter(atomic_update_pragma=atomic_pragma),
+            )
         )
-    )
+    else:
+        lines.extend(
+            source_builder.scatter_add_lines(
+                "%s[%s]" % (pointer, node_expr % "scatter"),
+                value_expr % "scatter",
+                "%s        " % indent,
+            )
+        )
     lines.extend(
         [
             "%s    }" % indent,

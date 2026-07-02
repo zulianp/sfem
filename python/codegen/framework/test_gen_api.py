@@ -22,6 +22,30 @@ from codegen.framework.kernel_signature import (
     MeshKernelSignature,
     local_kernel_suffix_from_plan,
 )
+from codegen.framework.energy_emitters import OpenMPEnergySoASourceBuilder
+from codegen.framework.kernel_ast import (
+    AssignmentNode,
+    BufferDeclNode,
+    GatherNode,
+    GeometryNode,
+    GeometryNodeKind,
+    KernelAST,
+    KernelASTPass,
+    KernelASTPassPipeline,
+    LoopKind,
+    LoopNode,
+    PartialAssemblyStrategy,
+    ScatterNode,
+    add_assign_increment,
+    buffer_access,
+    expr_ref,
+    iteration_range,
+    iterator,
+    pre_increment,
+    symbol_ref,
+)
+from codegen.framework.kernel_ast_printer import CLikeKernelASTPrinter
+from codegen.framework.kernel_ast_pystencils import PystencilsKernelASTAdapter
 from codegen.framework.openmp_backend import OpenMPSoABackend
 from codegen.framework.reference_data_plan import ReferenceDataPlan, ReferenceDataSetPlan
 
@@ -165,6 +189,278 @@ def _assert_generated_lane_loops_request_simd(test_case, result):
 
 
 class GenApiTest(unittest.TestCase):
+    def test_kernel_ast_prints_current_openmp_loop_and_scatter_shapes(self):
+        ast = KernelAST(
+            "parity_smoke",
+            nodes=(
+                LoopNode(
+                    LoopKind.TILE,
+                    iterator("evbegin", "ptrdiff_t"),
+                    iteration_range(0, expr_ref("nelements", "element_count")),
+                    add_assign_increment(
+                        iterator("evbegin", "ptrdiff_t"),
+                        expr_ref("VECTOR_SIZE", "vector_width"),
+                    ),
+                ),
+                BufferDeclNode(
+                    "const int",
+                    "nelems",
+                    (),
+                    "(int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin)",
+                ),
+                LoopNode(
+                    LoopKind.SIMD,
+                    iterator("lane", "int"),
+                    iteration_range(0, expr_ref("nelems", "tile_extent")),
+                    pre_increment(iterator("lane", "int")),
+                    (
+                        AssignmentNode(
+                            buffer_access("block_value", expr_ref("lane", "lane_index")),
+                            expr_ref("scalar_t(0)", "zero_value"),
+                        ),
+                    ),
+                    vectorized=True,
+                ),
+                ScatterNode(
+                    buffer_access("out", expr_ref("node * out_stride", "global_output_index")),
+                    buffer_access("block_out", expr_ref("lane", "lane_index")),
+                    "+=",
+                    atomic=True,
+                ),
+            ),
+        )
+        printer = CLikeKernelASTPrinter(
+            vectorize_pragma="#pragma omp simd",
+            atomic_update_pragma="#pragma omp atomic update",
+        )
+
+        self.assertEqual(
+            printer.print_ast(ast),
+            (
+                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+                "const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+                "#pragma omp simd",
+                "for (int lane = 0; lane < nelems; ++lane) {",
+                "    block_value[lane] = scalar_t(0);",
+                "}",
+                "#pragma omp atomic update",
+                "out[node * out_stride] += block_out[lane];",
+            ),
+        )
+        dump = ast.to_dict()
+        self.assertEqual(dump["nodes"][0]["kind"], "loop")
+        self.assertEqual(dump["nodes"][0]["loop_kind"], "tile")
+        self.assertEqual(dump["nodes"][0]["iterator"]["kind"], "iterator")
+        self.assertEqual(dump["nodes"][0]["range"]["kind"], "range")
+        self.assertEqual(dump["nodes"][0]["increment"]["kind"], "add_assign")
+        self.assertTrue(dump["nodes"][2]["vectorized"])
+        self.assertNotIn("pragma", dump["nodes"][2])
+        self.assertTrue(dump["nodes"][3]["atomic"])
+
+    def test_kernel_ast_models_geometry_and_pa_strategy_without_printing_policy(self):
+        ast = KernelAST(
+            "geometry_pa",
+            partial_assembly_strategy=PartialAssemblyStrategy.ISOPARAMETRIC_GEOMETRY_PA,
+            nodes=(
+                BufferDeclNode("scalar_t", "block_adjugate", ("N_QP", "DIM * DIM", "VECTOR_SIZE")),
+                GeometryNode(
+                    GeometryNodeKind.TRANSIENT_JACOBIAN,
+                    inputs=("block_coordinate_data", "grad_ref"),
+                    outputs=("J",),
+                    scope="quadrature_lane",
+                    persist=False,
+                ),
+                GeometryNode(
+                    GeometryNodeKind.ADJUGATE,
+                    inputs=("J",),
+                    outputs=("block_adjugate",),
+                    scope="quadrature_lane",
+                    persist=True,
+                ),
+                GeometryNode(
+                    GeometryNodeKind.DETERMINANT,
+                    inputs=("J",),
+                    outputs=("block_determinant",),
+                    scope="quadrature_lane",
+                    persist=True,
+                ),
+                GeometryNode(
+                    GeometryNodeKind.MEASURE,
+                    inputs=("block_determinant", "q_weight"),
+                    outputs=("block_measure",),
+                    scope="quadrature_lane",
+                    persist=True,
+                ),
+            ),
+        )
+
+        dump = ast.to_dict()
+        self.assertEqual(dump["partial_assembly_strategy"], "isoparametric_geometry_pa")
+        geometry = [node for node in dump["nodes"] if node["kind"] == "geometry"]
+        self.assertFalse(geometry[0]["persist"])
+        self.assertEqual(geometry[0]["geometry_kind"], "transient_jacobian")
+        self.assertEqual(
+            [node["geometry_kind"] for node in geometry[1:]],
+            ["adjugate", "determinant", "measure"],
+        )
+        self.assertTrue(all(node["persist"] for node in geometry[1:]))
+
+    def test_kernel_ast_pass_metadata_distinguishes_parity_and_performance(self):
+        parity_pass = KernelASTPass(
+            "quadrature_loop_preservation",
+            preconditions=("quadrature_loop_exists",),
+            expected_impact={"flops": 0, "bytes": 0},
+            parity_preserving=True,
+            performance_changing=False,
+        )
+        ast = KernelAST("empty")
+        after, results = KernelASTPassPipeline((parity_pass,)).apply(ast)
+        self.assertIs(after, ast)
+        self.assertFalse(results[0].changed)
+        self.assertTrue(results[0].ast_pass.parity_preserving)
+
+        with self.assertRaises(ValueError):
+            KernelASTPass(
+                "illegal_pass_metadata",
+                parity_preserving=True,
+                performance_changing=True,
+            )
+
+    def test_pystencils_adapter_is_optional_and_separate_from_model(self):
+        ast = KernelAST(
+            "assignment_only",
+            nodes=(AssignmentNode(symbol_ref("a"), expr_ref("b + 1", "test_expression")),),
+        )
+        result = PystencilsKernelASTAdapter().lower(ast)
+        self.assertEqual(result.ast_name, "assignment_only")
+        if result.available.available:
+            self.assertTrue(result.success)
+            self.assertEqual(len(result.lowered.args), 1)
+            self.assertIn("lowered 1 SFEM node", result.diagnostics[0])
+        else:
+            self.assertFalse(result.success)
+            self.assertIn("not installed", result.available.reason)
+
+    def test_pystencils_adapter_lowers_semantic_loop_and_generates_c(self):
+        tile = iterator("evbegin", "ptrdiff_t")
+        lane = iterator("lane", "int")
+        ast = KernelAST(
+            "pystencils_loop",
+            nodes=(
+                LoopNode(
+                    LoopKind.TILE,
+                    tile,
+                    iteration_range(0, expr_ref("nelements", "element_count")),
+                    add_assign_increment(tile, expr_ref("VECTOR_SIZE", "vector_width")),
+                    (
+                        LoopNode(
+                            LoopKind.SIMD,
+                            lane,
+                            iteration_range(0, expr_ref("nelems", "tile_extent")),
+                            pre_increment(lane),
+                            (
+                                AssignmentNode(
+                                    symbol_ref("acc"),
+                                    expr_ref("acc + value", "accumulation"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        result = PystencilsKernelASTAdapter().generate_c(ast)
+        if result.available.available:
+            self.assertTrue(result.success)
+            self.assertIn("generated C with pystencils", result.diagnostics[-1])
+            self.assertIn(
+                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE)",
+                result.lowered,
+            )
+            self.assertIn("for (int lane = 0; lane < nelems; lane += 1)", result.lowered)
+            self.assertIn("const double acc = acc + value;", result.lowered)
+        else:
+            self.assertFalse(result.success)
+            self.assertIn("not installed", result.available.reason)
+
+    def test_pystencils_adapter_lowers_scalar_decl_gather_and_direct_scatter(self):
+        ast = KernelAST(
+            "pystencils_memory_ops",
+            nodes=(
+                BufferDeclNode("const int", "nelems", (), 1),
+                GatherNode(symbol_ref("value"), symbol_ref("input"), symbol_ref("node")),
+                ScatterNode(
+                    buffer_access("out", symbol_ref("node")),
+                    symbol_ref("value"),
+                    "=",
+                    atomic=False,
+                ),
+            ),
+        )
+
+        result = PystencilsKernelASTAdapter().generate_c(ast)
+        if result.available.available:
+            self.assertTrue(result.success)
+            self.assertIn("const int nelems = 1;", result.lowered)
+            self.assertIn("const double value = input[node];", result.lowered)
+            self.assertIn("out[node] = value;", result.lowered)
+        else:
+            self.assertFalse(result.success)
+            self.assertIn("not installed", result.available.reason)
+
+    def test_pystencils_adapter_reports_unparseable_current_c_expression(self):
+        ast = KernelAST(
+            "pystencils_unparseable_c_expr",
+            nodes=(
+                BufferDeclNode(
+                    "const int",
+                    "nelems",
+                    (),
+                    "(int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin)",
+                ),
+            ),
+        )
+
+        result = PystencilsKernelASTAdapter().lower(ast)
+        if result.available.available:
+            self.assertFalse(result.success)
+            self.assertIn("BufferDeclNode", result.diagnostics[0])
+            self.assertIn("SympifyError", result.diagnostics[0])
+        else:
+            self.assertFalse(result.success)
+            self.assertIn("not installed", result.available.reason)
+
+    def test_pystencils_adapter_rejects_unmapped_scatter_semantics(self):
+        ast = KernelAST(
+            "scatter_requires_sfem_printer",
+            nodes=(
+                ScatterNode(
+                    buffer_access("out", expr_ref("node", "global_index")),
+                    symbol_ref("value"),
+                    "+=",
+                    atomic=True,
+                ),
+            ),
+        )
+
+        result = PystencilsKernelASTAdapter().lower(ast)
+        if result.available.available:
+            self.assertFalse(result.success)
+            self.assertIn("ScatterNode", result.diagnostics[0])
+        else:
+            self.assertFalse(result.success)
+            self.assertIn("not installed", result.available.reason)
+
+    def test_energy_source_builder_mesh_loop_is_ast_printed_with_parity(self):
+        self.assertEqual(
+            OpenMPEnergySoASourceBuilder().mesh_loop_lines(),
+            (
+                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
+                "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+            ),
+        )
+
     def test_public_api_hides_low_level_generator_internals(self):
         self.assertIn("generate", gen.__all__)
         self.assertIn("run", gen.__all__)
