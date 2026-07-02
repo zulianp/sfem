@@ -376,7 +376,7 @@ Acceptance criteria:
 ## M8. Form transformations: Specialized Kernels for Simple Cases and Generalizations
 
 Task:
-1. TET4 gradients are mostly zero. In order to avoid usless multiplication by zero we need specialized local kernels with fully expanded gradients into the trial Gradient computation phase and in the contraction phase
+1. TET4 gradients are mostly zero. In order to avoid usless multiplication by zero we need specialized local kernels with fully expanded gradients into the trial Gradient computation phase and in the contraction phase (use linear elasticity as the first performance benchmark case)
 2.  Implement the laplace operator in materials, create a mechanism to reproduce the functionality of FFF (in SFEM) automatically by grouping the geometric terms (for TET4 but also for any affine specialization) and elimnating symmetries, so that it can be precomputed and passed to the kernel for more efficient evaluation.
 3. Try to apply these semplifcations automatically to general kernels (affine specializations) and see if there is an opportunity to generalize this geometric grouping concept further 
 4. Guarantee the proper layered architectural separation
@@ -428,7 +428,8 @@ Acceptance criteria:
 3. M4, to normalize generated C++ structure once backend traversal is shared.
 4. M6, because wrappers should consume the stable plan/ABI metadata.
 5. M7, after the replacement public path is complete.
-6. M8 continuously, adding regression tests as each milestone becomes
+6. M8, make sure that for special cases we can replicate (or improve) the current performance
+7. M9 continuously, adding regression tests as each milestone becomes
    functional.
-7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
+8. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
