@@ -513,16 +513,16 @@ static SFEM_INLINE int laplace_tri3_residual_affine_mesh_soa_impl(
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_current[0][lane] = u[ev[lane * N_SHAPE + 0] * current_stride];
-            block_current[1][lane] = u[ev[lane * N_SHAPE + 1] * current_stride];
-            block_current[2][lane] = u[ev[lane * N_SHAPE + 2] * current_stride];
+            block_current[0][lane] = u[ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[1][lane] = u[ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[2][lane] = u[ev[2 * VECTOR_SIZE + lane] * current_stride];
         }
 
         #pragma omp simd
@@ -556,19 +556,19 @@ static SFEM_INLINE int laplace_tri3_residual_affine_mesh_soa_impl(
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
     }
@@ -653,22 +653,22 @@ static SFEM_INLINE int laplace_tri3_residual_isoparametric_mesh_soa_impl(
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[lane * N_SHAPE + 0]];
-            block_coordinates[1][lane] = points[1][ev[lane * N_SHAPE + 0]];
-            block_current[0][lane] = u[ev[lane * N_SHAPE + 0] * current_stride];
-            block_coordinates[2][lane] = points[0][ev[lane * N_SHAPE + 1]];
-            block_coordinates[3][lane] = points[1][ev[lane * N_SHAPE + 1]];
-            block_current[1][lane] = u[ev[lane * N_SHAPE + 1] * current_stride];
-            block_coordinates[4][lane] = points[0][ev[lane * N_SHAPE + 2]];
-            block_coordinates[5][lane] = points[1][ev[lane * N_SHAPE + 2]];
-            block_current[2][lane] = u[ev[lane * N_SHAPE + 2] * current_stride];
+            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
+            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
+            block_current[0][lane] = u[ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_coordinates[2][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
+            block_coordinates[3][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
+            block_current[1][lane] = u[ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_coordinates[4][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
+            block_coordinates[5][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
+            block_current[2][lane] = u[ev[2 * VECTOR_SIZE + lane] * current_stride];
         }
 
         #pragma omp simd
@@ -700,19 +700,19 @@ static SFEM_INLINE int laplace_tri3_residual_isoparametric_mesh_soa_impl(
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
     }
@@ -840,16 +840,16 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_affine_mesh_soa_impl(
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_direction[0][lane] = u_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_direction[1][lane] = u_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_direction[2][lane] = u_direction[ev[lane * N_SHAPE + 2] * direction_stride];
+            block_direction[0][lane] = u_direction[ev[0 * VECTOR_SIZE + lane] * direction_stride];
+            block_direction[1][lane] = u_direction[ev[1 * VECTOR_SIZE + lane] * direction_stride];
+            block_direction[2][lane] = u_direction[ev[2 * VECTOR_SIZE + lane] * direction_stride];
         }
 
         #pragma omp simd
@@ -883,19 +883,19 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_affine_mesh_soa_impl(
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
     }
@@ -980,22 +980,22 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_isoparametric_mesh_soa_impl(
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * N_SHAPE + 2] = elements[2][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[lane * N_SHAPE + 0]];
-            block_coordinates[1][lane] = points[1][ev[lane * N_SHAPE + 0]];
-            block_direction[0][lane] = u_direction[ev[lane * N_SHAPE + 0] * direction_stride];
-            block_coordinates[2][lane] = points[0][ev[lane * N_SHAPE + 1]];
-            block_coordinates[3][lane] = points[1][ev[lane * N_SHAPE + 1]];
-            block_direction[1][lane] = u_direction[ev[lane * N_SHAPE + 1] * direction_stride];
-            block_coordinates[4][lane] = points[0][ev[lane * N_SHAPE + 2]];
-            block_coordinates[5][lane] = points[1][ev[lane * N_SHAPE + 2]];
-            block_direction[2][lane] = u_direction[ev[lane * N_SHAPE + 2] * direction_stride];
+            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
+            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
+            block_direction[0][lane] = u_direction[ev[0 * VECTOR_SIZE + lane] * direction_stride];
+            block_coordinates[2][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
+            block_coordinates[3][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
+            block_direction[1][lane] = u_direction[ev[1 * VECTOR_SIZE + lane] * direction_stride];
+            block_coordinates[4][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
+            block_coordinates[5][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
+            block_direction[2][lane] = u_direction[ev[2 * VECTOR_SIZE + lane] * direction_stride];
         }
 
         #pragma omp simd
@@ -1027,19 +1027,19 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_isoparametric_mesh_soa_impl(
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[ev[scatter * N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
     }

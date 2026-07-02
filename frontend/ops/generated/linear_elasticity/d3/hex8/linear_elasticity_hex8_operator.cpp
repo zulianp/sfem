@@ -263,7 +263,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_affine_mesh_soa_imp
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
@@ -273,7 +273,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_affine_mesh_soa_imp
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -440,7 +440,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_s
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
 
@@ -456,7 +456,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_s
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -640,7 +640,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -650,7 +650,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -661,7 +661,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -804,7 +804,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_steps_isoparametric
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -814,7 +814,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_steps_isoparametric
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -831,7 +831,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_objective_steps_isoparametric
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -1119,7 +1119,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_impl
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
@@ -1129,7 +1129,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_impl
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1189,7 +1189,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_impl
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1316,7 +1316,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_s
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -1326,7 +1326,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_s
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -1337,7 +1337,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_s
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1386,7 +1386,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_s
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1625,7 +1625,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_affine_mesh_soa_impl(
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const h_components[DIM] = {hx, hy, hz};
@@ -1635,7 +1635,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_affine_mesh_soa_impl(
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1695,7 +1695,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_affine_mesh_soa_impl(
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1822,7 +1822,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -1832,7 +1832,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -1843,7 +1843,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1892,7 +1892,7 @@ static SFEM_INLINE int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
