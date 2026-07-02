@@ -2990,7 +2990,7 @@ def _mixed_affine_function(
     )
     for shape in range(cell_rule.n_shape):
         lines.append(
-            "            ev[lane * CELL_N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
     lines.append("        }")
@@ -3000,7 +3000,7 @@ def _mixed_affine_function(
     for field_index, field in enumerate(system.fields):
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
-            node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
+            node = "ev[%d * VECTOR_SIZE + lane]" % local_shape
             for group in dependency_groups:
                 lines.append(
                     "            block_%s[%d][lane] = %s[%s * %s];"
@@ -3060,7 +3060,7 @@ def _mixed_affine_function(
             lines.extend(
                 _direct_atomic_scatter_lines(
                     _mixed_mesh_output_pointer(field),
-                    "ev[%%s * CELL_N_SHAPE + %d] * out_stride" % local_shape,
+                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % local_shape,
                     "block_output[%d][%%s]" % stream,
                     "        ",
                 )
@@ -3209,14 +3209,14 @@ def _mixed_isoparametric_function(
     )
     for shape in range(cell_rule.n_shape):
         lines.append(
-            "            ev[lane * CELL_N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
     lines.append("        }")
     dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
     lines.extend(["", *_work_item_loop_lines("        ")])
     for shape in range(cell_rule.n_shape):
-        node = "ev[lane * CELL_N_SHAPE + %d]" % shape
+        node = "ev[%d * VECTOR_SIZE + lane]" % shape
         for d in range(dim):
             lines.append(
                 "            block_coordinates[%d][lane] = points[%d][%s];"
@@ -3225,7 +3225,7 @@ def _mixed_isoparametric_function(
     for field_index, field in enumerate(system.fields):
         for local_shape in range(layout.n_shape(field_index)):
             stream = layout.stream_index(field_index, local_shape)
-            node = "ev[lane * CELL_N_SHAPE + %d]" % local_shape
+            node = "ev[%d * VECTOR_SIZE + lane]" % local_shape
             for group in dependency_groups:
                 lines.append(
                     "            block_%s[%d][lane] = %s[%s * %s];"
@@ -3347,7 +3347,7 @@ def _mixed_isoparametric_function(
             lines.extend(
                 _direct_atomic_scatter_lines(
                     _mixed_mesh_output_pointer(field),
-                    "ev[%%s * CELL_N_SHAPE + %d] * out_stride" % local_shape,
+                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % local_shape,
                     "block_output[%d][%%s]" % stream,
                     "        ",
                 )
@@ -3829,7 +3829,7 @@ def _mesh_operator_source(
     )
     for shape in range(n_shape):
         lines.append(
-            "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
     lines.append("        }")
@@ -3838,7 +3838,7 @@ def _mesh_operator_source(
         for shape in range(n_shape):
             for field_index, field in enumerate(system.fields):
                 stream = shape * n_fields + field_index
-                node = "ev[lane * N_SHAPE + %d]" % shape
+                node = "ev[%d * VECTOR_SIZE + lane]" % shape
                 if dependencies.current:
                     lines.append(
                         "            block_current[%d][lane] = %s[%s * current_stride];"
@@ -4000,7 +4000,7 @@ def _mesh_operator_source(
             lines.extend(
                 _direct_atomic_scatter_lines(
                     "%s_out" % field.name,
-                    "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
                     "block_output[%d][%%s]" % stream,
                     "        ",
                 )
@@ -4277,12 +4277,12 @@ def _isoparametric_mesh_operator_source(
     )
     for shape in range(n_shape):
         lines.append(
-            "            ev[lane * N_SHAPE + %d] = elements[%d][evbegin + lane];"
+            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
             % (shape, shape)
         )
     lines.extend(["        }", "", *_work_item_loop_lines("        ")])
     for shape in range(n_shape):
-        node = "ev[lane * N_SHAPE + %d]" % shape
+        node = "ev[%d * VECTOR_SIZE + lane]" % shape
         for d in range(dim):
             lines.append(
                 "            block_coordinates[%d][lane] = points[%d][%s];"
@@ -4488,7 +4488,7 @@ def _isoparametric_mesh_operator_source(
             lines.extend(
                 _direct_atomic_scatter_lines(
                     "%s_out" % field.name,
-                    "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
                     "block_output[%d][%%s]" % stream,
                     "        ",
                 )

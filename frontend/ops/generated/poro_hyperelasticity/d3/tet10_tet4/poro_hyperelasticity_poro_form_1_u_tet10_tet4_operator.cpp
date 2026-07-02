@@ -459,54 +459,54 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_u_tet10_tet4_residual_af
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 3] = elements[3][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 4] = elements[4][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 6] = elements[6][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 7] = elements[7][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 8] = elements[8][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 9] = elements[9][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
+            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
+            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
+            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
+            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
+            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
+            ev[8 * VECTOR_SIZE + lane] = elements[8][evbegin + lane];
+            ev[9 * VECTOR_SIZE + lane] = elements[9][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_current[0][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[1][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[2][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[3][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[4][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[5][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[6][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[7][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[8][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[9][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[10][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[11][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[12][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[13][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[14][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[15][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[16][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[17][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[18][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[19][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[20][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[21][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[22][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[23][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[24][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[25][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[26][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[27][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[28][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[29][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[30][lane] = p_data[ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[31][lane] = p_data[ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[32][lane] = p_data[ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[33][lane] = p_data[ev[lane * CELL_N_SHAPE + 3] * current_stride];
+            block_current[0][lane] = u_data[0][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[1][lane] = u_data[0][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[2][lane] = u_data[0][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[3][lane] = u_data[0][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[4][lane] = u_data[0][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[5][lane] = u_data[0][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[6][lane] = u_data[0][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[7][lane] = u_data[0][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[8][lane] = u_data[0][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[9][lane] = u_data[0][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[10][lane] = u_data[1][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[11][lane] = u_data[1][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[12][lane] = u_data[1][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[13][lane] = u_data[1][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[14][lane] = u_data[1][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[15][lane] = u_data[1][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[16][lane] = u_data[1][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[17][lane] = u_data[1][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[18][lane] = u_data[1][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[19][lane] = u_data[1][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[20][lane] = u_data[2][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[21][lane] = u_data[2][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[22][lane] = u_data[2][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[23][lane] = u_data[2][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[24][lane] = u_data[2][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[25][lane] = u_data[2][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[26][lane] = u_data[2][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[27][lane] = u_data[2][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[28][lane] = u_data[2][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[29][lane] = u_data[2][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[30][lane] = p_data[ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[31][lane] = p_data[ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[32][lane] = p_data[ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[33][lane] = p_data[ev[3 * VECTOR_SIZE + lane] * current_stride];
         }
 
         #pragma omp simd
@@ -585,205 +585,205 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_u_tet10_tet4_residual_af
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[0][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[0][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[0][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+                u_out[0][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+                u_out[0][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+                u_out[0][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[6][scatter];
+                u_out[0][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[7][scatter];
+                u_out[0][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[8][scatter];
+                u_out[0][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[9][scatter];
+                u_out[0][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[10][scatter];
+                u_out[1][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[11][scatter];
+                u_out[1][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[12][scatter];
+                u_out[1][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[13][scatter];
+                u_out[1][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[14][scatter];
+                u_out[1][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[15][scatter];
+                u_out[1][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[16][scatter];
+                u_out[1][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[16][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[17][scatter];
+                u_out[1][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[17][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[18][scatter];
+                u_out[1][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[18][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[19][scatter];
+                u_out[1][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[19][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[20][scatter];
+                u_out[2][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[20][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[21][scatter];
+                u_out[2][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[21][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[22][scatter];
+                u_out[2][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[22][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[23][scatter];
+                u_out[2][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[23][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[24][scatter];
+                u_out[2][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[24][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[25][scatter];
+                u_out[2][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[25][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[26][scatter];
+                u_out[2][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[26][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[27][scatter];
+                u_out[2][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[27][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[28][scatter];
+                u_out[2][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[28][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[29][scatter];
+                u_out[2][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[29][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[30][scatter];
+                p_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[30][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[31][scatter];
+                p_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[31][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[32][scatter];
+                p_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[32][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[33][scatter];
+                p_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[33][scatter];
             }
         }
     }
@@ -883,84 +883,84 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_u_tet10_tet4_residual_is
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            ev[lane * CELL_N_SHAPE + 0] = elements[0][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 1] = elements[1][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 2] = elements[2][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 3] = elements[3][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 4] = elements[4][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 5] = elements[5][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 6] = elements[6][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 7] = elements[7][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 8] = elements[8][evbegin + lane];
-            ev[lane * CELL_N_SHAPE + 9] = elements[9][evbegin + lane];
+            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
+            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
+            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
+            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
+            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
+            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
+            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
+            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
+            ev[8 * VECTOR_SIZE + lane] = elements[8][evbegin + lane];
+            ev[9 * VECTOR_SIZE + lane] = elements[9][evbegin + lane];
         }
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[lane * CELL_N_SHAPE + 0]];
-            block_coordinates[1][lane] = points[1][ev[lane * CELL_N_SHAPE + 0]];
-            block_coordinates[2][lane] = points[2][ev[lane * CELL_N_SHAPE + 0]];
-            block_coordinates[3][lane] = points[0][ev[lane * CELL_N_SHAPE + 1]];
-            block_coordinates[4][lane] = points[1][ev[lane * CELL_N_SHAPE + 1]];
-            block_coordinates[5][lane] = points[2][ev[lane * CELL_N_SHAPE + 1]];
-            block_coordinates[6][lane] = points[0][ev[lane * CELL_N_SHAPE + 2]];
-            block_coordinates[7][lane] = points[1][ev[lane * CELL_N_SHAPE + 2]];
-            block_coordinates[8][lane] = points[2][ev[lane * CELL_N_SHAPE + 2]];
-            block_coordinates[9][lane] = points[0][ev[lane * CELL_N_SHAPE + 3]];
-            block_coordinates[10][lane] = points[1][ev[lane * CELL_N_SHAPE + 3]];
-            block_coordinates[11][lane] = points[2][ev[lane * CELL_N_SHAPE + 3]];
-            block_coordinates[12][lane] = points[0][ev[lane * CELL_N_SHAPE + 4]];
-            block_coordinates[13][lane] = points[1][ev[lane * CELL_N_SHAPE + 4]];
-            block_coordinates[14][lane] = points[2][ev[lane * CELL_N_SHAPE + 4]];
-            block_coordinates[15][lane] = points[0][ev[lane * CELL_N_SHAPE + 5]];
-            block_coordinates[16][lane] = points[1][ev[lane * CELL_N_SHAPE + 5]];
-            block_coordinates[17][lane] = points[2][ev[lane * CELL_N_SHAPE + 5]];
-            block_coordinates[18][lane] = points[0][ev[lane * CELL_N_SHAPE + 6]];
-            block_coordinates[19][lane] = points[1][ev[lane * CELL_N_SHAPE + 6]];
-            block_coordinates[20][lane] = points[2][ev[lane * CELL_N_SHAPE + 6]];
-            block_coordinates[21][lane] = points[0][ev[lane * CELL_N_SHAPE + 7]];
-            block_coordinates[22][lane] = points[1][ev[lane * CELL_N_SHAPE + 7]];
-            block_coordinates[23][lane] = points[2][ev[lane * CELL_N_SHAPE + 7]];
-            block_coordinates[24][lane] = points[0][ev[lane * CELL_N_SHAPE + 8]];
-            block_coordinates[25][lane] = points[1][ev[lane * CELL_N_SHAPE + 8]];
-            block_coordinates[26][lane] = points[2][ev[lane * CELL_N_SHAPE + 8]];
-            block_coordinates[27][lane] = points[0][ev[lane * CELL_N_SHAPE + 9]];
-            block_coordinates[28][lane] = points[1][ev[lane * CELL_N_SHAPE + 9]];
-            block_coordinates[29][lane] = points[2][ev[lane * CELL_N_SHAPE + 9]];
-            block_current[0][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[1][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[2][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[3][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[4][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[5][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[6][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[7][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[8][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[9][lane] = u_data[0][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[10][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[11][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[12][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[13][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[14][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[15][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[16][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[17][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[18][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[19][lane] = u_data[1][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[20][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[21][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[22][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[23][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 3] * current_stride];
-            block_current[24][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 4] * current_stride];
-            block_current[25][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 5] * current_stride];
-            block_current[26][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 6] * current_stride];
-            block_current[27][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 7] * current_stride];
-            block_current[28][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 8] * current_stride];
-            block_current[29][lane] = u_data[2][ev[lane * CELL_N_SHAPE + 9] * current_stride];
-            block_current[30][lane] = p_data[ev[lane * CELL_N_SHAPE + 0] * current_stride];
-            block_current[31][lane] = p_data[ev[lane * CELL_N_SHAPE + 1] * current_stride];
-            block_current[32][lane] = p_data[ev[lane * CELL_N_SHAPE + 2] * current_stride];
-            block_current[33][lane] = p_data[ev[lane * CELL_N_SHAPE + 3] * current_stride];
+            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
+            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
+            block_coordinates[2][lane] = points[2][ev[0 * VECTOR_SIZE + lane]];
+            block_coordinates[3][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
+            block_coordinates[4][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
+            block_coordinates[5][lane] = points[2][ev[1 * VECTOR_SIZE + lane]];
+            block_coordinates[6][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
+            block_coordinates[7][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
+            block_coordinates[8][lane] = points[2][ev[2 * VECTOR_SIZE + lane]];
+            block_coordinates[9][lane] = points[0][ev[3 * VECTOR_SIZE + lane]];
+            block_coordinates[10][lane] = points[1][ev[3 * VECTOR_SIZE + lane]];
+            block_coordinates[11][lane] = points[2][ev[3 * VECTOR_SIZE + lane]];
+            block_coordinates[12][lane] = points[0][ev[4 * VECTOR_SIZE + lane]];
+            block_coordinates[13][lane] = points[1][ev[4 * VECTOR_SIZE + lane]];
+            block_coordinates[14][lane] = points[2][ev[4 * VECTOR_SIZE + lane]];
+            block_coordinates[15][lane] = points[0][ev[5 * VECTOR_SIZE + lane]];
+            block_coordinates[16][lane] = points[1][ev[5 * VECTOR_SIZE + lane]];
+            block_coordinates[17][lane] = points[2][ev[5 * VECTOR_SIZE + lane]];
+            block_coordinates[18][lane] = points[0][ev[6 * VECTOR_SIZE + lane]];
+            block_coordinates[19][lane] = points[1][ev[6 * VECTOR_SIZE + lane]];
+            block_coordinates[20][lane] = points[2][ev[6 * VECTOR_SIZE + lane]];
+            block_coordinates[21][lane] = points[0][ev[7 * VECTOR_SIZE + lane]];
+            block_coordinates[22][lane] = points[1][ev[7 * VECTOR_SIZE + lane]];
+            block_coordinates[23][lane] = points[2][ev[7 * VECTOR_SIZE + lane]];
+            block_coordinates[24][lane] = points[0][ev[8 * VECTOR_SIZE + lane]];
+            block_coordinates[25][lane] = points[1][ev[8 * VECTOR_SIZE + lane]];
+            block_coordinates[26][lane] = points[2][ev[8 * VECTOR_SIZE + lane]];
+            block_coordinates[27][lane] = points[0][ev[9 * VECTOR_SIZE + lane]];
+            block_coordinates[28][lane] = points[1][ev[9 * VECTOR_SIZE + lane]];
+            block_coordinates[29][lane] = points[2][ev[9 * VECTOR_SIZE + lane]];
+            block_current[0][lane] = u_data[0][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[1][lane] = u_data[0][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[2][lane] = u_data[0][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[3][lane] = u_data[0][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[4][lane] = u_data[0][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[5][lane] = u_data[0][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[6][lane] = u_data[0][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[7][lane] = u_data[0][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[8][lane] = u_data[0][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[9][lane] = u_data[0][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[10][lane] = u_data[1][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[11][lane] = u_data[1][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[12][lane] = u_data[1][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[13][lane] = u_data[1][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[14][lane] = u_data[1][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[15][lane] = u_data[1][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[16][lane] = u_data[1][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[17][lane] = u_data[1][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[18][lane] = u_data[1][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[19][lane] = u_data[1][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[20][lane] = u_data[2][ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[21][lane] = u_data[2][ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[22][lane] = u_data[2][ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[23][lane] = u_data[2][ev[3 * VECTOR_SIZE + lane] * current_stride];
+            block_current[24][lane] = u_data[2][ev[4 * VECTOR_SIZE + lane] * current_stride];
+            block_current[25][lane] = u_data[2][ev[5 * VECTOR_SIZE + lane] * current_stride];
+            block_current[26][lane] = u_data[2][ev[6 * VECTOR_SIZE + lane] * current_stride];
+            block_current[27][lane] = u_data[2][ev[7 * VECTOR_SIZE + lane] * current_stride];
+            block_current[28][lane] = u_data[2][ev[8 * VECTOR_SIZE + lane] * current_stride];
+            block_current[29][lane] = u_data[2][ev[9 * VECTOR_SIZE + lane] * current_stride];
+            block_current[30][lane] = p_data[ev[0 * VECTOR_SIZE + lane] * current_stride];
+            block_current[31][lane] = p_data[ev[1 * VECTOR_SIZE + lane] * current_stride];
+            block_current[32][lane] = p_data[ev[2 * VECTOR_SIZE + lane] * current_stride];
+            block_current[33][lane] = p_data[ev[3 * VECTOR_SIZE + lane] * current_stride];
         }
 
         #pragma omp simd
@@ -1031,205 +1031,205 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_u_tet10_tet4_residual_is
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[0][scatter];
+                u_out[0][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[1][scatter];
+                u_out[0][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[2][scatter];
+                u_out[0][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[3][scatter];
+                u_out[0][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[4][scatter];
+                u_out[0][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[5][scatter];
+                u_out[0][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[6][scatter];
+                u_out[0][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[7][scatter];
+                u_out[0][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[8][scatter];
+                u_out[0][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[0][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[9][scatter];
+                u_out[0][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[10][scatter];
+                u_out[1][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[11][scatter];
+                u_out[1][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[12][scatter];
+                u_out[1][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[13][scatter];
+                u_out[1][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[14][scatter];
+                u_out[1][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[15][scatter];
+                u_out[1][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[16][scatter];
+                u_out[1][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[16][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[17][scatter];
+                u_out[1][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[17][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[18][scatter];
+                u_out[1][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[18][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[1][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[19][scatter];
+                u_out[1][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[19][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[20][scatter];
+                u_out[2][ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[20][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[21][scatter];
+                u_out[2][ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[21][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[22][scatter];
+                u_out[2][ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[22][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[23][scatter];
+                u_out[2][ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[23][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 4] * out_stride] += block_output[24][scatter];
+                u_out[2][ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[24][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 5] * out_stride] += block_output[25][scatter];
+                u_out[2][ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[25][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 6] * out_stride] += block_output[26][scatter];
+                u_out[2][ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[26][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 7] * out_stride] += block_output[27][scatter];
+                u_out[2][ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[27][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 8] * out_stride] += block_output[28][scatter];
+                u_out[2][ev[8 * VECTOR_SIZE + scatter] * out_stride] += block_output[28][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                u_out[2][ev[scatter * CELL_N_SHAPE + 9] * out_stride] += block_output[29][scatter];
+                u_out[2][ev[9 * VECTOR_SIZE + scatter] * out_stride] += block_output[29][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 0] * out_stride] += block_output[30][scatter];
+                p_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[30][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 1] * out_stride] += block_output[31][scatter];
+                p_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[31][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 2] * out_stride] += block_output[32][scatter];
+                p_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[32][scatter];
             }
         }
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
                 #pragma omp atomic update
-                p_out[ev[scatter * CELL_N_SHAPE + 3] * out_stride] += block_output[33][scatter];
+                p_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[33][scatter];
             }
         }
     }

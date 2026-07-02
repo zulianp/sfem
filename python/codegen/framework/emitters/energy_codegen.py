@@ -2351,7 +2351,7 @@ def _sfem_soa_mesh_operator_function(
             "        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {",
             "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
-            "                ev[%s * N_SHAPE + element_node] = element_shape[evbegin + %s];" % (work_item, work_item),
+            "                ev[element_node * VECTOR_SIZE + %s] = element_shape[evbegin + %s];" % (work_item, work_item),
             "            }",
             "        }",
         ]
@@ -2372,7 +2372,7 @@ def _sfem_soa_mesh_operator_function(
                     ),
                     "            for (int d = 0; d < DIM; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
-                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][ev[%s * N_SHAPE + stream_shape]];" % (work_item, work_item),
+                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + %s]];" % (work_item, work_item),
                     "                }",
                     "            }",
                     "        }",
@@ -2385,8 +2385,8 @@ def _sfem_soa_mesh_operator_function(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            block_%s[%s] = %s[ev[%s * N_SHAPE + %d]];"
-                        % (stream, work_item, _component_name(d), work_item, shape)
+                        "            block_%s[%s] = %s[ev[%d * VECTOR_SIZE + %s]];"
+                        % (stream, work_item, _component_name(d), shape, work_item)
                     )
             lines.append("        }")
 
@@ -2407,7 +2407,7 @@ def _sfem_soa_mesh_operator_function(
                 ),
                 "            for (int d = 0; d < DIM; ++d) {",
                 *_work_item_loop_lines(source_builder, "                "),
-                "                    const idx_t node = ev[%s * N_SHAPE + stream_shape];" % work_item,
+                "                    const idx_t node = ev[stream_shape * VECTOR_SIZE + %s];" % work_item,
             ]
         )
         if uses_current:
@@ -2442,13 +2442,13 @@ def _sfem_soa_mesh_operator_function(
                 component = _component_name(d)
                 if uses_current:
                     lines.append(
-                        "            block_u%s%d[%s] = u%s[ev[%s * N_SHAPE + %d] * u_stride];"
-                        % (component, shape, work_item, component, work_item, shape)
+                        "            block_u%s%d[%s] = u%s[ev[%d * VECTOR_SIZE + %s] * u_stride];"
+                        % (component, shape, work_item, component, shape, work_item)
                     )
                 if uses_direction:
                     lines.append(
-                        "            block_h%s%d[%s] = h%s[ev[%s * N_SHAPE + %d] * h_stride];"
-                        % (component, shape, work_item, component, work_item, shape)
+                        "            block_h%s%d[%s] = h%s[ev[%d * VECTOR_SIZE + %s] * h_stride];"
+                        % (component, shape, work_item, component, shape, work_item)
                     )
         for stream in _output_stream_names(form, dim, n_nodes):
             lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
@@ -2730,7 +2730,7 @@ def _sfem_soa_mesh_operator_function(
                     *_scatter_add_lines(
                         source_builder,
                         "out_components[d]",
-                        "ev[%s * N_SHAPE + stream_shape] * out_stride",
+                        "ev[stream_shape * VECTOR_SIZE + %s] * out_stride",
                         "block_out_data[shape * DIM + d][%s]",
                         "                ",
                     ),
@@ -2747,7 +2747,7 @@ def _sfem_soa_mesh_operator_function(
                             _scatter_add_lines(
                                 source_builder,
                                 "out%s" % component,
-                                "ev[%%s * N_SHAPE + %d] * out_stride" % shape,
+                                "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
                                 "block_out%s%d[%%s]" % (component, shape),
                                 "        ",
                             )
@@ -3002,7 +3002,7 @@ def _sfem_soa_mesh_objective_steps_function(
             "        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {",
             "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
-            "                ev[%s * N_SHAPE + element_node] = element_shape[evbegin + %s];"
+            "                ev[element_node * VECTOR_SIZE + %s] = element_shape[evbegin + %s];"
             % (work_item, work_item),
             "            }",
             "        }",
@@ -3024,7 +3024,7 @@ def _sfem_soa_mesh_objective_steps_function(
                     ),
                     "            for (int d = 0; d < DIM; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
-                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][ev[%s * N_SHAPE + stream_shape]];"
+                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + %s]];"
                     % (work_item, work_item),
                     "                }",
                     "            }",
@@ -3037,8 +3037,8 @@ def _sfem_soa_mesh_objective_steps_function(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            block_%s[%s] = %s[ev[%s * N_SHAPE + %d]];"
-                        % (stream, work_item, _component_name(d), work_item, shape)
+                        "            block_%s[%s] = %s[ev[%d * VECTOR_SIZE + %s]];"
+                        % (stream, work_item, _component_name(d), shape, work_item)
                     )
             lines.append("        }")
 
@@ -3066,7 +3066,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 ),
                 "            for (int d = 0; d < DIM; ++d) {",
                 *_work_item_loop_lines(source_builder, "                "),
-                "                    const idx_t node = ev[%s * N_SHAPE + stream_shape];" % work_item,
+                "                    const idx_t node = ev[stream_shape * VECTOR_SIZE + %s];" % work_item,
                 "                    block_u_base_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item,
                 "                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item,
                 "                }",
@@ -3094,12 +3094,12 @@ def _sfem_soa_mesh_objective_steps_function(
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "            block_u%s%d_base[%s] = u%s[ev[%s * N_SHAPE + %d] * u_stride];"
-                    % (component, shape, work_item, component, work_item, shape)
+                    "            block_u%s%d_base[%s] = u%s[ev[%d * VECTOR_SIZE + %s] * u_stride];"
+                    % (component, shape, work_item, component, shape, work_item)
                 )
                 lines.append(
-                    "            block_h%s%d[%s] = h%s[ev[%s * N_SHAPE + %d] * h_stride];"
-                    % (component, shape, work_item, component, work_item, shape)
+                    "            block_h%s%d[%s] = h%s[ev[%d * VECTOR_SIZE + %s] * h_stride];"
+                    % (component, shape, work_item, component, shape, work_item)
                 )
         lines.append("        }")
 

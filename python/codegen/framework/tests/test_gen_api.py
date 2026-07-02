@@ -1280,6 +1280,9 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("linear_elasticity_d3_simplex_tet4_gradient_block", local)
         self.assertIn("linear_elasticity_d3_simplex_apply_block", tet10_operator)
         self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block", tet10_operator)
+        self.assertIn("ev[element_node * VECTOR_SIZE + lane]", tet10_operator)
+        self.assertNotIn("ev[lane * N_SHAPE", tet10_operator)
+        self.assertNotIn("ev[scatter * N_SHAPE", tet10_operator)
 
     def test_generates_factory_registration_aggregate_from_op_manifests(self):
         manifests = []
@@ -3413,6 +3416,11 @@ class GenApiTest(unittest.TestCase):
                 "tri6_tri3",
                 "stokes_tri6_tri3_operator.cpp",
             )
+            with open(source, encoding="utf-8") as input_file:
+                operator_source = input_file.read()
+            self.assertIn("ev[0 * VECTOR_SIZE + lane]", operator_source)
+            self.assertNotIn("ev[lane * CELL_N_SHAPE", operator_source)
+            self.assertNotIn("ev[scatter * CELL_N_SHAPE", operator_source)
             subprocess.run(
                 [
                     compiler,
@@ -3536,6 +3544,9 @@ class GenApiTest(unittest.TestCase):
             )
             with open(operator) as source:
                 operator_source = source.read()
+            self.assertIn("ev[0 * VECTOR_SIZE + lane]", operator_source)
+            self.assertNotIn("ev[lane * N_SHAPE", operator_source)
+            self.assertNotIn("ev[scatter * N_SHAPE", operator_source)
             affine_begin = operator_source.index(
                 "laplace_tet4_residual_affine_mesh_soa_impl"
             )

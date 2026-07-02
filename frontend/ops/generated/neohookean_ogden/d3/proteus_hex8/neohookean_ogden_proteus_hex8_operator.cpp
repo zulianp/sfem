@@ -262,7 +262,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_affi
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
@@ -272,7 +272,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_affi
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -438,7 +438,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_step
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
 
@@ -454,7 +454,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_step
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -637,7 +637,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_isop
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -647,7 +647,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_isop
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -658,7 +658,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_isop
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -800,7 +800,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_step
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -810,7 +810,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_step
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -827,7 +827,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_objective_step
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -1114,7 +1114,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affin
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
@@ -1124,7 +1124,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affin
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1184,7 +1184,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_affin
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1310,7 +1310,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isopa
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -1320,7 +1320,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isopa
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -1331,7 +1331,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isopa
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1380,7 +1380,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_gradient_isopa
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1623,7 +1623,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_m
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
@@ -1634,7 +1634,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_m
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -1699,7 +1699,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_affine_m
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1838,7 +1838,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparam
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[lane * N_SHAPE + element_node] = element_shape[evbegin + lane];
+                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
             }
         }
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
@@ -1848,7 +1848,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparam
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[lane * N_SHAPE + stream_shape]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -1860,7 +1860,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparam
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[lane * N_SHAPE + stream_shape];
+                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -1914,7 +1914,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_apply_isoparam
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[scatter * N_SHAPE + stream_shape] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }

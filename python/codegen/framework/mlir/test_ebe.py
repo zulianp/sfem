@@ -922,6 +922,34 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
 
         self._run_mlir_opt(module)
 
+    def test_laplace_quad4_full_ebe_gpu_manifest_topology_tokens_are_present(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEGPULowering(
+            ir,
+            max_elements=8,
+            max_nodes=17,
+            max_node_degree=4,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+            module = artifacts.file_for_suffix(".ebe.full.gpu.mlir").read_text()
+
+        self.assertIn('sfem.mesh_phases = "ebe_map,ebe_reduce"', module)
+        self.assertGreater(module.count("_ebe_map_kernel"), 1)
+        self.assertGreater(module.count("_ebe_reduce_kernel"), 1)
+        self.assertIn("%node = gpu.thread_id x", module)
+        self.assertIn("%elem = memref.load %node_to_element_map[%node, %i]", module)
+        self.assertIn("%local = memref.load %node_to_local_idx[%node, %i]", module)
+        self.assertIn("%value = memref.load %element_out[%elem, %local]", module)
+        self.assertIn("memref.store %sum, %out[%node]", module)
+        self.assertNotIn("atomic", module)
+
     def test_laplace_hex27_form_ir_emits_full_ebe_gpu_map_reduce_artifact(self):
         from codegen.framework.materials.laplace import material
 
@@ -1159,6 +1187,12 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(any(item["name"] == "matrix_unit_pipeline_calls" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_pipeline_scratch" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_alignment" for item in manifest["performance_shape"]))
+        ebe_topology = next(
+            item for item in manifest["performance_shape"] if item["name"] == "ebe_gpu_topology"
+        )
+        self.assertTrue(ebe_topology["ok"], ebe_topology)
+        self.assertEqual(ebe_topology["missing_tokens"], [])
+        self.assertEqual(ebe_topology["found_tokens"], [])
         self.assertEqual(len(manifest["iree_metal"]), 1)
         self.assertEqual(manifest["iree_metal"][0]["name"], "sum_factor_matrix_unit_pipeline_to_metal_vmfb")
         if shutil.which("iree-compile") is None:
