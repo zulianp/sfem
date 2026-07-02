@@ -7,7 +7,7 @@ import sympy.codegen.ast as ast
 from sympy.printing.c import C99CodePrinter
 
 try:
-    from .fem import (
+    from codegen.framework.fem.reference import (
         SfemElementQuadratureRule,
         SfemSoAArrayInput,
         SfemSoAElementSpecialization,
@@ -20,7 +20,7 @@ try:
         sfem_supported_element_types,
         sfem_tensor_product_hex_uses_cartesian_ordering,
     )
-    from .reference_data_plan import validate_reference_data_plan
+    from codegen.framework.plans.reference_data import validate_reference_data_plan
 except ImportError:
     from fem import (
         SfemElementQuadratureRule,
@@ -52,7 +52,7 @@ def _validate_diagnostics_plan_names(plan, expected_names):
     return plan
 
 try:
-    from .tensor_product_geometry import (
+    from codegen.framework.fem.tensor_product_geometry import (
         isoparametric_adjugate_lines,
         isoparametric_adjugate_call_lines,
         isoparametric_adjugate_stream_array_lines,
@@ -77,7 +77,7 @@ except ImportError:
     )
 
 try:
-    from .quadrature_codegen import (
+    from codegen.framework.emitters.quadrature_codegen import (
         quadrature_reference_accessor,
         quadrature_reference_struct_lines,
     )
@@ -88,12 +88,12 @@ except ImportError:
     )
 
 try:
-    from .targets import CUDATarget, OpenMPTarget
+    from codegen.framework.backends.targets import CUDATarget, OpenMPTarget
 except ImportError:
     from targets import CUDATarget, OpenMPTarget
 
 try:
-    from .tensor_product_kernels import sfem_tensor_product_kernels_header_source
+    from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
 except ImportError:
     from tensor_product_kernels import sfem_tensor_product_kernels_header_source
 

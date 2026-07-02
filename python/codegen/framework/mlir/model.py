@@ -152,11 +152,11 @@ def linear_elasticity_mlir_model(element="TET4", vector_size=8, quadrature_order
 
 def mlir_model_from_material(material, *, element, vector_size=8, quadrature_order=None):
     from sfem import gen
-    from codegen.framework.energy_codegen import (
+    from codegen.framework.emitters.energy_codegen import (
         _weak_form_deformation_gradient_substitutions,
         _weak_form_material_expression,
     )
-    from codegen.framework.energy_plan import energy_soa_kernel_emission_plan
+    from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 
     if getattr(material, "name", "") != "linear_elasticity":
         raise ValueError("initial MLIR EBE lowering is wired to the linear_elasticity model")

@@ -261,7 +261,7 @@ class SfemSoAElementSpecialization:
         determinant_name="jacobian_determinant",
     ):
         try:
-            from .symbolic import sfem_soa_adjugate_geometry_inputs
+            from codegen.framework.symbolic import sfem_soa_adjugate_geometry_inputs
         except ImportError:
             from symbolic import sfem_soa_adjugate_geometry_inputs
 

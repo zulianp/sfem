@@ -1,4 +1,5 @@
 import importlib.util
+import importlib
 import os
 from pathlib import Path
 import subprocess
@@ -19,10 +20,33 @@ def _pymlir_namespace_conflict_hint():
     )
 
 
+def import_mlir_bindings():
+    """Import LLVM's top-level ``mlir`` package without framework-path shadowing."""
+    shadow = sys.modules.get("mlir")
+    shadow_path = str(getattr(shadow, "__file__", "")) if shadow is not None else ""
+    if shadow_path and "/codegen/framework/mlir/" in shadow_path:
+        del sys.modules["mlir"]
+
+    original_path = list(sys.path)
+    try:
+        sys.path = [
+            entry
+            for entry in sys.path
+            if not (
+                Path(entry or ".").name == "framework"
+                and Path(entry or ".").parent.name == "codegen"
+            )
+        ]
+        module = importlib.import_module("mlir")
+        ir = importlib.import_module("mlir.ir")
+        return module, ir
+    finally:
+        sys.path = original_path
+
+
 def llvm_mlir_availability():
     try:
-        from mlir import ir  # noqa: F401
-        import mlir as module
+        module, _ir = import_mlir_bindings()
         return PyMLIRAvailability(
             True,
             "mlir",
@@ -181,7 +205,7 @@ def _serialize_spirv_module(source_path, output_path, mlir_translate=None):
 
 
 def _extract_single_top_level_operation(module_text, op_name):
-    from mlir import ir
+    _, ir = import_mlir_bindings()
 
     with ir.Context(), ir.Location.unknown():
         module = ir.Module.parse(module_text)
