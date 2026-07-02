@@ -1,0 +1,2733 @@
+from dataclasses import dataclass
+from pathlib import Path
+import shutil
+import subprocess
+
+from codegen.framework.fem.basis import BasisFamily
+from codegen.framework.fem.tensor_product import TensorProductOperation
+
+from .common import CodeInspectionArtifacts
+
+
+@dataclass(frozen=True)
+class MetalSmokeTestResult:
+    harness_path: Path
+    executable_path: Path
+    compile_returncode: int
+    compile_stdout: str
+    compile_stderr: str
+    run_returncode: int = -1
+    run_stdout: str = ""
+    run_stderr: str = ""
+
+    @property
+    def compiled(self):
+        return self.compile_returncode == 0
+
+    @property
+    def ran(self):
+        return self.run_returncode >= 0
+
+    @property
+    def success(self):
+        return self.compiled and self.run_returncode == 0
+
+    @property
+    def no_default_device(self):
+        return self.run_returncode == 77
+
+
+@dataclass(frozen=True)
+class TensorProductContractionStage:
+    name: str
+    operation: str
+    derivative: int
+    axis: int
+    basis: str
+    transpose_basis: bool
+    lhs_rows: int
+    lhs_cols: int
+    rhs_cols: int
+
+    def __post_init__(self):
+        object.__setattr__(self, "name", str(self.name))
+        object.__setattr__(self, "operation", str(self.operation))
+        object.__setattr__(self, "derivative", int(self.derivative))
+        object.__setattr__(self, "axis", int(self.axis))
+        object.__setattr__(self, "basis", str(self.basis))
+        object.__setattr__(self, "transpose_basis", bool(self.transpose_basis))
+        object.__setattr__(self, "lhs_rows", int(self.lhs_rows))
+        object.__setattr__(self, "lhs_cols", int(self.lhs_cols))
+        object.__setattr__(self, "rhs_cols", int(self.rhs_cols))
+        if not self.name or not self.operation or not self.basis:
+            raise ValueError("sum-factorization stages require names, operations, and basis tags")
+        if self.derivative < 0 or self.axis < 0:
+            raise ValueError("sum-factorization derivative and axis must be non-negative")
+        if self.lhs_rows <= 0 or self.lhs_cols <= 0 or self.rhs_cols <= 0:
+            raise ValueError("sum-factorization stage matrix sizes must be positive")
+
+    @property
+    def rhs_rows(self):
+        return self.lhs_cols
+
+    @property
+    def result_rows(self):
+        return self.lhs_rows
+
+    @property
+    def result_cols(self):
+        return self.rhs_cols
+
+    @property
+    def lhs_tensor_type(self):
+        return "tensor<%dx%dxf32>" % (self.lhs_rows, self.lhs_cols)
+
+    @property
+    def rhs_tensor_type(self):
+        return "tensor<%dx%dxf32>" % (self.rhs_rows, self.rhs_cols)
+
+    @property
+    def result_tensor_type(self):
+        return "tensor<%dx%dxf32>" % (self.result_rows, self.result_cols)
+
+    @property
+    def lhs_vector_type(self):
+        return "vector<%dxf32>" % (self.lhs_rows * self.lhs_cols)
+
+    @property
+    def rhs_vector_type(self):
+        return "vector<%dxf32>" % (self.rhs_rows * self.rhs_cols)
+
+    @property
+    def result_vector_type(self):
+        return "vector<%dxf32>" % (self.result_rows * self.result_cols)
+
+    @property
+    def lhs_memref_type(self):
+        return "memref<%dx%dxf32>" % (self.lhs_rows, self.lhs_cols)
+
+    @property
+    def rhs_memref_type(self):
+        return "memref<%dx%dxf32>" % (self.rhs_rows, self.rhs_cols)
+
+    @property
+    def result_memref_type(self):
+        return "memref<%dx%dxf32>" % (self.result_rows, self.result_cols)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "operation": self.operation,
+            "derivative": self.derivative,
+            "axis": self.axis,
+            "basis": self.basis,
+            "transpose_basis": self.transpose_basis,
+            "lhs_rows": self.lhs_rows,
+            "lhs_cols": self.lhs_cols,
+            "rhs_cols": self.rhs_cols,
+        }
+
+
+@dataclass(frozen=True)
+class TensorProductSumFactorIR:
+    material_name: str
+    element_type: str
+    element_label: str
+    dim: int
+    n_shape: int
+    n_qp: int
+    n_shape_1d: int
+    n_qp_1d: int
+    quadrature_order: int
+    vector_size: int
+    shape_values_1d: tuple
+    shape_gradients_1d: tuple
+    weights_1d: tuple
+    field_gradient_stages: tuple
+    test_gradient_stages: tuple
+
+    def __post_init__(self):
+        dim = int(self.dim)
+        n_shape = int(self.n_shape)
+        n_qp = int(self.n_qp)
+        n_shape_1d = int(self.n_shape_1d)
+        n_qp_1d = int(self.n_qp_1d)
+        field_gradient_stages = tuple(self.field_gradient_stages)
+        test_gradient_stages = tuple(self.test_gradient_stages)
+        object.__setattr__(self, "material_name", str(self.material_name))
+        object.__setattr__(self, "element_type", str(self.element_type).upper())
+        object.__setattr__(self, "element_label", str(self.element_label).lower())
+        object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "n_shape", n_shape)
+        object.__setattr__(self, "n_qp", n_qp)
+        object.__setattr__(self, "n_shape_1d", n_shape_1d)
+        object.__setattr__(self, "n_qp_1d", n_qp_1d)
+        object.__setattr__(self, "quadrature_order", int(self.quadrature_order))
+        object.__setattr__(self, "vector_size", int(self.vector_size))
+        object.__setattr__(self, "shape_values_1d", tuple(float(v) for v in self.shape_values_1d))
+        object.__setattr__(self, "shape_gradients_1d", tuple(float(v) for v in self.shape_gradients_1d))
+        object.__setattr__(self, "weights_1d", tuple(float(v) for v in self.weights_1d))
+        object.__setattr__(self, "field_gradient_stages", field_gradient_stages)
+        object.__setattr__(self, "test_gradient_stages", test_gradient_stages)
+        if dim not in (2, 3):
+            raise ValueError("tensor-product sum-factorization IR supports dimensions 2 and 3")
+        if n_shape != n_shape_1d ** dim:
+            raise ValueError("tensor-product IR n_shape must equal n_shape_1d ** dim")
+        if n_qp != n_qp_1d ** dim:
+            raise ValueError("tensor-product IR n_qp must equal n_qp_1d ** dim")
+        expected_1d = n_qp_1d * n_shape_1d
+        if len(self.shape_values_1d) != expected_1d:
+            raise ValueError("shape_values_1d must have n_qp_1d * n_shape_1d entries")
+        if len(self.shape_gradients_1d) != expected_1d:
+            raise ValueError("shape_gradients_1d must have n_qp_1d * n_shape_1d entries")
+        if len(self.weights_1d) != n_qp_1d:
+            raise ValueError("weights_1d must have n_qp_1d entries")
+        for stage in field_gradient_stages + test_gradient_stages:
+            if not isinstance(stage, TensorProductContractionStage):
+                raise TypeError("sum-factorization stages must be TensorProductContractionStage objects")
+
+    @property
+    def stages(self):
+        return self.field_gradient_stages + self.test_gradient_stages
+
+    @property
+    def function_prefix(self):
+        return "sfem_%s_%s_sum_factor" % (self.material_name, self.element_label)
+
+    def to_dict(self):
+        return {
+            "material_name": self.material_name,
+            "element_type": self.element_type,
+            "element_label": self.element_label,
+            "dim": self.dim,
+            "n_shape": self.n_shape,
+            "n_qp": self.n_qp,
+            "n_shape_1d": self.n_shape_1d,
+            "n_qp_1d": self.n_qp_1d,
+            "quadrature_order": self.quadrature_order,
+            "vector_size": self.vector_size,
+            "shape_values_1d": list(self.shape_values_1d),
+            "shape_gradients_1d": list(self.shape_gradients_1d),
+            "weights_1d": list(self.weights_1d),
+            "field_gradient_stages": [stage.to_dict() for stage in self.field_gradient_stages],
+            "test_gradient_stages": [stage.to_dict() for stage in self.test_gradient_stages],
+        }
+
+
+@dataclass(frozen=True)
+class TensorProductLaplaceFormIR:
+    sum_factor: TensorProductSumFactorIR
+    parameter_name: str = "kappa"
+    parameter_default: float = 1.0
+
+    def __post_init__(self):
+        if not isinstance(self.sum_factor, TensorProductSumFactorIR):
+            raise TypeError("sum_factor must be a TensorProductSumFactorIR")
+        object.__setattr__(self, "parameter_name", str(self.parameter_name))
+        object.__setattr__(self, "parameter_default", float(self.parameter_default))
+        if self.sum_factor.material_name != "laplace":
+            raise ValueError("TensorProductLaplaceFormIR requires the laplace material")
+        if self.parameter_name != "kappa":
+            raise ValueError("laplace tensor-product form currently supports kappa only")
+
+    @property
+    def function_prefix(self):
+        return "%s_laplace_apply" % self.sum_factor.function_prefix
+
+    def to_dict(self):
+        values = self.sum_factor.to_dict()
+        values.update(
+            {
+                "form": "laplace",
+                "parameter_name": self.parameter_name,
+                "parameter_default": self.parameter_default,
+            }
+        )
+        return values
+
+
+class TensorProductLaplaceReferenceEvaluator:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductLaplaceFormIR):
+            raise TypeError("ir must be a TensorProductLaplaceFormIR")
+        self.ir = ir
+
+    def apply_local(self, u, kappa=None):
+        sf = self.ir.sum_factor
+        if len(u) != sf.n_shape:
+            raise ValueError("local vector length must match tensor-product shape count")
+        kappa = self.ir.parameter_default if kappa is None else float(kappa)
+        result = []
+        for row in range(sf.n_shape):
+            row_idx = _tensor_product_multi_index(row, sf.n_shape_1d, sf.dim)
+            value = 0.0
+            for q in range(sf.n_qp):
+                q_idx = _tensor_product_multi_index(q, sf.n_qp_1d, sf.dim)
+                weight = _tensor_product_weight(sf, q_idx)
+                dot = 0.0
+                for derivative in range(sf.dim):
+                    test = _tensor_product_basis(sf, q_idx, row_idx, derivative)
+                    grad_u = 0.0
+                    for trial in range(sf.n_shape):
+                        trial_idx = _tensor_product_multi_index(trial, sf.n_shape_1d, sf.dim)
+                        grad_u += float(u[trial]) * _tensor_product_basis(sf, q_idx, trial_idx, derivative)
+                    dot += test * grad_u
+                value += kappa * weight * dot
+            result.append(float(value))
+        return tuple(result)
+
+    def apply_ebe(self, connectivity, u, node_degree, node_to_element_map, node_to_local_idx, kappa=None):
+        sf = self.ir.sum_factor
+        num_elements = len(connectivity)
+        num_nodes = len(node_degree)
+        if num_elements <= 0 or num_nodes <= 0:
+            raise ValueError("EBE reference requires positive element and node counts")
+        element_out = []
+        for elem in range(num_elements):
+            local_u = []
+            for local in range(sf.n_shape):
+                node = int(_rank2_value(connectivity, elem, local, sf.n_shape))
+                local_u.append(float(u[node]))
+            element_out.append(self.apply_local(local_u, kappa=kappa))
+        out = []
+        max_node_degree = _rank2_width(node_to_element_map)
+        for node in range(num_nodes):
+            degree = int(node_degree[node])
+            acc = 0.0
+            for i in range(degree):
+                elem = int(_rank2_value(node_to_element_map, node, i, max_node_degree))
+                local = int(_rank2_value(node_to_local_idx, node, i, max_node_degree))
+                acc += element_out[elem][local]
+            out.append(float(acc))
+        return tuple(tuple(row) for row in element_out), tuple(out)
+
+
+class TensorProductSumFactorReferenceEvaluator:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductSumFactorIR):
+            raise TypeError("ir must be a TensorProductSumFactorIR")
+        self.ir = ir
+
+    def apply_stage(self, stage, operand):
+        if not isinstance(stage, TensorProductContractionStage):
+            raise TypeError("stage must be a TensorProductContractionStage")
+        if len(operand) != stage.rhs_rows * stage.rhs_cols:
+            raise ValueError("operand length does not match stage RHS shape")
+        basis = self._stage_basis_matrix(stage)
+        result = []
+        for row in range(stage.result_rows):
+            for col in range(stage.result_cols):
+                value = 0.0
+                for k in range(stage.lhs_cols):
+                    value += basis[row * stage.lhs_cols + k] * float(operand[k * stage.rhs_cols + col])
+                result.append(float(value))
+        return tuple(result)
+
+    def apply_pipeline(self, stages, operand):
+        stages = tuple(stages)
+        if not stages:
+            raise ValueError("sum-factorization pipeline requires stages")
+        values = tuple(float(value) for value in operand)
+        previous_stage = None
+        for stage in stages:
+            if previous_stage is not None:
+                values = self._reorder_between_stages(values, previous_stage, stage)
+            if len(values) != stage.rhs_rows * stage.rhs_cols:
+                raise ValueError("stage operand element count does not match pipeline state")
+            values = self.apply_stage(stage, values)
+            previous_stage = stage
+        return values
+
+    def field_gradient(self, u, derivative):
+        stages = tuple(stage for stage in self.ir.field_gradient_stages if stage.derivative == derivative)
+        values = self.apply_pipeline(stages, u)
+        return self._reorder_stage_output_to_canonical(values, stages[-1])
+
+    def direct_field_gradient(self, u, derivative):
+        sf = self.ir
+        if len(u) != sf.n_shape:
+            raise ValueError("field vector length must match tensor-product shape count")
+        values = []
+        for q in range(sf.n_qp):
+            q_idx = _tensor_product_multi_index_row_major(q, sf.n_qp_1d, sf.dim)
+            value = 0.0
+            for trial in range(sf.n_shape):
+                trial_idx = _tensor_product_multi_index_row_major(trial, sf.n_shape_1d, sf.dim)
+                value += float(u[trial]) * _tensor_product_basis(sf, q_idx, trial_idx, derivative)
+            values.append(float(value))
+        return tuple(values)
+
+    def test_contraction(self, q_values, derivative):
+        stages = tuple(stage for stage in self.ir.test_gradient_stages if stage.derivative == derivative)
+        values = self._reorder_canonical_to_stage_input(q_values, stages[0])
+        values = self.apply_pipeline(stages, values)
+        return self._reorder_stage_output_to_canonical(values, stages[-1])
+
+    def direct_test_contraction(self, q_values, derivative):
+        sf = self.ir
+        if len(q_values) != sf.n_qp:
+            raise ValueError("quadrature vector length must match tensor-product quadrature count")
+        values = []
+        for row in range(sf.n_shape):
+            row_idx = _tensor_product_multi_index_row_major(row, sf.n_shape_1d, sf.dim)
+            value = 0.0
+            for q in range(sf.n_qp):
+                q_idx = _tensor_product_multi_index_row_major(q, sf.n_qp_1d, sf.dim)
+                value += float(q_values[q]) * _tensor_product_basis(sf, q_idx, row_idx, derivative)
+            values.append(float(value))
+        return tuple(values)
+
+    def apply_laplace_local(self, u, kappa=1.0):
+        sf = self.ir
+        if len(u) != sf.n_shape:
+            raise ValueError("local vector length must match tensor-product shape count")
+        result = [0.0 for _ in range(sf.n_shape)]
+        for derivative in range(sf.dim):
+            gradients = self.field_gradient(u, derivative)
+            weighted = []
+            for q, value in enumerate(gradients):
+                q_idx = _tensor_product_multi_index(q, sf.n_qp_1d, sf.dim)
+                weighted.append(float(kappa) * _tensor_product_weight(sf, q_idx) * value)
+            contracted = self.test_contraction(weighted, derivative)
+            for i, value in enumerate(contracted):
+                result[i] += value
+        return tuple(float(value) for value in result)
+
+    def direct_laplace_local(self, u, kappa=1.0):
+        sf = self.ir
+        if len(u) != sf.n_shape:
+            raise ValueError("local vector length must match tensor-product shape count")
+        result = []
+        for row in range(sf.n_shape):
+            row_idx = _tensor_product_multi_index_row_major(row, sf.n_shape_1d, sf.dim)
+            value = 0.0
+            for q in range(sf.n_qp):
+                q_idx = _tensor_product_multi_index_row_major(q, sf.n_qp_1d, sf.dim)
+                weight = _tensor_product_weight(sf, q_idx)
+                dot = 0.0
+                for derivative in range(sf.dim):
+                    test = _tensor_product_basis(sf, q_idx, row_idx, derivative)
+                    grad_u = 0.0
+                    for trial in range(sf.n_shape):
+                        trial_idx = _tensor_product_multi_index_row_major(trial, sf.n_shape_1d, sf.dim)
+                        grad_u += float(u[trial]) * _tensor_product_basis(sf, q_idx, trial_idx, derivative)
+                    dot += test * grad_u
+                value += float(kappa) * weight * dot
+            result.append(float(value))
+        return tuple(result)
+
+    def _stage_basis_matrix(self, stage):
+        sf = self.ir
+        values = sf.shape_gradients_1d if "grad" in stage.basis else sf.shape_values_1d
+        basis = []
+        if stage.transpose_basis:
+            for row in range(stage.lhs_rows):
+                for col in range(stage.lhs_cols):
+                    basis.append(values[col * sf.n_shape_1d + row])
+        else:
+            for row in range(stage.lhs_rows):
+                for col in range(stage.lhs_cols):
+                    basis.append(values[row * sf.n_shape_1d + col])
+        return tuple(float(value) for value in basis)
+
+    def _reorder_between_stages(self, values, previous_stage, next_stage):
+        sf = self.ir
+        source_extents = _stage_output_extents(sf, previous_stage)
+        target_extents = _stage_input_extents(sf, next_stage)
+        if source_extents != target_extents:
+            raise ValueError("adjacent sum-factor stages do not have matching canonical extents")
+        source_axes = _stage_view_axes(sf.dim, previous_stage.axis)
+        target_axes = _stage_view_axes(sf.dim, next_stage.axis)
+        if source_axes == target_axes:
+            return values
+        result = [0.0 for _ in range(len(values))]
+        for linear in range(len(values)):
+            multi = _linear_to_multi_index(linear, source_extents)
+            source = _view_offset(multi, source_axes, source_extents)
+            target = _view_offset(multi, target_axes, target_extents)
+            result[target] = values[source]
+        return tuple(result)
+
+    def _reorder_canonical_to_stage_input(self, values, stage):
+        extents = _stage_input_extents(self.ir, stage)
+        return _reorder_tensor_values(values, tuple(range(self.ir.dim)), _stage_view_axes(self.ir.dim, stage.axis), extents)
+
+    def _reorder_stage_output_to_canonical(self, values, stage):
+        extents = _stage_output_extents(self.ir, stage)
+        return _reorder_tensor_values(values, _stage_view_axes(self.ir.dim, stage.axis), tuple(range(self.ir.dim)), extents)
+
+
+class TensorProductSumFactorMLIRLowering:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductSumFactorIR):
+            raise TypeError("ir must be a TensorProductSumFactorIR")
+        self.ir = ir
+
+    def render_linalg_module(self):
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_generic_gpu"} {'
+            % (self.ir.material_name, self.ir.element_type)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_stage_function(stage))
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_vector_module(self):
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_vector"} {'
+            % (self.ir.material_name, self.ir.element_type)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_vector_stage_function(stage))
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_matrix_unit_module(self, tile_size=None):
+        tile_size = self.ir.vector_size if tile_size is None else int(tile_size)
+        if tile_size <= 0:
+            raise ValueError("matrix unit tile size must be positive")
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_matrix_unit", '
+            "sfem.matrix_unit.tile_size = %d : i64} {"
+            % (self.ir.material_name, self.ir.element_type, tile_size)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_matrix_unit_stage_function(stage, tile_size))
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_matrix_unit_memref_module(self, tile_size=None):
+        tile_size = self.ir.vector_size if tile_size is None else int(tile_size)
+        if tile_size <= 0:
+            raise ValueError("matrix unit tile size must be positive")
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_matrix_unit_memref", '
+            "sfem.matrix_unit.tile_size = %d : i64} {"
+            % (self.ir.material_name, self.ir.element_type, tile_size)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_matrix_unit_memref_stage_function(stage, tile_size))
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_matrix_unit_pipeline_module(self, tile_size=None):
+        tile_size = self.ir.vector_size if tile_size is None else int(tile_size)
+        if tile_size <= 0:
+            raise ValueError("matrix unit tile size must be positive")
+        self._check_pipeline_stage_types()
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline", '
+            "sfem.matrix_unit.tile_size = %d : i64} {"
+            % (self.ir.material_name, self.ir.element_type, tile_size)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_matrix_unit_memref_stage_function(stage, tile_size))
+        for operation, stages in (
+            ("field_gradient", self.ir.field_gradient_stages),
+            ("test_gradient_contraction", self.ir.test_gradient_stages),
+        ):
+            for derivative in range(self.ir.dim):
+                derivative_stages = tuple(stage for stage in stages if stage.derivative == derivative)
+                lines.extend(self._render_matrix_unit_pipeline_function(operation, derivative, derivative_stages))
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_gpu_module(self):
+        lines = [
+            'module attributes {gpu.container_module, sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_gpu"} {'
+            % (self.ir.material_name, self.ir.element_type)
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_gpu_launch_function(stage))
+        lines.append("  gpu.module @%s_gpu_kernels {" % self.ir.function_prefix)
+        for stage in self.ir.stages:
+            lines.extend(self._render_gpu_kernel(stage))
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_metal_source(self):
+        lines = [
+            "#include <metal_stdlib>",
+            "using namespace metal;",
+            "",
+        ]
+        for stage in self.ir.stages:
+            lines.extend(self._render_metal_kernel(stage))
+        return "\n".join(lines) + "\n"
+
+    def write_inspection_artifacts(
+        self,
+        output_dir,
+        *,
+        include_metal_source=True,
+        include_metal_smoke_harness=True,
+    ):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefix = output_dir / self.ir.function_prefix
+
+        linalg_path = prefix.with_suffix(".linalg.mlir")
+        vector_path = prefix.with_suffix(".vector.mlir")
+        matrix_unit_path = prefix.with_suffix(".matrix_unit.mlir")
+        matrix_unit_memref_path = prefix.with_suffix(".matrix_unit_memref.mlir")
+        matrix_unit_pipeline_path = prefix.with_suffix(".matrix_unit_pipeline.mlir")
+        gpu_path = prefix.with_suffix(".gpu.mlir")
+        metal_path = prefix.with_suffix(".metal")
+        harness_path = prefix.with_suffix(".metal_smoke.mm")
+
+        linalg_path.write_text(self.render_linalg_module())
+        vector_path.write_text(self.render_vector_module())
+        matrix_unit_path.write_text(self.render_matrix_unit_module())
+        matrix_unit_memref_path.write_text(self.render_matrix_unit_memref_module())
+        matrix_unit_pipeline_path.write_text(self.render_matrix_unit_pipeline_module())
+        gpu_path.write_text(self.render_gpu_module())
+
+        files = [
+            linalg_path,
+            vector_path,
+            matrix_unit_path,
+            matrix_unit_memref_path,
+            matrix_unit_pipeline_path,
+            gpu_path,
+        ]
+        if include_metal_source:
+            metal_path.write_text(self.render_metal_source())
+            files.append(metal_path)
+        if include_metal_smoke_harness:
+            harness_path.write_text(self.render_metal_smoke_test_harness())
+            files.append(harness_path)
+
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=tuple(str(path) for path in files),
+        )
+
+    def render_metal_smoke_test_harness(self, stage=None):
+        stage = self.ir.stages[0] if stage is None else stage
+        kernel_name = self._metal_kernel_name(stage)
+        source = _objc_string_literal(self.render_metal_source())
+        basis = _float_initializer(
+            _deterministic_values(stage.lhs_rows * stage.lhs_cols, scale=0.25, offset=1.0)
+        )
+        operand = _float_initializer(
+            _deterministic_values(stage.rhs_rows * stage.rhs_cols, scale=0.125, offset=2.0)
+        )
+        return _METAL_SMOKE_TEST_TEMPLATE % {
+            "source": source,
+            "kernel_name": kernel_name,
+            "lhs_size": stage.lhs_rows * stage.lhs_cols,
+            "rhs_size": stage.rhs_rows * stage.rhs_cols,
+            "result_size": stage.result_rows * stage.result_cols,
+            "lhs_cols": stage.lhs_cols,
+            "rhs_cols": stage.rhs_cols,
+            "result_rows": stage.result_rows,
+            "result_cols": stage.result_cols,
+            "basis": basis,
+            "operand": operand,
+        }
+
+    def iree_metal_compile_command(self, input_mlir, output_vmfb):
+        return [
+            "iree-compile",
+            str(input_mlir),
+            "--iree-hal-target-backends=metal",
+            "-o",
+            str(output_vmfb),
+        ]
+
+    def compile_with_iree_metal(self, output_dir, *, iree_compile=None, input_kind="matrix_unit_pipeline"):
+        iree_compile = iree_compile or shutil.which("iree-compile")
+        if iree_compile is None:
+            raise FileNotFoundError("iree-compile is not available")
+        if input_kind not in ("linalg", "matrix_unit", "matrix_unit_memref", "matrix_unit_pipeline"):
+            raise ValueError(
+                "IREE Metal input_kind must be 'linalg', 'matrix_unit', 'matrix_unit_memref', or 'matrix_unit_pipeline'"
+            )
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if input_kind == "matrix_unit_pipeline":
+            input_mlir = output_dir / ("%s.matrix_unit_pipeline.mlir" % self.ir.function_prefix)
+            input_mlir.write_text(self.render_matrix_unit_pipeline_module())
+            output_vmfb = output_dir / ("%s.matrix_unit_pipeline.metal.vmfb" % self.ir.function_prefix)
+        elif input_kind == "matrix_unit_memref":
+            input_mlir = output_dir / ("%s.matrix_unit_memref.mlir" % self.ir.function_prefix)
+            input_mlir.write_text(self.render_matrix_unit_memref_module())
+            output_vmfb = output_dir / ("%s.matrix_unit_memref.metal.vmfb" % self.ir.function_prefix)
+        elif input_kind == "matrix_unit":
+            input_mlir = output_dir / ("%s.matrix_unit.mlir" % self.ir.function_prefix)
+            input_mlir.write_text(self.render_matrix_unit_module())
+            output_vmfb = output_dir / ("%s.matrix_unit.metal.vmfb" % self.ir.function_prefix)
+        else:
+            input_mlir = output_dir / ("%s.linalg.mlir" % self.ir.function_prefix)
+            input_mlir.write_text(self.render_linalg_module())
+            output_vmfb = output_dir / ("%s.linalg.metal.vmfb" % self.ir.function_prefix)
+        command = self.iree_metal_compile_command(input_mlir, output_vmfb)
+        command[0] = iree_compile
+        result = subprocess.run(
+            command,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return output_vmfb, result
+
+    def run_metal_smoke_test(self, output_dir, stage=None, *, xcrun=None):
+        xcrun = xcrun or shutil.which("xcrun")
+        if xcrun is None:
+            raise FileNotFoundError("xcrun is not available")
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        harness = output_dir / ("%s_metal_smoke.mm" % self.ir.function_prefix)
+        executable = output_dir / ("%s_metal_smoke" % self.ir.function_prefix)
+        harness.write_text(self.render_metal_smoke_test_harness(stage=stage))
+        compile_result = subprocess.run(
+            [
+                xcrun,
+                "clang++",
+                str(harness),
+                "-fobjc-arc",
+                "-framework",
+                "Foundation",
+                "-framework",
+                "Metal",
+                "-o",
+                str(executable),
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if compile_result.returncode != 0:
+            return MetalSmokeTestResult(
+                harness,
+                executable,
+                compile_result.returncode,
+                compile_result.stdout,
+                compile_result.stderr,
+            )
+        run_result = subprocess.run(
+            [str(executable)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return MetalSmokeTestResult(
+            harness,
+            executable,
+            compile_result.returncode,
+            compile_result.stdout,
+            compile_result.stderr,
+            run_result.returncode,
+            run_result.stdout,
+            run_result.stderr,
+        )
+
+    def _render_stage_function(self, stage):
+        function_name = "%s_%s" % (self.ir.function_prefix, stage.name)
+        return [
+            "",
+            "  func.func @%s(%%basis: %s, %%operand: %s) -> %s attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64} {"
+            % (
+                function_name,
+                stage.lhs_tensor_type,
+                stage.rhs_tensor_type,
+                stage.result_tensor_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+            ),
+            f"    %empty = tensor.empty() : {stage.result_tensor_type}",
+            "    %result = linalg.matmul ins(%basis, %operand : "
+            f"{stage.lhs_tensor_type}, {stage.rhs_tensor_type}) "
+            f"outs(%empty : {stage.result_tensor_type}) -> {stage.result_tensor_type}",
+            f"    return %result : {stage.result_tensor_type}",
+            "  }",
+        ]
+
+    def _render_vector_stage_function(self, stage):
+        function_name = "%s_%s_vector" % (self.ir.function_prefix, stage.name)
+        return [
+            "",
+            "  func.func @%s(%%basis: %s, %%operand: %s) -> %s attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64, "
+            'sfem.vector.matrix_multiply = "flattened"} {'
+            % (
+                function_name,
+                stage.lhs_vector_type,
+                stage.rhs_vector_type,
+                stage.result_vector_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+            ),
+            "    %%result = vector.matrix_multiply %%basis, %%operand "
+            "{lhs_rows = %d : i32, lhs_columns = %d : i32, rhs_columns = %d : i32} "
+            ": (%s, %s) -> %s"
+            % (
+                stage.lhs_rows,
+                stage.lhs_cols,
+                stage.rhs_cols,
+                stage.lhs_vector_type,
+                stage.rhs_vector_type,
+                stage.result_vector_type,
+            ),
+            f"    return %result : {stage.result_vector_type}",
+            "  }",
+        ]
+
+    def _render_matrix_unit_stage_function(self, stage, tile_size):
+        function_name = "%s_%s_matrix_unit" % (self.ir.function_prefix, stage.name)
+        lhs_rows = _align_up(stage.lhs_rows, tile_size)
+        lhs_cols = _align_up(stage.lhs_cols, tile_size)
+        rhs_cols = _align_up(stage.rhs_cols, tile_size)
+        lhs_vector_type = "vector<%dxf32>" % (lhs_rows * lhs_cols)
+        rhs_vector_type = "vector<%dxf32>" % (lhs_cols * rhs_cols)
+        result_vector_type = "vector<%dxf32>" % (lhs_rows * rhs_cols)
+        return [
+            "",
+            "  func.func @%s(%%basis: %s, %%operand: %s) -> %s attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64, "
+            'sfem.vector.matrix_multiply = "padded", sfem.matrix_unit.tile_size = %d : i64, '
+            "sfem.matrix_unit.raw_lhs_rows = %d : i64, sfem.matrix_unit.raw_lhs_columns = %d : i64, "
+            "sfem.matrix_unit.raw_rhs_columns = %d : i64} {"
+            % (
+                function_name,
+                lhs_vector_type,
+                rhs_vector_type,
+                result_vector_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+                tile_size,
+                stage.lhs_rows,
+                stage.lhs_cols,
+                stage.rhs_cols,
+            ),
+            "    %%result = vector.matrix_multiply %%basis, %%operand "
+            "{lhs_rows = %d : i32, lhs_columns = %d : i32, rhs_columns = %d : i32} "
+            ": (%s, %s) -> %s"
+            % (
+                lhs_rows,
+                lhs_cols,
+                rhs_cols,
+                lhs_vector_type,
+                rhs_vector_type,
+                result_vector_type,
+            ),
+            f"    return %result : {result_vector_type}",
+            "  }",
+        ]
+
+    def _check_pipeline_stage_types(self):
+        for stages in (self.ir.field_gradient_stages, self.ir.test_gradient_stages):
+            for derivative in range(self.ir.dim):
+                derivative_stages = tuple(stage for stage in stages if stage.derivative == derivative)
+                if not derivative_stages:
+                    raise ValueError("sum-factorization pipeline is missing derivative stages")
+                for previous, current in zip(derivative_stages, derivative_stages[1:]):
+                    previous_size = previous.result_rows * previous.result_cols
+                    current_size = current.rhs_rows * current.rhs_cols
+                    if previous_size != current_size:
+                        raise ValueError(
+                            "sum-factorization pipeline requires adjacent stage buffer element counts to match"
+                        )
+
+    def _render_matrix_unit_pipeline_function(self, operation, derivative, stages):
+        if not stages:
+            raise ValueError("sum-factorization pipeline requires at least one stage")
+        label = "field_gradient" if operation == "field_gradient" else "test_gradient"
+        function_name = "%s_%s_d%d_matrix_unit_pipeline" % (self.ir.function_prefix, label, derivative)
+        signature = []
+        for index, stage in enumerate(stages):
+            signature.append("%%basis%d: %s" % (index, stage.lhs_memref_type))
+        signature.append("%%input: %s" % stages[0].rhs_memref_type)
+        signature.append("%%output: %s" % stages[-1].result_memref_type)
+
+        lines = [
+            "",
+            "  func.func @%s(%s) attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.derivative = %d : i64, '
+            'sfem.vector.matrix_multiply = "padded_memref_pipeline"} {'
+            % (function_name, ", ".join(signature), operation, derivative),
+        ]
+        max_index = max(
+            max(stage.rhs_rows, stage.rhs_cols, stage.result_rows, stage.result_cols)
+            for stage in stages
+        )
+        for value in range(max_index):
+            lines.append("    %%c%d = arith.constant %d : index" % (value, value))
+        scratches = []
+        operand = "%input"
+        operand_type = stages[0].rhs_memref_type
+        previous_stage = None
+        for index, stage in enumerate(stages):
+            call_operand = operand
+            if previous_stage is not None:
+                call_operand = "%%bridge%d" % index
+                scratches.append((call_operand, stage.rhs_memref_type))
+                lines.append("    %s = memref.alloc() : %s" % (call_operand, stage.rhs_memref_type))
+                lines.extend(self._render_pipeline_bridge_copy(index, previous_stage, stage, operand, operand_type, call_operand))
+            result = "%output"
+            if index != len(stages) - 1:
+                result = "%%scratch%d" % index
+                scratches.append((result, stage.result_memref_type))
+                lines.append("    %s = memref.alloc() : %s" % (result, stage.result_memref_type))
+            stage_function_name = "%s_%s_matrix_unit_memref" % (self.ir.function_prefix, stage.name)
+            lines.append(
+                "    func.call @%s(%%basis%d, %s, %s) : (%s, %s, %s) -> ()"
+                % (
+                    stage_function_name,
+                    index,
+                    call_operand,
+                    result,
+                    stage.lhs_memref_type,
+                    stage.rhs_memref_type,
+                    stage.result_memref_type,
+                )
+            )
+            operand = result
+            operand_type = stage.result_memref_type
+            previous_stage = stage
+        for scratch_name, scratch_type in reversed(tuple(scratches)):
+            lines.append("    memref.dealloc %s : %s" % (scratch_name, scratch_type))
+        lines.extend(["    return", "  }"])
+        return lines
+
+    def _render_pipeline_bridge_copy(self, bridge_index, previous_stage, next_stage, source, source_type, target):
+        sf = self.ir
+        source_extents = _stage_output_extents(sf, previous_stage)
+        target_extents = _stage_input_extents(sf, next_stage)
+        if source_extents != target_extents:
+            raise ValueError("adjacent sum-factor stages do not have matching canonical extents")
+        source_axes = _stage_view_axes(sf.dim, previous_stage.axis)
+        target_axes = _stage_view_axes(sf.dim, next_stage.axis)
+        lines = []
+        for linear in range(_product(source_extents)):
+            multi = _linear_to_multi_index(linear, source_extents)
+            source_offset = _view_offset(multi, source_axes, source_extents)
+            target_offset = _view_offset(multi, target_axes, target_extents)
+            source_row = source_offset // previous_stage.result_cols
+            source_col = source_offset % previous_stage.result_cols
+            target_row = target_offset // next_stage.rhs_cols
+            target_col = target_offset % next_stage.rhs_cols
+            lines.extend(
+                [
+                    "    %%bridge%d_value_%d = memref.load %s[%%c%d, %%c%d] : %s"
+                    % (bridge_index, linear, source, source_row, source_col, source_type),
+                    "    memref.store %%bridge%d_value_%d, %s[%%c%d, %%c%d] : %s"
+                    % (bridge_index, linear, target, target_row, target_col, next_stage.rhs_memref_type),
+                ]
+            )
+        return lines
+
+    def _render_matrix_unit_memref_stage_function(self, stage, tile_size):
+        function_name = "%s_%s_matrix_unit_memref" % (self.ir.function_prefix, stage.name)
+        lhs_rows = _align_up(stage.lhs_rows, tile_size)
+        lhs_cols = _align_up(stage.lhs_cols, tile_size)
+        rhs_cols = _align_up(stage.rhs_cols, tile_size)
+        lhs_matrix_vector_type = "vector<%dx%dxf32>" % (lhs_rows, lhs_cols)
+        rhs_matrix_vector_type = "vector<%dx%dxf32>" % (lhs_cols, rhs_cols)
+        result_matrix_vector_type = "vector<%dx%dxf32>" % (lhs_rows, rhs_cols)
+        lhs_flat_vector_type = "vector<%dxf32>" % (lhs_rows * lhs_cols)
+        rhs_flat_vector_type = "vector<%dxf32>" % (lhs_cols * rhs_cols)
+        result_flat_vector_type = "vector<%dxf32>" % (lhs_rows * rhs_cols)
+        return [
+            "",
+            "  func.func @%s(%%basis: %s, %%operand: %s, %%result: %s) attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64, "
+            'sfem.vector.matrix_multiply = "padded_memref", sfem.matrix_unit.tile_size = %d : i64, '
+            "sfem.matrix_unit.raw_lhs_rows = %d : i64, sfem.matrix_unit.raw_lhs_columns = %d : i64, "
+            "sfem.matrix_unit.raw_rhs_columns = %d : i64} {"
+            % (
+                function_name,
+                stage.lhs_memref_type,
+                stage.rhs_memref_type,
+                stage.result_memref_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+                tile_size,
+                stage.lhs_rows,
+                stage.lhs_cols,
+                stage.rhs_cols,
+            ),
+            "    %c0 = arith.constant 0 : index",
+            "    %zero = arith.constant 0.0 : f32",
+            "    %%basis_tile = vector.transfer_read %%basis[%%c0, %%c0], %%zero : %s, %s"
+            % (stage.lhs_memref_type, lhs_matrix_vector_type),
+            "    %%operand_tile = vector.transfer_read %%operand[%%c0, %%c0], %%zero : %s, %s"
+            % (stage.rhs_memref_type, rhs_matrix_vector_type),
+            "    %%basis_flat = vector.shape_cast %%basis_tile : %s to %s"
+            % (lhs_matrix_vector_type, lhs_flat_vector_type),
+            "    %%operand_flat = vector.shape_cast %%operand_tile : %s to %s"
+            % (rhs_matrix_vector_type, rhs_flat_vector_type),
+            "    %%result_flat = vector.matrix_multiply %%basis_flat, %%operand_flat "
+            "{lhs_rows = %d : i32, lhs_columns = %d : i32, rhs_columns = %d : i32} "
+            ": (%s, %s) -> %s"
+            % (
+                lhs_rows,
+                lhs_cols,
+                rhs_cols,
+                lhs_flat_vector_type,
+                rhs_flat_vector_type,
+                result_flat_vector_type,
+            ),
+            "    %%result_tile = vector.shape_cast %%result_flat : %s to %s"
+            % (result_flat_vector_type, result_matrix_vector_type),
+            "    vector.transfer_write %%result_tile, %%result[%%c0, %%c0] : %s, %s"
+            % (result_matrix_vector_type, stage.result_memref_type),
+            "    return",
+            "  }",
+        ]
+
+    def _gpu_kernel_name(self, stage):
+        return "%s_%s_kernel" % (self.ir.function_prefix, stage.name)
+
+    def _gpu_launch_name(self, stage):
+        return "%s_%s_gpu" % (self.ir.function_prefix, stage.name)
+
+    def _render_gpu_launch_function(self, stage):
+        launch_name = self._gpu_launch_name(stage)
+        kernel_name = self._gpu_kernel_name(stage)
+        kernel_module_name = "%s_gpu_kernels" % self.ir.function_prefix
+        return [
+            "",
+            "  func.func @%s(%%basis: %s, %%operand: %s, %%result: %s) attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64} {"
+            % (
+                launch_name,
+                stage.lhs_memref_type,
+                stage.rhs_memref_type,
+                stage.result_memref_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+            ),
+            "    %c1 = arith.constant 1 : index",
+            f"    %threads_x = arith.constant {stage.result_cols} : index",
+            f"    %threads_y = arith.constant {stage.result_rows} : index",
+            "    gpu.launch_func @%s::@%s blocks in (%%c1, %%c1, %%c1) "
+            "threads in (%%threads_x, %%threads_y, %%c1) args(%%basis : %s, %%operand : %s, %%result : %s)"
+            % (
+                kernel_module_name,
+                kernel_name,
+                stage.lhs_memref_type,
+                stage.rhs_memref_type,
+                stage.result_memref_type,
+            ),
+            "    return",
+            "  }",
+        ]
+
+    def _render_gpu_kernel(self, stage):
+        kernel_name = self._gpu_kernel_name(stage)
+        return [
+            "",
+            "    gpu.func @%s(%%basis: %s, %%operand: %s, %%result: %s) kernel attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64} {"
+            % (
+                kernel_name,
+                stage.lhs_memref_type,
+                stage.rhs_memref_type,
+                stage.result_memref_type,
+                stage.operation,
+                stage.basis,
+                stage.axis,
+                stage.derivative,
+            ),
+            "      %tx = gpu.thread_id x",
+            "      %ty = gpu.thread_id y",
+            "      %c0 = arith.constant 0 : index",
+            "      %c1 = arith.constant 1 : index",
+            f"      %contract_extent = arith.constant {stage.lhs_cols} : index",
+            "      %zero = arith.constant 0.0 : f32",
+            "      %sum = scf.for %k = %c0 to %contract_extent step %c1 iter_args(%acc = %zero) -> (f32) {",
+            f"        %a = memref.load %basis[%ty, %k] : {stage.lhs_memref_type}",
+            f"        %b = memref.load %operand[%k, %tx] : {stage.rhs_memref_type}",
+            "        %prod = arith.mulf %a, %b : f32",
+            "        %next = arith.addf %acc, %prod : f32",
+            "        scf.yield %next : f32",
+            "      }",
+            f"      memref.store %sum, %result[%ty, %tx] : {stage.result_memref_type}",
+            "      gpu.return",
+            "    }",
+        ]
+
+    def _metal_kernel_name(self, stage):
+        return "%s_%s_metal" % (self.ir.function_prefix, stage.name)
+
+    def _render_metal_kernel(self, stage):
+        return [
+            "kernel void %s(" % self._metal_kernel_name(stage),
+            "        device const float *basis [[buffer(0)]],",
+            "        device const float *operand [[buffer(1)]],",
+            "        device float *result [[buffer(2)]],",
+            "        uint2 tid [[thread_position_in_grid]]) {",
+            "    const uint col = tid.x;",
+            "    const uint row = tid.y;",
+            "    float acc = 0.0f;",
+            "    #pragma unroll",
+            "    for (uint k = 0; k < %d; ++k) {" % stage.lhs_cols,
+            "        acc += basis[row * %d + k] * operand[k * %d + col];"
+            % (stage.lhs_cols, stage.rhs_cols),
+            "    }",
+            "    result[row * %d + col] = acc;" % stage.result_cols,
+            "}",
+            "",
+        ]
+
+
+class TensorProductLaplaceFormMetalLowering:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductLaplaceFormIR):
+            raise TypeError("ir must be a TensorProductLaplaceFormIR")
+        self.ir = ir
+
+    def render_metal_source(self):
+        sf = self.ir.sum_factor
+        lines = [
+            "#include <metal_stdlib>",
+            "using namespace metal;",
+            "",
+            "constant float sfem_shape_1d[%d] = {%s};"
+            % (len(sf.shape_values_1d), _float_initializer(sf.shape_values_1d)),
+            "constant float sfem_grad_1d[%d] = {%s};"
+            % (len(sf.shape_gradients_1d), _float_initializer(sf.shape_gradients_1d)),
+            "constant float sfem_weight_1d[%d] = {%s};"
+            % (len(sf.weights_1d), _float_initializer(sf.weights_1d)),
+            "",
+        ]
+        if sf.dim == 2:
+            lines.extend(self._render_quad_kernel())
+        elif sf.dim == 3:
+            lines.extend(self._render_hex_kernel())
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        return "\n".join(lines) + "\n"
+
+    def render_metal_smoke_test_harness(self):
+        sf = self.ir.sum_factor
+        source = _objc_string_literal(self.render_metal_source())
+        u = _deterministic_values(sf.n_shape, scale=0.03125, offset=0.5)
+        return _LAPLACE_METAL_SMOKE_TEST_TEMPLATE % {
+            "source": source,
+            "kernel_name": self._metal_kernel_name(),
+            "n_shape": sf.n_shape,
+            "u": _float_initializer(u),
+            "kappa": _c_float_literal(self.ir.parameter_default),
+            "host_reference": self._render_host_reference_function(),
+        }
+
+    def write_inspection_artifacts(self, output_dir, *, include_metal_smoke_harness=True):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefix = output_dir / self.ir.function_prefix
+
+        metal_path = prefix.with_suffix(".metal")
+        harness_path = prefix.with_suffix(".metal_smoke.mm")
+
+        metal_path.write_text(self.render_metal_source())
+
+        files = [metal_path]
+        if include_metal_smoke_harness:
+            harness_path.write_text(self.render_metal_smoke_test_harness())
+            files.append(harness_path)
+
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=tuple(str(path) for path in files),
+        )
+
+    def run_metal_smoke_test(self, output_dir, *, xcrun=None):
+        xcrun = xcrun or shutil.which("xcrun")
+        if xcrun is None:
+            raise FileNotFoundError("xcrun is not available")
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        harness = output_dir / ("%s_metal_smoke.mm" % self.ir.function_prefix)
+        executable = output_dir / ("%s_metal_smoke" % self.ir.function_prefix)
+        harness.write_text(self.render_metal_smoke_test_harness())
+        compile_result = subprocess.run(
+            [
+                xcrun,
+                "clang++",
+                str(harness),
+                "-fobjc-arc",
+                "-framework",
+                "Foundation",
+                "-framework",
+                "Metal",
+                "-o",
+                str(executable),
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if compile_result.returncode != 0:
+            return MetalSmokeTestResult(
+                harness,
+                executable,
+                compile_result.returncode,
+                compile_result.stdout,
+                compile_result.stderr,
+            )
+        run_result = subprocess.run(
+            [str(executable)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return MetalSmokeTestResult(
+            harness,
+            executable,
+            compile_result.returncode,
+            compile_result.stdout,
+            compile_result.stderr,
+            run_result.returncode,
+            run_result.stdout,
+            run_result.stderr,
+        )
+
+    def _metal_kernel_name(self):
+        return "%s_metal" % self.ir.function_prefix
+
+    def _render_quad_kernel(self):
+        sf = self.ir.sum_factor
+        q = sf.n_qp_1d
+        s = sf.n_shape_1d
+        return [
+            "kernel void %s(" % self._metal_kernel_name(),
+            "        device const float *u [[buffer(0)]],",
+            "        device float *out [[buffer(1)]],",
+            "        constant float &kappa [[buffer(2)]],",
+            "        uint row [[thread_position_in_grid]]) {",
+            "    const uint rx = row %% %d;" % s,
+            "    const uint ry = row / %d;" % s,
+            "    float value = 0.0f;",
+            "    #pragma unroll",
+            "    for (uint qy = 0; qy < %d; ++qy) {" % q,
+            "        #pragma unroll",
+            "        for (uint qx = 0; qx < %d; ++qx) {" % q,
+            "            const float wt = sfem_weight_1d[qx] * sfem_weight_1d[qy];",
+            "            const float test_gx = sfem_grad_1d[qx * %d + rx] * sfem_shape_1d[qy * %d + ry];"
+            % (s, s),
+            "            const float test_gy = sfem_shape_1d[qx * %d + rx] * sfem_grad_1d[qy * %d + ry];"
+            % (s, s),
+            "            float grad_u_x = 0.0f;",
+            "            float grad_u_y = 0.0f;",
+            "            #pragma unroll",
+            "            for (uint sy = 0; sy < %d; ++sy) {" % s,
+            "                #pragma unroll",
+            "                for (uint sx = 0; sx < %d; ++sx) {" % s,
+            "                    const uint trial = sx + %d * sy;" % s,
+            "                    const float coeff = u[trial];",
+            "                    grad_u_x += coeff * sfem_grad_1d[qx * %d + sx] * sfem_shape_1d[qy * %d + sy];"
+            % (s, s),
+            "                    grad_u_y += coeff * sfem_shape_1d[qx * %d + sx] * sfem_grad_1d[qy * %d + sy];"
+            % (s, s),
+            "                }",
+            "            }",
+            "            value += kappa * wt * (test_gx * grad_u_x + test_gy * grad_u_y);",
+            "        }",
+            "    }",
+            "    out[row] = value;",
+            "}",
+            "",
+        ]
+
+    def _render_hex_kernel(self):
+        sf = self.ir.sum_factor
+        q = sf.n_qp_1d
+        s = sf.n_shape_1d
+        return [
+            "kernel void %s(" % self._metal_kernel_name(),
+            "        device const float *u [[buffer(0)]],",
+            "        device float *out [[buffer(1)]],",
+            "        constant float &kappa [[buffer(2)]],",
+            "        uint row [[thread_position_in_grid]]) {",
+            "    const uint rx = row %% %d;" % s,
+            "    const uint ry = (row / %d) %% %d;" % (s, s),
+            "    const uint rz = row / %d;" % (s * s),
+            "    float value = 0.0f;",
+            "    #pragma unroll",
+            "    for (uint qz = 0; qz < %d; ++qz) {" % q,
+            "        #pragma unroll",
+            "        for (uint qy = 0; qy < %d; ++qy) {" % q,
+            "            #pragma unroll",
+            "            for (uint qx = 0; qx < %d; ++qx) {" % q,
+            "                const float wt = sfem_weight_1d[qx] * sfem_weight_1d[qy] * sfem_weight_1d[qz];",
+            "                const float test_gx = sfem_grad_1d[qx * %d + rx] * sfem_shape_1d[qy * %d + ry] * sfem_shape_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                const float test_gy = sfem_shape_1d[qx * %d + rx] * sfem_grad_1d[qy * %d + ry] * sfem_shape_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                const float test_gz = sfem_shape_1d[qx * %d + rx] * sfem_shape_1d[qy * %d + ry] * sfem_grad_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                float grad_u_x = 0.0f;",
+            "                float grad_u_y = 0.0f;",
+            "                float grad_u_z = 0.0f;",
+            "                #pragma unroll",
+            "                for (uint sz = 0; sz < %d; ++sz) {" % s,
+            "                    #pragma unroll",
+            "                    for (uint sy = 0; sy < %d; ++sy) {" % s,
+            "                        #pragma unroll",
+            "                        for (uint sx = 0; sx < %d; ++sx) {" % s,
+            "                            const uint trial = sx + %d * (sy + %d * sz);" % (s, s),
+            "                            const float coeff = u[trial];",
+            "                            grad_u_x += coeff * sfem_grad_1d[qx * %d + sx] * sfem_shape_1d[qy * %d + sy] * sfem_shape_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                            grad_u_y += coeff * sfem_shape_1d[qx * %d + sx] * sfem_grad_1d[qy * %d + sy] * sfem_shape_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                            grad_u_z += coeff * sfem_shape_1d[qx * %d + sx] * sfem_shape_1d[qy * %d + sy] * sfem_grad_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                        }",
+            "                    }",
+            "                }",
+            "                value += kappa * wt * (test_gx * grad_u_x + test_gy * grad_u_y + test_gz * grad_u_z);",
+            "            }",
+            "        }",
+            "    }",
+            "    out[row] = value;",
+            "}",
+            "",
+        ]
+
+    def _render_host_reference_function(self):
+        sf = self.ir.sum_factor
+        arrays = [
+            "static const float shape_1d[%d] = {%s};"
+            % (len(sf.shape_values_1d), _float_initializer(sf.shape_values_1d)),
+            "static const float grad_1d[%d] = {%s};"
+            % (len(sf.shape_gradients_1d), _float_initializer(sf.shape_gradients_1d)),
+            "static const float weight_1d[%d] = {%s};"
+            % (len(sf.weights_1d), _float_initializer(sf.weights_1d)),
+        ]
+        if sf.dim == 2:
+            body = self._render_quad_host_reference_body()
+        elif sf.dim == 3:
+            body = self._render_hex_host_reference_body()
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        return "\n".join(
+            [
+                "static void reference_apply(const float *u, float *out, const float kappa) {",
+                *("    %s" % line for line in arrays),
+                *("    %s" % line for line in body),
+                "}",
+            ]
+        )
+
+    def _render_quad_host_reference_body(self):
+        sf = self.ir.sum_factor
+        q = sf.n_qp_1d
+        s = sf.n_shape_1d
+        return [
+            "for (unsigned row = 0; row < %d; ++row) {" % sf.n_shape,
+            "    const unsigned rx = row %% %d;" % s,
+            "    const unsigned ry = row / %d;" % s,
+            "    float value = 0.0f;",
+            "    for (unsigned qy = 0; qy < %d; ++qy) {" % q,
+            "        for (unsigned qx = 0; qx < %d; ++qx) {" % q,
+            "            const float wt = weight_1d[qx] * weight_1d[qy];",
+            "            const float test_gx = grad_1d[qx * %d + rx] * shape_1d[qy * %d + ry];"
+            % (s, s),
+            "            const float test_gy = shape_1d[qx * %d + rx] * grad_1d[qy * %d + ry];"
+            % (s, s),
+            "            float grad_u_x = 0.0f;",
+            "            float grad_u_y = 0.0f;",
+            "            for (unsigned sy = 0; sy < %d; ++sy) {" % s,
+            "                for (unsigned sx = 0; sx < %d; ++sx) {" % s,
+            "                    const unsigned trial = sx + %d * sy;" % s,
+            "                    const float coeff = u[trial];",
+            "                    grad_u_x += coeff * grad_1d[qx * %d + sx] * shape_1d[qy * %d + sy];"
+            % (s, s),
+            "                    grad_u_y += coeff * shape_1d[qx * %d + sx] * grad_1d[qy * %d + sy];"
+            % (s, s),
+            "                }",
+            "            }",
+            "            value += kappa * wt * (test_gx * grad_u_x + test_gy * grad_u_y);",
+            "        }",
+            "    }",
+            "    out[row] = value;",
+            "}",
+        ]
+
+    def _render_hex_host_reference_body(self):
+        sf = self.ir.sum_factor
+        q = sf.n_qp_1d
+        s = sf.n_shape_1d
+        return [
+            "for (unsigned row = 0; row < %d; ++row) {" % sf.n_shape,
+            "    const unsigned rx = row %% %d;" % s,
+            "    const unsigned ry = (row / %d) %% %d;" % (s, s),
+            "    const unsigned rz = row / %d;" % (s * s),
+            "    float value = 0.0f;",
+            "    for (unsigned qz = 0; qz < %d; ++qz) {" % q,
+            "        for (unsigned qy = 0; qy < %d; ++qy) {" % q,
+            "            for (unsigned qx = 0; qx < %d; ++qx) {" % q,
+            "                const float wt = weight_1d[qx] * weight_1d[qy] * weight_1d[qz];",
+            "                const float test_gx = grad_1d[qx * %d + rx] * shape_1d[qy * %d + ry] * shape_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                const float test_gy = shape_1d[qx * %d + rx] * grad_1d[qy * %d + ry] * shape_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                const float test_gz = shape_1d[qx * %d + rx] * shape_1d[qy * %d + ry] * grad_1d[qz * %d + rz];"
+            % (s, s, s),
+            "                float grad_u_x = 0.0f;",
+            "                float grad_u_y = 0.0f;",
+            "                float grad_u_z = 0.0f;",
+            "                for (unsigned sz = 0; sz < %d; ++sz) {" % s,
+            "                    for (unsigned sy = 0; sy < %d; ++sy) {" % s,
+            "                        for (unsigned sx = 0; sx < %d; ++sx) {" % s,
+            "                            const unsigned trial = sx + %d * (sy + %d * sz);" % (s, s),
+            "                            const float coeff = u[trial];",
+            "                            grad_u_x += coeff * grad_1d[qx * %d + sx] * shape_1d[qy * %d + sy] * shape_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                            grad_u_y += coeff * shape_1d[qx * %d + sx] * grad_1d[qy * %d + sy] * shape_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                            grad_u_z += coeff * shape_1d[qx * %d + sx] * shape_1d[qy * %d + sy] * grad_1d[qz * %d + sz];"
+            % (s, s, s),
+            "                        }",
+            "                    }",
+            "                }",
+            "                value += kappa * wt * (test_gx * grad_u_x + test_gy * grad_u_y + test_gz * grad_u_z);",
+            "            }",
+            "        }",
+            "    }",
+            "    out[row] = value;",
+            "}",
+        ]
+
+
+class TensorProductLaplaceFormGPULowering:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductLaplaceFormIR):
+            raise TypeError("ir must be a TensorProductLaplaceFormIR")
+        self.ir = ir
+
+    def render_gpu_module(self):
+        sf = self.ir.sum_factor
+        lines = [
+            'module attributes {gpu.container_module, sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_laplace_form_gpu"} {'
+            % (sf.material_name, sf.element_type),
+            "",
+            "  func.func @%s_gpu(%%u: memref<%dxf32>, %%out: memref<%dxf32>, "
+            "%%kappa: memref<1xf32>, %%shape_1d: memref<%dxf32>, %%grad_1d: memref<%dxf32>, "
+            "%%weight_1d: memref<%dxf32>) attributes {sfem.form = \"laplace\", sfem.parameter = \"kappa\"} {"
+            % (
+                self.ir.function_prefix,
+                sf.n_shape,
+                sf.n_shape,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    %c1 = arith.constant 1 : index",
+            f"    %threads = arith.constant {sf.n_shape} : index",
+            "    gpu.launch_func @%s_gpu_kernels::@%s_kernel blocks in (%%c1, %%c1, %%c1) "
+            "threads in (%%threads, %%c1, %%c1) args(%%u : memref<%dxf32>, %%out : memref<%dxf32>, "
+            "%%kappa : memref<1xf32>, %%shape_1d : memref<%dxf32>, %%grad_1d : memref<%dxf32>, "
+            "%%weight_1d : memref<%dxf32>)"
+            % (
+                self.ir.function_prefix,
+                self.ir.function_prefix,
+                sf.n_shape,
+                sf.n_shape,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    return",
+            "  }",
+            "",
+            "  gpu.module @%s_gpu_kernels {" % self.ir.function_prefix,
+        ]
+        if sf.dim == 2:
+            lines.extend(self._render_quad_kernel())
+        elif sf.dim == 3:
+            lines.extend(self._render_hex_kernel())
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def write_inspection_artifacts(
+        self,
+        output_dir,
+        *,
+        include_metal_source=True,
+        include_metal_smoke_harness=True,
+    ):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefix = output_dir / self.ir.function_prefix
+
+        gpu_path = prefix.with_suffix(".gpu.mlir")
+        metal_path = prefix.with_suffix(".metal")
+        harness_path = prefix.with_suffix(".metal_smoke.mm")
+
+        gpu_path.write_text(self.render_gpu_module())
+
+        files = [gpu_path]
+        if include_metal_source or include_metal_smoke_harness:
+            metal = TensorProductLaplaceFormMetalLowering(self.ir)
+            if include_metal_source:
+                metal_path.write_text(metal.render_metal_source())
+                files.append(metal_path)
+            if include_metal_smoke_harness:
+                harness_path.write_text(metal.render_metal_smoke_test_harness())
+                files.append(harness_path)
+
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=tuple(str(path) for path in files),
+        )
+
+    def _kernel_signature(self):
+        sf = self.ir.sum_factor
+        return (
+            "    gpu.func @%s_kernel(%%u: memref<%dxf32>, %%out: memref<%dxf32>, "
+            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
+            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
+            "attributes {sfem.form = \"laplace\", sfem.parameter = \"kappa\"} {"
+            % (
+                self.ir.function_prefix,
+                sf.n_shape,
+                sf.n_shape,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            )
+        )
+
+    def _render_quad_kernel(self):
+        sf = self.ir.sum_factor
+        s = sf.n_shape_1d
+        q = sf.n_qp_1d
+        n_shape = sf.n_shape
+        ref_size = len(sf.shape_values_1d)
+        return [
+            self._kernel_signature(),
+            "      %row = gpu.thread_id x",
+            "      %c0 = arith.constant 0 : index",
+            "      %c1 = arith.constant 1 : index",
+            f"      %S = arith.constant {s} : index",
+            f"      %Q = arith.constant {q} : index",
+            "      %zero = arith.constant 0.0 : f32",
+            "      %rx = arith.remui %row, %S : index",
+            "      %ry = arith.divui %row, %S : index",
+            "      %kappa = memref.load %kappa_ref[%c0] : memref<1xf32>",
+            "      %sum_y = scf.for %qy = %c0 to %Q step %c1 iter_args(%acc_y = %zero) -> (f32) {",
+            "        %sum_x = scf.for %qx = %c0 to %Q step %c1 iter_args(%acc_x = %acc_y) -> (f32) {",
+            "          %qx_s = arith.muli %qx, %S : index",
+            "          %qy_s = arith.muli %qy, %S : index",
+            "          %test_gx_i = arith.addi %qx_s, %rx : index",
+            "          %test_gy_i = arith.addi %qy_s, %ry : index",
+            f"          %test_gx_a = memref.load %grad_1d[%test_gx_i] : memref<{ref_size}xf32>",
+            f"          %test_gx_b = memref.load %shape_1d[%test_gy_i] : memref<{ref_size}xf32>",
+            "          %test_gx = arith.mulf %test_gx_a, %test_gx_b : f32",
+            f"          %test_gy_a = memref.load %shape_1d[%test_gx_i] : memref<{ref_size}xf32>",
+            f"          %test_gy_b = memref.load %grad_1d[%test_gy_i] : memref<{ref_size}xf32>",
+            "          %test_gy = arith.mulf %test_gy_a, %test_gy_b : f32",
+            "          %grad_y_x, %grad_y_y = scf.for %sy = %c0 to %S step %c1 iter_args(%acc_gx_y = %zero, %acc_gy_y = %zero) -> (f32, f32) {",
+            "            %grad_x_x, %grad_x_y = scf.for %sx = %c0 to %S step %c1 iter_args(%acc_gx_x = %acc_gx_y, %acc_gy_x = %acc_gy_y) -> (f32, f32) {",
+            "              %trial_y = arith.muli %sy, %S : index",
+            "              %trial = arith.addi %sx, %trial_y : index",
+            f"              %coeff = memref.load %u[%trial] : memref<{n_shape}xf32>",
+            "              %gx_i = arith.addi %qx_s, %sx : index",
+            "              %gy_i = arith.addi %qy_s, %sy : index",
+            f"              %gx_a = memref.load %grad_1d[%gx_i] : memref<{ref_size}xf32>",
+            f"              %gx_b = memref.load %shape_1d[%gy_i] : memref<{ref_size}xf32>",
+            f"              %gy_a = memref.load %shape_1d[%gx_i] : memref<{ref_size}xf32>",
+            f"              %gy_b = memref.load %grad_1d[%gy_i] : memref<{ref_size}xf32>",
+            "              %gx_basis = arith.mulf %gx_a, %gx_b : f32",
+            "              %gy_basis = arith.mulf %gy_a, %gy_b : f32",
+            "              %gx_term = arith.mulf %coeff, %gx_basis : f32",
+            "              %gy_term = arith.mulf %coeff, %gy_basis : f32",
+            "              %next_gx = arith.addf %acc_gx_x, %gx_term : f32",
+            "              %next_gy = arith.addf %acc_gy_x, %gy_term : f32",
+            "              scf.yield %next_gx, %next_gy : f32, f32",
+            "            }",
+            "            scf.yield %grad_x_x, %grad_x_y : f32, f32",
+            "          }",
+            "          %dot_x = arith.mulf %test_gx, %grad_y_x : f32",
+            "          %dot_y = arith.mulf %test_gy, %grad_y_y : f32",
+            "          %dot = arith.addf %dot_x, %dot_y : f32",
+            f"          %wx = memref.load %weight_1d[%qx] : memref<{q}xf32>",
+            f"          %wy = memref.load %weight_1d[%qy] : memref<{q}xf32>",
+            "          %w = arith.mulf %wx, %wy : f32",
+            "          %scaled0 = arith.mulf %kappa, %w : f32",
+            "          %scaled = arith.mulf %scaled0, %dot : f32",
+            "          %next = arith.addf %acc_x, %scaled : f32",
+            "          scf.yield %next : f32",
+            "        }",
+            "        scf.yield %sum_x : f32",
+            "      }",
+            f"      memref.store %sum_y, %out[%row] : memref<{n_shape}xf32>",
+            "      gpu.return",
+            "    }",
+        ]
+
+    def _render_hex_kernel(self):
+        sf = self.ir.sum_factor
+        s = sf.n_shape_1d
+        q = sf.n_qp_1d
+        n_shape = sf.n_shape
+        ref_size = len(sf.shape_values_1d)
+        return [
+            self._kernel_signature(),
+            "      %row = gpu.thread_id x",
+            "      %c0 = arith.constant 0 : index",
+            "      %c1 = arith.constant 1 : index",
+            f"      %S = arith.constant {s} : index",
+            f"      %SS = arith.constant {s * s} : index",
+            f"      %Q = arith.constant {q} : index",
+            "      %zero = arith.constant 0.0 : f32",
+            "      %rx = arith.remui %row, %S : index",
+            "      %row_div_s = arith.divui %row, %S : index",
+            "      %ry = arith.remui %row_div_s, %S : index",
+            "      %rz = arith.divui %row, %SS : index",
+            "      %kappa = memref.load %kappa_ref[%c0] : memref<1xf32>",
+            "      %sum_z = scf.for %qz = %c0 to %Q step %c1 iter_args(%acc_z = %zero) -> (f32) {",
+            "        %sum_y = scf.for %qy = %c0 to %Q step %c1 iter_args(%acc_y = %acc_z) -> (f32) {",
+            "          %sum_x = scf.for %qx = %c0 to %Q step %c1 iter_args(%acc_x = %acc_y) -> (f32) {",
+            "            %qx_s = arith.muli %qx, %S : index",
+            "            %qy_s = arith.muli %qy, %S : index",
+            "            %qz_s = arith.muli %qz, %S : index",
+            "            %ix = arith.addi %qx_s, %rx : index",
+            "            %iy = arith.addi %qy_s, %ry : index",
+            "            %iz = arith.addi %qz_s, %rz : index",
+            f"            %test_gx_a = memref.load %grad_1d[%ix] : memref<{ref_size}xf32>",
+            f"            %test_gx_b = memref.load %shape_1d[%iy] : memref<{ref_size}xf32>",
+            f"            %test_gx_c = memref.load %shape_1d[%iz] : memref<{ref_size}xf32>",
+            "            %test_gx_ab = arith.mulf %test_gx_a, %test_gx_b : f32",
+            "            %test_gx = arith.mulf %test_gx_ab, %test_gx_c : f32",
+            f"            %test_gy_a = memref.load %shape_1d[%ix] : memref<{ref_size}xf32>",
+            f"            %test_gy_b = memref.load %grad_1d[%iy] : memref<{ref_size}xf32>",
+            f"            %test_gy_c = memref.load %shape_1d[%iz] : memref<{ref_size}xf32>",
+            "            %test_gy_ab = arith.mulf %test_gy_a, %test_gy_b : f32",
+            "            %test_gy = arith.mulf %test_gy_ab, %test_gy_c : f32",
+            f"            %test_gz_a = memref.load %shape_1d[%ix] : memref<{ref_size}xf32>",
+            f"            %test_gz_b = memref.load %shape_1d[%iy] : memref<{ref_size}xf32>",
+            f"            %test_gz_c = memref.load %grad_1d[%iz] : memref<{ref_size}xf32>",
+            "            %test_gz_ab = arith.mulf %test_gz_a, %test_gz_b : f32",
+            "            %test_gz = arith.mulf %test_gz_ab, %test_gz_c : f32",
+            "            %grad_z_x, %grad_z_y, %grad_z_z = scf.for %sz = %c0 to %S step %c1 iter_args(%acc_gx_z = %zero, %acc_gy_z = %zero, %acc_gz_z = %zero) -> (f32, f32, f32) {",
+            "              %grad_y_x, %grad_y_y, %grad_y_z = scf.for %sy = %c0 to %S step %c1 iter_args(%acc_gx_y = %acc_gx_z, %acc_gy_y = %acc_gy_z, %acc_gz_y = %acc_gz_z) -> (f32, f32, f32) {",
+            "                %grad_x_x, %grad_x_y, %grad_x_z = scf.for %sx = %c0 to %S step %c1 iter_args(%acc_gx_x = %acc_gx_y, %acc_gy_x = %acc_gy_y, %acc_gz_x = %acc_gz_y) -> (f32, f32, f32) {",
+            "                  %sy_s = arith.muli %sy, %S : index",
+            "                  %sz_ss = arith.muli %sz, %SS : index",
+            "                  %trial_y = arith.addi %sx, %sy_s : index",
+            "                  %trial = arith.addi %trial_y, %sz_ss : index",
+            f"                  %coeff = memref.load %u[%trial] : memref<{n_shape}xf32>",
+            "                  %jx = arith.addi %qx_s, %sx : index",
+            "                  %jy = arith.addi %qy_s, %sy : index",
+            "                  %jz = arith.addi %qz_s, %sz : index",
+            f"                  %gx_a = memref.load %grad_1d[%jx] : memref<{ref_size}xf32>",
+            f"                  %gx_b = memref.load %shape_1d[%jy] : memref<{ref_size}xf32>",
+            f"                  %gx_c = memref.load %shape_1d[%jz] : memref<{ref_size}xf32>",
+            "                  %gx_ab = arith.mulf %gx_a, %gx_b : f32",
+            "                  %gx_basis = arith.mulf %gx_ab, %gx_c : f32",
+            f"                  %gy_a = memref.load %shape_1d[%jx] : memref<{ref_size}xf32>",
+            f"                  %gy_b = memref.load %grad_1d[%jy] : memref<{ref_size}xf32>",
+            f"                  %gy_c = memref.load %shape_1d[%jz] : memref<{ref_size}xf32>",
+            "                  %gy_ab = arith.mulf %gy_a, %gy_b : f32",
+            "                  %gy_basis = arith.mulf %gy_ab, %gy_c : f32",
+            f"                  %gz_a = memref.load %shape_1d[%jx] : memref<{ref_size}xf32>",
+            f"                  %gz_b = memref.load %shape_1d[%jy] : memref<{ref_size}xf32>",
+            f"                  %gz_c = memref.load %grad_1d[%jz] : memref<{ref_size}xf32>",
+            "                  %gz_ab = arith.mulf %gz_a, %gz_b : f32",
+            "                  %gz_basis = arith.mulf %gz_ab, %gz_c : f32",
+            "                  %gx_term = arith.mulf %coeff, %gx_basis : f32",
+            "                  %gy_term = arith.mulf %coeff, %gy_basis : f32",
+            "                  %gz_term = arith.mulf %coeff, %gz_basis : f32",
+            "                  %next_gx = arith.addf %acc_gx_x, %gx_term : f32",
+            "                  %next_gy = arith.addf %acc_gy_x, %gy_term : f32",
+            "                  %next_gz = arith.addf %acc_gz_x, %gz_term : f32",
+            "                  scf.yield %next_gx, %next_gy, %next_gz : f32, f32, f32",
+            "                }",
+            "                scf.yield %grad_x_x, %grad_x_y, %grad_x_z : f32, f32, f32",
+            "              }",
+            "              scf.yield %grad_y_x, %grad_y_y, %grad_y_z : f32, f32, f32",
+            "            }",
+            "            %dot_x = arith.mulf %test_gx, %grad_z_x : f32",
+            "            %dot_y = arith.mulf %test_gy, %grad_z_y : f32",
+            "            %dot_xy = arith.addf %dot_x, %dot_y : f32",
+            "            %dot_z = arith.mulf %test_gz, %grad_z_z : f32",
+            "            %dot = arith.addf %dot_xy, %dot_z : f32",
+            f"            %wx = memref.load %weight_1d[%qx] : memref<{q}xf32>",
+            f"            %wy = memref.load %weight_1d[%qy] : memref<{q}xf32>",
+            f"            %wz = memref.load %weight_1d[%qz] : memref<{q}xf32>",
+            "            %wxy = arith.mulf %wx, %wy : f32",
+            "            %w = arith.mulf %wxy, %wz : f32",
+            "            %scaled0 = arith.mulf %kappa, %w : f32",
+            "            %scaled = arith.mulf %scaled0, %dot : f32",
+            "            %next = arith.addf %acc_x, %scaled : f32",
+            "            scf.yield %next : f32",
+            "          }",
+            "          scf.yield %sum_x : f32",
+            "        }",
+            "        scf.yield %sum_y : f32",
+            "      }",
+            f"      memref.store %sum_z, %out[%row] : memref<{n_shape}xf32>",
+            "      gpu.return",
+            "    }",
+        ]
+
+
+class TensorProductLaplaceFormBatchedGPULowering(TensorProductLaplaceFormGPULowering):
+    """Batched EBE map lowering for tensor-product Laplace forms.
+
+    The emitted GPU kernel launches one block per element and one thread per
+    local test function.  It gathers the local trial vector through static
+    connectivity and stores an element-local residual scratch buffer, so the
+    map phase stays branch-free and does not require global atomics.
+    """
+
+    def __init__(self, ir, *, max_elements, max_nodes):
+        super().__init__(ir)
+        self.max_elements = int(max_elements)
+        self.max_nodes = int(max_nodes)
+        if self.max_elements <= 0 or self.max_nodes <= 0:
+            raise ValueError("batched tensor-product GPU bounds must be positive")
+
+    @property
+    def connectivity_memref_type(self):
+        return "memref<%dx%dxindex>" % (self.max_elements, self.ir.sum_factor.n_shape)
+
+    @property
+    def u_memref_type(self):
+        return "memref<%dxf32>" % self.max_nodes
+
+    @property
+    def element_out_memref_type(self):
+        return "memref<%dx%dxf32>" % (self.max_elements, self.ir.sum_factor.n_shape)
+
+    def render_gpu_module(self):
+        sf = self.ir.sum_factor
+        lines = [
+            'module attributes {gpu.container_module, sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_laplace_ebe_gpu_map"} {'
+            % (sf.material_name, sf.element_type),
+            "",
+            "  func.func @%s_ebe_gpu(%%connectivity: %s, %%u: %s, %%element_out: %s, "
+            "%%kappa: memref<1xf32>, %%shape_1d: memref<%dxf32>, %%grad_1d: memref<%dxf32>, "
+            "%%weight_1d: memref<%dxf32>) attributes {sfem.form = \"laplace\", "
+            'sfem.mesh_phase = "ebe_map", sfem.parameter = "kappa"} {'
+            % (
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    %c1 = arith.constant 1 : index",
+            f"    %blocks = arith.constant {self.max_elements} : index",
+            f"    %threads = arith.constant {sf.n_shape} : index",
+            "    gpu.launch_func @%s_ebe_gpu_kernels::@%s_ebe_kernel blocks in (%%blocks, %%c1, %%c1) "
+            "threads in (%%threads, %%c1, %%c1) args(%%connectivity : %s, %%u : %s, %%element_out : %s, "
+            "%%kappa : memref<1xf32>, %%shape_1d : memref<%dxf32>, %%grad_1d : memref<%dxf32>, "
+            "%%weight_1d : memref<%dxf32>)"
+            % (
+                self.ir.function_prefix,
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    return",
+            "  }",
+            "",
+            "  gpu.module @%s_ebe_gpu_kernels {" % self.ir.function_prefix,
+        ]
+        if sf.dim == 2:
+            lines.extend(self._render_quad_kernel())
+        elif sf.dim == 3:
+            lines.extend(self._render_hex_kernel())
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def write_inspection_artifacts(self, output_dir):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        gpu_path = output_dir / ("%s.ebe.gpu.mlir" % self.ir.function_prefix)
+        gpu_path.write_text(self.render_gpu_module())
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=(str(gpu_path),),
+        )
+
+    def _kernel_signature(self):
+        sf = self.ir.sum_factor
+        return (
+            "    gpu.func @%s_ebe_kernel(%%connectivity: %s, %%u: %s, %%element_out: %s, "
+            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
+            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
+            "attributes {sfem.form = \"laplace\", sfem.mesh_phase = \"ebe_map\", "
+            'sfem.parameter = "kappa"} {'
+            % (
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            )
+        )
+
+    def _render_quad_kernel(self):
+        return self._batched_kernel_lines(super()._render_quad_kernel())
+
+    def _render_hex_kernel(self):
+        return self._batched_kernel_lines(super()._render_hex_kernel())
+
+    def _batched_kernel_lines(self, lines):
+        sf = self.ir.sum_factor
+        rewritten = []
+        for line in lines:
+            rewritten.append(line)
+            if line == "      %row = gpu.thread_id x":
+                rewritten.append("      %elem = gpu.block_id x")
+                continue
+            if "%coeff = memref.load %u[%trial]" in line:
+                rewritten.pop()
+                rewritten.append(
+                    f"              %node = memref.load %connectivity[%elem, %trial] : {self.connectivity_memref_type}"
+                )
+                rewritten.append(
+                    f"              %coeff = memref.load %u[%node] : {self.u_memref_type}"
+                )
+                continue
+            if line.strip().startswith("memref.store %sum_") and "%out[%row]" in line:
+                rewritten.pop()
+                sum_name = line.strip().split(",")[0].split()[1]
+                rewritten.append(
+                    "      memref.store %s, %%element_out[%%elem, %%row] : %s"
+                    % (sum_name, self.element_out_memref_type)
+                )
+                continue
+        expected_coeff_loads = 1
+        actual_coeff_loads = sum(1 for line in rewritten if "memref.load %u[%node]" in line)
+        if actual_coeff_loads != expected_coeff_loads:
+            raise ValueError(
+                "expected to rewrite one local coefficient load for %s, found %d"
+                % (sf.element_type, actual_coeff_loads)
+            )
+        return rewritten
+
+
+class TensorProductLaplaceFormEBEGPULowering(TensorProductLaplaceFormBatchedGPULowering):
+    """Atomics-free EBE map/reduce lowering for scalar tensor-product Laplace."""
+
+    def __init__(self, ir, *, max_elements, max_nodes, max_node_degree):
+        super().__init__(ir, max_elements=max_elements, max_nodes=max_nodes)
+        self.max_node_degree = int(max_node_degree)
+        if self.max_node_degree <= 0:
+            raise ValueError("tensor-product EBE GPU max_node_degree must be positive")
+
+    @property
+    def node_degree_memref_type(self):
+        return "memref<%dxindex>" % self.max_nodes
+
+    @property
+    def inverse_topology_memref_type(self):
+        return "memref<%dx%dxindex>" % (self.max_nodes, self.max_node_degree)
+
+    @property
+    def output_memref_type(self):
+        return "memref<%dxf32>" % self.max_nodes
+
+    def render_gpu_module(self):
+        sf = self.ir.sum_factor
+        lines = [
+            'module attributes {gpu.container_module, sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_laplace_ebe_gpu"} {'
+            % (sf.material_name, sf.element_type),
+            "",
+            "  func.func @%s_ebe_gpu(%%connectivity: %s, %%u: %s, %%element_out: %s, "
+            "%%node_degree: %s, %%node_to_element_map: %s, %%node_to_local_idx: %s, %%out: %s, "
+            "%%kappa: memref<1xf32>, %%shape_1d: memref<%dxf32>, %%grad_1d: memref<%dxf32>, "
+            "%%weight_1d: memref<%dxf32>) attributes {sfem.form = \"laplace\", "
+            'sfem.mesh_phases = "ebe_map,ebe_reduce", sfem.parameter = "kappa"} {'
+            % (
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                self.node_degree_memref_type,
+                self.inverse_topology_memref_type,
+                self.inverse_topology_memref_type,
+                self.output_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    %c1 = arith.constant 1 : index",
+            f"    %map_blocks = arith.constant {self.max_elements} : index",
+            f"    %map_threads = arith.constant {sf.n_shape} : index",
+            f"    %reduce_threads = arith.constant {self.max_nodes} : index",
+            "    gpu.launch_func @%s_ebe_gpu_kernels::@%s_ebe_map_kernel blocks in (%%map_blocks, %%c1, %%c1) "
+            "threads in (%%map_threads, %%c1, %%c1) args(%%connectivity : %s, %%u : %s, %%element_out : %s, "
+            "%%kappa : memref<1xf32>, %%shape_1d : memref<%dxf32>, %%grad_1d : memref<%dxf32>, "
+            "%%weight_1d : memref<%dxf32>)"
+            % (
+                self.ir.function_prefix,
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            ),
+            "    gpu.launch_func @%s_ebe_gpu_kernels::@%s_ebe_reduce_kernel blocks in (%%c1, %%c1, %%c1) "
+            "threads in (%%reduce_threads, %%c1, %%c1) args(%%element_out : %s, %%node_degree : %s, "
+            "%%node_to_element_map : %s, %%node_to_local_idx : %s, %%out : %s)"
+            % (
+                self.ir.function_prefix,
+                self.ir.function_prefix,
+                self.element_out_memref_type,
+                self.node_degree_memref_type,
+                self.inverse_topology_memref_type,
+                self.inverse_topology_memref_type,
+                self.output_memref_type,
+            ),
+            "    return",
+            "  }",
+            "",
+            "  gpu.module @%s_ebe_gpu_kernels {" % self.ir.function_prefix,
+        ]
+        if sf.dim == 2:
+            lines.extend(self._render_quad_kernel())
+        elif sf.dim == 3:
+            lines.extend(self._render_hex_kernel())
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        lines.extend(self._render_reduce_kernel())
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def write_inspection_artifacts(self, output_dir):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        gpu_path = output_dir / ("%s.ebe.full.gpu.mlir" % self.ir.function_prefix)
+        gpu_path.write_text(self.render_gpu_module())
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=(str(gpu_path),),
+        )
+
+    def _kernel_signature(self):
+        sf = self.ir.sum_factor
+        return (
+            "    gpu.func @%s_ebe_map_kernel(%%connectivity: %s, %%u: %s, %%element_out: %s, "
+            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
+            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
+            "attributes {sfem.form = \"laplace\", sfem.mesh_phase = \"ebe_map\", "
+            'sfem.parameter = "kappa"} {'
+            % (
+                self.ir.function_prefix,
+                self.connectivity_memref_type,
+                self.u_memref_type,
+                self.element_out_memref_type,
+                len(sf.shape_values_1d),
+                len(sf.shape_gradients_1d),
+                len(sf.weights_1d),
+            )
+        )
+
+    def _render_reduce_kernel(self):
+        return [
+            "",
+            "    gpu.func @%s_ebe_reduce_kernel(%%element_out: %s, %%node_degree: %s, "
+            "%%node_to_element_map: %s, %%node_to_local_idx: %s, %%out: %s) kernel "
+            'attributes {sfem.form = "laplace", sfem.mesh_phase = "ebe_reduce"} {'
+            % (
+                self.ir.function_prefix,
+                self.element_out_memref_type,
+                self.node_degree_memref_type,
+                self.inverse_topology_memref_type,
+                self.inverse_topology_memref_type,
+                self.output_memref_type,
+            ),
+            "      %node = gpu.thread_id x",
+            "      %c0 = arith.constant 0 : index",
+            "      %c1 = arith.constant 1 : index",
+            "      %zero = arith.constant 0.0 : f32",
+            f"      %degree = memref.load %node_degree[%node] : {self.node_degree_memref_type}",
+            "      %sum = scf.for %i = %c0 to %degree step %c1 iter_args(%acc = %zero) -> (f32) {",
+            f"        %elem = memref.load %node_to_element_map[%node, %i] : {self.inverse_topology_memref_type}",
+            f"        %local = memref.load %node_to_local_idx[%node, %i] : {self.inverse_topology_memref_type}",
+            f"        %value = memref.load %element_out[%elem, %local] : {self.element_out_memref_type}",
+            "        %next = arith.addf %acc, %value : f32",
+            "        scf.yield %next : f32",
+            "      }",
+            f"      memref.store %sum, %out[%node] : {self.output_memref_type}",
+            "      gpu.return",
+            "    }",
+        ]
+
+
+class TensorProductLaplaceFormEBEMetalLowering(TensorProductLaplaceFormMetalLowering):
+    """Metal EBE map/reduce lowering for scalar tensor-product Laplace."""
+
+    def __init__(self, ir, *, max_elements, max_nodes, max_node_degree):
+        super().__init__(ir)
+        self.max_elements = int(max_elements)
+        self.max_nodes = int(max_nodes)
+        self.max_node_degree = int(max_node_degree)
+        if self.max_elements <= 0 or self.max_nodes <= 0 or self.max_node_degree <= 0:
+            raise ValueError("Metal EBE bounds must be positive")
+
+    def render_metal_source(self):
+        sf = self.ir.sum_factor
+        lines = [
+            "#include <metal_stdlib>",
+            "using namespace metal;",
+            "",
+            "constant float sfem_shape_1d[%d] = {%s};"
+            % (len(sf.shape_values_1d), _float_initializer(sf.shape_values_1d)),
+            "constant float sfem_grad_1d[%d] = {%s};"
+            % (len(sf.shape_gradients_1d), _float_initializer(sf.shape_gradients_1d)),
+            "constant float sfem_weight_1d[%d] = {%s};"
+            % (len(sf.weights_1d), _float_initializer(sf.weights_1d)),
+            "",
+        ]
+        if sf.dim == 2:
+            lines.extend(self._render_map_kernel_from_local(self._render_quad_kernel()))
+        elif sf.dim == 3:
+            lines.extend(self._render_map_kernel_from_local(self._render_hex_kernel()))
+        else:
+            raise ValueError("unsupported laplace tensor-product dimension")
+        lines.extend(self._render_reduce_kernel())
+        return "\n".join(lines) + "\n"
+
+    def render_metal_smoke_test_harness(self):
+        sf = self.ir.sum_factor
+        fixture_elements = 1
+        fixture_nodes = sf.n_shape
+        if self.max_elements >= 2 and self.max_nodes >= 2 * sf.n_shape - 1 and self.max_node_degree >= 2:
+            fixture_elements = 2
+            fixture_nodes = 2 * sf.n_shape - 1
+
+        connectivity_rows = [tuple(range(sf.n_shape))]
+        if fixture_elements == 2:
+            connectivity_rows.append(tuple(range(sf.n_shape - 1, 2 * sf.n_shape - 1)))
+        connectivity = tuple(node for row in connectivity_rows for node in row)
+
+        node_degree = [0 for _ in range(fixture_nodes)]
+        node_to_element_map = [0 for _ in range(fixture_nodes * self.max_node_degree)]
+        node_to_local_idx = [0 for _ in range(fixture_nodes * self.max_node_degree)]
+        for elem, row in enumerate(connectivity_rows):
+            for local, node in enumerate(row):
+                degree = node_degree[node]
+                map_index = node * self.max_node_degree + degree
+                node_to_element_map[map_index] = elem
+                node_to_local_idx[map_index] = local
+                node_degree[node] = degree + 1
+
+        u = _deterministic_values(fixture_nodes, scale=0.03125, offset=0.5)
+        return _LAPLACE_EBE_METAL_SMOKE_TEST_TEMPLATE % {
+            "source": _objc_string_literal(self.render_metal_source()),
+            "map_kernel_name": self._map_kernel_name(),
+            "reduce_kernel_name": self._reduce_kernel_name(),
+            "host_reference": self._render_host_reference_function(),
+            "n_shape": sf.n_shape,
+            "max_elements": fixture_elements,
+            "max_nodes": fixture_nodes,
+            "max_node_degree": self.max_node_degree,
+            "connectivity": _uint_initializer(connectivity),
+            "node_degree": _uint_initializer(node_degree),
+            "node_to_element_map": _uint_initializer(node_to_element_map),
+            "node_to_local_idx": _uint_initializer(node_to_local_idx),
+            "u": _float_initializer(u),
+            "kappa": _c_float_literal(self.ir.parameter_default),
+        }
+
+    def write_inspection_artifacts(self, output_dir, *, include_metal_smoke_harness=True):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefix = output_dir / self.ir.function_prefix
+        metal_path = prefix.with_suffix(".ebe.metal")
+        harness_path = prefix.with_suffix(".ebe_metal_smoke.mm")
+        metal_path.write_text(self.render_metal_source())
+        files = [metal_path]
+        if include_metal_smoke_harness:
+            harness_path.write_text(self.render_metal_smoke_test_harness())
+            files.append(harness_path)
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=tuple(str(path) for path in files),
+        )
+
+    def run_metal_smoke_test(self, output_dir, *, xcrun=None):
+        xcrun = xcrun or shutil.which("xcrun")
+        if xcrun is None:
+            raise FileNotFoundError("xcrun is not available")
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        harness = output_dir / ("%s_ebe_metal_smoke.mm" % self.ir.function_prefix)
+        executable = output_dir / ("%s_ebe_metal_smoke" % self.ir.function_prefix)
+        harness.write_text(self.render_metal_smoke_test_harness())
+        compile_result = subprocess.run(
+            [
+                xcrun,
+                "clang++",
+                str(harness),
+                "-fobjc-arc",
+                "-framework",
+                "Foundation",
+                "-framework",
+                "Metal",
+                "-o",
+                str(executable),
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if compile_result.returncode != 0:
+            return MetalSmokeTestResult(
+                harness,
+                executable,
+                compile_result.returncode,
+                compile_result.stdout,
+                compile_result.stderr,
+            )
+        run_result = subprocess.run(
+            [str(executable)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return MetalSmokeTestResult(
+            harness,
+            executable,
+            compile_result.returncode,
+            compile_result.stdout,
+            compile_result.stderr,
+            run_result.returncode,
+            run_result.stdout,
+            run_result.stderr,
+        )
+
+    def _map_kernel_name(self):
+        return "%s_ebe_map_metal" % self.ir.function_prefix
+
+    def _reduce_kernel_name(self):
+        return "%s_ebe_reduce_metal" % self.ir.function_prefix
+
+    def _render_map_kernel_from_local(self, local_lines):
+        sf = self.ir.sum_factor
+        lines = [
+            "kernel void %s(" % self._map_kernel_name(),
+            "        device const uint *connectivity [[buffer(0)]],",
+            "        device const float *u [[buffer(1)]],",
+            "        device float *element_out [[buffer(2)]],",
+            "        constant float &kappa [[buffer(3)]],",
+            "        uint2 tid [[thread_position_in_grid]]) {",
+            "    const uint row = tid.x;",
+            "    const uint elem = tid.y;",
+        ]
+        for line in local_lines[5:]:
+            if "const float coeff = u[trial];" in line:
+                lines.append("                    const uint node = connectivity[elem * %d + trial];" % sf.n_shape)
+                lines.append("                    const float coeff = u[node];")
+                continue
+            if line == "    out[row] = value;":
+                lines.append("    element_out[elem * %d + row] = value;" % sf.n_shape)
+                continue
+            lines.append(line)
+        return lines
+
+    def _render_reduce_kernel(self):
+        sf = self.ir.sum_factor
+        return [
+            "kernel void %s(" % self._reduce_kernel_name(),
+            "        device const float *element_out [[buffer(0)]],",
+            "        device const uint *node_degree [[buffer(1)]],",
+            "        device const uint *node_to_element_map [[buffer(2)]],",
+            "        device const uint *node_to_local_idx [[buffer(3)]],",
+            "        device float *out [[buffer(4)]],",
+            "        uint node [[thread_position_in_grid]]) {",
+            "    const uint degree = node_degree[node];",
+            "    float acc = 0.0f;",
+            "    for (uint i = 0; i < degree; ++i) {",
+            "        const uint map_index = node * %d + i;" % self.max_node_degree,
+            "        const uint elem = node_to_element_map[map_index];",
+            "        const uint local = node_to_local_idx[map_index];",
+            "        acc += element_out[elem * %d + local];" % sf.n_shape,
+            "    }",
+            "    out[node] = acc;",
+            "}",
+            "",
+        ]
+def tensor_product_sum_factor_ir_from_material(
+    material,
+    *,
+    element,
+    vector_size=8,
+    quadrature_order=None,
+):
+    from sfem import gen
+
+    user_input = gen.UserInputStage.create(
+        material,
+        (element,),
+        int(vector_size),
+        quadrature_order,
+    )
+    context = user_input.element_contexts[0]
+    basis = context.basis_plan("cell")
+    if basis.family is not BasisFamily.TENSOR_PRODUCT:
+        raise ValueError("element '%s' does not use tensor-product basis evaluation" % context.element_type)
+    field_plan = basis.field_evaluation_sum_factorization
+    test_plan = basis.test_contraction_sum_factorization
+    if TensorProductOperation.FIELD_GRADIENT not in field_plan.operations:
+        raise ValueError("tensor-product field gradient plan is required")
+    if TensorProductOperation.TEST_GRADIENT_CONTRACTION not in test_plan.operations:
+        raise ValueError("tensor-product test gradient contraction plan is required")
+    rule = context.specialization.quadrature_rule
+    return TensorProductSumFactorIR(
+        material_name=material.name,
+        element_type=context.element_type,
+        element_label=context.label,
+        dim=basis.dim,
+        n_shape=basis.n_shape,
+        n_qp=basis.n_qp,
+        n_shape_1d=basis.n_shape_1d,
+        n_qp_1d=basis.n_qp_1d,
+        quadrature_order=rule.order,
+        vector_size=context.specialization.vector_size,
+        shape_values_1d=rule.tensor_product_shape_values_1d,
+        shape_gradients_1d=rule.tensor_product_shape_gradients_1d,
+        weights_1d=rule.tensor_product_weights_1d,
+        field_gradient_stages=_field_gradient_stages(basis.dim, basis.n_shape_1d, basis.n_qp_1d),
+        test_gradient_stages=_test_gradient_stages(basis.dim, basis.n_shape_1d, basis.n_qp_1d),
+    )
+
+
+def tensor_product_laplace_form_ir_from_material(
+    material,
+    *,
+    element,
+    vector_size=8,
+    quadrature_order=None,
+):
+    parameter_defaults = dict(getattr(material, "parameter_defaults", ()))
+    return TensorProductLaplaceFormIR(
+        tensor_product_sum_factor_ir_from_material(
+            material,
+            element=element,
+            vector_size=vector_size,
+            quadrature_order=quadrature_order,
+        ),
+        "kappa",
+        parameter_defaults.get("kappa", 1.0),
+    )
+
+
+def _field_gradient_stages(dim, n_shape_1d, n_qp_1d):
+    stages = []
+    for derivative in range(dim):
+        for axis in range(dim):
+            before = n_qp_1d ** axis
+            after = n_shape_1d ** (dim - axis - 1)
+            basis = "grad_1d" if axis == derivative else "shape_1d"
+            stages.append(
+                TensorProductContractionStage(
+                    "field_gradient_d%d_axis%d" % (derivative, axis),
+                    "field_gradient",
+                    derivative,
+                    axis,
+                    basis,
+                    False,
+                    n_qp_1d,
+                    n_shape_1d,
+                    before * after,
+                )
+            )
+    return tuple(stages)
+
+
+def _test_gradient_stages(dim, n_shape_1d, n_qp_1d):
+    stages = []
+    for derivative in range(dim):
+        for axis in reversed(range(dim)):
+            before = n_qp_1d ** axis
+            after = n_shape_1d ** (dim - axis - 1)
+            basis = "grad_1d_t" if axis == derivative else "shape_1d_t"
+            stages.append(
+                TensorProductContractionStage(
+                    "test_gradient_d%d_axis%d" % (derivative, axis),
+                    "test_gradient_contraction",
+                    derivative,
+                    axis,
+                    basis,
+                    True,
+                    n_shape_1d,
+                    n_qp_1d,
+                    before * after,
+                )
+            )
+    return tuple(stages)
+
+
+def _deterministic_values(count, scale, offset):
+    return tuple(float(offset + scale * (i + 1)) for i in range(int(count)))
+
+
+def _tensor_product_multi_index(index, base, dim):
+    values = []
+    index = int(index)
+    base = int(base)
+    for _ in range(int(dim)):
+        values.append(index % base)
+        index //= base
+    return tuple(values)
+
+
+def _tensor_product_multi_index_row_major(index, base, dim):
+    values = []
+    index = int(index)
+    base = int(base)
+    dim = int(dim)
+    for axis in range(dim):
+        divisor = base ** (dim - axis - 1)
+        values.append((index // divisor) % base)
+    return tuple(values)
+
+
+def _stage_view_axes(dim, axis):
+    axis = int(axis)
+    return (axis,) + tuple(range(axis)) + tuple(range(axis + 1, int(dim)))
+
+
+def _stage_input_extents(sf, stage):
+    if stage.operation == "field_gradient":
+        return tuple(sf.n_qp_1d if axis < stage.axis else sf.n_shape_1d for axis in range(sf.dim))
+    if stage.operation == "test_gradient_contraction":
+        return tuple(sf.n_qp_1d if axis <= stage.axis else sf.n_shape_1d for axis in range(sf.dim))
+    raise ValueError("unsupported sum-factorization stage operation")
+
+
+def _stage_output_extents(sf, stage):
+    if stage.operation == "field_gradient":
+        return tuple(sf.n_qp_1d if axis <= stage.axis else sf.n_shape_1d for axis in range(sf.dim))
+    if stage.operation == "test_gradient_contraction":
+        return tuple(sf.n_qp_1d if axis < stage.axis else sf.n_shape_1d for axis in range(sf.dim))
+    raise ValueError("unsupported sum-factorization stage operation")
+
+
+def _product(values):
+    result = 1
+    for value in values:
+        result *= int(value)
+    return result
+
+
+def _linear_to_multi_index(index, extents):
+    values = []
+    remaining = int(index)
+    suffix = _product(extents)
+    for extent in extents:
+        suffix //= int(extent)
+        values.append((remaining // suffix) % int(extent))
+    return tuple(values)
+
+
+def _view_offset(multi_index, axes, extents):
+    offset = 0
+    for axis in axes:
+        offset = offset * int(extents[axis]) + int(multi_index[axis])
+    return offset
+
+
+def _reorder_tensor_values(values, source_axes, target_axes, extents):
+    values = tuple(float(value) for value in values)
+    if source_axes == target_axes:
+        return values
+    result = [0.0 for _ in range(len(values))]
+    for linear in range(len(values)):
+        multi = _linear_to_multi_index(linear, extents)
+        source = _view_offset(multi, source_axes, extents)
+        target = _view_offset(multi, target_axes, extents)
+        result[target] = values[source]
+    return tuple(result)
+
+
+def _align_up(value, alignment):
+    value = int(value)
+    alignment = int(alignment)
+    return ((value + alignment - 1) // alignment) * alignment
+
+
+def _tensor_product_weight(sf, q_idx):
+    value = 1.0
+    for axis in range(sf.dim):
+        value *= sf.weights_1d[q_idx[axis]]
+    return value
+
+
+def _tensor_product_basis(sf, q_idx, shape_idx, derivative):
+    value = 1.0
+    s = sf.n_shape_1d
+    for axis in range(sf.dim):
+        offset = q_idx[axis] * s + shape_idx[axis]
+        if axis == derivative:
+            value *= sf.shape_gradients_1d[offset]
+        else:
+            value *= sf.shape_values_1d[offset]
+    return value
+
+
+def _rank2_width(values):
+    if not values:
+        raise ValueError("rank-2 value container must be non-empty")
+    first = values[0]
+    if isinstance(first, (list, tuple)):
+        return len(first)
+    raise ValueError("flat rank-2 value containers require an explicit width")
+
+
+def _rank2_value(values, row, col, width):
+    row_values = values[row]
+    if isinstance(row_values, (list, tuple)):
+        return row_values[col]
+    return values[row * width + col]
+
+
+def _float_initializer(values):
+    return ", ".join("%sf" % _c_float_literal(value) for value in values)
+
+
+def _uint_initializer(values):
+    return ", ".join("%du" % int(value) for value in values)
+
+
+def _c_float_literal(value):
+    literal = "%.9g" % float(value)
+    if "." not in literal and "e" not in literal and "E" not in literal:
+        literal += ".0"
+    return literal
+
+
+def _objc_string_literal(text):
+    escaped = (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+    )
+    return '@"%s"' % escaped
+
+
+_METAL_SMOKE_TEST_TEMPLATE = r'''#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#include <cmath>
+#include <cstdio>
+
+int main() {
+    @autoreleasepool {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        if (!device) {
+            return 77;
+        }
+
+        NSString *source = %(source)s;
+        NSError *error = nil;
+        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+        id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
+        if (!library) {
+            std::fprintf(stderr, "Metal library compilation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 78;
+        }
+
+        id<MTLFunction> function = [library newFunctionWithName:@"%(kernel_name)s"];
+        if (!function) {
+            std::fprintf(stderr, "Metal function lookup failed\n");
+            return 79;
+        }
+
+        id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
+        if (!pipeline) {
+            std::fprintf(stderr, "Metal pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 80;
+        }
+
+        const float basis[%(lhs_size)d] = {%(basis)s};
+        const float operand[%(rhs_size)d] = {%(operand)s};
+        float expected[%(result_size)d] = {0.0f};
+        for (unsigned row = 0; row < %(result_rows)d; ++row) {
+            for (unsigned col = 0; col < %(result_cols)d; ++col) {
+                float acc = 0.0f;
+                for (unsigned k = 0; k < %(lhs_cols)d; ++k) {
+                    acc += basis[row * %(lhs_cols)d + k] * operand[k * %(rhs_cols)d + col];
+                }
+                expected[row * %(result_cols)d + col] = acc;
+            }
+        }
+
+        id<MTLBuffer> basis_buffer = [device newBufferWithBytes:basis length:sizeof(basis) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> operand_buffer = [device newBufferWithBytes:operand length:sizeof(operand) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> result_buffer = [device newBufferWithLength:sizeof(expected) options:MTLResourceStorageModeShared];
+        id<MTLCommandQueue> queue = [device newCommandQueue];
+        id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+        id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+        [encoder setComputePipelineState:pipeline];
+        [encoder setBuffer:basis_buffer offset:0 atIndex:0];
+        [encoder setBuffer:operand_buffer offset:0 atIndex:1];
+        [encoder setBuffer:result_buffer offset:0 atIndex:2];
+        [encoder dispatchThreads:MTLSizeMake(%(result_cols)d, %(result_rows)d, 1)
+            threadsPerThreadgroup:MTLSizeMake(%(result_cols)d, %(result_rows)d, 1)];
+        [encoder endEncoding];
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+
+        if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
+            std::fprintf(stderr, "Metal command failed\n");
+            return 81;
+        }
+
+        const float *result = static_cast<const float *>([result_buffer contents]);
+        for (unsigned i = 0; i < %(result_size)d; ++i) {
+            if (std::fabs(result[i] - expected[i]) > 1.0e-5f) {
+                std::fprintf(stderr, "Mismatch at %%u: got %%g expected %%g\n", i, result[i], expected[i]);
+                return 82;
+            }
+        }
+        return 0;
+    }
+}
+'''
+
+
+_LAPLACE_METAL_SMOKE_TEST_TEMPLATE = r'''#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#include <cmath>
+#include <cstdio>
+
+%(host_reference)s
+
+int main() {
+    @autoreleasepool {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        if (!device) {
+            return 77;
+        }
+
+        NSString *source = %(source)s;
+        NSError *error = nil;
+        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+        id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
+        if (!library) {
+            std::fprintf(stderr, "Metal library compilation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 78;
+        }
+
+        id<MTLFunction> function = [library newFunctionWithName:@"%(kernel_name)s"];
+        if (!function) {
+            std::fprintf(stderr, "Metal function lookup failed\n");
+            return 79;
+        }
+
+        id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
+        if (!pipeline) {
+            std::fprintf(stderr, "Metal pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 80;
+        }
+
+        const float kappa = %(kappa)sf;
+        const float u[%(n_shape)d] = {%(u)s};
+        float expected[%(n_shape)d];
+        reference_apply(u, expected, kappa);
+
+        id<MTLBuffer> u_buffer = [device newBufferWithBytes:u length:sizeof(u) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> out_buffer = [device newBufferWithLength:sizeof(expected) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> kappa_buffer = [device newBufferWithBytes:&kappa length:sizeof(kappa) options:MTLResourceStorageModeShared];
+        id<MTLCommandQueue> queue = [device newCommandQueue];
+        id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+        id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+        [encoder setComputePipelineState:pipeline];
+        [encoder setBuffer:u_buffer offset:0 atIndex:0];
+        [encoder setBuffer:out_buffer offset:0 atIndex:1];
+        [encoder setBuffer:kappa_buffer offset:0 atIndex:2];
+        [encoder dispatchThreads:MTLSizeMake(%(n_shape)d, 1, 1)
+            threadsPerThreadgroup:MTLSizeMake(%(n_shape)d, 1, 1)];
+        [encoder endEncoding];
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+
+        if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
+            std::fprintf(stderr, "Metal command failed\n");
+            return 81;
+        }
+
+        const float *result = static_cast<const float *>([out_buffer contents]);
+        for (unsigned i = 0; i < %(n_shape)d; ++i) {
+            if (std::fabs(result[i] - expected[i]) > 1.0e-4f) {
+                std::fprintf(stderr, "Mismatch at %%u: got %%g expected %%g\n", i, result[i], expected[i]);
+                return 82;
+            }
+        }
+        return 0;
+    }
+}
+'''
+
+
+_LAPLACE_EBE_METAL_SMOKE_TEST_TEMPLATE = r'''#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#include <cmath>
+#include <cstdio>
+
+%(host_reference)s
+
+int main() {
+    @autoreleasepool {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        if (!device) {
+            return 77;
+        }
+
+        NSString *source = %(source)s;
+        NSError *error = nil;
+        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+        id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
+        if (!library) {
+            std::fprintf(stderr, "Metal library compilation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 78;
+        }
+
+        id<MTLFunction> map_function = [library newFunctionWithName:@"%(map_kernel_name)s"];
+        id<MTLFunction> reduce_function = [library newFunctionWithName:@"%(reduce_kernel_name)s"];
+        if (!map_function || !reduce_function) {
+            std::fprintf(stderr, "Metal EBE function lookup failed\n");
+            return 79;
+        }
+
+        id<MTLComputePipelineState> map_pipeline = [device newComputePipelineStateWithFunction:map_function error:&error];
+        if (!map_pipeline) {
+            std::fprintf(stderr, "Metal map pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 80;
+        }
+        id<MTLComputePipelineState> reduce_pipeline = [device newComputePipelineStateWithFunction:reduce_function error:&error];
+        if (!reduce_pipeline) {
+            std::fprintf(stderr, "Metal reduce pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 81;
+        }
+
+        const float kappa = %(kappa)sf;
+        const unsigned connectivity[%(max_elements)d * %(n_shape)d] = {%(connectivity)s};
+        const unsigned node_degree[%(max_nodes)d] = {%(node_degree)s};
+        const unsigned node_to_element_map[%(max_nodes)d * %(max_node_degree)d] = {%(node_to_element_map)s};
+        const unsigned node_to_local_idx[%(max_nodes)d * %(max_node_degree)d] = {%(node_to_local_idx)s};
+        const float u[%(max_nodes)d] = {%(u)s};
+        float expected_element[%(max_elements)d * %(n_shape)d] = {0.0f};
+        float expected[%(max_nodes)d] = {0.0f};
+
+        for (unsigned elem = 0; elem < %(max_elements)d; ++elem) {
+            float local_u[%(n_shape)d];
+            float local_out[%(n_shape)d];
+            for (unsigned local = 0; local < %(n_shape)d; ++local) {
+                local_u[local] = u[connectivity[elem * %(n_shape)d + local]];
+            }
+            reference_apply(local_u, local_out, kappa);
+            for (unsigned local = 0; local < %(n_shape)d; ++local) {
+                expected_element[elem * %(n_shape)d + local] = local_out[local];
+            }
+        }
+        for (unsigned node = 0; node < %(max_nodes)d; ++node) {
+            float acc = 0.0f;
+            for (unsigned i = 0; i < node_degree[node]; ++i) {
+                const unsigned map_index = node * %(max_node_degree)d + i;
+                const unsigned elem = node_to_element_map[map_index];
+                const unsigned local = node_to_local_idx[map_index];
+                acc += expected_element[elem * %(n_shape)d + local];
+            }
+            expected[node] = acc;
+        }
+
+        id<MTLBuffer> connectivity_buffer = [device newBufferWithBytes:connectivity length:sizeof(connectivity) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> u_buffer = [device newBufferWithBytes:u length:sizeof(u) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> element_out_buffer = [device newBufferWithLength:sizeof(expected_element) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> kappa_buffer = [device newBufferWithBytes:&kappa length:sizeof(kappa) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> node_degree_buffer = [device newBufferWithBytes:node_degree length:sizeof(node_degree) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> node_to_element_buffer = [device newBufferWithBytes:node_to_element_map length:sizeof(node_to_element_map) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> node_to_local_buffer = [device newBufferWithBytes:node_to_local_idx length:sizeof(node_to_local_idx) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> out_buffer = [device newBufferWithLength:sizeof(expected) options:MTLResourceStorageModeShared];
+
+        id<MTLCommandQueue> queue = [device newCommandQueue];
+        id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+
+        id<MTLComputeCommandEncoder> map_encoder = [command_buffer computeCommandEncoder];
+        [map_encoder setComputePipelineState:map_pipeline];
+        [map_encoder setBuffer:connectivity_buffer offset:0 atIndex:0];
+        [map_encoder setBuffer:u_buffer offset:0 atIndex:1];
+        [map_encoder setBuffer:element_out_buffer offset:0 atIndex:2];
+        [map_encoder setBuffer:kappa_buffer offset:0 atIndex:3];
+        [map_encoder dispatchThreads:MTLSizeMake(%(n_shape)d, %(max_elements)d, 1)
+            threadsPerThreadgroup:MTLSizeMake(%(n_shape)d, 1, 1)];
+        [map_encoder endEncoding];
+
+        id<MTLComputeCommandEncoder> reduce_encoder = [command_buffer computeCommandEncoder];
+        [reduce_encoder setComputePipelineState:reduce_pipeline];
+        [reduce_encoder setBuffer:element_out_buffer offset:0 atIndex:0];
+        [reduce_encoder setBuffer:node_degree_buffer offset:0 atIndex:1];
+        [reduce_encoder setBuffer:node_to_element_buffer offset:0 atIndex:2];
+        [reduce_encoder setBuffer:node_to_local_buffer offset:0 atIndex:3];
+        [reduce_encoder setBuffer:out_buffer offset:0 atIndex:4];
+        [reduce_encoder dispatchThreads:MTLSizeMake(%(max_nodes)d, 1, 1)
+            threadsPerThreadgroup:MTLSizeMake(%(max_nodes)d, 1, 1)];
+        [reduce_encoder endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+
+        if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
+            std::fprintf(stderr, "Metal EBE command failed\n");
+            return 82;
+        }
+
+        const float *result = static_cast<const float *>([out_buffer contents]);
+        for (unsigned i = 0; i < %(max_nodes)d; ++i) {
+            if (std::fabs(result[i] - expected[i]) > 1.0e-4f) {
+                std::fprintf(stderr, "Mismatch at %%u: got %%g expected %%g\n", i, result[i], expected[i]);
+                return 83;
+            }
+        }
+        return 0;
+    }
+}
+'''
