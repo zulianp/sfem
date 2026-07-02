@@ -104,10 +104,10 @@ iree-compile frontend_pymlir_output.mlir \
 ## 5. Codex Implementation Rules for `pymlir` Generator
 When writing the generation logic:
 1. **Enforce Rigid Tile Dimensions:** Ensure your code generator forces matrix math operations into explicit sizes (like `16x16` or `8x8` tiles). Vector hardware matrix units cannot compile arbitrary or unaligned shapes natively.
-2. **Leverage Structural Primitives:** Stick entirely to generating **`linalg.matmul`** or **`linalg.generic`** blocks inside your text printer. Do not try to write custom assembly macros in Python; let the target-tuned vector compilers handle register scheduling automatically.
+2. **Leverage Structural Primitives:** Stick entirely to generating **`linalg.matmul`** or **`linalg.generic`** blocks inside your text printer. Do not try to write custom assembly macros in Python; let the target-tuned vector compilers handle register scheduling automatically. The generated orchestrated kernels are then called either from C++ or Python runtimes.
 
 
-# MMA plan
+# Sum-Factorization MMA plan
 
                 [ High-Order FEM Kernel Spec (From Kernel Plan) ]
                 • N_elements x N_quad_points x N_components

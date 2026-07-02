@@ -13,6 +13,7 @@ run_generator() {
 }
 
 run_generator codegen.framework.generators.linear_elasticity
+run_generator codegen.framework.generators.laplace
 run_generator codegen.framework.generators.neohookean_ogden
 run_generator codegen.framework.generators.neumann
 # shellcheck disable=SC2086

@@ -33,6 +33,11 @@ from codegen.framework.emitters.quadrature_codegen import (
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
+from codegen.framework.plans.form_transformations import (
+    simplex_gradient_metric_transformation,
+    symmetric_metric_component_count,
+    symmetric_metric_component_index,
+)
 from codegen.framework.symbolic.core import (
     GeneratedKernelFile,
     KernelExpressions,
@@ -354,6 +359,14 @@ def _dependency_stream_groups(dependencies, *, mesh=False):
             )
         )
     return tuple(groups)
+
+
+def _dependency_stream_group_by_name(dependencies, name):
+    name = str(name)
+    for group in _dependency_stream_groups(dependencies):
+        if group.name == name:
+            return group
+    raise ValueError("dependency stream group '%s' is not active" % name)
 
 
 def _indexed_stream_initializer(name, count):
@@ -1476,16 +1489,27 @@ def _local_function(
     rule = specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    gradient_metric = (
+        None
+        if tensor_product
+        else simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
+    )
     params = [
         "const int nelems",
         "const ptrdiff_t geometry_stride",
-        "const scalar_t *const SFEM_RESTRICT determinant",
     ]
-    if dependencies.uses_adjugate:
+    if gradient_metric is not None:
+        params.append(
+            "const scalar_t *const SFEM_RESTRICT geom_metric[%d]"
+            % symmetric_metric_component_count(dim)
+        )
+    else:
+        params.append("const scalar_t *const SFEM_RESTRICT determinant")
+    if dependencies.uses_adjugate and gradient_metric is None:
         params.append(
             "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
         )
-    tensor_product = _is_tensor_product_family(rule, basis_family)
     if tensor_product:
         params.append("const scalar_t *const SFEM_RESTRICT shape_1d")
         if dependencies.uses_reference_gradients:
@@ -1544,12 +1568,17 @@ def _local_function(
             )
         )
     else:
-        lines.extend(_simplex_local_body(system, coefficients, dependencies))
+        lines.extend(_simplex_local_body(system, rule, coefficients, dependencies, gradient_metric))
     lines.append("}")
     return lines
 
 
-def _simplex_local_body(system, coefficients, dependencies):
+def _simplex_local_body(system, rule, coefficients, dependencies, gradient_metric=None):
+    if gradient_metric is None:
+        gradient_metric = simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
+    if gradient_metric is not None:
+        return _simplex_gradient_metric_body(system, rule, dependencies, gradient_metric)
+
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
     lines = ["    for (int q = 0; q < N_QP; ++q) {"]
@@ -1707,6 +1736,118 @@ def _simplex_local_body(system, coefficients, dependencies):
             )
     lines.extend(["            }", "        }", "    }"])
     return lines
+
+
+def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
+    dim = system.dim
+    field = system.fields[0]
+    group = _dependency_stream_group_by_name(dependencies, specialization.stream_group_name)
+    field_index = specialization.field_index
+    scale = _sfem_ccode(specialization.scale)
+    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
+    for d in range(dim):
+        lines.append(
+            "        scalar_t %s%s_grad_%d_ref_values[VECTOR_SIZE];"
+            % (field.name, group.symbol_suffix, d)
+        )
+    lines.extend(_work_item_loop_lines("        "))
+    for trial in range(rule.n_shape):
+        lines.append(
+            "            const scalar_t coeff_%s_%s_%d = %s[%d][lane];"
+            % (
+                group.name,
+                field.name,
+                trial,
+                group.name,
+                trial * len(system.fields) + field_index,
+            )
+        )
+    for d in range(dim):
+        terms = []
+        for trial in range(rule.n_shape):
+            factor = specialization.reference_gradient(trial, d)
+            if factor == 0:
+                continue
+            terms.append(
+                _scaled_cpp_term(
+                    factor,
+                    "coeff_%s_%s_%d" % (group.name, field.name, trial),
+                )
+            )
+        value = _sum_cpp_terms(terms)
+        lines.append(
+            "            %s%s_grad_%d_ref_values[lane] = %s;"
+            % (field.name, group.symbol_suffix, d, value)
+        )
+    lines.append("        }")
+    lines.extend(_work_item_loop_lines("        "))
+    if scale == "1":
+        metric_factor = "q_weight[q]"
+    else:
+        metric_factor = "q_weight[q] * (%s)" % scale
+    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
+    for left in range(dim):
+        for right in range(left, dim):
+            lines.append(
+                "            const scalar_t geom_metric%d%d = (%s) * geom_metric[%d][geometry_offset];"
+                % (
+                    left,
+                    right,
+                    metric_factor,
+                    specialization.metric_component(left, right),
+                )
+            )
+    for test in range(rule.n_shape):
+        terms = []
+        for left in range(dim):
+            test_factor = specialization.reference_gradient(test, left)
+            if test_factor == 0:
+                continue
+            for right in range(dim):
+                metric = "geom_metric%d%d" % (
+                    min(left, right),
+                    max(left, right),
+                )
+                trial_grad = "%s%s_grad_%d_ref_values[lane]" % (
+                    field.name,
+                    group.symbol_suffix,
+                    right,
+                )
+                terms.append(
+                    _scaled_cpp_term(
+                        test_factor,
+                        "%s * %s" % (metric, trial_grad),
+                    )
+                )
+        if terms:
+            lines.append(
+                "            output[%d][lane] += %s;"
+                % (test * len(system.fields) + field_index, _sum_cpp_terms(terms))
+            )
+    lines.extend(["        }", "    }"])
+    return lines
+
+
+def _scaled_cpp_term(factor, expression):
+    factor = sp.sympify(factor)
+    if factor == 1:
+        return expression
+    if factor == -1:
+        return "-(%s)" % expression
+    return "(%s) * (%s)" % (_sfem_ccode(factor), expression)
+
+
+def _sum_cpp_terms(terms):
+    terms = tuple(term for term in terms if term)
+    if not terms:
+        return "scalar_t(0)"
+    expression = terms[0]
+    for term in terms[1:]:
+        if term.startswith("-("):
+            expression += " - " + term[2:-1]
+        else:
+            expression += " + " + term
+    return expression
 
 
 def _tensor_local_body(system, prefix, coefficients, dependencies):
@@ -1959,6 +2100,47 @@ def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependen
     return lines
 
 
+def _geometry_metric_stream_initializer(name, dim):
+    return "{%s}" % ", ".join(
+        "%s[%d]" % (name, index)
+        for index in range(symmetric_metric_component_count(dim))
+    )
+
+
+def _geometry_metric_grouping_lines(
+    dim,
+    determinant_expr,
+    adjugate_expr,
+    metric_target,
+    indent,
+    prefix,
+    scalar_type="scalar_t",
+):
+    lines = ["%sconst %s %s_det = %s;" % (indent, scalar_type, prefix, determinant_expr)]
+    for component in range(dim * dim):
+        lines.append(
+            "%sconst %s %s_adj%d = %s;"
+            % (indent, scalar_type, prefix, component, adjugate_expr(component))
+        )
+    for left in range(dim):
+        for right in range(left, dim):
+            dot = " + ".join(
+                "%s_adj%d * %s_adj%d"
+                % (prefix, left * dim + d, prefix, right * dim + d)
+                for d in range(dim)
+            )
+            lines.append(
+                "%s%s = (%s) / %s_det;"
+                % (
+                    indent,
+                    metric_target(symmetric_metric_component_index(left, right)),
+                    dot,
+                    prefix,
+                )
+            )
+    return lines
+
+
 def _operator_source(
     system,
     prefix,
@@ -2036,6 +2218,17 @@ def _operator_source(
     }
     for form in ("residual", "jacobian_action"):
         dependencies = form_dependencies[form]
+        coefficients = residual_coeffs if form == "residual" else action_coeffs
+        gradient_metric = (
+            None
+            if tensor_product
+            else simplex_gradient_metric_transformation(
+                system,
+                rule,
+                coefficients,
+                dependencies,
+            )
+        )
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in (("double", ""), ("float", "_float")):
@@ -2078,8 +2271,46 @@ def _operator_source(
                     "        %s%s"
                     % (param, "," if index + 1 < len(params) else "")
                 )
-            call_args = ["nelems", "geometry_stride", "determinant"]
-            if dependencies.uses_adjugate:
+            call_args = ["nelems", "geometry_stride"]
+            pre_call_lines = []
+            if gradient_metric is not None:
+                pre_call_lines.extend(
+                    [
+                        "    static constexpr int N_QP = %d;" % n_qp,
+                        "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+                        "    %s geom_metric_data[%d][N_QP * VECTOR_SIZE];"
+                        % (scalar_type, gradient_metric.metric_components),
+                        "    const %s *const geom_metric[%d] = %s;"
+                        % (
+                            scalar_type,
+                            gradient_metric.metric_components,
+                            _geometry_metric_stream_initializer(
+                                "geom_metric_data",
+                                dim,
+                            ),
+                        ),
+                        "    for (int q = 0; q < N_QP; ++q) {",
+                        *_work_item_loop_lines("        "),
+                        "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+                    ]
+                )
+                pre_call_lines.extend(
+                    _geometry_metric_grouping_lines(
+                        dim,
+                        "determinant[geometry_offset]",
+                        lambda component: "adjugate[%d][geometry_offset]" % component,
+                        lambda component: "geom_metric_data[%d][q * VECTOR_SIZE + lane]"
+                        % component,
+                        "            ",
+                        "metric",
+                        scalar_type,
+                    )
+                )
+                pre_call_lines.extend(["        }", "    }"])
+                call_args.append("geom_metric")
+            else:
+                call_args.append("determinant")
+            if dependencies.uses_adjugate and gradient_metric is None:
                 call_args.append("adjugate")
             if tensor_product:
                 call_args.append(
@@ -2126,6 +2357,7 @@ def _operator_source(
             lines.extend(
                 [
                     ") {",
+                    *pre_call_lines,
                     "    sfem::codegen::%s<%s, %d, %d, %d>(%s);"
                     % (
                         block,
@@ -2149,6 +2381,7 @@ def _operator_source(
                 specialization,
                 form,
                 dependencies,
+                coefficients,
                 basis_family,
                 geometry_family,
             )
@@ -3185,6 +3418,7 @@ def _mesh_operator_source(
     isoparametric_specialization,
     form,
     dependencies,
+    coefficients,
     basis_family=None,
     geometry_family=None,
 ):
@@ -3195,6 +3429,16 @@ def _mesh_operator_source(
     n_qp = rule.n_qp
     vector_size = affine_specialization.vector_size
     tensor_product = _is_tensor_product_family(rule, basis_family)
+    gradient_metric = (
+        None
+        if tensor_product
+        else simplex_gradient_metric_transformation(
+            system,
+            rule,
+            coefficients,
+            dependencies,
+        )
+    )
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
@@ -3292,6 +3536,11 @@ def _mesh_operator_source(
         lines.append(
             "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
         )
+    if gradient_metric is not None:
+        lines.append(
+            "        scalar_t block_geom_metric_data[%d][VECTOR_SIZE];"
+            % gradient_metric.metric_components
+        )
     lines.extend(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
@@ -3370,12 +3619,38 @@ def _mesh_operator_source(
                 ),
             )
         )
+    if gradient_metric is not None:
+        lines.extend(["", *_work_item_loop_lines("        ")])
+        lines.extend(
+            _geometry_metric_grouping_lines(
+                dim,
+                "block_jacobian_determinant0[lane]",
+                lambda component: "block_jacobian_adjugate%d[lane]" % component,
+                lambda component: "block_geom_metric_data[%d][lane]" % component,
+                "            ",
+                "metric",
+            )
+        )
+        lines.append("        }")
+        lines.append(
+            "        const scalar_t *const block_geom_metric[%d] = %s;"
+            % (
+                gradient_metric.metric_components,
+                _geometry_metric_stream_initializer(
+                    "block_geom_metric_data",
+                    dim,
+                ),
+            )
+        )
     call_args = [
         "nelems",
         "0",
-        "block_jacobian_determinant0",
     ]
-    if dependencies.uses_adjugate:
+    if gradient_metric is not None:
+        call_args.append("block_geom_metric")
+    else:
+        call_args.append("block_jacobian_determinant0")
+    if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
         call_args.append(_mesh_reference_name("affine", "shape_1d"))
@@ -3481,6 +3756,7 @@ def _mesh_operator_source(
             isoparametric_specialization,
             form,
             dependencies,
+            coefficients,
             basis_family,
             geometry_family,
         )
@@ -3563,6 +3839,7 @@ def _isoparametric_mesh_operator_source(
     specialization,
     form,
     dependencies,
+    coefficients,
     basis_family=None,
     geometry_family=None,
 ):
@@ -3574,6 +3851,16 @@ def _isoparametric_mesh_operator_source(
     vector_size = specialization.vector_size
     tensor_product = _is_tensor_product_family(rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    gradient_metric = (
+        None
+        if tensor_product
+        else simplex_gradient_metric_transformation(
+            system,
+            rule,
+            coefficients,
+            dependencies,
+        )
+    )
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
@@ -3668,6 +3955,11 @@ def _isoparametric_mesh_operator_source(
     if dependencies.direction:
         lines.append(
             "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+        )
+    if gradient_metric is not None:
+        lines.append(
+            "        scalar_t block_geom_metric_data[%d][N_QP * VECTOR_SIZE];"
+            % gradient_metric.metric_components
         )
     lines.extend(
         [
@@ -3777,6 +4069,26 @@ def _isoparametric_mesh_operator_source(
                 )
         lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
         lines.extend(["            }", "        }"])
+    if gradient_metric is not None:
+        lines.extend(
+            [
+                "",
+                "        for (int q = 0; q < N_QP; ++q) {",
+                *_work_item_loop_lines("            "),
+                "                const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;",
+            ]
+        )
+        lines.extend(
+            _geometry_metric_grouping_lines(
+                dim,
+                "block_determinant[geometry_offset]",
+                lambda component: "block_adjugate_data[%d][geometry_offset]" % component,
+                lambda component: "block_geom_metric_data[%d][geometry_offset]" % component,
+                "                ",
+                "metric",
+            )
+        )
+        lines.extend(["            }", "        }"])
     lines.append("")
     if dependencies.current:
         lines.append(
@@ -3810,12 +4122,26 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
+    if gradient_metric is not None:
+        lines.append(
+            "        const scalar_t *const block_geom_metric[%d] = %s;"
+            % (
+                gradient_metric.metric_components,
+                _geometry_metric_stream_initializer(
+                    "block_geom_metric_data",
+                    dim,
+                ),
+            )
+        )
     call_args = [
         "nelems",
         "VECTOR_SIZE",
-        "block_determinant",
     ]
-    if dependencies.uses_adjugate:
+    if gradient_metric is not None:
+        call_args.append("block_geom_metric")
+    else:
+        call_args.append("block_determinant")
+    if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
         call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))

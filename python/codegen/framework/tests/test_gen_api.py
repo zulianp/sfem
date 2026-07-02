@@ -51,6 +51,7 @@ from codegen.framework.plans.reference_data import ReferenceDataPlan, ReferenceD
 
 from ..materials.neohookean_ogden import material as neohookean_ogden
 from ..materials.linear_elasticity import material as linear_elasticity
+from ..materials.laplace import material as laplace
 from ..materials.neumann import material as neumann
 from ..materials.poro_hyperelasticity import material as poro_hyperelasticity
 from ..materials.stokes import material as stokes
@@ -3360,6 +3361,63 @@ class GenApiTest(unittest.TestCase):
                     out_dir,
                     "-o",
                     os.path.join(out_dir, "poro_residual.o"),
+                ],
+                check=True,
+            )
+
+    def test_tet4_laplace_uses_metric_specialized_simplex_kernel(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                laplace,
+                out_dir,
+                elements=("TET4",),
+            )
+            local = os.path.join(out_dir, "d3", "laplace_d3_simplex_local.hpp")
+            with open(local) as source:
+                local_source = source.read()
+
+            self.assertIn("geom_metric00", local_source)
+            self.assertIn("geom_metric01", local_source)
+            self.assertIn("geom_metric22", local_source)
+            self.assertIn("const scalar_t *const SFEM_RESTRICT geom_metric[6]", local_source)
+            self.assertIn("q_weight[q] * (kappa)) * geom_metric[0][geometry_offset]", local_source)
+            self.assertIn(
+                "u_grad_0_ref_values[lane] = -(coeff_current_u_0) + coeff_current_u_1;",
+                local_source,
+            )
+            self.assertNotIn("const scalar_t det", local_source)
+            self.assertNotIn("test_grad0", local_source)
+            self.assertNotIn("grad_ref_0[q * N_SHAPE + trial]", local_source)
+
+    def test_compiles_tet4_laplace_operator(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                laplace,
+                out_dir,
+                elements=("TET4",),
+            )
+            source = os.path.join(
+                out_dir,
+                "d3",
+                "tet4",
+                "laplace_tet4_operator.cpp",
+            )
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    source,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "laplace_tet4.o"),
                 ],
                 check=True,
             )
