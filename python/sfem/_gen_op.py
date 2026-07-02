@@ -27,7 +27,9 @@ def generate_op_files(material, elements, kernel_sources=None):
         raise ValueError("single-equation generated Op wrappers require an unnamed equation")
     elif equations[0].is_energy:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
-        header, source = _hyperelastic_op(material, elements, c_abi_header, form_collections)
+        header, source = _hyperelastic_op(
+            material, elements, c_abi_header, form_collections, kernel_sources
+        )
     elif equations[0].is_residual:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         measures = {collection.measure for collection in form_collections.values()}
@@ -219,7 +221,9 @@ namespace sfem {
 """ % {"op": material.op_name, "extra": extra, "value_steps": value_steps}
 
 
-def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=None):
+def _hyperelastic_op(
+    material, elements, c_abi_header=None, form_collections=None, kernel_sources=None
+):
     if form_collections is None:
         raise ValueError("energy generated Op requires form collections")
     parameters = tuple(str(name) for name, _ in material.parameter_defaults)
@@ -231,6 +235,8 @@ def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=Non
     objective_steps_cases = []
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
+    gradient_affine_aos_flags = []
+    apply_affine_aos_flags = []
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
@@ -283,42 +289,131 @@ def _hyperelastic_op(material, elements, c_abi_header=None, form_collections=Non
             "domain.block->elements()->data(), %s, determinant%s"
             % (_affine_geometry_offsets(dim), args)
         )
-        gradient_cases.append(
-            _dual_case(
-                element,
-                "gradient_uses_affine",
-                "%s_gradient_affine_mesh_soa" % stem,
-                ", ".join(_nonempty(
-                    common_affine_args,
-                    *_energy_field_args(gradient_dependencies, dim, components, current="x"),
-                    *_energy_output_args(dim, components),
-                )),
-                "%s_gradient_isoparametric_mesh_soa" % stem,
-                ", ".join(_nonempty(
-                    common_isoparametric_args,
-                    *_energy_field_args(gradient_dependencies, dim, components, current="x"),
-                    *_energy_output_args(dim, components),
-                )),
+        common_affine_aos_args = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), adjugate_aos, determinant%s"
+            % args
+        )
+        gradient_affine_uses_aos = _c_abi_function_exists(
+            kernel_sources, "%s_gradient_affine_mesh_soa_aos_unit" % stem
+        )
+        apply_affine_uses_aos = _c_abi_function_exists(
+            kernel_sources, "%s_apply_affine_mesh_soa_aos_unit" % stem
+        )
+        gradient_affine_aos_flags.append(gradient_affine_uses_aos)
+        apply_affine_aos_flags.append(apply_affine_uses_aos)
+        gradient_affine_args = ", ".join(
+            _nonempty(
+                common_affine_args,
+                *_energy_field_args(
+                    gradient_dependencies, dim, components, current="x"
+                ),
+                *_energy_output_args(dim, components),
             )
         )
-        apply_cases.append(
-            _dual_case(
-                element,
-                "apply_uses_affine",
-                "%s_apply_affine_mesh_soa" % stem,
-                ", ".join(_nonempty(
-                    common_affine_args,
-                    *_energy_field_args(apply_dependencies, dim, components, current="x", direction="h"),
-                    *_energy_output_args(dim, components),
-                )),
-                "%s_apply_isoparametric_mesh_soa" % stem,
-                ", ".join(_nonempty(
-                    common_isoparametric_args,
-                    *_energy_field_args(apply_dependencies, dim, components, current="x", direction="h"),
-                    *_energy_output_args(dim, components),
-                )),
+        gradient_isoparametric_args = ", ".join(
+            _nonempty(
+                common_isoparametric_args,
+                *_energy_field_args(
+                    gradient_dependencies, dim, components, current="x"
+                ),
+                *_energy_output_args(dim, components),
             )
         )
+        if gradient_affine_uses_aos:
+            gradient_cases.append(
+                _dual_aos_unit_case(
+                    element,
+                    "gradient_uses_affine",
+                    "%s_gradient_affine_mesh_soa_aos_unit" % stem,
+                    ", ".join(
+                        _nonempty(
+                            common_affine_aos_args,
+                            *_energy_field_args(
+                                gradient_dependencies, dim, components, current="x"
+                            ),
+                            *_energy_output_args(dim, components),
+                        )
+                    ),
+                    "%s_gradient_affine_mesh_soa" % stem,
+                    gradient_affine_args,
+                    "%s_gradient_isoparametric_mesh_soa" % stem,
+                    gradient_isoparametric_args,
+                )
+            )
+        else:
+            gradient_cases.append(
+                _dual_case(
+                    element,
+                    "gradient_uses_affine",
+                    "%s_gradient_affine_mesh_soa" % stem,
+                    gradient_affine_args,
+                    "%s_gradient_isoparametric_mesh_soa" % stem,
+                    gradient_isoparametric_args,
+                )
+            )
+        apply_affine_args = ", ".join(
+            _nonempty(
+                common_affine_args,
+                *_energy_field_args(
+                    apply_dependencies,
+                    dim,
+                    components,
+                    current="x",
+                    direction="h",
+                ),
+                *_energy_output_args(dim, components),
+            )
+        )
+        apply_isoparametric_args = ", ".join(
+            _nonempty(
+                common_isoparametric_args,
+                *_energy_field_args(
+                    apply_dependencies,
+                    dim,
+                    components,
+                    current="x",
+                    direction="h",
+                ),
+                *_energy_output_args(dim, components),
+            )
+        )
+        if apply_affine_uses_aos:
+            apply_cases.append(
+                _dual_aos_unit_case(
+                    element,
+                    "apply_uses_affine",
+                    "%s_apply_affine_mesh_soa_aos_unit" % stem,
+                    ", ".join(
+                        _nonempty(
+                            common_affine_aos_args,
+                            *_energy_field_args(
+                                apply_dependencies,
+                                dim,
+                                components,
+                                current="x",
+                                direction="h",
+                            ),
+                            *_energy_output_args(dim, components),
+                        )
+                    ),
+                    "%s_apply_affine_mesh_soa" % stem,
+                    apply_affine_args,
+                    "%s_apply_isoparametric_mesh_soa" % stem,
+                    apply_isoparametric_args,
+                )
+            )
+        else:
+            apply_cases.append(
+                _dual_case(
+                    element,
+                    "apply_uses_affine",
+                    "%s_apply_affine_mesh_soa" % stem,
+                    apply_affine_args,
+                    "%s_apply_isoparametric_mesh_soa" % stem,
+                    apply_isoparametric_args,
+                )
+            )
         objective_cases.append(
             _dual_status_case(
                 element,
@@ -405,18 +500,34 @@ namespace sfem {
             return 0;
         }
 
+        struct AffineGeometryCache {
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+        };
+
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
             auto mesh = space->mesh_ptr();
+            const bool needs_jacobian_aos =
+                    %(gradient_affine_uses_jacobian_aos)s ||
+                    %(apply_affine_uses_jacobian_aos)s;
             for (auto &entry : domains.domains()) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if (needs_jacobian_aos) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -469,12 +580,21 @@ namespace sfem {
             if (needs_affine_geometry) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if ((impl_->gradient_uses_affine && %(gradient_affine_uses_jacobian_aos)s) ||
+                    (impl_->apply_uses_affine && %(apply_affine_uses_jacobian_aos)s)) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
@@ -487,18 +607,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->gradient_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("%(op)s affine gradient requires cached geometry\\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (%(gradient_affine_uses_jacobian_aos)s) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("%(op)s affine gradient requires cached AoS geometry\\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
 %(gradient_cases)s
@@ -518,18 +649,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("%(op)s affine hessian action requires cached geometry\\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (%(apply_affine_uses_jacobian_aos)s) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("%(op)s affine hessian action requires cached AoS geometry\\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
 %(apply_cases)s
@@ -551,16 +693,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("%(op)s affine objective requires cached geometry\\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             std::fill(impl_->element_values.get(),
                       impl_->element_values.get() + nelements,
@@ -601,16 +743,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             if (nvalues > impl_->element_capacity) {
                 impl_->element_values.reset(new real_t[nvalues]);
@@ -732,6 +874,8 @@ namespace sfem {
         "declarations": "\n".join(declarations),
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
+        "gradient_affine_uses_jacobian_aos": _cpp_bool(any(gradient_affine_aos_flags)),
+        "apply_affine_uses_jacobian_aos": _cpp_bool(any(apply_affine_aos_flags)),
         "gradient_cases": "\n".join(gradient_cases),
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
@@ -772,6 +916,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     block_size_by_dim = {}
     residual_affine_metric_flags = []
     action_affine_metric_flags = []
+    residual_affine_metric_soa_flags = []
+    action_affine_metric_soa_flags = []
+    residual_affine_metric_aos_flags = []
+    action_affine_metric_aos_flags = []
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
@@ -836,8 +984,28 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         action_affine_uses_metric = _c_abi_function_uses_cached_metric(
             kernel_sources, "%s_jacobian_action_affine_mesh_soa" % stem
         )
+        residual_affine_uses_metric_aos = _c_abi_function_exists(
+            kernel_sources, "%s_residual_affine_mesh_soa_aos" % stem
+        )
+        action_affine_uses_metric_aos = _c_abi_function_exists(
+            kernel_sources, "%s_jacobian_action_affine_mesh_soa_aos" % stem
+        )
+        residual_affine_uses_metric_aos_unit = _c_abi_function_exists(
+            kernel_sources, "%s_residual_affine_mesh_soa_aos_unit" % stem
+        )
+        action_affine_uses_metric_aos_unit = _c_abi_function_exists(
+            kernel_sources, "%s_jacobian_action_affine_mesh_soa_aos_unit" % stem
+        )
         residual_affine_metric_flags.append(residual_affine_uses_metric)
         action_affine_metric_flags.append(action_affine_uses_metric)
+        residual_affine_metric_soa_flags.append(
+            residual_affine_uses_metric and not residual_affine_uses_metric_aos
+        )
+        action_affine_metric_soa_flags.append(
+            action_affine_uses_metric and not action_affine_uses_metric_aos
+        )
+        residual_affine_metric_aos_flags.append(residual_affine_uses_metric_aos)
+        action_affine_metric_aos_flags.append(action_affine_uses_metric_aos)
         common_affine_residual = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), %s"
@@ -847,6 +1015,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 else "%s, determinant" % _affine_geometry_offsets(dim)
             )
         )
+        common_affine_residual_aos = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), geom_metric_aos"
+        )
         common_affine_action = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), %s"
@@ -855,6 +1027,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 if action_affine_uses_metric
                 else "%s, determinant" % _affine_geometry_offsets(dim)
             )
+        )
+        common_affine_action_aos = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), geom_metric_aos"
         )
         residual_common_args = []
         residual_common_args.extend(
@@ -898,16 +1074,48 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         residual_common_args.append("FIELD_STRIDE")
         residual_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        residual_unit_args = []
+        if residual_dependencies.current:
+            residual_unit_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+            )
+        residual_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
         residual_cases.append(
             _residual_dual_soa_case(
                 element,
                 "residual_uses_affine",
-                "%s_residual_affine_mesh_soa" % stem,
-                ", ".join((common_affine_residual, *residual_common_args)),
+                (
+                    "%s_residual_affine_mesh_soa_aos" % stem
+                    if residual_affine_uses_metric_aos
+                    else "%s_residual_affine_mesh_soa" % stem
+                ),
+                ", ".join(
+                    (
+                        common_affine_residual_aos
+                        if residual_affine_uses_metric_aos
+                        else common_affine_residual,
+                        *residual_common_args,
+                    )
+                ),
                 "%s_residual_isoparametric_mesh_soa" % stem,
                 ", ".join((common_isoparametric, *residual_common_args)),
                 block_size_by_dim[dim],
                 residual_setup,
+                affine_unit_function=(
+                    "%s_residual_affine_mesh_soa_aos_unit" % stem
+                    if residual_affine_uses_metric_aos_unit
+                    else None
+                ),
+                affine_unit_arguments=(
+                    ", ".join((common_affine_residual_aos, *residual_unit_args))
+                    if residual_affine_uses_metric_aos_unit
+                    else None
+                ),
+                affine_unit_condition=(
+                    "storage[0] == real_t(1)"
+                    if residual_affine_uses_metric_aos_unit
+                    else None
+                ),
             )
         )
         action_common_args = []
@@ -965,16 +1173,48 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         action_common_args.append("FIELD_STRIDE")
         action_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        action_unit_args = []
+        if action_dependencies.direction:
+            action_unit_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+            )
+        action_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
         action_cases.append(
             _residual_dual_soa_case(
                 element,
                 "jacobian_action_uses_affine",
-                "%s_jacobian_action_affine_mesh_soa" % stem,
-                ", ".join((common_affine_action, *action_common_args)),
+                (
+                    "%s_jacobian_action_affine_mesh_soa_aos" % stem
+                    if action_affine_uses_metric_aos
+                    else "%s_jacobian_action_affine_mesh_soa" % stem
+                ),
+                ", ".join(
+                    (
+                        common_affine_action_aos
+                        if action_affine_uses_metric_aos
+                        else common_affine_action,
+                        *action_common_args,
+                    )
+                ),
                 "%s_jacobian_action_isoparametric_mesh_soa" % stem,
                 ", ".join((common_isoparametric, *action_common_args)),
                 block_size_by_dim[dim],
                 action_setup,
+                affine_unit_function=(
+                    "%s_jacobian_action_affine_mesh_soa_aos_unit" % stem
+                    if action_affine_uses_metric_aos_unit
+                    else None
+                ),
+                affine_unit_arguments=(
+                    ", ".join((common_affine_action_aos, *action_unit_args))
+                    if action_affine_uses_metric_aos_unit
+                    else None
+                ),
+                affine_unit_condition=(
+                    "storage[0] == real_t(1)"
+                    if action_affine_uses_metric_aos_unit
+                    else None
+                ),
             )
         )
 
@@ -989,6 +1229,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     )
     residual_affine_uses_metric = any(residual_affine_metric_flags)
     action_affine_uses_metric = any(action_affine_metric_flags)
+    residual_affine_uses_metric_soa = any(residual_affine_metric_soa_flags)
+    action_affine_uses_metric_soa = any(action_affine_metric_soa_flags)
+    residual_affine_uses_metric_aos = any(residual_affine_metric_aos_flags)
+    action_affine_uses_metric_aos = any(action_affine_metric_aos_flags)
     residual_affine_uses_jacobian = not all(residual_affine_metric_flags)
     action_affine_uses_jacobian = not all(action_affine_metric_flags)
 
@@ -1037,13 +1281,15 @@ namespace sfem {
 
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
-            std::shared_ptr<smesh::FFF> metric;
+            std::shared_ptr<smesh::FFF> metric_soa;
+            std::shared_ptr<smesh::FFF> metric_aos;
         };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool needs_jacobian,
-                                  const bool needs_metric) {
+                                  const bool needs_metric_soa,
+                                  const bool needs_metric_aos) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -1060,10 +1306,17 @@ namespace sfem {
                         return SFEM_FAILURE;
                     }
                 }
-                if (needs_metric && !cache->metric) {
-                    cache->metric = smesh::FFF::create_SoA(
+                if (needs_metric_soa && !cache->metric_soa) {
+                    cache->metric_soa = smesh::FFF::create_SoA(
                             mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric) {
+                    if (!cache->metric_soa) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                if (needs_metric_aos && !cache->metric_aos) {
+                    cache->metric_aos = smesh::FFF::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->metric_aos) {
                         return SFEM_FAILURE;
                     }
                 }
@@ -1127,13 +1380,20 @@ namespace sfem {
                 (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
                 (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
         const bool needs_affine_metric =
-                (impl_->residual_uses_affine && %(residual_affine_uses_metric)s) ||
-                (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric)s);
+                (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
+                (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
+        const bool needs_affine_metric_soa =
+                (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
+                (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
+        const bool needs_affine_metric_aos =
+                (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
+                (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
         if (needs_affine_jacobian || needs_affine_metric) {
             return cache_affine_geometry(impl_->space,
                                          *impl_->domains,
                                          needs_affine_jacobian,
-                                         needs_affine_metric);
+                                         needs_affine_metric_soa,
+                                         needs_affine_metric_aos);
         }
         return SFEM_SUCCESS;
     }
@@ -1163,6 +1423,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->residual_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -1180,13 +1441,21 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian->jacobian_determinant()->data());
                 }
-                if (%(residual_affine_uses_metric)s) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("%(op)s affine residual requires cached metric geometry\\n");
+                if (%(residual_affine_uses_metric_soa)s) {
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("%(op)s affine residual requires cached SoA metric geometry\\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (%(residual_affine_uses_metric_aos)s) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("%(op)s affine residual requires cached AoS metric geometry\\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -1216,6 +1485,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->jacobian_action_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -1233,13 +1503,21 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian->jacobian_determinant()->data());
                 }
-                if (%(action_affine_uses_metric)s) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("%(op)s affine jacobian action requires cached metric geometry\\n");
+                if (%(action_affine_uses_metric_soa)s) {
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("%(op)s affine jacobian action requires cached SoA metric geometry\\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (%(action_affine_uses_metric_aos)s) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("%(op)s affine jacobian action requires cached AoS metric geometry\\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -1287,12 +1565,19 @@ namespace sfem {
                     (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
                     (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
             const bool needs_affine_metric =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_metric)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric)s);
+                    (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
+                    (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
+            const bool needs_affine_metric_soa =
+                    (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
+                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
+            const bool needs_affine_metric_aos =
+                    (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
+                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
             if (cache_affine_geometry(impl_->space,
                                       *impl_->domains,
                                       needs_affine_jacobian,
-                                      needs_affine_metric) != SFEM_SUCCESS) {
+                                      needs_affine_metric_soa,
+                                      needs_affine_metric_aos) != SFEM_SUCCESS) {
                 SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
             }
         }
@@ -1389,6 +1674,10 @@ namespace sfem {
         "action_affine_uses_jacobian": _cpp_bool(action_affine_uses_jacobian),
         "residual_affine_uses_metric": _cpp_bool(residual_affine_uses_metric),
         "action_affine_uses_metric": _cpp_bool(action_affine_uses_metric),
+        "residual_affine_uses_metric_soa": _cpp_bool(residual_affine_uses_metric_soa),
+        "action_affine_uses_metric_soa": _cpp_bool(action_affine_uses_metric_soa),
+        "residual_affine_uses_metric_aos": _cpp_bool(residual_affine_uses_metric_aos),
+        "action_affine_uses_metric_aos": _cpp_bool(action_affine_uses_metric_aos),
         "yaml_affine_options": _affine_option_entries(
             "residual_uses_affine",
             "jacobian_action_uses_affine",
@@ -2840,20 +3129,44 @@ def _residual_dual_soa_case(
         isoparametric_function,
         isoparametric_arguments,
         field_stride,
-        setup_lines):
+        setup_lines,
+        affine_unit_function=None,
+        affine_unit_arguments=None,
+        affine_unit_condition=None):
+    if affine_unit_function:
+        body = """                    if (impl_->%(flag)s) {
+                        if (%(affine_unit_condition)s) {
+                            return %(affine_unit_function)s(%(affine_unit_arguments)s);
+                        }
+                        return %(affine_function)s(%(affine_arguments)s);
+                    }
+                    return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+            "flag": flag,
+            "affine_unit_condition": affine_unit_condition,
+            "affine_unit_function": affine_unit_function,
+            "affine_unit_arguments": affine_unit_arguments,
+            "affine_function": affine_function,
+            "affine_arguments": affine_arguments,
+            "isoparametric_function": isoparametric_function,
+            "isoparametric_arguments": isoparametric_arguments,
+        }
+    else:
+        body = """                    return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+            "flag": flag,
+            "affine_function": affine_function,
+            "affine_arguments": affine_arguments,
+            "isoparametric_function": isoparametric_function,
+            "isoparametric_arguments": isoparametric_arguments,
+        }
     return """                case smesh::%(element)s: {
                     static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
 %(setup)s
-                    return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);
+%(body)s
                 }""" % {
         "element": _mesh_element_name(element),
-        "flag": flag,
-        "affine_function": affine_function,
-        "affine_arguments": affine_arguments,
-        "isoparametric_function": isoparametric_function,
-        "isoparametric_arguments": isoparametric_arguments,
         "field_stride": field_stride,
         "setup": "\n".join(setup_lines),
+        "body": body,
     }
 
 
@@ -2993,6 +3306,15 @@ def _extract_c_abi_declarations(kernel_sources):
 def _c_abi_function_name(declaration):
     match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", declaration)
     return match.group(1) if match else None
+
+
+def _c_abi_function_exists(kernel_sources, function_name):
+    if not kernel_sources:
+        return False
+    for declaration in _extract_c_abi_declarations(kernel_sources):
+        if _c_abi_function_name(declaration) == function_name:
+            return True
+    return False
 
 
 _RUNTIME_OPERATION_MARKERS = (
@@ -3372,6 +3694,32 @@ def _dual_case(element, flag, affine_function, affine_arguments, isoparametric_f
                     return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
         "element": _mesh_element_name(element),
         "flag": flag,
+        "affine_function": affine_function,
+        "affine_arguments": affine_arguments,
+        "isoparametric_function": isoparametric_function,
+        "isoparametric_arguments": isoparametric_arguments,
+    }
+
+
+def _dual_aos_unit_case(
+    element,
+    flag,
+    affine_aos_function,
+    affine_aos_arguments,
+    affine_function,
+    affine_arguments,
+    isoparametric_function,
+    isoparametric_arguments,
+):
+    return """                case smesh::%(element)s:
+                    if (impl_->%(flag)s) {
+                        return adjugate_aos ? %(affine_aos_function)s(%(affine_aos_arguments)s) : %(affine_function)s(%(affine_arguments)s);
+                    }
+                    return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+        "element": _mesh_element_name(element),
+        "flag": flag,
+        "affine_aos_function": affine_aos_function,
+        "affine_aos_arguments": affine_aos_arguments,
         "affine_function": affine_function,
         "affine_arguments": affine_arguments,
         "isoparametric_function": isoparametric_function,

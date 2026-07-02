@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import sympy as sp
 
@@ -30,10 +31,28 @@ class GradientMetricTransformation:
     def metric_component(self, left, right):
         return symmetric_metric_component_index(left, right)
 
+    def to_dict(self):
+        return {
+            "kind": "simplex_gradient_metric",
+            "field_index": self.field_index,
+            "stream_group_name": self.stream_group_name,
+            "scale": str(self.scale),
+            "dim": self.dim,
+            "n_shape": self.n_shape,
+            "metric_components": self.metric_components,
+            "affine_geometry_storage": self.affine_geometry_storage,
+            "affine_geometry_component_order": self.affine_geometry_component_order,
+            "reference_gradients": [
+                [str(value) for value in row]
+                for row in self.reference_gradients
+            ],
+        }
+
 
 def simplex_gradient_metric_transformation(system, rule, coefficients, dependencies):
     if not _is_constant_p1_simplex_rule(rule):
         return None
+    dependencies = _gradient_metric_dependencies(system, coefficients, dependencies)
     if len(system.fields) != 1 or len(coefficients) != 1:
         return None
     if any(dependencies.value_coefficients):
@@ -67,6 +86,47 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
         stream_group_name=stream_group_name,
         scale=scale,
         reference_gradients=_constant_reference_gradients(rule),
+    )
+
+
+def _gradient_metric_dependencies(system, coefficients, dependencies):
+    if hasattr(dependencies, "value_coefficients"):
+        return dependencies
+    free_symbols = set()
+    for coefficient in coefficients:
+        free_symbols.update(sp.sympify(coefficient.value).free_symbols)
+        for expression in coefficient.gradient:
+            free_symbols.update(sp.sympify(expression).free_symbols)
+    current_value = any(field.value in free_symbols for field in system.fields)
+    current_gradient = any(
+        free_symbols.intersection(field.gradient) for field in system.fields
+    )
+    previous_value = any(
+        field.previous_value is not None and field.previous_value in free_symbols
+        for field in system.fields
+    )
+    previous_gradient = any(
+        free_symbols.intersection(field.previous_gradient) for field in system.fields
+    )
+    direction_value = any(
+        field.direction_value in free_symbols for field in system.fields
+    )
+    direction_gradient = any(
+        free_symbols.intersection(field.direction_gradient) for field in system.fields
+    )
+    return SimpleNamespace(
+        current=current_value or current_gradient,
+        previous=previous_value or previous_gradient,
+        direction=direction_value or direction_gradient,
+        current_value=current_value,
+        current_gradient=current_gradient,
+        previous_value=previous_value,
+        previous_gradient=previous_gradient,
+        direction_value=direction_value,
+        direction_gradient=direction_gradient,
+        value_coefficients=tuple(
+            not _is_zero(coefficient.value) for coefficient in coefficients
+        ),
     )
 
 
@@ -115,6 +175,11 @@ def _uniform_gradient_scale(expressions, gradient_symbols, forbidden_symbols):
         elif sp.simplify(ratio - scale) != 0:
             return None
     return None if scale is None else sp.simplify(scale)
+
+
+def _is_zero(expression):
+    expression = sp.sympify(expression)
+    return expression == 0 or expression.is_zero is True
 
 
 def _is_constant_p1_simplex_rule(rule):

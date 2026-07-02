@@ -921,7 +921,7 @@ def _constant_p1_specialized_local(local_prefix, quadrature_rule):
     if quadrature_rule is None or not str(local_prefix).endswith("_simplex"):
         return None
 
-    element_type = {3: "TET4"}.get(int(getattr(quadrature_rule, "dim", 0)))
+    element_type = {2: "TRI3", 3: "TET4"}.get(int(getattr(quadrature_rule, "dim", 0)))
     if element_type is None:
         return None
 
@@ -941,7 +941,7 @@ def _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule):
     if constant_p1_simplex_reference_gradients(quadrature_rule) is None:
         return None
     element_type = str(getattr(quadrature_rule, "element_type", "")).lower()
-    if element_type != "tet4":
+    if element_type not in ("tri3", "tet4"):
         return None
     return "%s_%s" % (local_prefix, element_type)
 
@@ -2072,6 +2072,17 @@ def _sfem_soa_operator_source(
                     source_builder=source_builder,
                 )
             )
+            fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
+                form,
+                prefix,
+                dim,
+                n_nodes,
+                affine_rule,
+                source_builder=source_builder,
+            )
+            if fast_aos_unit_lines:
+                lines.append("")
+                lines.extend(fast_aos_unit_lines)
             if form.name == "objective" and source_builder.emit_objective_steps:
                 lines.append("")
                 lines.extend(
@@ -2134,6 +2145,214 @@ def _sfem_soa_operator_source(
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _is_tet4_linear_elasticity_aos_unit_candidate(form, prefix, dim, n_nodes, quadrature_rule):
+    if form.name not in ("gradient", "apply"):
+        return False
+    if form.weak_form is None:
+        return False
+    if dim != 3 or n_nodes != 4:
+        return False
+    if not str(prefix).startswith("linear_elasticity_"):
+        return False
+    if quadrature_rule is None:
+        return False
+    element_type = str(getattr(quadrature_rule, "element_type", "")).lower()
+    return element_type == "tet4"
+
+
+def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    quadrature_rule,
+    source_builder=None,
+):
+    if source_builder is None:
+        source_builder = _default_openmp_energy_source_builder()
+    if not _is_tet4_linear_elasticity_aos_unit_candidate(
+        form, prefix, dim, n_nodes, quadrature_rule
+    ):
+        return []
+
+    function_name = "%s_aos_unit" % _sfem_soa_mesh_public_function_name(
+        prefix,
+        form.name,
+        quadrature_rule,
+        "affine",
+    )
+    implementation_name = "%s_impl" % function_name
+    input_prefix = "u" if form.name == "gradient" else "h"
+    stride_name = "%s_stride" % input_prefix
+    input_components = tuple("%s%s" % (input_prefix, _component_name(d)) for d in range(3))
+
+    impl_params = (
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate_aos",
+        "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0",
+        "const scalar_t mu",
+        "const scalar_t lmbda",
+        "const ptrdiff_t %s" % stride_name,
+        "const scalar_t *const SFEM_RESTRICT %s" % input_components[0],
+        "const scalar_t *const SFEM_RESTRICT %s" % input_components[1],
+        "const scalar_t *const SFEM_RESTRICT %s" % input_components[2],
+        "const ptrdiff_t out_stride",
+        "scalar_t *const SFEM_RESTRICT outx",
+        "scalar_t *const SFEM_RESTRICT outy",
+        "scalar_t *const SFEM_RESTRICT outz",
+    )
+    wrapper_params = tuple(
+        param.replace("jacobian_t", "geom_t") for param in impl_params
+    )
+
+    vx, vy, vz = input_components
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t>",
+        "static SFEM_INLINE int %s(" % implementation_name,
+    ]
+    for idx, param in enumerate(impl_params):
+        comma = "," if idx + 1 < len(impl_params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    (void)nnodes;",
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "        const idx_t ev0 = elements[0][element];",
+            "        const idx_t ev1 = elements[1][element];",
+            "        const idx_t ev2 = elements[2][element];",
+            "        const idx_t ev3 = elements[3][element];",
+            "",
+            "        const scalar_t ux0 = %s[ev0 * %s];" % (vx, stride_name),
+            "        const scalar_t ux1 = %s[ev1 * %s];" % (vx, stride_name),
+            "        const scalar_t ux2 = %s[ev2 * %s];" % (vx, stride_name),
+            "        const scalar_t ux3 = %s[ev3 * %s];" % (vx, stride_name),
+            "        const scalar_t uy0 = %s[ev0 * %s];" % (vy, stride_name),
+            "        const scalar_t uy1 = %s[ev1 * %s];" % (vy, stride_name),
+            "        const scalar_t uy2 = %s[ev2 * %s];" % (vy, stride_name),
+            "        const scalar_t uy3 = %s[ev3 * %s];" % (vy, stride_name),
+            "        const scalar_t uz0 = %s[ev0 * %s];" % (vz, stride_name),
+            "        const scalar_t uz1 = %s[ev1 * %s];" % (vz, stride_name),
+            "        const scalar_t uz2 = %s[ev2 * %s];" % (vz, stride_name),
+            "        const scalar_t uz3 = %s[ev3 * %s];" % (vz, stride_name),
+            "",
+            "        const jacobian_t *const SFEM_RESTRICT adjugate = g_jacobian_adjugate_aos + element * 9;",
+        ]
+    )
+    for component in range(9):
+        lines.append(
+            "        const scalar_t a%d = scalar_t(adjugate[%d]);"
+            % (component, component)
+        )
+    lines.extend(
+        [
+            "        const scalar_t inv_det = scalar_t(1) / scalar_t(g_jacobian_determinant0[element]);",
+            "",
+            "        const scalar_t x1 = ux0 - ux1;",
+            "        const scalar_t x2 = ux0 - ux2;",
+            "        const scalar_t x3 = ux0 - ux3;",
+            "        const scalar_t x4 = uy0 - uy1;",
+            "        const scalar_t x5 = uy0 - uy2;",
+            "        const scalar_t x6 = uy0 - uy3;",
+            "        const scalar_t x7 = uz0 - uz1;",
+            "        const scalar_t x8 = uz0 - uz2;",
+            "        const scalar_t x9 = uz0 - uz3;",
+            "",
+            "        scalar_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);",
+            "        scalar_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);",
+            "        scalar_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);",
+            "        scalar_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);",
+            "        scalar_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);",
+            "        scalar_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);",
+            "        scalar_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);",
+            "        scalar_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);",
+            "        scalar_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);",
+            "",
+            "        const scalar_t m0 = (scalar_t(1) / scalar_t(6)) * mu;",
+            "        const scalar_t m1 = m0 * (p1 + p3);",
+            "        const scalar_t m2 = m0 * (p2 + p6);",
+            "        const scalar_t m3 = scalar_t(2) * mu;",
+            "        const scalar_t m4 = lmbda * (p0 + p4 + p8);",
+            "        const scalar_t m5 = (scalar_t(1) / scalar_t(6)) * p0 * m3 + (scalar_t(1) / scalar_t(6)) * m4;",
+            "        const scalar_t m6 = m0 * (p5 + p7);",
+            "        const scalar_t m7 = (scalar_t(1) / scalar_t(6)) * p4 * m3 + (scalar_t(1) / scalar_t(6)) * m4;",
+            "        const scalar_t m8 = (scalar_t(1) / scalar_t(6)) * p8 * m3 + (scalar_t(1) / scalar_t(6)) * m4;",
+            "",
+            "        const scalar_t q0 = a0 * m5 + a1 * m1 + a2 * m2;",
+            "        const scalar_t q1 = a3 * m5 + a4 * m1 + a5 * m2;",
+            "        const scalar_t q2 = a6 * m5 + a7 * m1 + a8 * m2;",
+            "        const scalar_t q3 = a0 * m1 + a1 * m7 + a2 * m6;",
+            "        const scalar_t q4 = a3 * m1 + a4 * m7 + a5 * m6;",
+            "        const scalar_t q5 = a6 * m1 + a7 * m7 + a8 * m6;",
+            "        const scalar_t q6 = a0 * m2 + a1 * m6 + a2 * m8;",
+            "        const scalar_t q7 = a3 * m2 + a4 * m6 + a5 * m8;",
+            "        const scalar_t q8 = a6 * m2 + a7 * m6 + a8 * m8;",
+            "",
+        ]
+    )
+    scatter_values = (
+        ("outx", "ev0", "-q0 - q1 - q2"),
+        ("outx", "ev1", "q0"),
+        ("outx", "ev2", "q1"),
+        ("outx", "ev3", "q2"),
+        ("outy", "ev0", "-q3 - q4 - q5"),
+        ("outy", "ev1", "q3"),
+        ("outy", "ev2", "q4"),
+        ("outy", "ev3", "q5"),
+        ("outz", "ev0", "-q6 - q7 - q8"),
+        ("outz", "ev1", "q6"),
+        ("outz", "ev2", "q7"),
+        ("outz", "ev3", "q8"),
+    )
+    for out, ev, value in scatter_values:
+        lines.extend(
+            [
+                "        #pragma omp atomic update",
+                "        %s[%s * out_stride] += %s;" % (out, ev, value),
+            ]
+        )
+    lines.extend(
+        [
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+
+    wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    for public_name, scalar_type in (
+        (function_name, "double"),
+        ("%s_float" % function_name, "float"),
+    ):
+        concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
+        lines.append('extern "C" int %s(' % public_name)
+        for idx, param in enumerate(concrete_params):
+            comma = "," if idx + 1 < len(concrete_params) else ""
+            lines.append("        %s%s" % (param, comma))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);"
+                % (implementation_name, scalar_type, ", ".join(wrapper_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
 
 
 def _sfem_soa_mesh_operator_function(

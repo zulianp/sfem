@@ -165,6 +165,500 @@ def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
     return lines
 
 
+def _metric_component_load(component, scale, source=None):
+    if source is None:
+        source = "scalar_t(g_geom_metric%d[i])" % component
+    if scale == "1":
+        return source
+    return "metric_factor * %s" % source
+
+
+def _simplex_metric_scalar_affine_loop_lines(
+    system,
+    rule,
+    input_name,
+    input_stride,
+    output_name,
+    scale,
+    indent,
+    unit_stride,
+    unit_scale,
+    metric_layout="soa",
+):
+    if (
+        system.dim == 3
+        and rule.n_shape == 4
+        and metric_layout == "aos"
+        and unit_stride
+        and unit_scale
+    ):
+        lines = [
+            "",
+            "%s%s" % (indent, _parallel_for_pragma("static").strip()),
+            "%sfor (ptrdiff_t i = 0; i < nelements; ++i) {" % indent,
+            "%s    scalar_t element_vector[4];" % indent,
+            "%s    idx_t ev[4];" % indent,
+            "%s    scalar_t fff[6];" % indent,
+            "%s    for (int k = 0; k < 6; ++k) {" % indent,
+            "%s        fff[k] = scalar_t(g_geom_metric[i * 6 + k]);" % indent,
+            "%s    }" % indent,
+            "%s    #pragma unroll(4)" % indent,
+            "%s    for (int v = 0; v < 4; ++v) {" % indent,
+            "%s        ev[v] = elements[v][i];" % indent,
+            "%s    }" % indent,
+            "%s    const scalar_t u0 = %s[ev[0]];" % (indent, input_name),
+            "%s    const scalar_t u1 = %s[ev[1]];" % (indent, input_name),
+            "%s    const scalar_t u2 = %s[ev[2]];" % (indent, input_name),
+            "%s    const scalar_t u3 = %s[ev[3]];" % (indent, input_name),
+            "%s    const scalar_t x0 = fff[0] + fff[1] + fff[2];" % indent,
+            "%s    const scalar_t x1 = fff[1] + fff[3] + fff[4];" % indent,
+            "%s    const scalar_t x2 = fff[2] + fff[4] + fff[5];" % indent,
+            "%s    const scalar_t x3 = fff[1] * u0;" % indent,
+            "%s    const scalar_t x4 = fff[2] * u0;" % indent,
+            "%s    const scalar_t x5 = fff[4] * u0;" % indent,
+            "%s    element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;" % indent,
+            "%s    element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;" % indent,
+            "%s    element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;" % indent,
+            "%s    element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;" % indent,
+            "%s    for (int edof_i = 0; edof_i < 4; ++edof_i) {" % indent,
+            "%s        const idx_t dof_i = ev[edof_i];" % indent,
+            "%s        %s" % (indent, _atomic_update_pragma()),
+            "%s        %s[dof_i] += element_vector[edof_i];" % (indent, output_name),
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+        return lines
+
+    lines = [
+        "",
+        "%s%s" % (indent, _parallel_for_pragma("static").strip()),
+        "%sfor (ptrdiff_t i = 0; i < nelements; ++i) {" % indent,
+    ]
+    for shape in range(rule.n_shape):
+        lines.append(
+            "%s    const idx_t ev%d = elements[%d][i];" % (indent, shape, shape)
+        )
+    for shape in range(rule.n_shape):
+        index = "ev%d" % shape if unit_stride else "ev%d * %s" % (shape, input_stride)
+        lines.append(
+            "%s    const scalar_t u%d = %s[%s];"
+            % (indent, shape, input_name, index)
+        )
+    if not unit_scale and scale != "1":
+        lines.append("%s    const scalar_t metric_factor = %s;" % (indent, scale))
+    component_scale = "1" if unit_scale else scale
+    metric_components = system.dim * (system.dim + 1) // 2
+    for component in range(metric_components):
+        if metric_layout == "aos":
+            source = "scalar_t(g_geom_metric[i * %d + %d])" % (
+                metric_components,
+                component,
+            )
+        else:
+            source = "scalar_t(g_geom_metric%d[i])" % component
+        lines.append(
+            "%s    const scalar_t fff%d = %s;"
+            % (
+                indent,
+                component,
+                _metric_component_load(component, component_scale, source),
+            )
+        )
+    for d in range(system.dim):
+        lines.append("%s    const scalar_t grad%d = u%d - u0;" % (indent, d, d + 1))
+
+    if system.dim == 2:
+        lines.extend(
+            [
+                "%s    const scalar_t e1 = fff0 * grad0 + fff1 * grad1;" % indent,
+                "%s    const scalar_t e2 = fff1 * grad0 + fff2 * grad1;" % indent,
+                "%s    const scalar_t e0 = -(e1) - e2;" % indent,
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "%s    const scalar_t x0 = fff0 + fff1 + fff2;" % indent,
+                "%s    const scalar_t x1 = fff1 + fff3 + fff4;" % indent,
+                "%s    const scalar_t x2 = fff2 + fff4 + fff5;" % indent,
+                "%s    const scalar_t x3 = fff1 * u0;" % indent,
+                "%s    const scalar_t x4 = fff2 * u0;" % indent,
+                "%s    const scalar_t x5 = fff4 * u0;" % indent,
+                "%s    const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;" % indent,
+                "%s    const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;" % indent,
+                "%s    const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;" % indent,
+                "%s    const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;" % indent,
+            ]
+        )
+    for shape in range(rule.n_shape):
+        index = "ev%d" % shape if unit_stride else "ev%d * out_stride" % shape
+        lines.extend(
+            [
+                "%s    %s" % (indent, _atomic_update_pragma()),
+                "%s    %s[%s] += e%d;" % (indent, output_name, index, shape),
+            ]
+        )
+    lines.append("%s}" % indent)
+    return lines
+
+
+def _simplex_metric_scalar_affine_fast_path_body(
+    system,
+    rule,
+    dependencies,
+    gradient_metric,
+):
+    if not _uses_cached_affine_metric(gradient_metric):
+        return None
+    if len(system.fields) != 1 or rule.n_qp != 1:
+        return None
+    if system.dim not in (2, 3) or rule.n_shape != system.dim + 1:
+        return None
+    if dependencies.previous or dependencies.current == dependencies.direction:
+        return None
+
+    stream_group_name = "current" if dependencies.current else "direction"
+    if gradient_metric.stream_group_name != stream_group_name:
+        return None
+
+    field = system.fields[0]
+    input_name = field.name if dependencies.current else "%s_direction" % field.name
+    input_stride = "current_stride" if dependencies.current else "direction_stride"
+    output_name = "%s_out" % field.name
+    scale = _sfem_ccode(gradient_metric.scale)
+    lines = []
+    if scale == "1":
+        lines.extend(
+            [
+                "    if (%s == 1 && out_stride == 1) {" % input_stride,
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "        ",
+                    unit_stride=True,
+                    unit_scale=True,
+                    metric_layout="soa",
+                ),
+                "    } else {",
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "        ",
+                    unit_stride=False,
+                    unit_scale=True,
+                    metric_layout="soa",
+                ),
+                "    }",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "    if (%s == 1 && out_stride == 1) {" % input_stride,
+                "        if ((%s) == scalar_t(1)) {" % scale,
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=True,
+                    unit_scale=True,
+                    metric_layout="soa",
+                ),
+                "        } else {",
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=True,
+                    unit_scale=False,
+                    metric_layout="soa",
+                ),
+                "        }",
+                "    } else {",
+                "        if ((%s) == scalar_t(1)) {" % scale,
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=False,
+                    unit_scale=True,
+                    metric_layout="soa",
+                ),
+                "        } else {",
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=False,
+                    unit_scale=False,
+                    metric_layout="soa",
+                ),
+                "        }",
+                "    }",
+            ]
+        )
+    return lines
+
+
+def _simplex_metric_scalar_affine_aos_wrapper_lines(
+    function,
+    system,
+    rule,
+    dependencies,
+    gradient_metric,
+):
+    field = system.fields[0]
+    input_kind = "current" if dependencies.current else "direction"
+    input_name = field.name if dependencies.current else "%s_direction" % field.name
+    input_stride = "%s_stride" % input_kind
+    output_name = "%s_out" % field.name
+    scale = _sfem_ccode(gradient_metric.scale)
+    lines = []
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        params = [
+            "const ptrdiff_t nelements",
+            "const ptrdiff_t nnodes",
+            "idx_t **const SFEM_RESTRICT elements",
+            "const geom_t *const SFEM_RESTRICT g_geom_metric",
+        ]
+        params.extend(
+            "const %s %s" % (scalar_type, parameter)
+            for parameter in dependencies.parameters
+        )
+        if dependencies.current:
+            params.append("const ptrdiff_t current_stride")
+            params.extend(
+                "const %s *const SFEM_RESTRICT %s" % (scalar_type, field.name)
+                for field in system.fields
+            )
+        if dependencies.direction:
+            params.append("const ptrdiff_t direction_stride")
+            params.extend(
+                "const %s *const SFEM_RESTRICT %s_direction"
+                % (scalar_type, field.name)
+                for field in system.fields
+            )
+        params.append("const ptrdiff_t out_stride")
+        params.extend(
+            "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
+            for field in system.fields
+        )
+        lines.append('extern "C" int %s_aos%s(' % (function, suffix))
+        for index, param in enumerate(params):
+            lines.append(
+                "        %s%s"
+                % (param, "," if index + 1 < len(params) else "")
+            )
+        lines.extend(
+            [
+                ") {",
+                "    using scalar_t = %s;" % scalar_type,
+                "    static constexpr int DIM = %d;" % system.dim,
+                "    static constexpr int N_QP = %d;" % rule.n_qp,
+                "    static constexpr int N_SHAPE = %d;" % rule.n_shape,
+                "    (void)DIM;",
+                "    (void)N_QP;",
+                "    (void)N_SHAPE;",
+                "    (void)nnodes;",
+                "    if (%s == 1 && out_stride == 1) {" % input_stride,
+                "        if ((%s) == scalar_t(1)) {" % scale,
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=True,
+                    unit_scale=True,
+                    metric_layout="aos",
+                ),
+                "        } else {",
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=True,
+                    unit_scale=False,
+                    metric_layout="aos",
+                ),
+                "        }",
+                "    } else {",
+                "        if ((%s) == scalar_t(1)) {" % scale,
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=False,
+                    unit_scale=True,
+                    metric_layout="aos",
+                ),
+                "        } else {",
+                *_simplex_metric_scalar_affine_loop_lines(
+                    system,
+                    rule,
+                    input_name,
+                    input_stride,
+                    output_name,
+                    scale,
+                    "            ",
+                    unit_stride=False,
+                    unit_scale=False,
+                    metric_layout="aos",
+                ),
+                "        }",
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+            ]
+        )
+        if len(dependencies.parameters) == 1 and scale == str(dependencies.parameters[0]):
+            unit_params = [
+                "const ptrdiff_t nelements",
+                "const ptrdiff_t nnodes",
+                "idx_t **const SFEM_RESTRICT elements",
+                "const geom_t *const SFEM_RESTRICT g_geom_metric",
+            ]
+            if dependencies.current:
+                unit_params.extend(
+                    "const %s *const SFEM_RESTRICT %s" % (scalar_type, field.name)
+                    for field in system.fields
+                )
+            if dependencies.direction:
+                unit_params.extend(
+                    "const %s *const SFEM_RESTRICT %s_direction"
+                    % (scalar_type, field.name)
+                    for field in system.fields
+                )
+            unit_params.extend(
+                "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
+                for field in system.fields
+            )
+            lines.append('extern "C" int %s_aos_unit%s(' % (function, suffix))
+            for index, param in enumerate(unit_params):
+                lines.append(
+                    "        %s%s"
+                    % (param, "," if index + 1 < len(unit_params) else "")
+                )
+            lines.extend(
+                [
+                    ") {",
+                    "    using scalar_t = %s;" % scalar_type,
+                    "    (void)nnodes;",
+                    *_simplex_metric_scalar_affine_loop_lines(
+                        system,
+                        rule,
+                        input_name,
+                        input_stride,
+                        output_name,
+                        scale,
+                        "    ",
+                        unit_stride=True,
+                        unit_scale=True,
+                        metric_layout="aos",
+                    ),
+                    "    return SFEM_SUCCESS;",
+                    "}",
+                    "",
+                ]
+            )
+    return lines
+
+
+def _affine_mesh_public_wrapper_lines(
+    function,
+    impl,
+    params,
+    uses_cached_affine_metric,
+    gradient_metric,
+    dependencies,
+    system,
+    dim,
+):
+    lines = []
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append(
+                "        %s%s"
+                % (param, "," if index + 1 < len(typed_params) else "")
+            )
+        call_args = ["nelements", "nnodes", "elements"]
+        if uses_cached_affine_metric:
+            call_args.extend(
+                "g_geom_metric%d" % i
+                for i in range(gradient_metric.metric_components)
+            )
+        elif dependencies.uses_adjugate:
+            call_args.extend(
+                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
+            )
+        if not uses_cached_affine_metric:
+            call_args.append("g_jacobian_determinant0")
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        if dependencies.direction:
+            call_args.append("direction_stride")
+            call_args.extend(
+                "%s_direction" % field.name for field in system.fields
+            )
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
 def _zero_block_output_lines(name, n_streams, indent):
     lines = [*_work_item_loop_lines(indent)]
     for stream in range(n_streams):
@@ -1020,7 +1514,7 @@ def _constant_p1_affine_specialized_local(local_prefix, specialization):
     if rule is None or not str(local_prefix).endswith("_simplex"):
         return None
 
-    element_type = {3: "TET4"}.get(int(getattr(rule, "dim", 0)))
+    element_type = {2: "TRI3", 3: "TET4"}.get(int(getattr(rule, "dim", 0)))
     if element_type is None:
         return None
 
@@ -1043,7 +1537,7 @@ def _constant_p1_affine_specialized_local_prefix(local_prefix, rule):
     if constant_p1_simplex_reference_gradients(rule) is None:
         return None
     element_type = str(getattr(rule, "element_type", "")).lower()
-    if element_type != "tet4":
+    if element_type not in ("tri3", "tet4"):
         return None
     return "%s_%s" % (local_prefix, element_type)
 
@@ -2012,19 +2506,18 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             "            const scalar_t %s%s_grad_%d_ref_value = %s;"
             % (field.name, group.symbol_suffix, d, value)
         )
-    if scale == "1":
-        metric_factor = "q_weight[q]"
-    else:
-        metric_factor = "q_weight[q] * (%s)" % scale
     lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
+    if scale == "1":
+        lines.append("            const scalar_t metric_factor = q_weight[q];")
+    else:
+        lines.append("            const scalar_t metric_factor = q_weight[q] * (%s);" % scale)
     for left in range(dim):
         for right in range(left, dim):
             lines.append(
-                "            const scalar_t geom_metric%d%d = (%s) * geom_metric[%d][geometry_offset];"
+                "            const scalar_t geom_metric%d%d = metric_factor * geom_metric[%d][geometry_offset];"
                 % (
                     left,
                     right,
-                    metric_factor,
                     specialization.metric_component(left, right),
                 )
             )
@@ -3786,6 +4279,61 @@ def _mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
+    fast_path_body = _simplex_metric_scalar_affine_fast_path_body(
+        system,
+        rule,
+        dependencies,
+        gradient_metric,
+    )
+    if fast_path_body is not None:
+        lines.extend(fast_path_body)
+        lines.extend(
+            [
+                "",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+        function = "%s_%s_affine_mesh_soa" % (prefix, form)
+        lines.extend(
+            _affine_mesh_public_wrapper_lines(
+                function,
+                impl,
+                params,
+                uses_cached_affine_metric,
+                gradient_metric,
+                dependencies,
+                system,
+                dim,
+            )
+        )
+        lines.extend(
+            _simplex_metric_scalar_affine_aos_wrapper_lines(
+                function,
+                system,
+                rule,
+                dependencies,
+                gradient_metric,
+            )
+        )
+        lines.extend(
+            _isoparametric_mesh_operator_source(
+                system,
+                prefix,
+                local_prefix,
+                isoparametric_specialization,
+                form,
+                dependencies,
+                coefficients,
+                basis_family,
+                geometry_family,
+            )
+        )
+        return lines
     lines.extend(
         _mesh_reference_alias_lines(
             prefix,
