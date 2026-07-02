@@ -1,0 +1,616 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_1_u_tet4_jacobian_action_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_1_u_tet4_jacobian_action_element_soa_diagnostics(void);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_1_u_tet4_jacobian_u_u_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_1_u_tet4_jacobian_u_u_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_1_u_tet4_jacobian_u_u_diagnostics(void);",
+      "name": "laplace_form_1_u_tet4_jacobian_u_u_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_u_u_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_u_u_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_jacobian_u_u_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_jacobian_u_u_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_residual_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_residual_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        const double *const SFEM_RESTRICT adjugate[9],\n        const double *const SFEM_RESTRICT current[4],\n        const double kappa,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_1_u_tet4_residual_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_1_u_tet4_residual_element_soa_diagnostics(void);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        const float *const SFEM_RESTRICT adjugate[9],\n        const float *const SFEM_RESTRICT current[4],\n        const float kappa,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        const double *const SFEM_RESTRICT current,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        const float *const SFEM_RESTRICT current,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        const double *const SFEM_RESTRICT adjugate[9],\n        const double *const SFEM_RESTRICT direction[4],\n        const double kappa,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_2_u_u_tet4_jacobian_action_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_2_u_u_tet4_jacobian_action_element_soa_diagnostics(void);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        const float *const SFEM_RESTRICT adjugate[9],\n        const float *const SFEM_RESTRICT direction[4],\n        const float kappa,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        const double *const SFEM_RESTRICT direction,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        const float *const SFEM_RESTRICT direction,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_2_u_u_tet4_jacobian_u_u_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_u_u_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_2_u_u_tet4_jacobian_u_u_diagnostics(void);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_u_u_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_u_u_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_u_u_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_jacobian_u_u_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_jacobian_u_u_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_form_2_u_u_tet4_residual_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_form_2_u_u_tet4_residual_element_soa_diagnostics(void);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        const double *const SFEM_RESTRICT adjugate[9],\n        const double *const SFEM_RESTRICT direction[4],\n        const double kappa,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_tet4_jacobian_action_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_tet4_jacobian_action_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_tet4_jacobian_action_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_tet4_jacobian_action_element_soa_diagnostics(void);",
+      "name": "laplace_tet4_jacobian_action_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        const float *const SFEM_RESTRICT adjugate[9],\n        const float *const SFEM_RESTRICT direction[4],\n        const float kappa,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_tet4_jacobian_action_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        const double *const SFEM_RESTRICT direction,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        const float *const SFEM_RESTRICT direction,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_action_isoparametric_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_tet4_jacobian_u_u_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_tet4_jacobian_u_u_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_tet4_jacobian_u_u_diagnostics(void);",
+      "name": "laplace_tet4_jacobian_u_u_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_u_u_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_u_u_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_jacobian_u_u_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_jacobian_u_u_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_affine_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_affine_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_element_soa(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const double *const SFEM_RESTRICT determinant,\n        const double *const SFEM_RESTRICT adjugate[9],\n        const double *const SFEM_RESTRICT current[4],\n        const double kappa,\n        double *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_tet4_residual_element_soa"
+    },
+    {
+      "declaration": "extern \"C\" double laplace_tet4_residual_element_soa_arithmetic_intensity(\n        const ptrdiff_t nelements,\n        const size_t scalar_bytes,\n        const size_t real_bytes,\n        const size_t accumulator_bytes);",
+      "name": "laplace_tet4_residual_element_soa_arithmetic_intensity"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_tet4_residual_element_soa_diagnostics(void);",
+      "name": "laplace_tet4_residual_element_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_element_soa_float(\n        const int nelems,\n        const ptrdiff_t geometry_stride,\n        const float *const SFEM_RESTRICT determinant,\n        const float *const SFEM_RESTRICT adjugate[9],\n        const float *const SFEM_RESTRICT current[4],\n        const float kappa,\n        float *const SFEM_RESTRICT output[4]\n);",
+      "name": "laplace_tet4_residual_element_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_element_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_element_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_element_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_element_soa_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_isoparametric_mesh_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double *const SFEM_RESTRICT parameters,\n        const double *const SFEM_RESTRICT current,\n        double *const SFEM_RESTRICT output\n);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_isoparametric_mesh_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float *const SFEM_RESTRICT parameters,\n        const float *const SFEM_RESTRICT current,\n        float *const SFEM_RESTRICT output\n);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_isoparametric_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_isoparametric_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_isoparametric_mesh_soa_float_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_soa_float_print_rate"
+    },
+    {
+      "declaration": "extern \"C\" void laplace_tet4_residual_isoparametric_mesh_soa_print_rate(\n        const double elapsed,\n        const ptrdiff_t nelements,\n        const ptrdiff_t ndofs,\n        const int repeat);",
+      "name": "laplace_tet4_residual_isoparametric_mesh_soa_print_rate"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedLaplace",
+    "create": "sfem::GeneratedLaplace::create",
+    "create_from_yaml": "sfem::GeneratedLaplace::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d3",
+    "d3/tet4",
+    "op"
+  ],
+  "material": "laplace",
+  "op_name": "GeneratedLaplace",
+  "registration": {
+    "function": "sfem::register_GeneratedLaplace_generated_op",
+    "operator_name": "GeneratedLaplace",
+    "source": "op/sfem_GeneratedLaplace_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "jacobian_action",
+      "variants": [
+        {
+          "function": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_tet4_jacobian_action_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_jacobian_action_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_jacobian_action_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_tet4_jacobian_action_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_tet4_jacobian_action_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_jacobian_action_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_jacobian_action_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_tet4_jacobian_action_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_tet4",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "residual",
+      "variants": [
+        {
+          "function": "laplace_form_1_u_tet4_residual_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_tet4_residual_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_residual_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_residual_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_tet4_residual_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_tet4",
+          "variant": "affine"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_tet4_residual_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "laplace_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_1_u_tet4_residual_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_1_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_form_2_u_u_tet4_residual_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_form_2_u_u_tet4",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "laplace_tet4_residual_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "laplace_tet4",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedLaplace_c_abi.hpp",
+    "header": "op/sfem_GeneratedLaplace.hpp",
+    "source": "op/sfem_GeneratedLaplace.cpp"
+  }
+}

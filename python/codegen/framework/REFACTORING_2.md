@@ -380,6 +380,7 @@ Task:
 2.  Implement the laplace operator in materials, create a mechanism to reproduce the functionality of FFF (in SFEM) automatically by grouping the geometric terms (for TET4 but also for any affine specialization) and elimnating symmetries, so that it can be precomputed and passed to the kernel for more efficient evaluation.
 3. Try to apply these semplifcations automatically to general kernels (affine specializations) and see if there is an opportunity to generalize this geometric grouping concept further 
 4. Guarantee the proper layered architectural separation
+5. Create a new folder in sfem/drivers called verification and replicate the studies (on per driver) from this paper: https://cea.hal.science/cea-02434556/document using our code generated stokes (ignore unsteady / Navier Stokes problems for now), measure error and collect for convergence plots. Create also extraction and plotting scripts to visualize  against the anlytical solution and show convergence rates. Create a reusable help for the different cases.
 
 ## M9. Complete Regression Coverage
 
