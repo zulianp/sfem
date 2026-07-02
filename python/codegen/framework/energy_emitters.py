@@ -1,9 +1,29 @@
 from dataclasses import dataclass
 
 try:
+    from .kernel_ast import (
+        BufferDeclNode,
+        LoopKind,
+        LoopNode,
+        add_assign_increment,
+        expr_ref,
+        iteration_range,
+        iterator,
+    )
+    from .kernel_ast_printer import render_kernel_ast_lines
     from .tensor_product_geometry import sfem_geometry_kernels_header_source
     from .targets import CUDATarget, OpenMPTarget
 except ImportError:
+    from kernel_ast import (
+        BufferDeclNode,
+        LoopKind,
+        LoopNode,
+        add_assign_increment,
+        expr_ref,
+        iteration_range,
+        iterator,
+    )
+    from kernel_ast_printer import render_kernel_ast_lines
     from tensor_product_geometry import sfem_geometry_kernels_header_source
     from targets import CUDATarget, OpenMPTarget
 
@@ -222,10 +242,28 @@ class OpenMPEnergySoASourceBuilder:
         return int(vector_size)
 
     def mesh_loop_lines(self):
-        return (
-            "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-            "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+        tile_iterator = iterator("evbegin", "ptrdiff_t")
+        lines = render_kernel_ast_lines(
+            "openmp_mesh_tile_loop",
+            (
+                LoopNode(
+                    LoopKind.TILE,
+                    tile_iterator,
+                    iteration_range(0, expr_ref("nelements", "element_count")),
+                    add_assign_increment(
+                        tile_iterator,
+                        expr_ref("VECTOR_SIZE", "vector_width"),
+                    ),
+                ),
+                BufferDeclNode(
+                    "const int",
+                    "nelems",
+                    (),
+                    "(int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin)",
+                ),
+            ),
         )
+        return ("    %s" % lines[0], "        %s" % lines[1])
 
     def mesh_template_line(self, geometry_mode):
         return (
@@ -333,10 +371,29 @@ class CUDAEnergySoASourceBuilder:
         return 1
 
     def mesh_loop_lines(self):
-        return (
-            "    for (ptrdiff_t evbegin = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evbegin < nelements; evbegin += (ptrdiff_t)blockDim.x * gridDim.x) {",
-            "        const int nelems = 1;",
+        kernel_iterator = iterator("evbegin", "ptrdiff_t")
+        lines = render_kernel_ast_lines(
+            "cuda_mesh_grid_stride_loop",
+            (
+                LoopNode(
+                    LoopKind.KERNEL,
+                    kernel_iterator,
+                    iteration_range(
+                        expr_ref(
+                            "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
+                            "cuda_thread_start",
+                        ),
+                        expr_ref("nelements", "element_count"),
+                    ),
+                    add_assign_increment(
+                        kernel_iterator,
+                        expr_ref("(ptrdiff_t)blockDim.x * gridDim.x", "cuda_grid_stride"),
+                    ),
+                ),
+                BufferDeclNode("const int", "nelems", (), "1"),
+            ),
         )
+        return ("    %s" % lines[0], "        %s" % lines[1])
 
     def mesh_template_line(self, geometry_mode):
         return (

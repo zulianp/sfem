@@ -3,7 +3,6 @@ from enum import Enum
 
 
 class KernelASTNodeKind(str, Enum):
-    OPAQUE_STATEMENT = "opaque_statement"
     LOOP = "loop"
     ASSIGNMENT = "assignment"
     BUFFER_DECL = "buffer_decl"
@@ -41,6 +40,129 @@ class PartialAssemblyStrategy(str, Enum):
     APPLY_PA = "apply_pa"
 
 
+class LoopIncrementKind(str, Enum):
+    PRE_INCREMENT = "pre_increment"
+    ADD_ASSIGN = "add_assign"
+
+
+@dataclass(frozen=True)
+class TypeRef:
+    name: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "name", str(self.name))
+
+    def to_dict(self):
+        return {"kind": "type", "name": self.name}
+
+
+@dataclass(frozen=True)
+class SymbolRef:
+    name: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "name", str(self.name))
+
+    def to_dict(self):
+        return {"kind": "symbol", "name": self.name}
+
+
+@dataclass(frozen=True)
+class ExpressionRef:
+    expression: str
+    role: str = "external_expression"
+
+    def __post_init__(self):
+        object.__setattr__(self, "expression", str(self.expression))
+        object.__setattr__(self, "role", str(self.role))
+
+    def to_dict(self):
+        return {
+            "kind": "expression",
+            "role": self.role,
+            "expression": self.expression,
+        }
+
+
+@dataclass(frozen=True)
+class Literal:
+    value: object
+
+    def to_dict(self):
+        return {"kind": "literal", "value": self.value}
+
+
+@dataclass(frozen=True)
+class Iterator:
+    symbol: SymbolRef
+    index_type: TypeRef
+
+    def __post_init__(self):
+        object.__setattr__(self, "symbol", _as_symbol(self.symbol))
+        object.__setattr__(self, "index_type", _as_type(self.index_type))
+
+    def to_dict(self):
+        return {
+            "kind": "iterator",
+            "symbol": self.symbol.to_dict(),
+            "index_type": self.index_type.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
+class IterationRange:
+    begin: object
+    end: object
+
+    def __post_init__(self):
+        object.__setattr__(self, "begin", _as_expr(self.begin))
+        object.__setattr__(self, "end", _as_expr(self.end))
+
+    def to_dict(self):
+        return {
+            "kind": "range",
+            "begin": _entity_to_dict(self.begin),
+            "end": _entity_to_dict(self.end),
+        }
+
+
+@dataclass(frozen=True)
+class LoopIncrement:
+    kind: LoopIncrementKind
+    iterator: Iterator
+    amount: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "kind", LoopIncrementKind(self.kind))
+        object.__setattr__(self, "iterator", self.iterator)
+        if self.amount is not None:
+            object.__setattr__(self, "amount", _as_expr(self.amount))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "iterator": self.iterator.to_dict(),
+            "amount": None if self.amount is None else _entity_to_dict(self.amount),
+        }
+
+
+@dataclass(frozen=True)
+class BufferAccess:
+    base: SymbolRef
+    indices: tuple = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "base", _as_symbol(self.base))
+        object.__setattr__(self, "indices", tuple(_as_expr(index) for index in self.indices))
+
+    def to_dict(self):
+        return {
+            "kind": "buffer_access",
+            "base": self.base.to_dict(),
+            "indices": [_entity_to_dict(index) for index in self.indices],
+        }
+
+
 @dataclass(frozen=True)
 class VectorizationStrategy:
     name: str = "simd_lane"
@@ -58,17 +180,17 @@ class VectorizationStrategy:
 @dataclass(frozen=True)
 class LoopStrategy:
     name: str
-    index: str
-    extent: str
-    increment: str = "++%s"
+    iterator: Iterator
+    iteration_range: IterationRange
+    increment: LoopIncrement
     vectorization: VectorizationStrategy = None
 
     def to_dict(self):
         return {
             "name": self.name,
-            "index": self.index,
-            "extent": self.extent,
-            "increment": self.increment,
+            "iterator": self.iterator.to_dict(),
+            "range": self.iteration_range.to_dict(),
+            "increment": self.increment.to_dict(),
             "vectorization": None
             if self.vectorization is None
             else self.vectorization.to_dict(),
@@ -120,44 +242,29 @@ class KernelAST:
 
 
 @dataclass(frozen=True)
-class OpaqueStatementNode:
-    statement: str
-    reason: str = "parity_migration"
-    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.OPAQUE_STATEMENT, init=False)
-
-    def to_dict(self):
-        return {
-            "kind": self.kind.value,
-            "statement": self.statement,
-            "reason": self.reason,
-        }
-
-
-@dataclass(frozen=True)
 class LoopNode:
     loop_kind: LoopKind
-    index_type: str
-    index: str
-    begin: str
-    end: str
-    increment: str
+    iterator: Iterator
+    iteration_range: IterationRange
+    increment: LoopIncrement
     body: tuple = ()
     vectorized: bool = False
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.LOOP, init=False)
 
     def __post_init__(self):
         object.__setattr__(self, "loop_kind", LoopKind(self.loop_kind))
+        object.__setattr__(self, "iterator", self.iterator)
+        object.__setattr__(self, "iteration_range", self.iteration_range)
+        object.__setattr__(self, "increment", self.increment)
         object.__setattr__(self, "body", tuple(self.body))
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
             "loop_kind": self.loop_kind.value,
-            "index_type": self.index_type,
-            "index": self.index,
-            "begin": self.begin,
-            "end": self.end,
-            "increment": self.increment,
+            "iterator": self.iterator.to_dict(),
+            "range": self.iteration_range.to_dict(),
+            "increment": self.increment.to_dict(),
             "vectorized": self.vectorized,
             "body": [node.to_dict() for node in self.body],
         }
@@ -165,95 +272,115 @@ class LoopNode:
 
 @dataclass(frozen=True)
 class AssignmentNode:
-    lhs: str
-    rhs: str
+    lhs: object
+    rhs: object
     operator: str = "="
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.ASSIGNMENT, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "lhs", _as_expr(self.lhs))
+        object.__setattr__(self, "rhs", _as_expr(self.rhs))
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
-            "lhs": self.lhs,
+            "lhs": _entity_to_dict(self.lhs),
             "operator": self.operator,
-            "rhs": self.rhs,
+            "rhs": _entity_to_dict(self.rhs),
         }
 
 
 @dataclass(frozen=True)
 class BufferDeclNode:
-    scalar_type: str
-    name: str
+    scalar_type: TypeRef
+    name: SymbolRef
     extents: tuple
-    initializer: str = ""
+    initializer: object = None
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.BUFFER_DECL, init=False)
 
     def __post_init__(self):
-        object.__setattr__(self, "extents", tuple(str(extent) for extent in self.extents))
+        object.__setattr__(self, "scalar_type", _as_type(self.scalar_type))
+        object.__setattr__(self, "name", _as_symbol(self.name))
+        object.__setattr__(self, "extents", tuple(_as_expr(extent) for extent in self.extents))
+        if self.initializer is not None:
+            object.__setattr__(self, "initializer", _as_expr(self.initializer))
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
-            "scalar_type": self.scalar_type,
-            "name": self.name,
-            "extents": list(self.extents),
-            "initializer": self.initializer,
+            "scalar_type": self.scalar_type.to_dict(),
+            "name": self.name.to_dict(),
+            "extents": [_entity_to_dict(extent) for extent in self.extents],
+            "initializer": None
+            if self.initializer is None
+            else _entity_to_dict(self.initializer),
         }
 
 
 @dataclass(frozen=True)
 class CallNode:
-    callee: str
+    callee: SymbolRef
     arguments: tuple = ()
     template_arguments: tuple = ()
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.CALL, init=False)
 
     def __post_init__(self):
-        object.__setattr__(self, "arguments", tuple(str(arg) for arg in self.arguments))
+        object.__setattr__(self, "callee", _as_symbol(self.callee))
+        object.__setattr__(self, "arguments", tuple(_as_expr(arg) for arg in self.arguments))
         object.__setattr__(
             self,
             "template_arguments",
-            tuple(str(arg) for arg in self.template_arguments),
+            tuple(_as_expr(arg) for arg in self.template_arguments),
         )
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
-            "callee": self.callee,
-            "template_arguments": list(self.template_arguments),
-            "arguments": list(self.arguments),
+            "callee": self.callee.to_dict(),
+            "template_arguments": [_entity_to_dict(arg) for arg in self.template_arguments],
+            "arguments": [_entity_to_dict(arg) for arg in self.arguments],
         }
 
 
 @dataclass(frozen=True)
 class GatherNode:
-    target: str
-    source: str
-    index: str
+    target: object
+    source: object
+    index: object
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.GATHER, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "target", _as_expr(self.target))
+        object.__setattr__(self, "source", _as_expr(self.source))
+        object.__setattr__(self, "index", _as_expr(self.index))
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
-            "target": self.target,
-            "source": self.source,
-            "index": self.index,
+            "target": _entity_to_dict(self.target),
+            "source": _entity_to_dict(self.source),
+            "index": _entity_to_dict(self.index),
         }
 
 
 @dataclass(frozen=True)
 class ScatterNode:
-    target: str
-    value: str
+    target: object
+    value: object
     operator: str = "+="
     atomic: bool = False
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.SCATTER, init=False)
 
+    def __post_init__(self):
+        object.__setattr__(self, "target", _as_expr(self.target))
+        object.__setattr__(self, "value", _as_expr(self.value))
+
     def to_dict(self):
         return {
             "kind": self.kind.value,
-            "target": self.target,
+            "target": _entity_to_dict(self.target),
             "operator": self.operator,
-            "value": self.value,
+            "value": _entity_to_dict(self.value),
             "atomic": self.atomic,
         }
 
@@ -269,15 +396,15 @@ class GeometryNode:
 
     def __post_init__(self):
         object.__setattr__(self, "geometry_kind", GeometryNodeKind(self.geometry_kind))
-        object.__setattr__(self, "outputs", tuple(str(output) for output in self.outputs))
-        object.__setattr__(self, "inputs", tuple(str(input_) for input_ in self.inputs))
+        object.__setattr__(self, "outputs", tuple(_as_expr(output) for output in self.outputs))
+        object.__setattr__(self, "inputs", tuple(_as_expr(input_) for input_ in self.inputs))
 
     def to_dict(self):
         return {
             "kind": self.kind.value,
             "geometry_kind": self.geometry_kind.value,
-            "inputs": list(self.inputs),
-            "outputs": list(self.outputs),
+            "inputs": [_entity_to_dict(input_) for input_ in self.inputs],
+            "outputs": [_entity_to_dict(output) for output in self.outputs],
             "scope": self.scope,
             "persist": self.persist,
         }
@@ -382,3 +509,65 @@ def _cost_to_dict(cost):
         "temporaries": getattr(cost, "temporaries", 0),
         "estimated_registers": getattr(cost, "estimated_registers", 0),
     }
+
+
+def type_ref(name):
+    return TypeRef(name)
+
+
+def symbol_ref(name):
+    return SymbolRef(name)
+
+
+def expr_ref(expression, role="external_expression"):
+    return ExpressionRef(expression, role)
+
+
+def literal(value):
+    return Literal(value)
+
+
+def iterator(name, index_type):
+    return Iterator(SymbolRef(name), TypeRef(index_type))
+
+
+def iteration_range(begin, end):
+    return IterationRange(begin, end)
+
+
+def pre_increment(iterator_):
+    return LoopIncrement(LoopIncrementKind.PRE_INCREMENT, iterator_)
+
+
+def add_assign_increment(iterator_, amount):
+    return LoopIncrement(LoopIncrementKind.ADD_ASSIGN, iterator_, amount)
+
+
+def buffer_access(base, *indices):
+    return BufferAccess(base, indices)
+
+
+def _as_type(value):
+    if isinstance(value, TypeRef):
+        return value
+    return TypeRef(value)
+
+
+def _as_symbol(value):
+    if isinstance(value, SymbolRef):
+        return value
+    return SymbolRef(value)
+
+
+def _as_expr(value):
+    if isinstance(value, (ExpressionRef, Literal, SymbolRef, BufferAccess)):
+        return value
+    if isinstance(value, (int, float)):
+        return Literal(value)
+    return ExpressionRef(value)
+
+
+def _entity_to_dict(value):
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    return {"kind": "unknown", "value": str(value)}
