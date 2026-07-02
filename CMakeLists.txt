@@ -130,6 +130,8 @@ list(APPEND SFEM_MODULES
     frontend/constraints
     frontend/ops
     frontend/ops/generated
+    frontend/ops/generated/laplace
+    frontend/ops/generated/laplace/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
     frontend/ops/generated/two_phase_flow
