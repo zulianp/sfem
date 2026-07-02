@@ -877,6 +877,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
 def _residual_codegen_unit(material_name, dim, evaluated):
     collection = evaluated.form_evaluation
     blocks = _block_plans_from_form_collection(collection)
+    coupling = _kernel_coupling_for_collection(collection)
     if evaluated.form_evaluation.measure == "ds":
         return CodeGenerationUnit(
             name=_unit_output_name_from_parts(material_name, evaluated.name),
@@ -888,15 +889,14 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             blocks=blocks,
             expression_plans=_form_collection_expression_plans(collection),
             target=KernelTarget.OPENMP,
-            coupling=_kernel_coupling_for_collection(collection),
+            coupling=coupling,
             material_name=material_name,
             unit_name=evaluated.name,
         )
-    block_kernels = _block_codegen_units(
-        material_name,
-        dim,
-        evaluated,
-        blocks,
+    block_kernels = (
+        _block_codegen_units(material_name, dim, evaluated, blocks)
+        if coupling is not KernelCoupling.SINGLE_FIELD
+        else ()
     )
     return CodeGenerationUnit(
         name=_unit_output_name_from_parts(material_name, evaluated.name),
@@ -908,7 +908,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         blocks=blocks,
         block_kernels=block_kernels,
         scope=KernelScope.MONOLITHIC,
-        coupling=_kernel_coupling_for_collection(collection),
+        coupling=coupling,
         expression_plans=_form_collection_expression_plans(collection),
         target=KernelTarget.OPENMP,
         material_name=material_name,
