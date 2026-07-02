@@ -3382,12 +3382,42 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("const scalar_t *const SFEM_RESTRICT geom_metric[6]", local_source)
             self.assertIn("q_weight[q] * (kappa)) * geom_metric[0][geometry_offset]", local_source)
             self.assertIn(
-                "u_grad_0_ref_values[lane] = -(coeff_current_u_0) + coeff_current_u_1;",
+                "const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
                 local_source,
             )
             self.assertNotIn("const scalar_t det", local_source)
             self.assertNotIn("test_grad0", local_source)
             self.assertNotIn("grad_ref_0[q * N_SHAPE + trial]", local_source)
+
+            operator = os.path.join(
+                out_dir,
+                "d3",
+                "tet4",
+                "laplace_tet4_operator.cpp",
+            )
+            with open(operator) as source:
+                operator_source = source.read()
+            affine_begin = operator_source.index(
+                "laplace_tet4_residual_affine_mesh_soa_impl"
+            )
+            affine_end = operator_source.index(
+                "laplace_tet4_residual_affine_mesh_soa("
+            )
+            affine_source = operator_source[affine_begin:affine_end]
+            self.assertIn("g_geom_metric0", affine_source)
+            self.assertIn(
+                "block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, "
+                "block_geom_metric3, block_geom_metric2, block_geom_metric4, "
+                "block_geom_metric5};",
+                affine_source,
+            )
+            self.assertIn(
+                "cached_affine_metric_q_weight[1] = {scalar_t(1)};",
+                affine_source,
+            )
+            self.assertIn("cached_affine_metric_q_weight", affine_source)
+            self.assertNotIn("g_jacobian_adjugate0", affine_source)
+            self.assertNotIn("g_jacobian_determinant0", affine_source)
 
     def test_compiles_tet4_laplace_operator(self):
         compiler = shutil.which("c++")

@@ -1,10 +1,9 @@
 #include "sfem_PackedLaplacian.hpp"
 
-
-#include "smesh_env.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"
+#include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
 
 #include "hex8_laplacian_inline_cpu.hpp"
@@ -227,6 +226,7 @@ struct Tet4MicroKernel {
                 u3[e]                = in[elements[3][eidx]];
             }
 
+#pragma omp simd
             for (ptrdiff_t e = 0; e < nelems; e++) {
                 tet4_laplacian_apply_fff_soa(fff0[e],
                                              fff1[e],
@@ -314,6 +314,7 @@ struct Hex8MicroKernel {
                 u7[e]                = in[elements[7][eidx]];
             }
 
+#pragma omp simd
             for (ptrdiff_t e = 0; e < nelems; e++) {
                 hex8_laplacian_apply_fff_integral_soa(fff0[e],
                                                       fff1[e],
@@ -421,6 +422,7 @@ struct Tet10MicroKernel {
                 u9[e]                = in[elements[9][eidx]];
             }
 
+#pragma omp simd
             for (ptrdiff_t e = 0; e < nelems; e++) {
                 tet10_laplacian_apply_fff_soa(fff0[e],
                                               fff1[e],
@@ -468,7 +470,7 @@ struct Tet10MicroKernel {
 };
 
 template <typename pack_idx_t>
-static int packed_laplacian_apply(smesh::ElemType                         element_type,
+static int packed_laplacian_apply(smesh::ElemType                       element_type,
                                   const ptrdiff_t                       n_packs,
                                   const ptrdiff_t                       n_elements_per_pack,
                                   const ptrdiff_t                       n_elements,
@@ -538,7 +540,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>                       space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp>                       domains;
-        std::shared_ptr<FunctionSpace::PackedMesh>          packed;
+        std::shared_ptr<FunctionSpace::PackedMesh>           packed;
         std::vector<SharedBuffer<jacobian_t>>                fff;
         std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
 
@@ -589,7 +591,8 @@ namespace sfem {
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
 
             auto mesh_ptr = impl_->space->mesh_ptr();
-            auto fff_src  = smesh::FFF::create_AoS(mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
+            auto fff_src  = smesh::FFF::create_AoS(
+                    mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
             if (!fff_src) {
                 return SFEM_FAILURE;
             }
@@ -778,4 +781,3 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem
-

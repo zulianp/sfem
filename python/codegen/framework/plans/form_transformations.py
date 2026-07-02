@@ -9,6 +9,8 @@ class GradientMetricTransformation:
     stream_group_name: str
     scale: sp.Expr
     reference_gradients: tuple
+    affine_geometry_storage: str = "symmetric_metric_soa"
+    affine_geometry_component_order: str = "upper_row_major"
 
     @property
     def dim(self):
@@ -68,6 +70,10 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
     )
 
 
+def constant_p1_simplex_reference_gradients(rule):
+    return _constant_reference_gradients(rule) if _is_constant_p1_simplex_rule(rule) else None
+
+
 def symmetric_metric_component_count(dim):
     dim = int(dim)
     return dim * (dim + 1) // 2
@@ -79,6 +85,19 @@ def symmetric_metric_component_index(left, right):
     if right < left:
         left, right = right, left
     return right * (right + 1) // 2 + left
+
+
+def symmetric_metric_storage_component_index(dim, left, right, order):
+    dim = int(dim)
+    left = int(left)
+    right = int(right)
+    if right < left:
+        left, right = right, left
+    if order == "upper_column_major":
+        return symmetric_metric_component_index(left, right)
+    if order == "upper_row_major":
+        return left * dim - (left * (left - 1)) // 2 + (right - left)
+    raise ValueError("unsupported symmetric metric component order %r" % (order,))
 
 
 def _uniform_gradient_scale(expressions, gradient_symbols, forbidden_symbols):
