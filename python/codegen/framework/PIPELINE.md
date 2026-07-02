@@ -60,7 +60,7 @@ formulations use ordinary SFEM element names. Mixed formulations may use
 compatible element descriptors such as Taylor-Hood pairs, where different field
 families use different interpolation orders on the same cell.
 
-Shared form abstractions live in `codegen.framework.forms`:
+Shared form abstractions live in `codegen.framework.symbolic.forms`:
 
 - `PipelineStage`
 - `FormKind`
@@ -210,7 +210,7 @@ deformation-gradient expression, and registers the strain energy with
 Generation scripts:
 
 - `python/codegen/framework/materials/neohookean_ogden.py`
-- `python/codegen/framework/generate_neohookean_ogden_files.py`
+- `python -m codegen.framework.generators.neohookean_ogden`
 
 ### Form Evaluation
 
@@ -301,7 +301,7 @@ system.add_residual("", form, fields=(water, co2))
 Generation scripts:
 
 - `python/codegen/framework/materials/two_phase_flow.py`
-- `python/codegen/framework/twophaseflow/generate_two_phase_flow_files.py`
+- `python -m codegen.framework.generators.two_phase_flow`
 
 ### Form Evaluation
 

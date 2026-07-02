@@ -11,5 +11,4 @@ This package contains the experimental MLIR-based matrix-free lowering path.
 - `cpp/`: benchmark C++ harnesses used by the MLIR benchmark script.
 - `scripts/`: MLIR benchmark drivers.
 
-The legacy `codegen.framework.mlir_ebe` module is a compatibility shim that
-re-exports this package.
+Use this package directly through `codegen.framework.mlir`.

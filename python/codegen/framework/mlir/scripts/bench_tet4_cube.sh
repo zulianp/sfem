@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../../../" >/dev/null 2>&1 && pwd -P)"
 BUILD_DIR="${SFEM_BUILD_DIR:-$ROOT_DIR/build64}"
 VENV_PYTHON="${SFEM_PYTHON:-$ROOT_DIR/venv/bin/python}"
-WORK_DIR="${SFEM_MLIR_BENCH_DIR:-$ROOT_DIR/IR/bench_tet4_cube}"
+WORK_DIR="${SFEM_MLIR_BENCH_DIR:-$ROOT_DIR/python/codegen/framework/mlir/scripts/bench}"
 
 CUBE_NX="${SFEM_CUBE_NX:-80}"
 CUBE_NY="${SFEM_CUBE_NY:-$CUBE_NX}"

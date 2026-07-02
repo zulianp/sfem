@@ -2250,7 +2250,7 @@ namespace sfem {
 
 
 def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
-    from codegen.framework.forms import FormOrder
+    from codegen.framework.symbolic.forms import FormOrder
 
     flags = {
         "gradient_previous": False,
@@ -2296,7 +2296,7 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
 
 
 def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_name, parameter_index):
-    from codegen.framework.forms import FormOrder
+    from codegen.framework.symbolic.forms import FormOrder
 
     cases = {
         "gradient": [],
@@ -2627,19 +2627,19 @@ def _boundary_residual_parameter_names(collection, available_parameters):
 
 
 def _form_order_zero():
-    from codegen.framework.forms import FormOrder
+    from codegen.framework.symbolic.forms import FormOrder
 
     return FormOrder.ZERO
 
 
 def _form_order_one():
-    from codegen.framework.forms import FormOrder
+    from codegen.framework.symbolic.forms import FormOrder
 
     return FormOrder.ONE
 
 
 def _form_order_two():
-    from codegen.framework.forms import FormOrder
+    from codegen.framework.symbolic.forms import FormOrder
 
     return FormOrder.TWO
 

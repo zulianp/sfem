@@ -136,8 +136,8 @@ from codegen.framework import (
     variable,
     value,
 )
-from codegen.framework.emission_plan import ElementEmissionPlan as _ElementEmissionPlan
-from codegen.framework.generation_plan import GenerationPlan as _GenerationPlan
+from codegen.framework.plans.emission import ElementEmissionPlan as _ElementEmissionPlan
+from codegen.framework.plans.generation import GenerationPlan as _GenerationPlan
 from codegen.framework.fem import (
     SfemCompatibleElement,
     SfemElementBasisPolicy,
@@ -168,8 +168,8 @@ from codegen.framework.fem import (
     sfem_tensor_product_hex_order,
     sfem_tensor_hex_shape_index,
 )
-from codegen.framework.cuda_backend import CUDASoABackend as _CUDASoABackend
-from codegen.framework.openmp_backend import OpenMPSoABackend as _OpenMPSoABackend
+from codegen.framework.backends.cuda import CUDASoABackend as _CUDASoABackend
+from codegen.framework.backends.openmp import OpenMPSoABackend as _OpenMPSoABackend
 
 
 DEFAULT_VECTOR_SIZE = 16
@@ -1101,9 +1101,7 @@ def _emit_codegen_unit(unit, context, target=KernelTarget.OPENMP):
     if unit.target is not KernelTarget.OPENMP:
         raise ValueError("unsupported code generation plan target %s" % unit.target)
     backend = _backend_for_target(target)
-    files = list(backend.emit(unit, context))
-    files.extend(_diagnostic_files_for_unit(unit, context))
-    return tuple(files)
+    return tuple(backend.emit(unit, context))
 
 
 def _backend_for_target(target):
@@ -1118,45 +1116,6 @@ def _normalize_generation_target(target):
     if isinstance(target, KernelTarget):
         return target
     return KernelTarget(str(target).lower())
-
-
-def _diagnostic_files_for_unit(unit, context):
-    if unit.kind is not CodeGenerationKind.ENERGY_SOA:
-        return ()
-    diagnostic_graph = _diagnostic_graph_from_expression_plans(unit)
-    if diagnostic_graph is None:
-        return ()
-    report_prefix = "%s_%s" % (
-        _unit_report_name(unit),
-        context.element_type.lower(),
-    )
-    return tuple(
-        (
-            GeneratedKernelFile(
-                "%s_summary.md" % report_prefix,
-                _summary(
-                    unit.material_name,
-                    diagnostic_graph,
-                    context.specialization,
-                ),
-            ),
-            GeneratedKernelFile(
-                "%s_reduced_outputs.txt" % report_prefix,
-                "\n\n".join(
-                    str(output)
-                    for output in diagnostic_graph.reduced_outputs
-                )
-                + "\n",
-            ),
-        )
-    )
-
-
-def _diagnostic_graph_from_expression_plans(unit):
-    for expression_plan in unit.expression_plans:
-        if expression_plan.diagnostics is not None:
-            return expression_plan.diagnostics
-    return None
 
 
 def _layout_codegen_files(unit, context, files):
@@ -1353,10 +1312,6 @@ def _unit_output_name_from_parts(material_name, unit_name):
     return material_name
 
 
-def _unit_report_name(unit):
-    return _unit_output_name(unit)
-
-
 def _energy_form_orders(kernels):
     order_by_kernel = {
         "objective": FormOrder.ZERO,
@@ -1369,36 +1324,6 @@ def _energy_form_orders(kernels):
         if order is not None and order not in orders:
             orders.append(order)
     return tuple(orders)
-
-
-def _summary(name, graph, specialization):
-    quadrature = specialization.quadrature_rule
-    lines = [
-        "# %s Generated Kernel Summary" % name.replace("_", " ").title(),
-        "",
-        "## Configuration",
-        "",
-        "- element_type: `%s`" % quadrature.element_type,
-        "- quadrature_order: `%d`" % quadrature.order,
-        "- dim: `%d`" % quadrature.dim,
-        "- n_nodes: `%d`" % quadrature.n_shape,
-        "- n_qp: `%d`" % quadrature.n_qp,
-        "- vector_size: `%d`" % specialization.vector_size,
-        "- outputs: `%d`" % len(graph.outputs),
-        "- statements: `%d`" % len(graph.evaluation_plan.statements),
-        "- temporaries: `%d`" % len(graph.evaluation_plan.intermediates),
-        "- flops: `%d`" % graph.cost.flops,
-        "- estimated_registers: `%d`" % graph.cost.estimated_registers,
-        "",
-        "## Template Parameters",
-        "",
-    ]
-    lines.extend(
-        "- `%s = %d` from `%s`" % (parameter.name, parameter.value, parameter.source)
-        for parameter in graph.template_parameters
-    )
-    lines.append("")
-    return "\n".join(lines)
 
 
 def _parse_elements(values, defaults):

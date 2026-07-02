@@ -3,12 +3,12 @@ from typing import Tuple
 
 import sympy as sp
 
-from .constitutive import (
+from ..symbolic.constitutive import (
     TwoPhaseFlowConstitutiveModel,
     TwoPhaseFlowConstitutiveState,
 )
-from .symbolic import KernelExpressions
-from .symbolic import directional_derivative
+from ..symbolic.core import KernelExpressions
+from ..symbolic.core import directional_derivative
 
 
 @dataclass(frozen=True)

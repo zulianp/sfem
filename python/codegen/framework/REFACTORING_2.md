@@ -50,7 +50,7 @@ Acceptance criteria:
 
 Verification:
 
-- `PYTHONPATH=python python -m unittest python.codegen.framework.test_gen_api`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.tests.test_gen_api`
 
 ## M2. Move Geometry and Basis Policy Fully Into Plans
 
@@ -99,9 +99,9 @@ Acceptance criteria:
 
 Verification:
 
-- `PYTHONPATH=python python -m unittest python.codegen.framework.test_gen_api`
-- `PYTHONPATH=python python -m unittest python.codegen.framework.test_neohookean_ogden`
-- `PYTHONPATH=python python -m unittest python.codegen.framework.test_residual`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.tests.test_gen_api`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.tests.test_neohookean_ogden`
+- `PYTHONPATH=python python -m unittest python.codegen.framework.tests.test_residual`
 
 ## M3. Replace Specialized Generator Entry Points With One Backend Traversal
 
@@ -274,8 +274,8 @@ Each wrapper also emits a generated registration source with a single
 `Factory::register_op(...)` entry point named in the manifest. Manifests can now
 be fed to `sfem.gen.generate_op_registration_files(...)` to emit an aggregate
 factory-registration translation unit, and
-`generate_op_registration_files.py` provides the same manifest-driven path for
-scripts. The frontend factory now consumes the generated aggregate registration
+`codegen.framework.generators.op_registration` provides the same manifest-driven
+path for scripts. The frontend factory now consumes the generated aggregate registration
 unit, so maintained generated material wrappers no longer require
 hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
 Energy-only and coupled energy/residual wrappers now assemble generated kernel
@@ -351,10 +351,10 @@ Tasks:
    maintained materials.
 3. [x] Move tests that need low-level helpers to internal test modules or update
    them to generate through `sfem.gen.CodeGenerator`.
-4. [x] Audit `python/codegen/framework/twophaseflow.py` and other historical files
+4. [x] Audit `python/codegen/framework/materials/two_phase_flow_model.py` and other historical files
    for standalone pipeline logic.
    - `materials/two_phase_flow.py` is the maintained generation path and uses
-     `sfem.gen.CodeGenerator`; `twophaseflow.py` remains only as an internal
+     `sfem.gen.CodeGenerator`; `materials/two_phase_flow_model.py` remains only as an internal
      symbolic helper covered by focused tests.
 5. [x] Remove or convert historical helpers that do not use:
    `EquationSystem` -> `FormCollection` -> `GenerationPlan` -> backend.
@@ -373,7 +373,15 @@ Acceptance criteria:
   construction.
 - Historical material-specific generation paths are removed or converted.
 
-## M8. Complete Regression Coverage
+## M8. Form transformations: Specialized Kernels for Simple Cases and Generalizations
+
+Task:
+1. TET4 gradients are mostly zero. In order to avoid usless multiplication by zero we need specialized local kernels with fully expanded gradients into the trial Gradient computation phase and in the contraction phase
+2.  Implement the laplace operator in materials, create a mechanism to reproduce the functionality of FFF (in SFEM) automatically by grouping the geometric terms (for TET4 but also for any affine specialization) and elimnating symmetries, so that it can be precomputed and passed to the kernel for more efficient evaluation.
+3. Try to apply these semplifcations automatically to general kernels (affine specializations) and see if there is an opportunity to generalize this geometric grouping concept further 
+4. Guarantee the proper layered architectural separation
+
+## M9. Complete Regression Coverage
 
 Goal: verify the unified backend with generated code and hardcoded references.
 
@@ -424,6 +432,3 @@ Acceptance criteria:
    functional.
 7. M5 can start with OpenMP target cleanup early, but CUDA completion can run in
    parallel once backend traversal is stable.
-
-
- The looping is currently hardcoded as strings but before emition there should be an additional layer of loop model construction, we have explicitly model the kernels main compponents with classes and distinguish Kernel Loop (at kernel level) with Tiling (vector-size), Quadrature Loop and SIMD Loop, the FLOPs. Same is for memory buffers and scopes, Gather and Scatter 
