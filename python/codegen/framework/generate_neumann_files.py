@@ -1,15 +1,12 @@
-#!/usr/bin/env python3
-try:
-    from ._script_common import bootstrap_python_path, generated_output_dir
-except ImportError:
-    from _script_common import bootstrap_python_path, generated_output_dir
-
-
-bootstrap_python_path(__file__, 2)
-
-from codegen.framework.materials.neumann import material  # noqa: E402
-from sfem import gen  # noqa: E402
-
-
 if __name__ == "__main__":
-    gen.run(material, generated_output_dir(__file__, "neumann", 3))
+    import runpy
+
+    runpy.run_module("codegen.framework.generators.neumann", run_name="__main__")
+else:
+    import codegen.framework.generators.neumann as _impl
+
+    globals().update({
+        _name: _value
+        for _name, _value in vars(_impl).items()
+        if not _name.startswith("__")
+    })

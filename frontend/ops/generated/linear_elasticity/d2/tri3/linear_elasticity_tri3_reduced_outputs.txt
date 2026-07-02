@@ -1,0 +1,17 @@
+linear_elasticity_inspect_tmp0**2*lmbda/2 + mu*(linear_elasticity_inspect_tmp1**2 + 2*linear_elasticity_inspect_tmp2**2 + 2*linear_elasticity_inspect_tmp3**2)/2
+
+linear_elasticity_inspect_tmp2*linear_elasticity_inspect_tmp5 + linear_elasticity_inspect_tmp4
+
+linear_elasticity_inspect_tmp6
+
+linear_elasticity_inspect_tmp6
+
+linear_elasticity_inspect_tmp3*linear_elasticity_inspect_tmp5 + linear_elasticity_inspect_tmp4
+
+linear_elasticity_inspect_tmp7*trial_grad[0] + lmbda*trial_grad[3]
+
+linear_elasticity_inspect_tmp8
+
+linear_elasticity_inspect_tmp8
+
+linear_elasticity_inspect_tmp7*trial_grad[3] + lmbda*trial_grad[0]

@@ -105,3 +105,49 @@ iree-compile frontend_pymlir_output.mlir \
 When writing the generation logic:
 1. **Enforce Rigid Tile Dimensions:** Ensure your code generator forces matrix math operations into explicit sizes (like `16x16` or `8x8` tiles). Vector hardware matrix units cannot compile arbitrary or unaligned shapes natively.
 2. **Leverage Structural Primitives:** Stick entirely to generating **`linalg.matmul`** or **`linalg.generic`** blocks inside your text printer. Do not try to write custom assembly macros in Python; let the target-tuned vector compilers handle register scheduling automatically.
+
+
+# MMA plan
+
+                [ High-Order FEM Kernel Spec (From Kernel Plan) ]
+                • N_elements x N_quad_points x N_components
+                • Tensor-product basis functions (1D interpolations)
+                                       │
+                                       ▼ (Parsed via Python Frontend)
+                     [ High-Level Graph Representation ]
+                     • Data-flow: Element Tensors (E-vectors)
+                     • Local gathering / scattering operations
+                                       │
+                                       ▼ (pymlir Generation Phase)
+                [ Platform-Agnostic Linalg Dialect Layer ]
+                • 1D Node-to-Quad Interpolation matrices (B_1D)
+                • Sequentially nested contraction stages (X -> Y -> Z)
+                • Expressed via structured loops over element dimensions
+                                       │
+                                       ▼ (Linalg-to-Vector Lowering Pass)
+                  [ 1D Sum Factorization Pipeline (Vector) ]
+                  • Dynamic dimensions unrolled into fixed tile loops
+                  • Block sizes sized to hardware register constraints
+                  • Batched element processing (1D vector steps)
+                                       │
+                ┌──────────────────────┴──────────────────────┐
+                ▼ (Stage 1: X-Direction)                      ▼ (Stage 2: Y-Direction)
+    [ vector.matrix_multiply ]                    [ vector.matrix_multiply ]
+    • Tile X_1D by B_1D                           • Tile Interim_Y by B_1D
+    • Outputs 1D Partial Slices                   • Outputs 2D Partial Slices
+                └──────────────────────┬──────────────────────┘
+                                       │
+                                       ▼ (Stage 3: Z-Direction)
+                         [ vector.matrix_multiply ]
+                         • Final contraction with Quadrature Weights (W)
+                         • Yields completed physical integration points
+                                       │
+                                       ▼ (IREE Target Optimisation Boundary)
+                ┌──────────────────────┴──────────────────────┐
+                ▼ (Target: Apple Silicon CPU/GPU)             ▼ (Target: NVIDIA CUDA Tensor Cores)
+     [ Apple AMX / ARM SME Engine ]                 [ Warp Matrix Multiply Accumulate ]
+     • Lowers vector ops to Outer-Product          • Lowers vector loops to gpu.mma dialect
+     • Maps 1D basis operations onto 2D tiles      • Translates tiles directly to warp lanes
+     • Emits native assembly loops:                 • Emits native PTX assembly calls:
+       - fmopa (Floating-point outer product)         - mma.sync.aligned.m16n8k16
+     • Computes in 32x32 hardware registers        • Computes across 32-thread hardware warps

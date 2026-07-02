@@ -11,6 +11,7 @@ from .tools import (
     _extract_single_top_level_operation,
     _find_mlir_opt,
     _serialize_spirv_module,
+    import_mlir_bindings,
     llvm_mlir_availability,
 )
 
@@ -363,7 +364,7 @@ class _SPIRVOpenCLModuleBuilder:
             return module
 
     def _load_bindings(self):
-        from mlir import ir
+        _, ir = import_mlir_bindings()
         import mlir.dialects.spirv as spirv
 
         self.ir = ir

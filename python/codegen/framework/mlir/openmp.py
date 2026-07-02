@@ -14,6 +14,7 @@ from .tools import (
     _find_mlir_opt,
     _find_mlir_runner,
     _find_runner_library,
+    import_mlir_bindings,
     _parse_mlir_runner_i32_result,
     _translate_emitc_file_to_cpp,
     _translate_emitc_to_cpp,
@@ -322,7 +323,7 @@ class _SCFOpenMPModuleBuilder:
             return module
 
     def _load_bindings(self):
-        from mlir import ir
+        _, ir = import_mlir_bindings()
         import mlir.dialects._func_ops_gen as func
         import mlir.dialects._scf_ops_gen as scf
         import mlir.dialects._arith_ops_gen as arith
@@ -1030,7 +1031,7 @@ class _EmitCKernelModuleBuilder:
             return module
 
     def _load_bindings(self):
-        from mlir import ir
+        _, ir = import_mlir_bindings()
         import mlir.dialects.emitc as emitc
 
         self.ir = ir

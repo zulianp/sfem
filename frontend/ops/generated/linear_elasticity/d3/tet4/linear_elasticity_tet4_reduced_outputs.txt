@@ -1,0 +1,37 @@
+linear_elasticity_inspect_tmp0**2*lmbda/2 + mu*(linear_elasticity_inspect_tmp1**2 + linear_elasticity_inspect_tmp2**2 + linear_elasticity_inspect_tmp3**2 + 2*linear_elasticity_inspect_tmp4**2 + 2*linear_elasticity_inspect_tmp5**2 + 2*linear_elasticity_inspect_tmp6**2)/2
+
+linear_elasticity_inspect_tmp4*linear_elasticity_inspect_tmp7 + linear_elasticity_inspect_tmp8
+
+linear_elasticity_inspect_tmp9
+
+linear_elasticity_inspect_tmp10
+
+linear_elasticity_inspect_tmp9
+
+linear_elasticity_inspect_tmp5*linear_elasticity_inspect_tmp7 + linear_elasticity_inspect_tmp8
+
+linear_elasticity_inspect_tmp11
+
+linear_elasticity_inspect_tmp10
+
+linear_elasticity_inspect_tmp11
+
+linear_elasticity_inspect_tmp6*linear_elasticity_inspect_tmp7 + linear_elasticity_inspect_tmp8
+
+linear_elasticity_inspect_tmp12 + linear_elasticity_inspect_tmp13 + linear_elasticity_inspect_tmp14*trial_grad[0]
+
+linear_elasticity_inspect_tmp15
+
+linear_elasticity_inspect_tmp16
+
+linear_elasticity_inspect_tmp15
+
+linear_elasticity_inspect_tmp13 + linear_elasticity_inspect_tmp14*trial_grad[4] + linear_elasticity_inspect_tmp17
+
+linear_elasticity_inspect_tmp18
+
+linear_elasticity_inspect_tmp16
+
+linear_elasticity_inspect_tmp18
+
+linear_elasticity_inspect_tmp12 + linear_elasticity_inspect_tmp14*trial_grad[8] + linear_elasticity_inspect_tmp17

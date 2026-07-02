@@ -274,17 +274,17 @@ namespace sfem {
             switch (domain.element_type) {
                 case smesh::TRI6: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics(), nelements);
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tri6_tri6_objective_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::TET10: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_objective_soa_diagnostics(), nelements);
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tet10_tet10_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tet10_tet10_objective_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::HEX27: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(), nelements);
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(), nelements);
                     break;
                 }
                 default:
@@ -338,20 +338,20 @@ namespace sfem {
             switch (domain.element_type) {
                 case smesh::TRI6: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics(), nelements);
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics(), nelements);
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::TET10: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_gradient_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics(), nelements);
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tet10_tet10_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tet10_tet10_gradient_soa_diagnostics(), nelements);
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::HEX27: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_hex27_hex8_residual_element_soa_diagnostics(), nelements);
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(), nelements);
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_hex27_hex8_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_hex27_hex8_residual_element_soa_diagnostics(), nelements);
                     break;
                 }
                 default:
@@ -408,20 +408,20 @@ namespace sfem {
             switch (domain.element_type) {
                 case smesh::TRI6: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements);
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tri6_tri6_apply_soa_diagnostics(), nelements);
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::TET10: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_tet10_tet10_apply_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements);
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_tet10_tet10_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_tet10_tet10_apply_soa_diagnostics(), nelements);
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements);
                     break;
                 }
                 case smesh::HEX27: {
                     const ptrdiff_t nelements = domain.block->n_elements();
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(), nelements);
-                    total += sfem::codegen::KernelDiagnostics_total_flops(poro_hyperelasticity_poro_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements);
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(), nelements);
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(poro_hyperelasticity_poro_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(poro_hyperelasticity_poro_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements);
                     break;
                 }
                 default:
