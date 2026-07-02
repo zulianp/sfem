@@ -261,9 +261,6 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_affine_mesh_soa_impl
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -332,7 +329,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_affine_mesh_soa_impl
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_tet4_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_u_streams, block_value);
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
@@ -434,9 +431,6 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_steps_affine_mesh_so
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -520,7 +514,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_steps_affine_mesh_so
                 block_value[lane] = scalar_t(0);
             }
 
-            neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_value);
+            neohookean_ogden_d3_simplex_tet4_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -796,7 +790,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_isoparametric_mesh_s
             }
         }
 
-        neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
+        neohookean_ogden_d3_simplex_tet4_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
@@ -1062,7 +1056,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_objective_steps_isoparametric_
                 block_value[lane] = scalar_t(0);
             }
 
-            neohookean_ogden_d3_simplex_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
+            neohookean_ogden_d3_simplex_tet4_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1291,9 +1285,6 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_gradient_affine_mesh_soa_impl(
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -1368,7 +1359,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_gradient_affine_mesh_soa_impl(
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_tet4_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1654,7 +1645,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_gradient_isoparametric_mesh_so
             }
         }
 
-        neohookean_ogden_d3_simplex_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_tet4_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1888,9 +1879,6 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_apply_affine_mesh_soa_impl(
     static constexpr int N_SHAPE = 4;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -1972,7 +1960,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_apply_affine_mesh_soa_impl(
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_tet4_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -2277,7 +2265,7 @@ static SFEM_INLINE int neohookean_ogden_tet4_tet4_apply_isoparametric_mesh_soa_i
             }
         }
 
-        neohookean_ogden_d3_simplex_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
+        neohookean_ogden_d3_simplex_tet4_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_u_streams, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
         for (int shape = 0; shape < N_SHAPE; ++shape) {

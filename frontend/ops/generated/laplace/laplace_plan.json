@@ -1,430 +1,264 @@
 {
   "kernels": [
     {
-      "block_kernels": [
+      "block_kernels": [],
+      "blocks": [
         {
-          "block_kernels": [],
-          "blocks": [
+          "basis_plans": [],
+          "column_field": "",
+          "form_order": 1,
+          "is_diagonal": true,
+          "local_phase_plans": [
             {
               "basis_plans": [],
-              "column_field": "",
-              "form_order": 1,
-              "is_diagonal": true,
-              "local_phase_plans": [
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "evaluate_trial",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "transform_reference",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "evaluate_material",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "contract_test",
-                  "streams": []
-                }
-              ],
-              "local_phases": [
-                "evaluate_trial",
-                "transform_reference",
-                "evaluate_material",
-                "contract_test"
-              ],
-              "name": "form_1_u",
-              "row_field": "u",
+              "label": "",
+              "phase": "evaluate_trial",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "transform_reference",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "evaluate_material",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "contract_test",
               "streams": []
             }
           ],
-          "coupling": "block",
-          "dim": 3,
-          "emission": "files",
-          "expression_plans": [
-            {
-              "blocks": [],
-              "coefficients": [],
-              "dependencies": null,
-              "fields": [
-                "u"
-              ],
-              "form_order": 0,
-              "has_direction": false,
-              "name": "merit",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "merit"
-            },
-            {
-              "blocks": [
-                "form_1_u"
-              ],
-              "coefficients": [
-                "WeakResidualCoefficients(row_field='u', value=0, gradient=(kappa*u_grad_0, kappa*u_grad_1, kappa*u_grad_2))"
-              ],
-              "dependencies": {
-                "current": true,
-                "direction": false,
-                "geometry": false,
-                "parameters": [
-                  "kappa"
-                ],
-                "previous": false
-              },
-              "fields": [
-                "u"
-              ],
-              "form_order": 1,
-              "has_direction": false,
-              "name": "residual",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "residual"
-            },
-            {
-              "blocks": [],
-              "coefficients": [],
-              "dependencies": {
-                "current": false,
-                "direction": true,
-                "geometry": false,
-                "parameters": [
-                  "kappa"
-                ],
-                "previous": false
-              },
-              "fields": [
-                "u"
-              ],
-              "form_order": 2,
-              "has_direction": false,
-              "name": "jacobian_action",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "jacobian_action"
-            }
+          "local_phases": [
+            "evaluate_trial",
+            "transform_reference",
+            "evaluate_material",
+            "contract_test"
           ],
-          "form_collection": {
-            "blocks": [
-              {
-                "column_field": null,
-                "is_coupling": false,
-                "is_diagonal": true,
-                "name": "form_1_u",
-                "order": 1,
-                "row_field": "u"
-              },
-              {
-                "column_field": "u",
-                "is_coupling": false,
-                "is_diagonal": true,
-                "name": "form_2_u_u",
-                "order": 2,
-                "row_field": "u"
-              }
-            ],
-            "equation_name": "",
-            "fields": [
-              {
-                "components": 1,
-                "family": "",
-                "name": "u"
-              }
-            ],
-            "forms": [
-              {
-                "name": "merit",
-                "order": 0,
-                "role": "merit",
-                "standard_name": "form_0"
-              },
-              {
-                "name": "residual",
-                "order": 1,
-                "role": "residual",
-                "standard_name": "form_1"
-              },
-              {
-                "name": "jacobian_action",
-                "order": 2,
-                "role": "jacobian_action",
-                "standard_name": "form_2"
-              }
-            ],
-            "kind": "residual"
-          },
-          "geometry": null,
-          "kind": "residual_soa",
-          "mesh_phase_plans": [
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "gather",
-              "streams": []
-            },
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "geometry",
-              "streams": []
-            },
-            {
-              "blocks": [
-                "form_1_u"
-              ],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "local_call",
-              "streams": []
-            },
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "scatter",
-              "streams": []
-            }
-          ],
-          "mesh_phases": [
-            "gather",
-            "geometry",
-            "local_call",
-            "scatter"
-          ],
-          "name": "laplace_form_1_u",
-          "scope": "block",
-          "selected_block": "form_1_u",
-          "streams": [],
-          "target": "openmp"
+          "name": "form_1_u",
+          "row_field": "u",
+          "streams": []
         },
         {
-          "block_kernels": [],
-          "blocks": [
+          "basis_plans": [],
+          "column_field": "u",
+          "form_order": 2,
+          "is_diagonal": true,
+          "local_phase_plans": [
             {
               "basis_plans": [],
-              "column_field": "u",
-              "form_order": 2,
-              "is_diagonal": true,
-              "local_phase_plans": [
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "evaluate_trial",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "transform_reference",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "evaluate_material",
-                  "streams": []
-                },
-                {
-                  "basis_plans": [],
-                  "label": "",
-                  "phase": "contract_test",
-                  "streams": []
-                }
-              ],
-              "local_phases": [
-                "evaluate_trial",
-                "transform_reference",
-                "evaluate_material",
-                "contract_test"
-              ],
-              "name": "form_2_u_u",
-              "row_field": "u",
+              "label": "",
+              "phase": "evaluate_trial",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "transform_reference",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "evaluate_material",
+              "streams": []
+            },
+            {
+              "basis_plans": [],
+              "label": "",
+              "phase": "contract_test",
               "streams": []
             }
           ],
-          "coupling": "block",
-          "dim": 3,
-          "emission": "files",
-          "expression_plans": [
-            {
-              "blocks": [],
-              "coefficients": [],
-              "dependencies": null,
-              "fields": [
-                "u"
-              ],
-              "form_order": 0,
-              "has_direction": false,
-              "name": "merit",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "merit"
-            },
-            {
-              "blocks": [],
-              "coefficients": [],
-              "dependencies": {
-                "current": true,
-                "direction": false,
-                "geometry": false,
-                "parameters": [
-                  "kappa"
-                ],
-                "previous": false
-              },
-              "fields": [
-                "u"
-              ],
-              "form_order": 1,
-              "has_direction": false,
-              "name": "residual",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "residual"
-            },
-            {
-              "blocks": [
-                "form_2_u_u"
-              ],
-              "coefficients": [
-                "WeakResidualCoefficients(row_field='u', value=0, gradient=(kappa*u_direction_grad_0, kappa*u_direction_grad_1, kappa*u_direction_grad_2))"
-              ],
-              "dependencies": {
-                "current": false,
-                "direction": true,
-                "geometry": false,
-                "parameters": [
-                  "kappa"
-                ],
-                "previous": false
-              },
-              "fields": [
-                "u"
-              ],
-              "form_order": 2,
-              "has_direction": false,
-              "name": "jacobian_action",
-              "output_mode": "",
-              "required_streams": [],
-              "role": "jacobian_action"
-            }
+          "local_phases": [
+            "evaluate_trial",
+            "transform_reference",
+            "evaluate_material",
+            "contract_test"
           ],
-          "form_collection": {
-            "blocks": [
-              {
-                "column_field": null,
-                "is_coupling": false,
-                "is_diagonal": true,
-                "name": "form_1_u",
-                "order": 1,
-                "row_field": "u"
-              },
-              {
-                "column_field": "u",
-                "is_coupling": false,
-                "is_diagonal": true,
-                "name": "form_2_u_u",
-                "order": 2,
-                "row_field": "u"
-              }
-            ],
-            "equation_name": "",
-            "fields": [
-              {
-                "components": 1,
-                "family": "",
-                "name": "u"
-              }
-            ],
-            "forms": [
-              {
-                "name": "merit",
-                "order": 0,
-                "role": "merit",
-                "standard_name": "form_0"
-              },
-              {
-                "name": "residual",
-                "order": 1,
-                "role": "residual",
-                "standard_name": "form_1"
-              },
-              {
-                "name": "jacobian_action",
-                "order": 2,
-                "role": "jacobian_action",
-                "standard_name": "form_2"
-              }
-            ],
-            "kind": "residual"
-          },
-          "geometry": null,
-          "kind": "residual_soa",
-          "mesh_phase_plans": [
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "gather",
-              "streams": []
-            },
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "geometry",
-              "streams": []
-            },
-            {
-              "blocks": [
-                "form_2_u_u"
-              ],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "local_call",
-              "streams": []
-            },
-            {
-              "blocks": [],
-              "geometries": [],
-              "geometry": null,
-              "label": "",
-              "phase": "scatter",
-              "streams": []
-            }
-          ],
-          "mesh_phases": [
-            "gather",
-            "geometry",
-            "local_call",
-            "scatter"
-          ],
-          "name": "laplace_form_2_u_u",
-          "scope": "block",
-          "selected_block": "form_2_u_u",
-          "streams": [],
-          "target": "openmp"
+          "name": "form_2_u_u",
+          "row_field": "u",
+          "streams": []
         }
       ],
+      "coupling": "single_field",
+      "dim": 2,
+      "emission": "files",
+      "expression_plans": [
+        {
+          "blocks": [],
+          "coefficients": [],
+          "dependencies": null,
+          "fields": [
+            "u"
+          ],
+          "form_order": 0,
+          "has_direction": false,
+          "name": "merit",
+          "output_mode": "",
+          "required_streams": [],
+          "role": "merit"
+        },
+        {
+          "blocks": [
+            "form_1_u"
+          ],
+          "coefficients": [
+            "WeakResidualCoefficients(row_field='u', value=0, gradient=(kappa*u_grad_0, kappa*u_grad_1))"
+          ],
+          "dependencies": {
+            "current": true,
+            "direction": false,
+            "geometry": false,
+            "parameters": [
+              "kappa"
+            ],
+            "previous": false
+          },
+          "fields": [
+            "u"
+          ],
+          "form_order": 1,
+          "has_direction": false,
+          "name": "residual",
+          "output_mode": "",
+          "required_streams": [],
+          "role": "residual"
+        },
+        {
+          "blocks": [
+            "form_2_u_u"
+          ],
+          "coefficients": [
+            "WeakResidualCoefficients(row_field='u', value=0, gradient=(kappa*u_direction_grad_0, kappa*u_direction_grad_1))"
+          ],
+          "dependencies": {
+            "current": false,
+            "direction": true,
+            "geometry": false,
+            "parameters": [
+              "kappa"
+            ],
+            "previous": false
+          },
+          "fields": [
+            "u"
+          ],
+          "form_order": 2,
+          "has_direction": false,
+          "name": "jacobian_action",
+          "output_mode": "",
+          "required_streams": [],
+          "role": "jacobian_action"
+        }
+      ],
+      "form_collection": {
+        "blocks": [
+          {
+            "column_field": null,
+            "is_coupling": false,
+            "is_diagonal": true,
+            "name": "form_1_u",
+            "order": 1,
+            "row_field": "u"
+          },
+          {
+            "column_field": "u",
+            "is_coupling": false,
+            "is_diagonal": true,
+            "name": "form_2_u_u",
+            "order": 2,
+            "row_field": "u"
+          }
+        ],
+        "equation_name": "",
+        "fields": [
+          {
+            "components": 1,
+            "family": "",
+            "name": "u"
+          }
+        ],
+        "forms": [
+          {
+            "name": "merit",
+            "order": 0,
+            "role": "merit",
+            "standard_name": "form_0"
+          },
+          {
+            "name": "residual",
+            "order": 1,
+            "role": "residual",
+            "standard_name": "form_1"
+          },
+          {
+            "name": "jacobian_action",
+            "order": 2,
+            "role": "jacobian_action",
+            "standard_name": "form_2"
+          }
+        ],
+        "kind": "residual"
+      },
+      "geometry": null,
+      "kind": "residual_soa",
+      "mesh_phase_plans": [
+        {
+          "blocks": [],
+          "geometries": [],
+          "geometry": null,
+          "label": "",
+          "phase": "gather",
+          "streams": []
+        },
+        {
+          "blocks": [],
+          "geometries": [],
+          "geometry": null,
+          "label": "",
+          "phase": "geometry",
+          "streams": []
+        },
+        {
+          "blocks": [
+            "form_1_u",
+            "form_2_u_u"
+          ],
+          "geometries": [],
+          "geometry": null,
+          "label": "",
+          "phase": "local_call",
+          "streams": []
+        },
+        {
+          "blocks": [],
+          "geometries": [],
+          "geometry": null,
+          "label": "",
+          "phase": "scatter",
+          "streams": []
+        }
+      ],
+      "mesh_phases": [
+        "gather",
+        "geometry",
+        "local_call",
+        "scatter"
+      ],
+      "name": "laplace",
+      "scope": "monolithic",
+      "selected_block": null,
+      "streams": [],
+      "target": "openmp"
+    },
+    {
+      "block_kernels": [],
       "blocks": [
         {
           "basis_plans": [],
@@ -681,9 +515,9 @@
       "target": "openmp"
     }
   ],
-  "n_block_kernels": 2,
+  "n_block_kernels": 0,
   "n_complete_system_kernels": 0,
-  "n_kernels": 1,
-  "n_monolithic_kernels": 1,
+  "n_kernels": 2,
+  "n_monolithic_kernels": 2,
   "stage": "specialized_form_manipulation"
 }

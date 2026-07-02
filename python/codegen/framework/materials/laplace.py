@@ -14,7 +14,9 @@ def _build_system(dim):
     with gen.geometric_dimension_context(dim):
         u = gen.Function(V, "u")
         v = gen.TestFunction(V, name="u_test")
-        system.add_residual("", kappa * gen.inner(gen.grad(u), gen.grad(v)), fields=(u,))
+        system.add_residual(
+            "", kappa * gen.inner(gen.grad(u), gen.grad(v)), fields=(u,)
+        )
     return system.build()
 
 
@@ -26,7 +28,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "laplace",
     systems,
-    elements=gen.sfem_supported_element_types(),
+    elements=gen.sfem_supported_element_types() + ("PROTEUS_HEX125", "PROTEUS_HEX729"),
     op_name="GeneratedLaplace",
     parameter_defaults=(("kappa", 1.0),),
 )

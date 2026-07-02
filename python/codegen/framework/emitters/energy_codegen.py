@@ -31,6 +31,7 @@ from codegen.framework.symbolic.core import (
     quadrature_reference_struct_lines,
     sfem_element_quadrature_rule,
     sfem_mesh_reference_data,
+    sfem_soa_element_specialization,
     sfem_soa_reference_input,
     sfem_tensor_product_hex_uses_cartesian_ordering,
     streams_in_shape_order,
@@ -40,6 +41,9 @@ from codegen.framework.symbolic.core import (
     tensor_product_gradient_isoparametric_geometry_lines,
     tensor_product_ordered_coordinate_streams,
     validate_reference_data_plan,
+)
+from codegen.framework.plans.form_transformations import (
+    constant_p1_simplex_reference_gradients,
 )
 
 
@@ -549,6 +553,29 @@ def _sfem_soa_local_header(
             )
         )
         lines.append("")
+        specialized = _constant_p1_specialized_local(
+            prefix,
+            quadrature_rule,
+        )
+        specialized_prefix = specialized[0] if specialized is not None else None
+        specialized_rule = specialized[1] if specialized is not None else None
+        if specialized_prefix is not None and form.weak_form is not None:
+            lines.extend(
+                _sfem_soa_block_function(
+                    form,
+                    prefix,
+                    dim,
+                    n_nodes,
+                    array_inputs,
+                    specialized_rule,
+                    basis_family,
+                    use_shared_weak_local,
+                    source_builder,
+                    function_name="%s_%s_block" % (specialized_prefix, form.name),
+                    constant_p1_gradient_expansion=True,
+                )
+            )
+            lines.append("")
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
@@ -564,11 +591,13 @@ def _sfem_soa_block_function(
     basis_family=None,
     use_shared_weak_local=False,
     source_builder=None,
+    function_name=None,
+    constant_p1_gradient_expansion=False,
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
-    name = "%s_%s_block" % (prefix, form.name)
+    name = function_name or "%s_%s_block" % (prefix, form.name)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
@@ -580,6 +609,11 @@ def _sfem_soa_block_function(
         not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
+    )
+    omit_reference_basis_inputs = (
+        constant_p1_gradient_expansion
+        and form.weak_form is not None
+        and not use_tensor_product_reference
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     uses_current = _form_uses_current(form, default=True)
@@ -599,7 +633,9 @@ def _sfem_soa_block_function(
         for array_input in element_inputs
         for stream in _soa_array_stream_names(array_input)
     )
-    if use_tensor_product_reference:
+    if omit_reference_basis_inputs:
+        pass
+    elif use_tensor_product_reference:
         params.extend(
             (
                 "const scalar_t *const SFEM_RESTRICT shape_1d",
@@ -861,6 +897,7 @@ def _sfem_soa_block_function(
             quadrature_rule,
             use_stream_arrays,
             source_builder,
+            constant_p1_gradient_expansion=constant_p1_gradient_expansion,
         )
         lines.append("}")
         return lines
@@ -871,6 +908,42 @@ def _sfem_soa_block_function(
     _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item)
     lines.extend(["    }", "}"])
     return lines
+
+
+def _constant_p1_specialized_local(local_prefix, quadrature_rule):
+    specialized_prefix = _constant_p1_specialized_local_prefix(
+        local_prefix,
+        quadrature_rule,
+    )
+    if specialized_prefix is not None:
+        return specialized_prefix, quadrature_rule
+
+    if quadrature_rule is None or not str(local_prefix).endswith("_simplex"):
+        return None
+
+    element_type = {3: "TET4"}.get(int(getattr(quadrature_rule, "dim", 0)))
+    if element_type is None:
+        return None
+
+    p1_specialization = sfem_soa_element_specialization(element_type)
+    p1_prefix = _constant_p1_specialized_local_prefix(
+        local_prefix,
+        p1_specialization.quadrature_rule,
+    )
+    if p1_prefix is None:
+        return None
+    return p1_prefix, p1_specialization.quadrature_rule
+
+
+def _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule):
+    if quadrature_rule is None:
+        return None
+    if constant_p1_simplex_reference_gradients(quadrature_rule) is None:
+        return None
+    element_type = str(getattr(quadrature_rule, "element_type", "")).lower()
+    if element_type != "tet4":
+        return None
+    return "%s_%s" % (local_prefix, element_type)
 
 
 def _append_sfem_soa_tensor_weak_form_lines(
@@ -1036,6 +1109,201 @@ def _append_sfem_soa_tensor_weak_form_lines(
         )
 
 
+def _scaled_cpp_term(factor, expression):
+    factor = sp.sympify(factor)
+    if factor == 1:
+        return expression
+    if factor == -1:
+        return "-(%s)" % expression
+    return "(%s) * (%s)" % (_sfem_ccode(factor), expression)
+
+
+def _sum_cpp_terms(terms):
+    terms = tuple(term for term in terms if term)
+    if not terms:
+        return "scalar_t(0)"
+    expression = terms[0]
+    for term in terms[1:]:
+        if term.startswith("-("):
+            expression += " - " + term[2:-1]
+        else:
+            expression += " + " + term
+    return expression
+
+
+def _constant_reference_gradient_expr(reference_gradients, shape, component):
+    return sp.sympify(reference_gradients[int(shape)][int(component)])
+
+
+def _constant_p1_field_gradient_expr(reference_gradients, dim, field_value, component):
+    terms = []
+    for shape in range(dim + 1):
+        factor = _constant_reference_gradient_expr(reference_gradients, shape, component)
+        if factor == 0:
+            continue
+        terms.append(_scaled_cpp_term(factor, field_value(shape)))
+    return _sum_cpp_terms(terms)
+
+
+def _append_constant_p1_sfem_soa_weak_form_lines(
+    lines,
+    form,
+    dim,
+    reference_gradients,
+    use_stream_arrays,
+    source_builder,
+):
+    work_item = _work_item_index(source_builder)
+    weak_form = form.weak_form
+    uses_current = _form_uses_current(form, default=True)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
+
+    def field_value(field, row, shape):
+        stream_prefix = "" if use_stream_arrays else "weak_"
+        return "%s%s_streams[%d * %d + %d][%s]" % (
+            stream_prefix,
+            field,
+            shape,
+            dim,
+            row,
+            work_item,
+        )
+
+    def geometry_value(name, component):
+        return _work_item_name(source_builder, name, component)
+
+    deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
+        weak_form,
+        "grad_u",
+        scalar_temporaries=True,
+    )
+
+    lines.append("        for (int q = 0; q < N_QP; ++q) {")
+    lines.append("            const scalar_t qw = q_weight[q];")
+    lines.extend(_work_item_loop_lines(source_builder, "            "))
+    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
+    for component in range(dim * dim):
+        lines.append(
+            "            const scalar_t %s = jacobian_adjugate%d[geometry_offset];"
+            % (geometry_value("jacobian_adjugate", component), component)
+        )
+    lines.append(
+        "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
+        % geometry_value("jacobian_determinant", 0)
+    )
+    for row in range(dim):
+        for col in range(dim):
+            idx = row * dim + col
+            if uses_current:
+                lines.append(
+                    "            const scalar_t grad_u_ref%d = %s;"
+                    % (
+                        idx,
+                        _constant_p1_field_gradient_expr(
+                            reference_gradients,
+                            dim,
+                            lambda shape, row=row: field_value("u", row, shape),
+                            col,
+                        ),
+                    )
+                )
+            if uses_direction:
+                lines.append(
+                    "            const scalar_t grad_h_ref%d = %s;"
+                    % (
+                        idx,
+                        _constant_p1_field_gradient_expr(
+                            reference_gradients,
+                            dim,
+                            lambda shape, row=row: field_value("h", row, shape),
+                            col,
+                        ),
+                    )
+                )
+    lines.append(
+        "            const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
+        % geometry_value("jacobian_determinant", 0)
+    )
+    for row in range(dim):
+        for col in range(dim):
+            if uses_current:
+                terms = [
+                    "grad_u_ref%d * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "            const scalar_t grad_u%d = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
+                )
+            if uses_direction:
+                terms = [
+                    "grad_h_ref%d * %s"
+                    % (
+                        row * dim + k,
+                        geometry_value("jacobian_adjugate", k * dim + col),
+                    )
+                    for k in range(dim)
+                ]
+                lines.append(
+                    "            const scalar_t trial_grad%d = (%s) * inv_jacobian_determinant;"
+                    % (row * dim + col, " + ".join(terms))
+                )
+
+    if form.name == "objective":
+        _append_cse_array_assignments(
+            lines,
+            [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
+            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
+            "weak_obj_tmp",
+            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+        )
+        lines.extend(["            }", "        }"])
+        return
+
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        deformation_gradient_substitutions,
+        tuple(sp.symbols("trial_grad%d" % i) for i in range(dim * dim)),
+    )
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+        scalar_temporaries=True,
+    )
+    output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+    op = "+=" if form.output_mode == "accumulate" else "="
+    for shape in range(dim + 1):
+        for row in range(dim):
+            terms = []
+            for col in range(dim):
+                factor = _constant_reference_gradient_expr(reference_gradients, shape, col)
+                if factor == 0:
+                    continue
+                terms.append(_scaled_cpp_term(factor, "loperand%d" % (row * dim + col)))
+            if terms:
+                lines.append(
+                    "            %s[%d * %d + %d][%s] %s %s;"
+                    % (
+                        output_streams,
+                        shape,
+                        dim,
+                        row,
+                        work_item,
+                        op,
+                        _sum_cpp_terms(terms),
+                    )
+                )
+    lines.extend(["            }", "        }"])
+
+
 def _append_sfem_soa_weak_form_lines(
     lines,
     form,
@@ -1047,6 +1315,7 @@ def _append_sfem_soa_weak_form_lines(
     quadrature_rule,
     use_stream_arrays=False,
     source_builder=None,
+    constant_p1_gradient_expansion=False,
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -1064,6 +1333,17 @@ def _append_sfem_soa_weak_form_lines(
         raise ValueError("weak form kernels require one grad_ref reference input")
     if use_tensor_product_reference:
         raise AssertionError("tensor-product weak forms must use the SoA tensor weak-form source_builder")
+    reference_gradients = constant_p1_simplex_reference_gradients(quadrature_rule)
+    if constant_p1_gradient_expansion and reference_gradients is not None:
+        _append_constant_p1_sfem_soa_weak_form_lines(
+            lines,
+            form,
+            dim,
+            reference_gradients,
+            use_stream_arrays,
+            source_builder,
+        )
+        return
 
     def reference_gradient(component, shape="shape"):
         if use_tensor_product_reference:
@@ -1889,6 +2169,12 @@ def _sfem_soa_mesh_operator_function(
     )
     implementation_name = "%s_impl" % function_name
     block_name = "%s_%s_block" % (local_prefix, form.name)
+    specialized_prefix = _constant_p1_specialized_local_prefix(
+        local_prefix,
+        quadrature_rule,
+    )
+    if specialized_prefix is not None and form.weak_form is not None:
+        block_name = "%s_%s_block" % (specialized_prefix, form.name)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
@@ -1904,6 +2190,11 @@ def _sfem_soa_mesh_operator_function(
         not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
+    )
+    omit_reference_basis_inputs = (
+        specialized_prefix is not None
+        and form.weak_form is not None
+        and not use_tensor_product_reference
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     uses_current = _form_uses_current(form, default=True)
@@ -2000,6 +2291,9 @@ def _sfem_soa_mesh_operator_function(
             use_tensor_product_reference,
             use_reference_gradient_vectors,
             geometry_mode,
+            emit_reference_basis=(
+                not omit_reference_basis_inputs or geometry_mode == "isoparametric"
+            ),
         )
     )
     if use_tensor_product_reference:
@@ -2371,7 +2665,9 @@ def _sfem_soa_mesh_operator_function(
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
-    if use_tensor_product_reference:
+    if omit_reference_basis_inputs:
+        pass
+    elif use_tensor_product_reference:
         call_args.extend((tensor_shape_name, tensor_grad_name))
     elif use_reference_gradient_vectors:
         call_args.extend(
@@ -2532,6 +2828,12 @@ def _sfem_soa_mesh_objective_steps_function(
     )
     implementation_name = "%s_impl" % function_name
     block_name = "%s_objective_block" % local_prefix
+    specialized_prefix = _constant_p1_specialized_local_prefix(
+        local_prefix,
+        quadrature_rule,
+    )
+    if specialized_prefix is not None:
+        block_name = "%s_objective_block" % specialized_prefix
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
@@ -2547,6 +2849,9 @@ def _sfem_soa_mesh_objective_steps_function(
         not use_tensor_product_reference
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
+    )
+    omit_reference_basis_inputs = (
+        specialized_prefix is not None and not use_tensor_product_reference
     )
     use_stream_arrays = use_shared_weak_local
     stream_shape_order = (
@@ -2638,6 +2943,9 @@ def _sfem_soa_mesh_objective_steps_function(
             use_tensor_product_reference,
             use_reference_gradient_vectors,
             geometry_mode,
+            emit_reference_basis=(
+                not omit_reference_basis_inputs or geometry_mode == "isoparametric"
+            ),
         )
     )
     if use_tensor_product_reference:
@@ -2897,7 +3205,9 @@ def _sfem_soa_mesh_objective_steps_function(
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
-    if use_tensor_product_reference:
+    if omit_reference_basis_inputs:
+        pass
+    elif use_tensor_product_reference:
         call_args.extend((tensor_shape_name, tensor_grad_name))
     elif use_reference_gradient_vectors:
         call_args.extend(
@@ -3691,9 +4001,19 @@ def _sfem_soa_mesh_reference_alias_lines(
     use_tensor_product_reference,
     use_reference_gradient_vectors,
     geometry_mode,
+    emit_reference_basis=True,
 ):
     lines = []
     reference_prefix = "%s_" % geometry_mode
+    if not emit_reference_basis:
+        lines.append(
+            "    const scalar_t *const %sq_weight = %s;"
+            % (
+                reference_prefix,
+                quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
+            )
+        )
+        return lines
     if use_tensor_product_reference:
         for name in ("shape_1d", "grad_1d", "q_weight_1d"):
             lines.append(

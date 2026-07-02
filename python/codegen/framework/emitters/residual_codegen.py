@@ -948,9 +948,32 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             dependencies=residual_dependencies,
             local_prefix=local_prefix,
             basis_family=basis_family,
+            allow_simplex_gradient_metric=False,
+            constant_p1_gradient_expansion=False,
         )
     )
     lines.append("")
+    specialized = _constant_p1_affine_specialized_local(
+        local_prefix,
+        specialization,
+    )
+    specialized_prefix = specialized[0] if specialized is not None else None
+    specialized_specialization = specialized[1] if specialized is not None else None
+    if specialized_prefix is not None:
+        lines.extend(
+            _local_function(
+                system,
+                "%s_residual_block" % specialized_prefix,
+                specialized_specialization,
+                residual_coeffs,
+                dependencies=residual_dependencies,
+                local_prefix=local_prefix,
+                basis_family=basis_family,
+                allow_simplex_gradient_metric=True,
+                constant_p1_gradient_expansion=True,
+            )
+        )
+        lines.append("")
     lines.extend(
         _local_function(
             system,
@@ -960,12 +983,69 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             dependencies=action_dependencies,
             local_prefix=local_prefix,
             basis_family=basis_family,
+            allow_simplex_gradient_metric=False,
+            constant_p1_gradient_expansion=False,
         )
     )
+    if specialized_prefix is not None:
+        lines.append("")
+        lines.extend(
+            _local_function(
+                system,
+                "%s_jacobian_action_block" % specialized_prefix,
+                specialized_specialization,
+                action_coeffs,
+                dependencies=action_dependencies,
+                local_prefix=local_prefix,
+                basis_family=basis_family,
+                allow_simplex_gradient_metric=True,
+                constant_p1_gradient_expansion=True,
+            )
+        )
     lines.extend(
         ["", "} // namespace codegen", "} // namespace sfem", "", "#endif", ""]
     )
     return "\n".join(lines)
+
+
+def _constant_p1_affine_specialized_local(local_prefix, specialization):
+    rule = specialization.quadrature_rule
+    specialized_prefix = _constant_p1_affine_specialized_local_prefix(
+        local_prefix,
+        rule,
+    )
+    if specialized_prefix is not None:
+        return specialized_prefix, specialization
+
+    if rule is None or not str(local_prefix).endswith("_simplex"):
+        return None
+
+    element_type = {3: "TET4"}.get(int(getattr(rule, "dim", 0)))
+    if element_type is None:
+        return None
+
+    p1_specialization = sfem_soa_element_specialization(
+        element_type,
+        vector_size=specialization.vector_size,
+    )
+    p1_prefix = _constant_p1_affine_specialized_local_prefix(
+        local_prefix,
+        p1_specialization.quadrature_rule,
+    )
+    if p1_prefix is None:
+        return None
+    return p1_prefix, p1_specialization
+
+
+def _constant_p1_affine_specialized_local_prefix(local_prefix, rule):
+    if rule is None:
+        return None
+    if constant_p1_simplex_reference_gradients(rule) is None:
+        return None
+    element_type = str(getattr(rule, "element_type", "")).lower()
+    if element_type != "tet4":
+        return None
+    return "%s_%s" % (local_prefix, element_type)
 
 
 def _mixed_local_header(
@@ -1495,6 +1575,8 @@ def _local_function(
     dependencies,
     local_prefix,
     basis_family=None,
+    allow_simplex_gradient_metric=True,
+    constant_p1_gradient_expansion=True,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1502,9 +1584,10 @@ def _local_function(
     tensor_product = _is_tensor_product_family(rule, basis_family)
     gradient_metric = (
         None
-        if tensor_product
+        if tensor_product or not allow_simplex_gradient_metric
         else simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
     )
+    omit_simplex_reference_basis_inputs = gradient_metric is not None
     params = [
         "const int nelems",
         "const ptrdiff_t geometry_stride",
@@ -1526,13 +1609,14 @@ def _local_function(
             params.append("const scalar_t *const SFEM_RESTRICT grad_1d")
         params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
     else:
-        params.append("const scalar_t *const SFEM_RESTRICT shape")
-        if dependencies.uses_reference_gradients:
-            params.extend(
-                "const scalar_t *const SFEM_RESTRICT %s"
-                % sfem_simplex_grad_ref_name("grad_ref", d)
-                for d in range(dim)
-            )
+        if not omit_simplex_reference_basis_inputs:
+            params.append("const scalar_t *const SFEM_RESTRICT shape")
+            if dependencies.uses_reference_gradients:
+                params.extend(
+                    "const scalar_t *const SFEM_RESTRICT %s"
+                    % sfem_simplex_grad_ref_name("grad_ref", d)
+                    for d in range(dim)
+                )
         params.append("const scalar_t *const SFEM_RESTRICT q_weight")
     if dependencies.current:
         params.append(
@@ -1578,18 +1662,36 @@ def _local_function(
             )
         )
     else:
-        lines.extend(_simplex_local_body(system, rule, coefficients, dependencies, gradient_metric))
+        lines.extend(
+            _simplex_local_body(
+                system,
+                rule,
+                coefficients,
+                dependencies,
+                gradient_metric,
+                allow_gradient_metric=allow_simplex_gradient_metric,
+                constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+            )
+        )
     lines.append("}")
     return lines
 
 
-def _simplex_local_body(system, rule, coefficients, dependencies, gradient_metric=None):
-    if gradient_metric is None:
+def _simplex_local_body(
+    system,
+    rule,
+    coefficients,
+    dependencies,
+    gradient_metric=None,
+    allow_gradient_metric=True,
+    constant_p1_gradient_expansion=True,
+):
+    if gradient_metric is None and allow_gradient_metric:
         gradient_metric = simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
     if gradient_metric is not None:
         return _simplex_gradient_metric_body(system, rule, dependencies, gradient_metric)
     reference_gradients = constant_p1_simplex_reference_gradients(rule)
-    if _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
+    if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
         return _constant_p1_gradient_expanded_body(
             system,
             coefficients,
@@ -2383,16 +2485,7 @@ def _operator_source(
     for form in ("residual", "jacobian_action"):
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
-        gradient_metric = (
-            None
-            if tensor_product
-            else simplex_gradient_metric_transformation(
-                system,
-                rule,
-                coefficients,
-                dependencies,
-            )
-        )
+        gradient_metric = None
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in (("double", ""), ("float", "_float")):
@@ -3595,9 +3688,13 @@ def _mesh_operator_source(
     n_qp = rule.n_qp
     vector_size = affine_specialization.vector_size
     tensor_product = _is_tensor_product_family(rule, basis_family)
+    specialized_prefix = _constant_p1_affine_specialized_local_prefix(
+        local_prefix,
+        rule,
+    )
     gradient_metric = (
         None
-        if tensor_product
+        if tensor_product or specialized_prefix is None
         else simplex_gradient_metric_transformation(
             system,
             rule,
@@ -3606,6 +3703,7 @@ def _mesh_operator_source(
         )
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
+    omit_simplex_reference_basis_inputs = gradient_metric is not None
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
@@ -3619,7 +3717,8 @@ def _mesh_operator_source(
         shape_order,
     )
     impl = "%s_%s_affine_mesh_soa_impl" % (prefix, form)
-    block = "%s_%s_block" % (local_prefix, form)
+    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    block = "%s_%s_block" % (block_prefix, form)
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -3687,7 +3786,14 @@ def _mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "affine"))
+    lines.extend(
+        _mesh_reference_alias_lines(
+            prefix,
+            rule,
+            "affine",
+            emit_reference_basis=not omit_simplex_reference_basis_inputs,
+        )
+    )
     lines.extend(
         [
             "",
@@ -3857,15 +3963,16 @@ def _mesh_operator_source(
             call_args.append(_mesh_reference_name("affine", "grad_1d"))
         call_args.append(_mesh_reference_name("affine", "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("affine", "shape"))
-        if dependencies.uses_reference_gradients:
-            call_args.extend(
-                _mesh_reference_name(
-                    "affine",
-                    sfem_simplex_grad_ref_name("grad_ref", d),
+        if not omit_simplex_reference_basis_inputs:
+            call_args.append(_mesh_reference_name("affine", "shape"))
+            if dependencies.uses_reference_gradients:
+                call_args.extend(
+                    _mesh_reference_name(
+                        "affine",
+                        sfem_simplex_grad_ref_name("grad_ref", d),
+                    )
+                    for d in range(dim)
                 )
-                for d in range(dim)
-            )
         call_args.append(
             "cached_affine_metric_q_weight"
             if uses_cached_affine_metric
@@ -4060,16 +4167,7 @@ def _isoparametric_mesh_operator_source(
     vector_size = specialization.vector_size
     tensor_product = _is_tensor_product_family(rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
-    gradient_metric = (
-        None
-        if tensor_product
-        else simplex_gradient_metric_transformation(
-            system,
-            rule,
-            coefficients,
-            dependencies,
-        )
-    )
+    gradient_metric = None
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
@@ -4455,12 +4553,17 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
     )
 
 
-def _mesh_reference_alias_lines(prefix, rule, geometry_mode):
+def _mesh_reference_alias_lines(prefix, rule, geometry_mode, emit_reference_basis=True):
+    references = tuple(sfem_mesh_reference_data(rule))
+    if not emit_reference_basis:
+        references = tuple(
+            reference for reference in references if reference.name.startswith("q_weight")
+        )
     return [
         "    const scalar_t *const %s = %s;"
         % (
             _mesh_reference_name(geometry_mode, reference.name),
             quadrature_reference_accessor(prefix, geometry_mode, reference.name),
         )
-        for reference in sfem_mesh_reference_data(rule)
+        for reference in references
     ]

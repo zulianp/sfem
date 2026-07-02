@@ -465,33 +465,7 @@ extern "C" int laplace_tet4_residual_element_soa(
         const double kappa,
         double *const SFEM_RESTRICT output[4]
 ) {
-    static constexpr int N_QP = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    double geom_metric_data[6][N_QP * VECTOR_SIZE];
-    const double *const geom_metric[6] = {geom_metric_data[0], geom_metric_data[1], geom_metric_data[2], geom_metric_data[3], geom_metric_data[4], geom_metric_data[5]};
-    for (int q = 0; q < N_QP; ++q) {
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const double metric_det = determinant[geometry_offset];
-            const double metric_adj0 = adjugate[0][geometry_offset];
-            const double metric_adj1 = adjugate[1][geometry_offset];
-            const double metric_adj2 = adjugate[2][geometry_offset];
-            const double metric_adj3 = adjugate[3][geometry_offset];
-            const double metric_adj4 = adjugate[4][geometry_offset];
-            const double metric_adj5 = adjugate[5][geometry_offset];
-            const double metric_adj6 = adjugate[6][geometry_offset];
-            const double metric_adj7 = adjugate[7][geometry_offset];
-            const double metric_adj8 = adjugate[8][geometry_offset];
-            geom_metric_data[0][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-            geom_metric_data[1][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-            geom_metric_data[3][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-            geom_metric_data[2][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-            geom_metric_data[4][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-            geom_metric_data[5][q * VECTOR_SIZE + lane] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-        }
-    }
-    sfem::codegen::laplace_d3_simplex_residual_block<double, 1, 4, 16>(nelems, geometry_stride, geom_metric, sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::q_weight(), current, kappa, output);
+    sfem::codegen::laplace_d3_simplex_residual_block<double, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::q_weight(), current, kappa, output);
     return SFEM_SUCCESS;
 }
 
@@ -504,33 +478,7 @@ extern "C" int laplace_tet4_residual_element_soa_float(
         const float kappa,
         float *const SFEM_RESTRICT output[4]
 ) {
-    static constexpr int N_QP = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    float geom_metric_data[6][N_QP * VECTOR_SIZE];
-    const float *const geom_metric[6] = {geom_metric_data[0], geom_metric_data[1], geom_metric_data[2], geom_metric_data[3], geom_metric_data[4], geom_metric_data[5]};
-    for (int q = 0; q < N_QP; ++q) {
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const float metric_det = determinant[geometry_offset];
-            const float metric_adj0 = adjugate[0][geometry_offset];
-            const float metric_adj1 = adjugate[1][geometry_offset];
-            const float metric_adj2 = adjugate[2][geometry_offset];
-            const float metric_adj3 = adjugate[3][geometry_offset];
-            const float metric_adj4 = adjugate[4][geometry_offset];
-            const float metric_adj5 = adjugate[5][geometry_offset];
-            const float metric_adj6 = adjugate[6][geometry_offset];
-            const float metric_adj7 = adjugate[7][geometry_offset];
-            const float metric_adj8 = adjugate[8][geometry_offset];
-            geom_metric_data[0][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-            geom_metric_data[1][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-            geom_metric_data[3][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-            geom_metric_data[2][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-            geom_metric_data[4][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-            geom_metric_data[5][q * VECTOR_SIZE + lane] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-        }
-    }
-    sfem::codegen::laplace_d3_simplex_residual_block<float, 1, 4, 16>(nelems, geometry_stride, geom_metric, sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::q_weight(), current, kappa, output);
+    sfem::codegen::laplace_d3_simplex_residual_block<float, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::q_weight(), current, kappa, output);
     return SFEM_SUCCESS;
 }
 
@@ -560,10 +508,6 @@ static SFEM_INLINE int laplace_tet4_residual_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -620,7 +564,7 @@ static SFEM_INLINE int laplace_tet4_residual_affine_mesh_soa_impl(
         const scalar_t *const block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, block_geom_metric3, block_geom_metric2, block_geom_metric4, block_geom_metric5};
         static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
 
-        laplace_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, cached_affine_metric_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_d3_simplex_tet4_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, cached_affine_metric_q_weight, block_current_streams, kappa, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -727,7 +671,6 @@ static SFEM_INLINE int laplace_tet4_residual_isoparametric_mesh_soa_impl(
         scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_geom_metric_data[6][N_QP * VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
         #pragma omp simd
@@ -785,35 +728,11 @@ static SFEM_INLINE int laplace_tet4_residual_isoparametric_mesh_soa_impl(
             }
         }
 
-        for (int q = 0; q < N_QP; ++q) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;
-                const scalar_t metric_det = block_determinant[geometry_offset];
-                const scalar_t metric_adj0 = block_adjugate_data[0][geometry_offset];
-                const scalar_t metric_adj1 = block_adjugate_data[1][geometry_offset];
-                const scalar_t metric_adj2 = block_adjugate_data[2][geometry_offset];
-                const scalar_t metric_adj3 = block_adjugate_data[3][geometry_offset];
-                const scalar_t metric_adj4 = block_adjugate_data[4][geometry_offset];
-                const scalar_t metric_adj5 = block_adjugate_data[5][geometry_offset];
-                const scalar_t metric_adj6 = block_adjugate_data[6][geometry_offset];
-                const scalar_t metric_adj7 = block_adjugate_data[7][geometry_offset];
-                const scalar_t metric_adj8 = block_adjugate_data[8][geometry_offset];
-                block_geom_metric_data[0][geometry_offset] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-                block_geom_metric_data[1][geometry_offset] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-                block_geom_metric_data[3][geometry_offset] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-                block_geom_metric_data[2][geometry_offset] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-                block_geom_metric_data[4][geometry_offset] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-                block_geom_metric_data[5][geometry_offset] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-            }
-        }
-
         const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3]};
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        const scalar_t *const block_geom_metric[6] = {block_geom_metric_data[0], block_geom_metric_data[1], block_geom_metric_data[2], block_geom_metric_data[3], block_geom_metric_data[4], block_geom_metric_data[5]};
 
-        laplace_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_geom_metric, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current_streams, kappa, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -908,33 +827,7 @@ extern "C" int laplace_tet4_jacobian_action_element_soa(
         const double kappa,
         double *const SFEM_RESTRICT output[4]
 ) {
-    static constexpr int N_QP = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    double geom_metric_data[6][N_QP * VECTOR_SIZE];
-    const double *const geom_metric[6] = {geom_metric_data[0], geom_metric_data[1], geom_metric_data[2], geom_metric_data[3], geom_metric_data[4], geom_metric_data[5]};
-    for (int q = 0; q < N_QP; ++q) {
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const double metric_det = determinant[geometry_offset];
-            const double metric_adj0 = adjugate[0][geometry_offset];
-            const double metric_adj1 = adjugate[1][geometry_offset];
-            const double metric_adj2 = adjugate[2][geometry_offset];
-            const double metric_adj3 = adjugate[3][geometry_offset];
-            const double metric_adj4 = adjugate[4][geometry_offset];
-            const double metric_adj5 = adjugate[5][geometry_offset];
-            const double metric_adj6 = adjugate[6][geometry_offset];
-            const double metric_adj7 = adjugate[7][geometry_offset];
-            const double metric_adj8 = adjugate[8][geometry_offset];
-            geom_metric_data[0][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-            geom_metric_data[1][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-            geom_metric_data[3][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-            geom_metric_data[2][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-            geom_metric_data[4][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-            geom_metric_data[5][q * VECTOR_SIZE + lane] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-        }
-    }
-    sfem::codegen::laplace_d3_simplex_jacobian_action_block<double, 1, 4, 16>(nelems, geometry_stride, geom_metric, sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::q_weight(), direction, kappa, output);
+    sfem::codegen::laplace_d3_simplex_jacobian_action_block<double, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<double>::q_weight(), direction, kappa, output);
     return SFEM_SUCCESS;
 }
 
@@ -947,33 +840,7 @@ extern "C" int laplace_tet4_jacobian_action_element_soa_float(
         const float kappa,
         float *const SFEM_RESTRICT output[4]
 ) {
-    static constexpr int N_QP = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    float geom_metric_data[6][N_QP * VECTOR_SIZE];
-    const float *const geom_metric[6] = {geom_metric_data[0], geom_metric_data[1], geom_metric_data[2], geom_metric_data[3], geom_metric_data[4], geom_metric_data[5]};
-    for (int q = 0; q < N_QP; ++q) {
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const float metric_det = determinant[geometry_offset];
-            const float metric_adj0 = adjugate[0][geometry_offset];
-            const float metric_adj1 = adjugate[1][geometry_offset];
-            const float metric_adj2 = adjugate[2][geometry_offset];
-            const float metric_adj3 = adjugate[3][geometry_offset];
-            const float metric_adj4 = adjugate[4][geometry_offset];
-            const float metric_adj5 = adjugate[5][geometry_offset];
-            const float metric_adj6 = adjugate[6][geometry_offset];
-            const float metric_adj7 = adjugate[7][geometry_offset];
-            const float metric_adj8 = adjugate[8][geometry_offset];
-            geom_metric_data[0][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-            geom_metric_data[1][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-            geom_metric_data[3][q * VECTOR_SIZE + lane] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-            geom_metric_data[2][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-            geom_metric_data[4][q * VECTOR_SIZE + lane] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-            geom_metric_data[5][q * VECTOR_SIZE + lane] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-        }
-    }
-    sfem::codegen::laplace_d3_simplex_jacobian_action_block<float, 1, 4, 16>(nelems, geometry_stride, geom_metric, sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::q_weight(), direction, kappa, output);
+    sfem::codegen::laplace_d3_simplex_jacobian_action_block<float, 1, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<float>::q_weight(), direction, kappa, output);
     return SFEM_SUCCESS;
 }
 
@@ -1003,10 +870,6 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::grad_ref_z();
     const scalar_t *const affine_q_weight = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -1063,7 +926,7 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_affine_mesh_soa_impl(
         const scalar_t *const block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, block_geom_metric3, block_geom_metric2, block_geom_metric4, block_geom_metric5};
         static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
 
-        laplace_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, cached_affine_metric_q_weight, block_direction_streams, kappa, block_output_streams);
+        laplace_d3_simplex_tet4_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, cached_affine_metric_q_weight, block_direction_streams, kappa, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -1170,7 +1033,6 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_isoparametric_mesh_soa_impl(
         scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_geom_metric_data[6][N_QP * VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
         #pragma omp simd
@@ -1228,35 +1090,11 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_isoparametric_mesh_soa_impl(
             }
         }
 
-        for (int q = 0; q < N_QP; ++q) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;
-                const scalar_t metric_det = block_determinant[geometry_offset];
-                const scalar_t metric_adj0 = block_adjugate_data[0][geometry_offset];
-                const scalar_t metric_adj1 = block_adjugate_data[1][geometry_offset];
-                const scalar_t metric_adj2 = block_adjugate_data[2][geometry_offset];
-                const scalar_t metric_adj3 = block_adjugate_data[3][geometry_offset];
-                const scalar_t metric_adj4 = block_adjugate_data[4][geometry_offset];
-                const scalar_t metric_adj5 = block_adjugate_data[5][geometry_offset];
-                const scalar_t metric_adj6 = block_adjugate_data[6][geometry_offset];
-                const scalar_t metric_adj7 = block_adjugate_data[7][geometry_offset];
-                const scalar_t metric_adj8 = block_adjugate_data[8][geometry_offset];
-                block_geom_metric_data[0][geometry_offset] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-                block_geom_metric_data[1][geometry_offset] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-                block_geom_metric_data[3][geometry_offset] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-                block_geom_metric_data[2][geometry_offset] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-                block_geom_metric_data[4][geometry_offset] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-                block_geom_metric_data[5][geometry_offset] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-            }
-        }
-
         const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3]};
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        const scalar_t *const block_geom_metric[6] = {block_geom_metric_data[0], block_geom_metric_data[1], block_geom_metric_data[2], block_geom_metric_data[3], block_geom_metric_data[4], block_geom_metric_data[5]};
 
-        laplace_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_geom_metric, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction_streams, kappa, block_output_streams);
+        laplace_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction_streams, kappa, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {

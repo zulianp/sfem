@@ -180,9 +180,6 @@ namespace sfem {
                                   MultiDomainOp &domains) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
-                if (entry.second.user_data) {
-                    continue;
-                }
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
                 auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
@@ -1011,9 +1008,10 @@ namespace sfem {
             {"apply_assume_affine", &impl_->apply_uses_affine},
         };
         const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains &&
-            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-            SFEM_ERROR("GeneratedLinearElasticity failed to cache affine geometry\n");
+        if (matched && val && impl_->domains) {
+            if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+                SFEM_ERROR("GeneratedLinearElasticity failed to cache affine geometry\n");
+            }
         }
     }
 

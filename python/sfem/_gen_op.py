@@ -405,39 +405,18 @@ namespace sfem {
             return 0;
         }
 
-        struct AffineGeometryCache {
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
-            std::shared_ptr<smesh::FFF> metric;
-        };
-
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains,
-                                  const bool needs_jacobian,
-                                  const bool needs_metric) {
+                                  MultiDomainOp &domains) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        entry.second.user_data);
-                if (!cache) {
-                    cache = std::make_shared<AffineGeometryCache>();
-                }
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                if (needs_jacobian && !cache->jacobian) {
-                    cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian) {
-                        return SFEM_FAILURE;
-                    }
+                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                if (!jacobian) {
+                    return SFEM_FAILURE;
                 }
-                if (needs_metric && !cache->metric) {
-                    cache->metric = smesh::FFF::create_SoA(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
+                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
             }
             return SFEM_SUCCESS;
         }
@@ -676,16 +655,7 @@ namespace sfem {
         };
         const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
         if (matched && val && impl_->domains) {
-            const bool needs_affine_jacobian =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-            const bool needs_affine_metric =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_metric)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric)s);
-            if (cache_affine_geometry(impl_->space,
-                                      *impl_->domains,
-                                      needs_affine_jacobian,
-                                      needs_affine_metric) != SFEM_SUCCESS) {
+            if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
                 SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
             }
         }

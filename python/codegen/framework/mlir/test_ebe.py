@@ -1,5 +1,8 @@
+import json
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,8 +13,14 @@ from codegen.framework.mlir import (
     MLIR_OPTIMIZATION_PLANS,
     MLIROptimizationStrategy,
     MatrixFreeEBEMLIRLowering,
+    TensorProductLaplaceFormBatchedGPULowering,
+    TensorProductLaplaceFormEBEGPULowering,
+    TensorProductLaplaceFormEBEMetalLowering,
+    TensorProductLaplaceFormGPULowering,
     TensorProductLaplaceFormMetalLowering,
+    TensorProductLaplaceReferenceEvaluator,
     TensorProductSumFactorMLIRLowering,
+    TensorProductSumFactorReferenceEvaluator,
     ThreadedEBEExecutor,
     build_inverted_topology,
     pad_to_vector_width,
@@ -287,6 +296,66 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(last.lhs_tensor_type, "tensor<2x2xf32>")
         self.assertEqual(last.result_tensor_type, "tensor<2x4xf32>")
 
+    def test_laplace_hex8_sum_factor_reference_pipeline_matches_direct_tensor_product(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="HEX8",
+            vector_size=8,
+        )
+        form_ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX8",
+            vector_size=8,
+        )
+        evaluator = TensorProductSumFactorReferenceEvaluator(ir)
+        u = tuple(0.5 + 0.03125 * (i + 1) for i in range(ir.n_shape))
+
+        for derivative in range(ir.dim):
+            field = evaluator.field_gradient(u, derivative)
+            direct_field = evaluator.direct_field_gradient(u, derivative)
+            self.assertLessEqual(max(abs(a - b) for a, b in zip(field, direct_field)), 1.0e-12)
+
+            q_values = tuple(0.25 + 0.015625 * (derivative + 1) * (i + 1) for i in range(ir.n_qp))
+            test = evaluator.test_contraction(q_values, derivative)
+            direct_test = evaluator.direct_test_contraction(q_values, derivative)
+            self.assertLessEqual(max(abs(a - b) for a, b in zip(test, direct_test)), 1.0e-12)
+
+        residual = evaluator.apply_laplace_local(u)
+        direct_residual = evaluator.direct_laplace_local(u, kappa=form_ir.parameter_default)
+        self.assertLessEqual(max(abs(a - b) for a, b in zip(residual, direct_residual)), 1.0e-12)
+
+    def test_laplace_hex8_quadrature_mismatch_sum_factor_reference_matches_direct_tensor_product(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="HEX8",
+            vector_size=8,
+            quadrature_order=3,
+        )
+        form_ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX8",
+            vector_size=8,
+            quadrature_order=3,
+        )
+        evaluator = TensorProductSumFactorReferenceEvaluator(ir)
+        u = tuple(0.5 + 0.03125 * (i + 1) for i in range(ir.n_shape))
+
+        self.assertEqual(ir.n_shape_1d, 2)
+        self.assertEqual(ir.n_qp_1d, 3)
+        for derivative in range(ir.dim):
+            field = evaluator.field_gradient(u, derivative)
+            direct_field = evaluator.direct_field_gradient(u, derivative)
+            self.assertEqual(len(field), ir.n_qp)
+            self.assertLessEqual(max(abs(a - b) for a, b in zip(field, direct_field)), 1.0e-12)
+
+        residual = evaluator.apply_laplace_local(u)
+        direct_residual = evaluator.direct_laplace_local(u, kappa=form_ir.parameter_default)
+        self.assertLessEqual(max(abs(a - b) for a, b in zip(residual, direct_residual)), 1.0e-12)
+
     def test_laplace_quad4_sum_factor_linalg_mlir_validates(self):
         from codegen.framework.materials.laplace import material
 
@@ -303,6 +372,107 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(module.count("linalg.matmul"), 8)
         self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0", module)
         self.assertIn("@sfem_laplace_quad4_sum_factor_test_gradient_d1_axis0", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_sum_factor_vector_mlir_validates_for_matrix_unit_boundary(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_vector_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_vector"', module)
+        self.assertEqual(module.count("= vector.matrix_multiply"), 8)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_vector", module)
+        self.assertIn("vector<4xf32>", module)
+        self.assertIn("lhs_rows = 2 : i32", module)
+        self.assertIn("lhs_columns = 2 : i32", module)
+        self.assertIn("rhs_columns = 2 : i32", module)
+        self.assertIn('sfem.vector.matrix_multiply = "flattened"', module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_sum_factor_matrix_unit_mlir_uses_padded_tile_dimensions(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_matrix_unit_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit"', module)
+        self.assertIn("sfem.matrix_unit.tile_size = 8 : i64", module)
+        self.assertEqual(module.count("= vector.matrix_multiply"), 8)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_matrix_unit", module)
+        self.assertIn("vector<64xf32>", module)
+        self.assertIn("lhs_rows = 8 : i32", module)
+        self.assertIn("lhs_columns = 8 : i32", module)
+        self.assertIn("rhs_columns = 8 : i32", module)
+        self.assertIn("sfem.matrix_unit.raw_lhs_rows = 2 : i64", module)
+        self.assertIn('sfem.vector.matrix_multiply = "padded"', module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_sum_factor_matrix_unit_memref_mlir_packs_raw_buffers(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_matrix_unit_memref_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_memref"', module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_matrix_unit_memref", module)
+        self.assertIn("memref<2x2xf32>", module)
+        self.assertIn("vector.transfer_read", module)
+        self.assertIn("vector.shape_cast", module)
+        self.assertIn("vector.matrix_multiply", module)
+        self.assertIn("vector.transfer_write", module)
+        self.assertIn("vector<8x8xf32>", module)
+        self.assertIn("vector<64xf32>", module)
+        self.assertIn("lhs_rows = 8 : i32", module)
+        self.assertIn("lhs_columns = 8 : i32", module)
+        self.assertIn("rhs_columns = 8 : i32", module)
+        self.assertIn('sfem.vector.matrix_multiply = "padded_memref"', module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_sum_factor_matrix_unit_pipeline_chains_stage_functions(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_matrix_unit_pipeline_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline"', module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_matrix_unit_pipeline", module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_test_gradient_d1_matrix_unit_pipeline", module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_matrix_unit_memref", module)
+        self.assertEqual(module.count("= vector.matrix_multiply"), 8)
+        self.assertEqual(module.count("func.call @"), 8)
+        self.assertEqual(module.count("memref.alloc"), 8)
+        self.assertEqual(module.count("memref.dealloc"), 8)
+        self.assertIn("%bridge1 = memref.alloc()", module)
+        self.assertIn("memref.load %scratch0", module)
+        self.assertIn("memref.store %bridge", module)
+        self.assertIn('sfem.vector.matrix_multiply = "padded_memref_pipeline"', module)
+        self.assertIn("func.call @sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_matrix_unit_memref", module)
+        self.assertIn("func.call @sfem_laplace_quad4_sum_factor_field_gradient_d0_axis1_matrix_unit_memref", module)
 
         self._run_mlir_opt(module)
 
@@ -347,6 +517,33 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
 
         self._run_mlir_opt(module)
 
+    def test_laplace_hex8_quadrature_mismatch_matrix_unit_pipeline_bridges_stage_views(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="HEX8",
+            vector_size=8,
+            quadrature_order=3,
+        )
+        self.assertEqual(ir.n_shape_1d, 2)
+        self.assertEqual(ir.n_qp_1d, 3)
+
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_matrix_unit_pipeline_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline"', module)
+        self.assertIn("%bridge1 = memref.alloc() : memref<2x6xf32>", module)
+        self.assertIn("%bridge2 = memref.alloc() : memref<2x9xf32>", module)
+        self.assertIn("memref.load %scratch0", module)
+        self.assertIn("memref.store %bridge", module)
+        self.assertEqual(module.count("= vector.matrix_multiply"), 18)
+        self.assertEqual(module.count("func.call @"), 18)
+        self.assertEqual(module.count("memref.alloc"), 24)
+        self.assertNotIn("memref.reinterpret_cast", module)
+
+        self._run_mlir_opt(module)
+
     def test_laplace_hex27_high_order_sum_factor_gpu_and_metal_sources_validate(self):
         from codegen.framework.materials.laplace import material
 
@@ -368,6 +565,47 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(first.result_tensor_type, "tensor<3x9xf32>")
 
         lowering = TensorProductSumFactorMLIRLowering(ir)
+        vector_module = lowering.render_vector_module()
+        self.assertEqual(vector_module.count("= vector.matrix_multiply"), 18)
+        self.assertIn("vector<9xf32>", vector_module)
+        self.assertIn("vector<27xf32>", vector_module)
+        self.assertIn("lhs_rows = 3 : i32", vector_module)
+        self.assertIn("rhs_columns = 9 : i32", vector_module)
+        self._run_mlir_opt(vector_module)
+
+        matrix_unit_module = lowering.render_matrix_unit_module()
+        self.assertEqual(matrix_unit_module.count("= vector.matrix_multiply"), 18)
+        self.assertIn("sfem.matrix_unit.tile_size = 8 : i64", matrix_unit_module)
+        self.assertIn("vector<64xf32>", matrix_unit_module)
+        self.assertIn("vector<128xf32>", matrix_unit_module)
+        self.assertIn("lhs_rows = 8 : i32", matrix_unit_module)
+        self.assertIn("lhs_columns = 8 : i32", matrix_unit_module)
+        self.assertIn("rhs_columns = 16 : i32", matrix_unit_module)
+        self.assertIn("sfem.matrix_unit.raw_lhs_rows = 3 : i64", matrix_unit_module)
+        self.assertIn("sfem.matrix_unit.raw_rhs_columns = 9 : i64", matrix_unit_module)
+        self._run_mlir_opt(matrix_unit_module)
+
+        matrix_unit_memref_module = lowering.render_matrix_unit_memref_module()
+        self.assertEqual(matrix_unit_memref_module.count("= vector.matrix_multiply"), 18)
+        self.assertIn("memref<3x3xf32>", matrix_unit_memref_module)
+        self.assertIn("memref<3x9xf32>", matrix_unit_memref_module)
+        self.assertIn("vector.transfer_read", matrix_unit_memref_module)
+        self.assertIn("vector.transfer_write", matrix_unit_memref_module)
+        self.assertIn("vector<8x16xf32>", matrix_unit_memref_module)
+        self.assertIn("rhs_columns = 16 : i32", matrix_unit_memref_module)
+        self.assertIn("sfem.matrix_unit.raw_rhs_columns = 9 : i64", matrix_unit_memref_module)
+        self._run_mlir_opt(matrix_unit_memref_module)
+
+        matrix_unit_pipeline_module = lowering.render_matrix_unit_pipeline_module()
+        self.assertEqual(matrix_unit_pipeline_module.count("= vector.matrix_multiply"), 18)
+        self.assertEqual(matrix_unit_pipeline_module.count("func.call @"), 18)
+        self.assertEqual(matrix_unit_pipeline_module.count("memref.alloc"), 24)
+        self.assertIn("@sfem_laplace_hex27_sum_factor_field_gradient_d2_matrix_unit_pipeline", matrix_unit_pipeline_module)
+        self.assertIn("@sfem_laplace_hex27_sum_factor_test_gradient_d2_matrix_unit_pipeline", matrix_unit_pipeline_module)
+        self.assertIn("vector<8x16xf32>", matrix_unit_pipeline_module)
+        self.assertIn("rhs_columns = 16 : i32", matrix_unit_pipeline_module)
+        self._run_mlir_opt(matrix_unit_pipeline_module)
+
         gpu_module = lowering.render_gpu_module()
         self.assertEqual(gpu_module.count("gpu.launch_func"), 18)
         self.assertEqual(gpu_module.count("gpu.func @"), 18)
@@ -400,6 +638,52 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("#pragma unroll", source)
         self.assertIn("for (uint k = 0; k < 2; ++k)", source)
         self.assertNotIn("if (", source)
+
+    def test_laplace_sum_factor_inspection_artifacts_are_written(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+
+            linalg_module = artifacts.file_for_suffix(".linalg.mlir").read_text()
+            vector_module = artifacts.file_for_suffix(".vector.mlir").read_text()
+            matrix_unit_module = artifacts.file_for_suffix(".matrix_unit.mlir").read_text()
+            matrix_unit_memref_module = artifacts.file_for_suffix(".matrix_unit_memref.mlir").read_text()
+            matrix_unit_pipeline_module = artifacts.file_for_suffix(".matrix_unit_pipeline.mlir").read_text()
+            gpu_module = artifacts.file_for_suffix(".gpu.mlir").read_text()
+            metal_source = artifacts.file_for_suffix(".metal").read_text()
+            harness = artifacts.file_for_suffix(".metal_smoke.mm").read_text()
+
+        self.assertIn("linalg.matmul", linalg_module)
+        self.assertIn("vector.matrix_multiply", vector_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit"', matrix_unit_module)
+        self.assertIn("sfem.matrix_unit.tile_size = 8 : i64", matrix_unit_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_memref"', matrix_unit_memref_module)
+        self.assertIn("vector.transfer_read", matrix_unit_memref_module)
+        self.assertIn("vector.transfer_write", matrix_unit_memref_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline"', matrix_unit_pipeline_module)
+        self.assertIn("func.call @", matrix_unit_pipeline_module)
+        self.assertIn("memref.alloc", matrix_unit_pipeline_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_gpu"', gpu_module)
+        self.assertIn("gpu.launch_func", gpu_module)
+        self.assertIn("kernel void sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_metal", metal_source)
+        self.assertIn("newLibraryWithSource", harness)
+        self.assertNotIn("scf.if", gpu_module)
+        self.assertNotIn("arith.cmpi", gpu_module)
+        self.assertNotIn("if (", metal_source)
+
+        self._run_mlir_opt(linalg_module)
+        self._run_mlir_opt(vector_module)
+        self._run_mlir_opt(matrix_unit_module)
+        self._run_mlir_opt(matrix_unit_memref_module)
+        self._run_mlir_opt(matrix_unit_pipeline_module)
+        self._run_mlir_opt(gpu_module)
 
     def test_laplace_quad4_sum_factor_runs_on_metal_when_device_is_available(self):
         from codegen.framework.materials.laplace import material
@@ -454,6 +738,504 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("std::fabs(result[i] - expected[i])", harness)
         self.assertIn("newLibraryWithSource", harness)
 
+    def test_laplace_quad4_form_ir_emits_fused_tensor_product_gpu_mlir(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormGPULowering(ir)
+        module = lowering.render_gpu_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_laplace_form_gpu"', module)
+        self.assertIn('sfem.form = "laplace"', module)
+        self.assertIn('sfem.parameter = "kappa"', module)
+        self.assertEqual(module.count("gpu.launch_func"), 1)
+        self.assertEqual(module.count("gpu.func @"), 1)
+        self.assertIn("memref<4xf32>", module)
+        self.assertIn("memref<1xf32>", module)
+        self.assertIn("scf.for %qy", module)
+        self.assertIn("scf.for %sx", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_reference_evaluator_checks_local_and_ebe_semantics(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        evaluator = TensorProductLaplaceReferenceEvaluator(ir)
+
+        constant = evaluator.apply_local((1.0, 1.0, 1.0, 1.0))
+        self.assertLessEqual(max(abs(value) for value in constant), 1.0e-6)
+
+        connectivity = ((0, 1, 3, 2), (1, 4, 5, 3))
+        node_degree = (1, 2, 1, 2, 1, 1)
+        node_to_element_map = ((0, 0), (0, 1), (0, 0), (0, 1), (1, 0), (1, 0))
+        node_to_local_idx = ((0, 0), (1, 0), (3, 0), (2, 3), (1, 0), (2, 0))
+        u = tuple(0.5 + 0.03125 * (i + 1) for i in range(6))
+        element_out, out = evaluator.apply_ebe(
+            connectivity,
+            u,
+            node_degree,
+            node_to_element_map,
+            node_to_local_idx,
+        )
+
+        self.assertEqual(len(element_out), 2)
+        self.assertEqual(len(element_out[0]), 4)
+        self.assertAlmostEqual(out[0], element_out[0][0])
+        self.assertAlmostEqual(out[1], element_out[0][1] + element_out[1][0])
+        self.assertAlmostEqual(out[3], element_out[0][2] + element_out[1][3])
+
+    def test_laplace_form_inspection_artifacts_are_written_for_generic_gpu_and_metal(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormGPULowering(ir)
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+
+            gpu_module = artifacts.file_for_suffix(".gpu.mlir").read_text()
+            metal_source = artifacts.file_for_suffix(".metal").read_text()
+            harness = artifacts.file_for_suffix(".metal_smoke.mm").read_text()
+
+        self.assertIn('sfem.lowering = "tensor_product_laplace_form_gpu"', gpu_module)
+        self.assertIn("gpu.func @sfem_laplace_quad4_sum_factor_laplace_apply_kernel", gpu_module)
+        self.assertIn("kernel void sfem_laplace_quad4_sum_factor_laplace_apply_metal", metal_source)
+        self.assertIn("reference_apply", harness)
+        self.assertIn("std::fabs(result[i] - expected[i])", harness)
+        self.assertNotIn("scf.if", gpu_module)
+        self.assertNotIn("arith.cmpi", gpu_module)
+        self.assertNotIn("if (", metal_source)
+
+        self._run_mlir_opt(gpu_module)
+
+    def test_laplace_quad4_form_ir_emits_batched_ebe_gpu_map(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormBatchedGPULowering(
+            ir,
+            max_elements=8,
+            max_nodes=17,
+        )
+        module = lowering.render_gpu_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_laplace_ebe_gpu_map"', module)
+        self.assertIn('sfem.mesh_phase = "ebe_map"', module)
+        self.assertIn("memref<8x4xindex>", module)
+        self.assertIn("memref<17xf32>", module)
+        self.assertIn("memref<8x4xf32>", module)
+        self.assertIn("%elem = gpu.block_id x", module)
+        self.assertIn("blocks in (%blocks, %c1, %c1)", module)
+        self.assertIn("threads in (%threads, %c1, %c1)", module)
+        self.assertIn("%node = memref.load %connectivity[%elem, %trial]", module)
+        self.assertIn("%coeff = memref.load %u[%node]", module)
+        self.assertIn("memref.store %sum_y, %element_out[%elem, %row]", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_hex27_form_ir_emits_high_order_batched_ebe_gpu_map_artifact(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX27",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormBatchedGPULowering(
+            ir,
+            max_elements=4,
+            max_nodes=64,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+            module = artifacts.file_for_suffix(".ebe.gpu.mlir").read_text()
+
+        self.assertIn("memref<4x27xindex>", module)
+        self.assertIn("memref<64xf32>", module)
+        self.assertIn("memref<4x27xf32>", module)
+        self.assertIn("arith.constant 27 : index", module)
+        self.assertIn("scf.for %qz", module)
+        self.assertIn("scf.for %sz", module)
+        self.assertIn("%node = memref.load %connectivity[%elem, %trial]", module)
+        self.assertIn("memref.store %sum_z, %element_out[%elem, %row]", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_form_ir_emits_full_ebe_gpu_map_reduce(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEGPULowering(
+            ir,
+            max_elements=8,
+            max_nodes=17,
+            max_node_degree=4,
+        )
+        module = lowering.render_gpu_module()
+
+        self.assertIn('sfem.lowering = "tensor_product_laplace_ebe_gpu"', module)
+        self.assertIn('sfem.mesh_phases = "ebe_map,ebe_reduce"', module)
+        self.assertEqual(module.count("gpu.launch_func"), 2)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_laplace_apply_ebe_map_kernel", module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_laplace_apply_ebe_reduce_kernel", module)
+        self.assertIn("memref<8x4xindex>", module)
+        self.assertIn("memref<8x4xf32>", module)
+        self.assertIn("memref<17xindex>", module)
+        self.assertIn("memref<17x4xindex>", module)
+        self.assertIn("memref<17xf32>", module)
+        self.assertIn("%node = gpu.thread_id x", module)
+        self.assertIn("%degree = memref.load %node_degree[%node]", module)
+        self.assertIn("scf.for %i = %c0 to %degree", module)
+        self.assertIn("%elem = memref.load %node_to_element_map[%node, %i]", module)
+        self.assertIn("%local = memref.load %node_to_local_idx[%node, %i]", module)
+        self.assertIn("%value = memref.load %element_out[%elem, %local]", module)
+        self.assertIn("memref.store %sum, %out[%node]", module)
+        self.assertNotIn("atomic", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_hex27_form_ir_emits_full_ebe_gpu_map_reduce_artifact(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX27",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEGPULowering(
+            ir,
+            max_elements=4,
+            max_nodes=64,
+            max_node_degree=8,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+            module = artifacts.file_for_suffix(".ebe.full.gpu.mlir").read_text()
+
+        self.assertIn("memref<4x27xindex>", module)
+        self.assertIn("memref<4x27xf32>", module)
+        self.assertIn("memref<64x8xindex>", module)
+        self.assertIn("arith.constant 27 : index", module)
+        self.assertIn("scf.for %qz", module)
+        self.assertIn("scf.for %sz", module)
+        self.assertIn("scf.for %i = %c0 to %degree", module)
+        self.assertIn("memref.store %sum_z, %element_out[%elem, %row]", module)
+        self.assertIn("memref.store %sum, %out[%node]", module)
+        self.assertNotIn("atomic", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
+
+    def test_laplace_quad4_form_ir_emits_ebe_metal_map_reduce_source_and_harness(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEMetalLowering(
+            ir,
+            max_elements=2,
+            max_nodes=7,
+            max_node_degree=2,
+        )
+        source = lowering.render_metal_source()
+
+        self.assertIn("kernel void sfem_laplace_quad4_sum_factor_laplace_apply_ebe_map_metal", source)
+        self.assertIn("kernel void sfem_laplace_quad4_sum_factor_laplace_apply_ebe_reduce_metal", source)
+        self.assertIn("device const uint *connectivity [[buffer(0)]]", source)
+        self.assertIn("device float *element_out [[buffer(2)]]", source)
+        self.assertIn("const uint elem = tid.y;", source)
+        self.assertIn("const uint node = connectivity[elem * 4 + trial];", source)
+        self.assertIn("const float coeff = u[node];", source)
+        self.assertIn("element_out[elem * 4 + row] = value;", source)
+        self.assertIn("const uint degree = node_degree[node];", source)
+        self.assertIn("const uint map_index = node * 2 + i;", source)
+        self.assertIn("acc += element_out[elem * 4 + local];", source)
+        self.assertNotIn("if (", source)
+
+        harness = lowering.render_metal_smoke_test_harness()
+        self.assertIn("reference_apply", harness)
+        self.assertIn("expected_element", harness)
+        self.assertIn("node_to_element_map", harness)
+        self.assertIn("newFunctionWithName", harness)
+        self.assertIn("dispatchThreads:MTLSizeMake(4, 2, 1)", harness)
+        self.assertIn("dispatchThreads:MTLSizeMake(7, 1, 1)", harness)
+        self.assertIn("std::fabs(result[i] - expected[i])", harness)
+
+    def test_laplace_ebe_metal_inspection_artifacts_are_written(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEMetalLowering(
+            ir,
+            max_elements=2,
+            max_nodes=6,
+            max_node_degree=2,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = lowering.write_inspection_artifacts(tmp)
+            source = artifacts.file_for_suffix(".ebe.metal").read_text()
+            harness = artifacts.file_for_suffix(".ebe_metal_smoke.mm").read_text()
+
+        self.assertIn("ebe_map_metal", source)
+        self.assertIn("ebe_reduce_metal", source)
+        self.assertIn("expected_element", harness)
+
+    def test_laplace_hex27_ebe_metal_smoke_harness_uses_high_order_fixture(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX27",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEMetalLowering(
+            ir,
+            max_elements=2,
+            max_nodes=53,
+            max_node_degree=2,
+        )
+        harness = lowering.render_metal_smoke_test_harness()
+
+        self.assertIn("const unsigned connectivity[2 * 27]", harness)
+        self.assertIn("const unsigned node_degree[53]", harness)
+        self.assertIn("const unsigned node_to_element_map[53 * 2]", harness)
+        self.assertIn("float local_u[27]", harness)
+        self.assertIn("dispatchThreads:MTLSizeMake(27, 2, 1)", harness)
+        self.assertIn("dispatchThreads:MTLSizeMake(53, 1, 1)", harness)
+        self.assertIn("sfem_laplace_hex27_sum_factor_laplace_apply_ebe_map_metal", harness)
+        self.assertIn("sfem_laplace_hex27_sum_factor_laplace_apply_ebe_reduce_metal", harness)
+
+    def test_laplace_ebe_metal_runs_when_device_is_available(self):
+        from codegen.framework.materials.laplace import material
+
+        if shutil.which("xcrun") is None:
+            self.skipTest("xcrun is not available for Metal runtime test")
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormEBEMetalLowering(
+            ir,
+            max_elements=2,
+            max_nodes=6,
+            max_node_degree=2,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            result = lowering.run_metal_smoke_test(tmp)
+
+        self.assertTrue(result.harness_path.name.endswith("_ebe_metal_smoke.mm"))
+        if not result.compiled:
+            self.fail(result.compile_stderr)
+        if result.no_default_device:
+            self.skipTest("Metal runtime has no default MTLDevice")
+        self.assertTrue(result.success, result.run_stderr)
+
+    def test_tensor_product_laplace_artifact_driver_emits_manifest_and_valid_mlir(self):
+        script = Path("python/codegen/framework/mlir/scripts/tensor_product_laplace_artifacts.py")
+        env = dict(os.environ)
+        pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = "python" if not pythonpath else "python:" + pythonpath
+
+        with tempfile.TemporaryDirectory() as tmp:
+            command = [
+                sys.executable,
+                str(script),
+                "--output-dir",
+                tmp,
+                "--element",
+                "QUAD4",
+                "--max-elements",
+                "2",
+                "--max-nodes",
+                "6",
+                "--max-node-degree",
+                "2",
+                "--verify-reference",
+                "--verify-performance-shape",
+                "--validate-mlir",
+                "--probe-iree-metal",
+                "--probe-metal-toolchain",
+            ]
+            result = subprocess.run(
+                command,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            manifest_path = Path(result.stdout.strip().splitlines()[-1])
+            manifest = json.loads(manifest_path.read_text())
+            sum_factor_ir_path = next(
+                Path(path) for path in manifest["artifacts"]["sfem_ir"] if path.endswith(".sum_factor.ir.json")
+            )
+            form_ir_path = next(
+                Path(path) for path in manifest["artifacts"]["sfem_ir"] if path.endswith(".laplace_form.ir.json")
+            )
+            sum_factor_ir = json.loads(sum_factor_ir_path.read_text())
+            form_ir = json.loads(form_ir_path.read_text())
+
+        self.assertEqual(manifest["material"], "laplace")
+        self.assertEqual(manifest["element"], "QUAD4")
+        self.assertEqual(manifest["n_shape"], 4)
+        self.assertIn("sfem_ir", manifest["artifacts"])
+        self.assertIn("sum_factor", manifest["artifacts"])
+        self.assertIn("ebe_full", manifest["artifacts"])
+        self.assertIn("ebe_metal", manifest["artifacts"])
+        self.assertTrue(any(path.endswith(".sum_factor.ir.json") for path in manifest["artifacts"]["sfem_ir"]))
+        self.assertTrue(any(path.endswith(".laplace_form.ir.json") for path in manifest["artifacts"]["sfem_ir"]))
+        self.assertTrue(any(path.endswith(".vector.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".matrix_unit.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".matrix_unit_memref.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".matrix_unit_pipeline.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".ebe.full.gpu.mlir") for path in manifest["artifacts"]["ebe_full"]))
+        self.assertTrue(any(path.endswith(".ebe.metal") for path in manifest["artifacts"]["ebe_metal"]))
+        self.assertTrue(any(path.endswith(".ebe_metal_smoke.mm") for path in manifest["artifacts"]["ebe_metal"]))
+        self.assertEqual(sum_factor_ir["element_type"], "QUAD4")
+        self.assertEqual(sum_factor_ir["n_shape_1d"], 2)
+        self.assertEqual(sum_factor_ir["n_qp_1d"], 2)
+        self.assertEqual(len(sum_factor_ir["field_gradient_stages"]), 4)
+        self.assertEqual(len(sum_factor_ir["test_gradient_stages"]), 4)
+        self.assertEqual(form_ir["form"], "laplace")
+        self.assertEqual(form_ir["parameter_name"], "kappa")
+        self.assertEqual(len(manifest["reference_verification"]), 2)
+        sum_factor_reference = next(
+            item for item in manifest["reference_verification"] if item["name"] == "tensor_product_sum_factor_pipeline_reference"
+        )
+        laplace_reference = next(
+            item for item in manifest["reference_verification"] if item["name"] == "tensor_product_laplace_cpu_reference"
+        )
+        self.assertTrue(sum_factor_reference["ok"], sum_factor_reference)
+        self.assertLessEqual(sum_factor_reference["max_field_gradient_diff"], 1.0e-6)
+        self.assertLessEqual(sum_factor_reference["max_test_contraction_diff"], 1.0e-6)
+        self.assertLessEqual(sum_factor_reference["max_laplace_residual_diff"], 1.0e-6)
+        self.assertTrue(laplace_reference["ok"], laplace_reference)
+        self.assertLessEqual(laplace_reference["max_abs_constant_residual"], 1.0e-5)
+        self.assertTrue(manifest["performance_shape"])
+        self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
+        self.assertTrue(any(item["name"] == "linalg_matmul" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "vector_matrix_multiply" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_vector_matrix_multiply" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_memref_transfer_read" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_memref_transfer_write" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_pipeline_calls" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_pipeline_scratch" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "matrix_unit_alignment" for item in manifest["performance_shape"]))
+        self.assertEqual(len(manifest["iree_metal"]), 1)
+        self.assertEqual(manifest["iree_metal"][0]["name"], "sum_factor_matrix_unit_pipeline_to_metal_vmfb")
+        if shutil.which("iree-compile") is None:
+            self.assertTrue(manifest["iree_metal"][0]["skipped"])
+            self.assertIn("iree-compile is not available", manifest["iree_metal"][0]["reason"])
+        else:
+            self.assertTrue(manifest["iree_metal"][0]["ok"], manifest["iree_metal"][0])
+            self.assertTrue(manifest["iree_metal"][0]["output_vmfb"].endswith(".matrix_unit_pipeline.metal.vmfb"))
+        self.assertTrue(manifest["metal_toolchain"])
+        if shutil.which("xcrun") is None:
+            self.assertTrue(all(item["skipped"] for item in manifest["metal_toolchain"]))
+        else:
+            self.assertTrue(all("returncode" in item for item in manifest["metal_toolchain"]))
+        self.assertTrue(manifest["mlir_validation"])
+        self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
+
+    def test_tensor_product_laplace_artifact_driver_handles_quadrature_mismatch_pipeline_views(self):
+        script = Path("python/codegen/framework/mlir/scripts/tensor_product_laplace_artifacts.py")
+        env = dict(os.environ)
+        pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = "python" if not pythonpath else "python:" + pythonpath
+
+        with tempfile.TemporaryDirectory() as tmp:
+            command = [
+                sys.executable,
+                str(script),
+                "--output-dir",
+                tmp,
+                "--element",
+                "HEX8",
+                "--quadrature-order",
+                "3",
+                "--max-elements",
+                "1",
+                "--max-nodes",
+                "8",
+                "--max-node-degree",
+                "1",
+                "--verify-reference",
+                "--verify-performance-shape",
+                "--validate-mlir",
+            ]
+            result = subprocess.run(
+                command,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            manifest_path = Path(result.stdout.strip().splitlines()[-1])
+            manifest = json.loads(manifest_path.read_text())
+            pipeline_path = next(
+                Path(path)
+                for path in manifest["artifacts"]["sum_factor"]
+                if path.endswith(".matrix_unit_pipeline.mlir")
+            )
+            pipeline_module = pipeline_path.read_text()
+
+        self.assertEqual(manifest["element"], "HEX8")
+        self.assertEqual(manifest["quadrature_order"], 3)
+        self.assertEqual(manifest["n_shape_1d"], 2)
+        self.assertEqual(manifest["n_qp_1d"], 3)
+        self.assertIn("%bridge1 = memref.alloc() : memref<2x6xf32>", pipeline_module)
+        self.assertIn("%bridge2 = memref.alloc() : memref<2x9xf32>", pipeline_module)
+        self.assertIn("memref.load %scratch0", pipeline_module)
+        self.assertIn("memref.store %bridge", pipeline_module)
+        self.assertNotIn("memref.reinterpret_cast", pipeline_module)
+        sum_factor_reference = next(
+            item for item in manifest["reference_verification"] if item["name"] == "tensor_product_sum_factor_pipeline_reference"
+        )
+        self.assertLessEqual(sum_factor_reference["max_field_gradient_diff"], 1.0e-6)
+        self.assertLessEqual(sum_factor_reference["max_laplace_residual_diff"], 1.0e-6)
+        self.assertTrue(all(item["ok"] for item in manifest["reference_verification"]), manifest["reference_verification"])
+        self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
+        self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
+
     def test_laplace_hex27_form_ir_emits_high_order_fused_metal_apply(self):
         from codegen.framework.materials.laplace import material
 
@@ -474,6 +1256,30 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("for (uint sx = 0; sx < 3; ++sx)", source)
         self.assertIn("test_gx * grad_u_x + test_gy * grad_u_y + test_gz * grad_u_z", source)
         self.assertNotIn("if (", source)
+
+    def test_laplace_hex27_form_ir_emits_high_order_fused_gpu_mlir(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_laplace_form_ir_from_material(
+            material,
+            element="HEX27",
+            vector_size=8,
+        )
+        lowering = TensorProductLaplaceFormGPULowering(ir)
+        module = lowering.render_gpu_module()
+
+        self.assertEqual(module.count("gpu.launch_func"), 1)
+        self.assertEqual(module.count("gpu.func @"), 1)
+        self.assertIn("memref<27xf32>", module)
+        self.assertIn("memref<9xf32>", module)
+        self.assertIn("memref<3xf32>", module)
+        self.assertIn("arith.constant 27 : index", module)
+        self.assertIn("scf.for %qz", module)
+        self.assertIn("scf.for %sz", module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+
+        self._run_mlir_opt(module)
 
     def test_laplace_form_apply_runs_on_metal_when_device_is_available(self):
         from codegen.framework.materials.laplace import material
@@ -515,11 +1321,54 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("--iree-hal-target-backends=metal", command)
         self.assertEqual(command[-1], "laplace_hex8.metal.vmfb")
 
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(FileNotFoundError):
+                lowering.compile_with_iree_metal(tmp, iree_compile="/does/not/exist/iree-compile")
+            output_dir = Path(tmp)
+            pipeline_input = output_dir / ("%s.matrix_unit_pipeline.mlir" % ir.function_prefix)
+            pipeline_output = output_dir / ("%s.matrix_unit_pipeline.metal.vmfb" % ir.function_prefix)
+            memref_input = output_dir / ("%s.matrix_unit_memref.mlir" % ir.function_prefix)
+            memref_output = output_dir / ("%s.matrix_unit_memref.metal.vmfb" % ir.function_prefix)
+            matrix_input = output_dir / ("%s.matrix_unit.mlir" % ir.function_prefix)
+            matrix_output = output_dir / ("%s.matrix_unit.metal.vmfb" % ir.function_prefix)
+            raw_input = output_dir / ("%s.linalg.mlir" % ir.function_prefix)
+            raw_output = output_dir / ("%s.linalg.metal.vmfb" % ir.function_prefix)
+            self.assertTrue(pipeline_input.exists())
+            self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline"', pipeline_input.read_text())
+            self.assertTrue(str(pipeline_output).endswith(".matrix_unit_pipeline.metal.vmfb"))
+            with self.assertRaises(FileNotFoundError):
+                lowering.compile_with_iree_metal(
+                    tmp,
+                    iree_compile="/does/not/exist/iree-compile",
+                    input_kind="matrix_unit_memref",
+                )
+            self.assertTrue(memref_input.exists())
+            self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_memref"', memref_input.read_text())
+            self.assertTrue(str(memref_output).endswith(".matrix_unit_memref.metal.vmfb"))
+            with self.assertRaises(FileNotFoundError):
+                lowering.compile_with_iree_metal(
+                    tmp,
+                    iree_compile="/does/not/exist/iree-compile",
+                    input_kind="matrix_unit",
+                )
+            self.assertTrue(matrix_input.exists())
+            self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit"', matrix_input.read_text())
+            self.assertTrue(str(matrix_output).endswith(".matrix_unit.metal.vmfb"))
+            with self.assertRaises(FileNotFoundError):
+                lowering.compile_with_iree_metal(
+                    tmp,
+                    iree_compile="/does/not/exist/iree-compile",
+                    input_kind="linalg",
+                )
+            self.assertTrue(raw_input.exists())
+            self.assertIn('sfem.lowering = "tensor_product_sum_factor_generic_gpu"', raw_input.read_text())
+            self.assertTrue(str(raw_output).endswith(".linalg.metal.vmfb"))
+
         if shutil.which("iree-compile") is None:
             self.skipTest("iree-compile is not available for Apple Metal integration test")
         with tempfile.TemporaryDirectory() as tmp:
             output_vmfb, result = lowering.compile_with_iree_metal(tmp)
-        self.assertTrue(output_vmfb.name.endswith(".metal.vmfb"))
+        self.assertTrue(output_vmfb.name.endswith(".matrix_unit_pipeline.metal.vmfb"))
         self.assertEqual(result.returncode, 0)
 
     def _run_mlir_opt(self, module, *passes):

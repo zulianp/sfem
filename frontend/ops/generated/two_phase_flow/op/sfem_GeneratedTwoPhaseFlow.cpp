@@ -224,21 +224,39 @@ namespace sfem {
             return 0;
         }
 
+        struct AffineGeometryCache {
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
+            std::shared_ptr<smesh::FFF> metric;
+        };
+
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
+                                  MultiDomainOp &domains,
+                                  const bool needs_jacobian,
+                                  const bool needs_metric) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
-                if (entry.second.user_data) {
-                    continue;
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
+                        entry.second.user_data);
+                if (!cache) {
+                    cache = std::make_shared<AffineGeometryCache>();
                 }
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
+                if (needs_jacobian && !cache->jacobian) {
+                    cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian) {
+                        return SFEM_FAILURE;
+                    }
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if (needs_metric && !cache->metric) {
+                    cache->metric = smesh::FFF::create_SoA(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->metric) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -537,21 +555,17 @@ namespace sfem {
         SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
-        auto mesh = impl_->space->mesh_ptr();
-        const bool needs_affine_geometry =
-                impl_->residual_uses_affine ||
-                impl_->jacobian_action_uses_affine;
-        if (needs_affine_geometry) {
-            for (auto &entry : impl_->domains->domains()) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
-            }
+        const bool needs_affine_jacobian =
+                (impl_->residual_uses_affine && true) ||
+                (impl_->jacobian_action_uses_affine && true);
+        const bool needs_affine_metric =
+                (impl_->residual_uses_affine && false) ||
+                (impl_->jacobian_action_uses_affine && false);
+        if (needs_affine_jacobian || needs_affine_metric) {
+            return cache_affine_geometry(impl_->space,
+                                         *impl_->domains,
+                                         needs_affine_jacobian,
+                                         needs_affine_metric);
         }
         return SFEM_SUCCESS;
     }
@@ -583,17 +597,32 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
+            const geom_t *const *geom_metric = nullptr;
             if (impl_->residual_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache) {
                     SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                if (true) {
+                    if (!cache->jacobian) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached jacobian geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate = reinterpret_cast<const geom_t *const *>(
+                            cache->jacobian->jacobian_adjugate_SoA()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian->jacobian_determinant()->data());
+                }
+                if (false) {
+                    if (!cache->metric) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric = reinterpret_cast<const geom_t *const *>(
+                            cache->metric->fff_SoA()->data());
+                }
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters,
@@ -663,17 +692,32 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
+            const geom_t *const *geom_metric = nullptr;
             if (impl_->jacobian_action_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache) {
                     SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                if (true) {
+                    if (!cache->jacobian) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached jacobian geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate = reinterpret_cast<const geom_t *const *>(
+                            cache->jacobian->jacobian_adjugate_SoA()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian->jacobian_determinant()->data());
+                }
+                if (false) {
+                    if (!cache->metric) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric = reinterpret_cast<const geom_t *const *>(
+                            cache->metric->fff_SoA()->data());
+                }
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters,
@@ -761,9 +805,19 @@ namespace sfem {
             {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
         };
         const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains &&
-            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-            SFEM_ERROR("GeneratedTwoPhaseFlow failed to cache affine geometry\n");
+        if (matched && val && impl_->domains) {
+            const bool needs_affine_jacobian =
+                    (impl_->residual_uses_affine && true) ||
+                    (impl_->jacobian_action_uses_affine && true);
+            const bool needs_affine_metric =
+                    (impl_->residual_uses_affine && false) ||
+                    (impl_->jacobian_action_uses_affine && false);
+            if (cache_affine_geometry(impl_->space,
+                                      *impl_->domains,
+                                      needs_affine_jacobian,
+                                      needs_affine_metric) != SFEM_SUCCESS) {
+                SFEM_ERROR("GeneratedTwoPhaseFlow failed to cache affine geometry\n");
+            }
         }
     }
 
