@@ -176,13 +176,15 @@ namespace sfem {
 
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
-            std::shared_ptr<smesh::FFF> metric;
+            std::shared_ptr<smesh::FFF> metric_soa;
+            std::shared_ptr<smesh::FFF> metric_aos;
         };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool needs_jacobian,
-                                  const bool needs_metric) {
+                                  const bool needs_metric_soa,
+                                  const bool needs_metric_aos) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -199,10 +201,17 @@ namespace sfem {
                         return SFEM_FAILURE;
                     }
                 }
-                if (needs_metric && !cache->metric) {
-                    cache->metric = smesh::FFF::create_SoA(
+                if (needs_metric_soa && !cache->metric_soa) {
+                    cache->metric_soa = smesh::FFF::create_SoA(
                             mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric) {
+                    if (!cache->metric_soa) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                if (needs_metric_aos && !cache->metric_aos) {
+                    cache->metric_aos = smesh::FFF::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->metric_aos) {
                         return SFEM_FAILURE;
                     }
                 }
@@ -624,13 +633,20 @@ namespace sfem {
                 (impl_->residual_uses_affine && true) ||
                 (impl_->jacobian_action_uses_affine && true);
         const bool needs_affine_metric =
+                (impl_->residual_uses_affine && (false || true)) ||
+                (impl_->jacobian_action_uses_affine && (false || true));
+        const bool needs_affine_metric_soa =
+                (impl_->residual_uses_affine && false) ||
+                (impl_->jacobian_action_uses_affine && false);
+        const bool needs_affine_metric_aos =
                 (impl_->residual_uses_affine && true) ||
                 (impl_->jacobian_action_uses_affine && true);
         if (needs_affine_jacobian || needs_affine_metric) {
             return cache_affine_geometry(impl_->space,
                                          *impl_->domains,
                                          needs_affine_jacobian,
-                                         needs_affine_metric);
+                                         needs_affine_metric_soa,
+                                         needs_affine_metric_aos);
         }
         return SFEM_SUCCESS;
     }
@@ -660,6 +676,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->residual_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -677,13 +694,21 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian->jacobian_determinant()->data());
                 }
-                if (true) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("GeneratedLaplace affine residual requires cached metric geometry\n");
+                if (false) {
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("GeneratedLaplace affine residual requires cached SoA metric geometry\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (true) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("GeneratedLaplace affine residual requires cached AoS metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -696,7 +721,13 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_data = state + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_tri3_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tri3_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    if (impl_->residual_uses_affine) {
+                        if (storage[0] == real_t(1)) {
+                            return laplace_tri3_residual_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
+                        }
+                        return laplace_tri3_residual_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_tri3_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                 }
                 case smesh::TRI6: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
@@ -714,7 +745,13 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_data = state + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_tet4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    if (impl_->residual_uses_affine) {
+                        if (storage[0] == real_t(1)) {
+                            return laplace_tet4_residual_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
+                        }
+                        return laplace_tet4_residual_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                 }
                 case smesh::TET10: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
@@ -784,6 +821,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->jacobian_action_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -801,13 +839,21 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian->jacobian_determinant()->data());
                 }
-                if (true) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached metric geometry\n");
+                if (false) {
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached SoA metric geometry\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (true) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached AoS metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -820,7 +866,13 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_tri3_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tri3_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    if (impl_->jacobian_action_uses_affine) {
+                        if (storage[0] == real_t(1)) {
+                            return laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
+                        }
+                        return laplace_tri3_jacobian_action_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_tri3_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                 }
                 case smesh::TRI6: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
@@ -838,7 +890,13 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_tet4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    if (impl_->jacobian_action_uses_affine) {
+                        if (storage[0] == real_t(1)) {
+                            return laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
+                        }
+                        return laplace_tet4_jacobian_action_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                 }
                 case smesh::TET10: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
@@ -933,12 +991,19 @@ namespace sfem {
                     (impl_->residual_uses_affine && true) ||
                     (impl_->jacobian_action_uses_affine && true);
             const bool needs_affine_metric =
+                    (impl_->residual_uses_affine && (false || true)) ||
+                    (impl_->jacobian_action_uses_affine && (false || true));
+            const bool needs_affine_metric_soa =
+                    (impl_->residual_uses_affine && false) ||
+                    (impl_->jacobian_action_uses_affine && false);
+            const bool needs_affine_metric_aos =
                     (impl_->residual_uses_affine && true) ||
                     (impl_->jacobian_action_uses_affine && true);
             if (cache_affine_geometry(impl_->space,
                                       *impl_->domains,
                                       needs_affine_jacobian,
-                                      needs_affine_metric) != SFEM_SUCCESS) {
+                                      needs_affine_metric_soa,
+                                      needs_affine_metric_aos) != SFEM_SUCCESS) {
                 SFEM_ERROR("GeneratedLaplace failed to cache affine geometry\n");
             }
         }

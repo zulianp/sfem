@@ -68,6 +68,13 @@ def _relative_sources(result, out_dir):
     return {os.path.relpath(path, out_dir) for path in result.sources}
 
 
+def _source_between(source, begin, end=None):
+    begin_index = source.index(begin)
+    if end is None:
+        return source[begin_index:]
+    return source[begin_index : source.index(end, begin_index + len(begin))]
+
+
 def _manifest_runtime_variants(metadata, operation):
     for runtime_operation in metadata["runtime_operations"]:
         if runtime_operation["name"] == operation:
@@ -1433,8 +1440,10 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("const geom_t *const *adjugate = nullptr;", source)
             self.assertIn("int cache_affine_geometry(", source)
             self.assertIn("const bool matched = set_affine_option", source)
+            self.assertIn("const bool needs_affine_jacobian", source)
+            self.assertIn("const bool needs_affine_metric", source)
             self.assertIn(
-                "cache_affine_geometry(impl_->space, *impl_->domains)",
+                "cache_affine_geometry(impl_->space,",
                 source,
             )
             self.assertIn("&ret->impl_->residual_uses_affine", source)
@@ -3170,8 +3179,10 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("jacobian_action_uses_affine", wrapper_contents)
             self.assertIn("int cache_affine_geometry(", wrapper_contents)
             self.assertIn("const bool matched = set_affine_option", wrapper_contents)
+            self.assertIn("const bool needs_affine_jacobian", wrapper_contents)
+            self.assertIn("const bool needs_affine_metric", wrapper_contents)
             self.assertIn(
-                "cache_affine_geometry(impl_->space, *impl_->domains)",
+                "cache_affine_geometry(impl_->space,",
                 wrapper_contents,
             )
             self.assertIn("&ret->impl_->jacobian_action_uses_affine", wrapper_contents)
@@ -3478,6 +3489,39 @@ class GenApiTest(unittest.TestCase):
                 out_dir,
                 elements=("TET4",),
             )
+            context = gen.UserInputStage.create(laplace, ("TET4",), 16, None).element_contexts[0]
+            specialized_units = result.plan.emission_kernels_for_context(context)
+            self.assertEqual(len(specialized_units), 1)
+            transform_phases = [
+                phase
+                for block in specialized_units[0].blocks
+                for phase in block.local_phase_plans
+                if phase.is_transform_reference
+            ]
+            self.assertEqual(len(transform_phases), 2)
+            self.assertEqual(
+                {phase.transformations[0].stream_group_name for phase in transform_phases},
+                {"current", "direction"},
+            )
+            for phase in transform_phases:
+                self.assertEqual(len(phase.transformations), 1)
+                transform = phase.transformations[0]
+                self.assertEqual(transform.affine_geometry_storage, "symmetric_metric_soa")
+                self.assertEqual(transform.metric_components, 6)
+                self.assertEqual(
+                    transform.reference_gradients,
+                    (
+                        (sp.Integer(-1), sp.Integer(-1), sp.Integer(-1)),
+                        (sp.Integer(1), sp.Integer(0), sp.Integer(0)),
+                        (sp.Integer(0), sp.Integer(1), sp.Integer(0)),
+                        (sp.Integer(0), sp.Integer(0), sp.Integer(1)),
+                    ),
+                )
+                self.assertIn("geom_metric", {stream.name for stream in phase.streams})
+                self.assertEqual(
+                    phase.to_dict()["transformations"][0]["kind"],
+                    "simplex_gradient_metric",
+                )
             self.assertEqual(result.plan.block_kernels, ())
             self.assertEqual(result.plan.units[0].block_kernels, ())
             self.assertNotIn(
@@ -3527,7 +3571,8 @@ class GenApiTest(unittest.TestCase):
                 self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
                 self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
                 self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
-                self.assertIn("q_weight[q] * (kappa)) * geom_metric[0][geometry_offset]", block)
+                self.assertIn("const scalar_t metric_factor = q_weight[q] * (kappa);", block)
+                self.assertIn("metric_factor * geom_metric[0][geometry_offset]", block)
                 self.assertNotIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
                 self.assertNotIn("grad_ref_x[q * N_SHAPE + trial]", block)
                 self.assertNotIn("test_grad0", block)
@@ -3535,6 +3580,7 @@ class GenApiTest(unittest.TestCase):
                 "const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
                 tet4_residual,
             )
+            self.assertIn("u_metric_grad_0_ref_value", tet4_residual)
 
             operator = os.path.join(
                 out_dir,
@@ -3555,29 +3601,34 @@ class GenApiTest(unittest.TestCase):
             )
             affine_source = operator_source[affine_begin:affine_end]
             self.assertIn("g_geom_metric0", affine_source)
+            self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
+            self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
+            self.assertIn("const idx_t ev3 = elements[3][i];", affine_source)
+            self.assertIn("const scalar_t metric_factor = kappa;", affine_source)
             self.assertIn(
-                "block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, "
-                "block_geom_metric3, block_geom_metric2, block_geom_metric4, "
-                "block_geom_metric5};",
+                "const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);",
                 affine_source,
             )
             self.assertIn(
-                "cached_affine_metric_q_weight[1] = {scalar_t(1)};",
+                "const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;",
                 affine_source,
             )
-            self.assertIn("cached_affine_metric_q_weight", affine_source)
-            self.assertIn("laplace_d3_simplex_tet4_residual_block<", affine_source)
+            self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
+            self.assertNotIn("block_current", affine_source)
+            self.assertNotIn("block_output", affine_source)
+            self.assertNotIn("block_geom_metric", affine_source)
+            self.assertNotIn("cached_affine_metric_q_weight", affine_source)
+            self.assertNotIn("laplace_d3_simplex_tet4_residual_block<", affine_source)
             self.assertNotIn("affine_shape", affine_source)
             self.assertNotIn("affine_grad_ref", affine_source)
             self.assertNotIn("g_jacobian_adjugate0", affine_source)
             self.assertNotIn("g_jacobian_determinant0", affine_source)
-            for call in re.findall(
-                r"laplace_d3_simplex_tet4_(?:residual|jacobian_action)_block<[^;]+;",
-                affine_source,
-                flags=re.DOTALL,
-            ):
-                self.assertNotIn("affine_shape", call)
-                self.assertNotIn("affine_grad_ref", call)
+            self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos", operator_source)
+            self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos_unit", operator_source)
+            self.assertIn(
+                "fff[k] = scalar_t(g_geom_metric[i * 6 + k]);",
+                operator_source,
+            )
 
             isoparametric_begin = operator_source.index(
                 "laplace_tet4_residual_isoparametric_mesh_soa_impl"
@@ -3590,6 +3641,405 @@ class GenApiTest(unittest.TestCase):
             self.assertNotIn(
                 "laplace_d3_simplex_tet4_residual_block<",
                 isoparametric_source,
+            )
+            wrapper = os.path.join(out_dir, "op", "sfem_GeneratedLaplace.cpp")
+            with open(wrapper) as source:
+                wrapper_source = source.read()
+            self.assertIn("metric_aos = smesh::FFF::create_AoS", wrapper_source)
+            self.assertIn("geom_metric_aos", wrapper_source)
+            self.assertIn(
+                "laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit",
+                wrapper_source,
+            )
+
+    def test_tri3_laplace_uses_metric_specialized_simplex_kernel(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(
+                laplace,
+                out_dir,
+                elements=("TRI3",),
+            )
+            context = gen.UserInputStage.create(laplace, ("TRI3",), 16, None).element_contexts[0]
+            specialized_units = result.plan.emission_kernels_for_context(context)
+            transform_phases = [
+                phase
+                for block in specialized_units[0].blocks
+                for phase in block.local_phase_plans
+                if phase.is_transform_reference
+            ]
+            self.assertEqual(len(transform_phases), 2)
+            for phase in transform_phases:
+                self.assertEqual(len(phase.transformations), 1)
+                transform = phase.transformations[0]
+                self.assertEqual(transform.affine_geometry_storage, "symmetric_metric_soa")
+                self.assertEqual(transform.metric_components, 3)
+                self.assertEqual(
+                    transform.reference_gradients,
+                    (
+                        (sp.Integer(-1), sp.Integer(-1)),
+                        (sp.Integer(1), sp.Integer(0)),
+                        (sp.Integer(0), sp.Integer(1)),
+                    ),
+                )
+                self.assertIn("geom_metric", {stream.name for stream in phase.streams})
+
+            local = os.path.join(out_dir, "d2", "laplace_d2_simplex_local.hpp")
+            with open(local) as source:
+                local_source = source.read()
+            generic_residual = _source_between(
+                local_source,
+                "laplace_d2_simplex_residual_block",
+                "laplace_d2_simplex_tri3_residual_block",
+            )
+            tri3_residual = _source_between(
+                local_source,
+                "laplace_d2_simplex_tri3_residual_block",
+                "laplace_d2_simplex_jacobian_action_block",
+            )
+            generic_action = _source_between(
+                local_source,
+                "laplace_d2_simplex_jacobian_action_block",
+                "laplace_d2_simplex_tri3_jacobian_action_block",
+            )
+            tri3_action = _source_between(
+                local_source,
+                "laplace_d2_simplex_tri3_jacobian_action_block",
+            )
+            for block in (generic_residual, generic_action):
+                self.assertIn("const scalar_t *const SFEM_RESTRICT determinant", block)
+                self.assertIn("const scalar_t *const SFEM_RESTRICT adjugate[4]", block)
+                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
+                self.assertIn("grad_ref_x[q * N_SHAPE + trial]", block)
+            for block in (tri3_residual, tri3_action):
+                self.assertIn("const scalar_t *const SFEM_RESTRICT geom_metric[3]", block)
+                self.assertIn("geom_metric00", block)
+                self.assertIn("geom_metric01", block)
+                self.assertIn("geom_metric11", block)
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
+                self.assertNotIn("grad_ref_x[q * N_SHAPE + trial]", block)
+            self.assertIn(
+                "const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
+                tri3_residual,
+            )
+            self.assertIn("u_metric_grad_0_ref_value", tri3_residual)
+
+            operator = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "laplace_tri3_operator.cpp",
+            )
+            with open(operator) as source:
+                operator_source = source.read()
+            affine_begin = operator_source.index(
+                "laplace_tri3_residual_affine_mesh_soa_impl"
+            )
+            affine_end = operator_source.index(
+                "laplace_tri3_residual_affine_mesh_soa("
+            )
+            affine_source = operator_source[affine_begin:affine_end]
+            self.assertIn("g_geom_metric0", affine_source)
+            self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
+            self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
+            self.assertIn("const idx_t ev2 = elements[2][i];", affine_source)
+            self.assertIn("const scalar_t metric_factor = kappa;", affine_source)
+            self.assertIn(
+                "const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);",
+                affine_source,
+            )
+            self.assertIn(
+                "const scalar_t e2 = fff1 * grad0 + fff2 * grad1;",
+                affine_source,
+            )
+            self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
+            self.assertNotIn("block_current", affine_source)
+            self.assertNotIn("block_output", affine_source)
+            self.assertNotIn("block_geom_metric", affine_source)
+            self.assertNotIn("cached_affine_metric_q_weight", affine_source)
+            self.assertNotIn("laplace_d2_simplex_tri3_residual_block<", affine_source)
+            self.assertNotIn("affine_shape", affine_source)
+            self.assertNotIn("affine_grad_ref", affine_source)
+            self.assertNotIn("g_jacobian_adjugate0", affine_source)
+            self.assertNotIn("g_jacobian_determinant0", affine_source)
+            self.assertNotIn("laplace_d2_simplex_tri3_jacobian_action_block<", operator_source)
+            self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos", operator_source)
+            self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos_unit", operator_source)
+
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    operator,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "laplace_tri3.o"),
+                ],
+                check=True,
+            )
+
+    def test_tet4_linear_elasticity_uses_constant_p1_specialized_local_kernels(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                linear_elasticity,
+                out_dir,
+                elements=("TET4",),
+            )
+            local = os.path.join(
+                out_dir,
+                "d3",
+                "linear_elasticity_d3_simplex_local.hpp",
+            )
+            with open(local) as source:
+                local_source = source.read()
+
+            generic_objective = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_objective_block",
+                "linear_elasticity_d3_simplex_tet4_objective_block",
+            )
+            tet4_objective = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_tet4_objective_block",
+                "linear_elasticity_d3_simplex_gradient_block",
+            )
+            generic_gradient = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_gradient_block",
+                "linear_elasticity_d3_simplex_tet4_gradient_block",
+            )
+            tet4_gradient = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_tet4_gradient_block",
+                "linear_elasticity_d3_simplex_apply_block",
+            )
+            generic_apply = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_apply_block",
+                "linear_elasticity_d3_simplex_tet4_apply_block",
+            )
+            tet4_apply = _source_between(
+                local_source,
+                "linear_elasticity_d3_simplex_tet4_apply_block",
+            )
+
+            for block in (generic_objective, generic_gradient, generic_apply):
+                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
+                self.assertIn("grad_ref_x[q * N_SHAPE + shape]", block)
+
+            for block in (tet4_objective, tet4_gradient, tet4_apply):
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertNotIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
+                self.assertNotIn("grad_ref_x[q * N_SHAPE + shape]", block)
+
+            self.assertIn(
+                "const scalar_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+                tet4_objective,
+            )
+            self.assertIn(
+                "const scalar_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
+                tet4_gradient,
+            )
+            self.assertIn(
+                "const scalar_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
+                tet4_apply,
+            )
+            self.assertIn(
+                "const scalar_t grad_h_ref8 = -(h_streams[0 * 3 + 2][lane]) + h_streams[3 * 3 + 2][lane];",
+                tet4_apply,
+            )
+
+            operator = os.path.join(
+                out_dir,
+                "d3",
+                "tet4",
+                "linear_elasticity_tet4_operator.cpp",
+            )
+            with open(operator) as source:
+                operator_source = source.read()
+            affine_begin = operator_source.index(
+                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_impl"
+            )
+            affine_end = operator_source.index(
+                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa("
+            )
+            affine_source = operator_source[affine_begin:affine_end]
+            for name in ("objective", "gradient", "apply"):
+                self.assertIn(
+                    "linear_elasticity_d3_simplex_tet4_%s_block<" % name,
+                    operator_source,
+                )
+            self.assertIn(
+                "linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit",
+                operator_source,
+            )
+            self.assertIn(
+                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit",
+                operator_source,
+            )
+            fast_apply = _source_between(
+                operator_source,
+                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_impl",
+                'extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit',
+            )
+            self.assertIn("g_jacobian_adjugate_aos + element * 9", fast_apply)
+            self.assertIn("const scalar_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
+            self.assertNotIn("block_h_data", fast_apply)
+            self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block<", fast_apply)
+            self.assertIn(
+                "linear_elasticity_d3_simplex_tet4_apply_block<",
+                affine_source,
+            )
+            for call in re.findall(
+                r"linear_elasticity_d3_simplex_tet4_(?:objective|gradient|apply)_block<[^;]+;",
+                operator_source,
+                flags=re.DOTALL,
+            ):
+                self.assertNotIn("affine_grad_ref", call)
+                self.assertNotIn("isoparametric_grad_ref", call)
+
+            wrapper = os.path.join(
+                out_dir,
+                "op",
+                "sfem_GeneratedLinearElasticity.cpp",
+            )
+            with open(wrapper) as source:
+                wrapper_source = source.read()
+            self.assertIn("jacobian_aos", wrapper_source)
+            self.assertIn("jacobian_adjugate_AoS", wrapper_source)
+            self.assertIn(
+                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit",
+                wrapper_source,
+            )
+
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    operator,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "linear_elasticity_tet4.o"),
+                ],
+                check=True,
+            )
+
+    def test_tri3_linear_elasticity_uses_constant_p1_specialized_local_kernels(self):
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                linear_elasticity,
+                out_dir,
+                elements=("TRI3",),
+            )
+            local = os.path.join(
+                out_dir,
+                "d2",
+                "linear_elasticity_d2_simplex_local.hpp",
+            )
+            with open(local) as source:
+                local_source = source.read()
+
+            generic_apply = _source_between(
+                local_source,
+                "linear_elasticity_d2_simplex_apply_block",
+                "linear_elasticity_d2_simplex_tri3_apply_block",
+            )
+            tri3_objective = _source_between(
+                local_source,
+                "linear_elasticity_d2_simplex_tri3_objective_block",
+                "linear_elasticity_d2_simplex_gradient_block",
+            )
+            tri3_gradient = _source_between(
+                local_source,
+                "linear_elasticity_d2_simplex_tri3_gradient_block",
+                "linear_elasticity_d2_simplex_apply_block",
+            )
+            tri3_apply = _source_between(
+                local_source,
+                "linear_elasticity_d2_simplex_tri3_apply_block",
+            )
+
+            self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", generic_apply)
+            self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", generic_apply)
+            for block in (tri3_objective, tri3_gradient, tri3_apply):
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
+                self.assertNotIn("grad_ref_x[q * N_SHAPE + shape]", block)
+            self.assertIn(
+                "const scalar_t grad_u_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
+                tri3_objective,
+            )
+            self.assertIn(
+                "const scalar_t grad_h_ref3 = -(h_streams[0 * 2 + 1][lane]) + h_streams[2 * 2 + 1][lane];",
+                tri3_apply,
+            )
+
+            operator = os.path.join(
+                out_dir,
+                "d2",
+                "tri3",
+                "linear_elasticity_tri3_operator.cpp",
+            )
+            with open(operator) as source:
+                operator_source = source.read()
+            for name in ("objective", "gradient", "apply"):
+                self.assertIn(
+                    "linear_elasticity_d2_simplex_tri3_%s_block<" % name,
+                    operator_source,
+                )
+            for call in re.findall(
+                r"linear_elasticity_d2_simplex_tri3_(?:objective|gradient|apply)_block<[^;]+;",
+                operator_source,
+                flags=re.DOTALL,
+            ):
+                self.assertNotIn("affine_grad_ref", call)
+                self.assertNotIn("isoparametric_grad_ref", call)
+
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c++14",
+                    "-O3",
+                    "-fopenmp-simd",
+                    "-Werror",
+                    "-c",
+                    operator,
+                    "-I",
+                    out_dir,
+                    "-o",
+                    os.path.join(out_dir, "linear_elasticity_tri3.o"),
+                ],
+                check=True,
             )
 
     def test_compiles_tet4_laplace_operator(self):

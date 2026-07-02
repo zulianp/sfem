@@ -176,18 +176,34 @@ namespace sfem {
             return 0;
         }
 
+        struct AffineGeometryCache {
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+        };
+
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
             auto mesh = space->mesh_ptr();
+            const bool needs_jacobian_aos =
+                    true ||
+                    true;
             for (auto &entry : domains.domains()) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if (needs_jacobian_aos) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -700,12 +716,21 @@ namespace sfem {
             if (needs_affine_geometry) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if ((impl_->gradient_uses_affine && true) ||
+                    (impl_->apply_uses_affine && true)) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
@@ -718,18 +743,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->gradient_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedLinearElasticity affine gradient requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (true) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("GeneratedLinearElasticity affine gradient requires cached AoS geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
                 case smesh::TRI3:
@@ -739,7 +775,10 @@ namespace sfem {
                 case smesh::QUAD4:
                     return impl_->gradient_uses_affine ? linear_elasticity_quad4_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
-                    return impl_->gradient_uses_affine ? linear_elasticity_tet4_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                    if (impl_->gradient_uses_affine) {
+                        return adjugate_aos ? linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                    }
+                    return linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::TET10:
                     return impl_->gradient_uses_affine ? linear_elasticity_tet10_tet10_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::HEX8:
@@ -772,18 +811,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedLinearElasticity affine hessian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (true) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("GeneratedLinearElasticity affine hessian action requires cached AoS geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
                 case smesh::TRI3:
@@ -793,7 +843,10 @@ namespace sfem {
                 case smesh::QUAD4:
                     return impl_->apply_uses_affine ? linear_elasticity_quad4_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
-                    return impl_->apply_uses_affine ? linear_elasticity_tet4_tet4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                    if (impl_->apply_uses_affine) {
+                        return adjugate_aos ? linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                    }
+                    return linear_elasticity_tet4_tet4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::TET10:
                     return impl_->apply_uses_affine ? linear_elasticity_tet10_tet10_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::HEX8:
@@ -828,16 +881,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedLinearElasticity affine objective requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             std::fill(impl_->element_values.get(),
                       impl_->element_values.get() + nelements,
@@ -913,16 +966,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedLinearElasticity affine objective_steps requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             if (nvalues > impl_->element_capacity) {
                 impl_->element_values.reset(new real_t[nvalues]);

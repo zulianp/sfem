@@ -4265,6 +4265,42 @@ extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outz
 );
 
+extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+
+extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+
 extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -4393,6 +4429,42 @@ extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+
+extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+
+extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 
 extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_float(

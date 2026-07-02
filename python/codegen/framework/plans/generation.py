@@ -4,6 +4,9 @@ from enum import Enum
 
 from codegen.framework.fem.basis import BasisPlanNode
 from codegen.framework.plans.expression import KernelExpressionPlan
+from codegen.framework.plans.form_transformations import (
+    simplex_gradient_metric_transformation,
+)
 from codegen.framework.symbolic.forms import FormCollection, FormOrder, PipelineStage
 from codegen.framework.fem.geometry import GeometryPlanNode
 
@@ -327,12 +330,14 @@ class LocalPhasePlan:
     phase: LocalPhase
     streams: tuple = ()
     basis_plans: tuple = ()
+    transformations: tuple = ()
     label: str = ""
 
     def __post_init__(self):
         phase = LocalPhase(self.phase)
         streams = tuple(self.streams)
         basis_plans = tuple(self.basis_plans)
+        transformations = tuple(self.transformations)
         label = str(self.label)
         for stream in streams:
             if not isinstance(stream, DataStreamPlan):
@@ -343,6 +348,7 @@ class LocalPhasePlan:
         object.__setattr__(self, "phase", phase)
         object.__setattr__(self, "streams", streams)
         object.__setattr__(self, "basis_plans", basis_plans)
+        object.__setattr__(self, "transformations", transformations)
         object.__setattr__(self, "label", label)
 
     @property
@@ -366,6 +372,12 @@ class LocalPhasePlan:
             "phase": self.phase.value,
             "label": self.label,
             "streams": [stream.name for stream in self.streams],
+            "transformations": [
+                transformation.to_dict()
+                if hasattr(transformation, "to_dict")
+                else {"kind": type(transformation).__name__}
+                for transformation in self.transformations
+            ],
             "basis_plans": [
                 {
                     "role": basis.role,
@@ -867,11 +879,64 @@ def _specialize_local_phase_for_context(phase, block, collection, context, basis
         phase_basis = context.field_basis_plans(_fields_by_name(collection.fields, (block.row_field,)))
     else:
         phase_basis = basis_plans
+    transformations = _local_phase_transformations(phase, block, collection, context)
     return replace(
         phase,
         basis_plans=phase_basis,
-        streams=tuple(stream for basis in phase_basis for stream in _basis_reference_streams(basis)),
+        streams=(
+            tuple(stream for basis in phase_basis for stream in _basis_reference_streams(basis))
+            + _local_phase_transformation_streams(transformations)
+        ),
+        transformations=transformations,
     )
+
+
+def _local_phase_transformations(phase, block, collection, context):
+    if phase.phase is not LocalPhase.TRANSFORM_REFERENCE:
+        return ()
+    system = getattr(collection, "source", None)
+    if system is None:
+        return ()
+    form_block = _form_block_for_plan(collection, block)
+    if form_block is None:
+        return ()
+    transform = simplex_gradient_metric_transformation(
+        system,
+        context.affine_specialization.quadrature_rule,
+        form_block.coefficients,
+        form_block.dependencies,
+    )
+    return () if transform is None else (transform,)
+
+
+def _local_phase_transformation_streams(transformations):
+    streams = []
+    for transformation in transformations:
+        if getattr(transformation, "affine_geometry_storage", "") == "symmetric_metric_soa":
+            streams.append(
+                DataStreamPlan(
+                    "geom_metric",
+                    DataStreamRole.GEOMETRY,
+                    DataStreamLayout.SOA,
+                    scalar_type="geom_t",
+                    components=transformation.metric_components,
+                    n_items=1,
+                    source="affine",
+                )
+            )
+    return tuple(streams)
+
+
+def _form_block_for_plan(collection, block):
+    for form_block in collection.blocks:
+        if (
+            form_block.name == block.name
+            and form_block.order is block.form_order
+            and form_block.row_field == block.row_field
+            and (form_block.column_field or "") == block.column_field
+        ):
+            return form_block
+    return None
 
 
 def _fields_for_block(fields, block):

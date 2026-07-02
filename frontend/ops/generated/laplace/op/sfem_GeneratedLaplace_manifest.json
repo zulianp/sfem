@@ -1301,6 +1301,22 @@
       "name": "laplace_tet4_jacobian_action_affine_mesh_soa"
     },
     {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double *const SFEM_RESTRICT u_direction,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float *const SFEM_RESTRICT u_direction,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit_float"
+    },
+    {
       "declaration": "extern \"C\" int laplace_tet4_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const geom_t *const SFEM_RESTRICT g_geom_metric3,\n        const geom_t *const SFEM_RESTRICT g_geom_metric4,\n        const geom_t *const SFEM_RESTRICT g_geom_metric5,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tet4_jacobian_action_affine_mesh_soa_float"
     },
@@ -1381,6 +1397,22 @@
       "name": "laplace_tet4_residual_affine_mesh_soa"
     },
     {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_aos_unit(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double *const SFEM_RESTRICT u,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_aos_unit_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float *const SFEM_RESTRICT u,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tet4_residual_affine_mesh_soa_aos_unit_float"
+    },
+    {
       "declaration": "extern \"C\" int laplace_tet4_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const geom_t *const SFEM_RESTRICT g_geom_metric3,\n        const geom_t *const SFEM_RESTRICT g_geom_metric4,\n        const geom_t *const SFEM_RESTRICT g_geom_metric5,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tet4_residual_affine_mesh_soa_float"
     },
@@ -1441,11 +1473,27 @@
       "name": "laplace_tet4_residual_isoparametric_mesh_soa_print_rate"
     },
     {
-      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tri3_jacobian_action_affine_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double kappa,\n        const ptrdiff_t direction_stride,\n        const double *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_jacobian_action_affine_mesh_soa_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_jacobian_action_affine_mesh_soa_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double *const SFEM_RESTRICT u_direction,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float *const SFEM_RESTRICT u_direction,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_jacobian_action_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const float kappa,\n        const ptrdiff_t direction_stride,\n        const float *const SFEM_RESTRICT u_direction,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tri3_jacobian_action_affine_mesh_soa_float"
     },
     {
@@ -1521,11 +1569,27 @@
       "name": "laplace_tri3_jacobian_u_u_print_rate"
     },
     {
-      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tri3_residual_affine_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_aos(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double kappa,\n        const ptrdiff_t current_stride,\n        const double *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_residual_affine_mesh_soa_aos"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_aos_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_residual_affine_mesh_soa_aos_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_aos_unit(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const double *const SFEM_RESTRICT u,\n        double *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_residual_affine_mesh_soa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_aos_unit_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric,\n        const float *const SFEM_RESTRICT u,\n        float *const SFEM_RESTRICT u_out\n);",
+      "name": "laplace_tri3_residual_affine_mesh_soa_aos_unit_float"
+    },
+    {
+      "declaration": "extern \"C\" int laplace_tri3_residual_affine_mesh_soa_float(\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_geom_metric0,\n        const geom_t *const SFEM_RESTRICT g_geom_metric1,\n        const geom_t *const SFEM_RESTRICT g_geom_metric2,\n        const float kappa,\n        const ptrdiff_t current_stride,\n        const float *const SFEM_RESTRICT u,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT u_out\n);",
       "name": "laplace_tri3_residual_affine_mesh_soa_float"
     },
     {

@@ -508,86 +508,170 @@ static SFEM_INLINE int laplace_tet4_residual_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_q_weight = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::q_weight();
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_current[0][lane] = u[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_current[1][lane] = u[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_current[2][lane] = u[ev[2 * VECTOR_SIZE + lane] * current_stride];
-            block_current[3][lane] = u[ev[3 * VECTOR_SIZE + lane] * current_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-        }
-
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3]};
-        scalar_t block_geom_metric0_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric0 + evbegin, block_geom_metric0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric1_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric1 + evbegin, block_geom_metric1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric2_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric2 + evbegin, block_geom_metric2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric3_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric3 + evbegin, block_geom_metric3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric4_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric4 + evbegin, block_geom_metric4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric5_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric5 + evbegin, block_geom_metric5_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, block_geom_metric3, block_geom_metric2, block_geom_metric4, block_geom_metric5};
-        static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
-
-        laplace_d3_simplex_tet4_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, cached_affine_metric_q_weight, block_current_streams, kappa, block_output_streams);
-
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t u3 = u[ev3];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t u3 = u[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
             }
         }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
             }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+                u_out[ev0 * out_stride] += e0;
                 #pragma omp atomic update
-                u_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
             }
         }
     }
@@ -634,6 +718,464 @@ extern "C" int laplace_tet4_residual_affine_mesh_soa_float(
         float *const SFEM_RESTRICT u_out
 ) {
     return sfem::codegen::laplace_tet4_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, current_stride, u, out_stride, u_out);
+}
+
+extern "C" int laplace_tet4_residual_affine_mesh_soa_aos(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t current_stride,
+        const double *const SFEM_RESTRICT u,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                scalar_t element_vector[4];
+                idx_t ev[4];
+                scalar_t fff[6];
+                for (int k = 0; k < 6; ++k) {
+                    fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+                }
+                #pragma unroll(4)
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elements[v][i];
+                }
+                const scalar_t u0 = u[ev[0]];
+                const scalar_t u1 = u[ev[1]];
+                const scalar_t u2 = u[ev[2]];
+                const scalar_t u3 = u[ev[3]];
+                const scalar_t x0 = fff[0] + fff[1] + fff[2];
+                const scalar_t x1 = fff[1] + fff[3] + fff[4];
+                const scalar_t x2 = fff[2] + fff[4] + fff[5];
+                const scalar_t x3 = fff[1] * u0;
+                const scalar_t x4 = fff[2] * u0;
+                const scalar_t x5 = fff[4] * u0;
+                element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+                element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+                element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    const idx_t dof_i = ev[edof_i];
+                    #pragma omp atomic update
+                    u_out[dof_i] += element_vector[edof_i];
+                }
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t u3 = u[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_residual_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double *const SFEM_RESTRICT u,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        scalar_t element_vector[4];
+        idx_t ev[4];
+        scalar_t fff[6];
+        for (int k = 0; k < 6; ++k) {
+            fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+        }
+        #pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+        const scalar_t u0 = u[ev[0]];
+        const scalar_t u1 = u[ev[1]];
+        const scalar_t u2 = u[ev[2]];
+        const scalar_t u3 = u[ev[3]];
+        const scalar_t x0 = fff[0] + fff[1] + fff[2];
+        const scalar_t x1 = fff[1] + fff[3] + fff[4];
+        const scalar_t x2 = fff[2] + fff[4] + fff[5];
+        const scalar_t x3 = fff[1] * u0;
+        const scalar_t x4 = fff[2] * u0;
+        const scalar_t x5 = fff[4] * u0;
+        element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+        element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+        element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+        element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            #pragma omp atomic update
+            u_out[dof_i] += element_vector[edof_i];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_residual_affine_mesh_soa_aos_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float kappa,
+        const ptrdiff_t current_stride,
+        const float *const SFEM_RESTRICT u,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                scalar_t element_vector[4];
+                idx_t ev[4];
+                scalar_t fff[6];
+                for (int k = 0; k < 6; ++k) {
+                    fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+                }
+                #pragma unroll(4)
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elements[v][i];
+                }
+                const scalar_t u0 = u[ev[0]];
+                const scalar_t u1 = u[ev[1]];
+                const scalar_t u2 = u[ev[2]];
+                const scalar_t u3 = u[ev[3]];
+                const scalar_t x0 = fff[0] + fff[1] + fff[2];
+                const scalar_t x1 = fff[1] + fff[3] + fff[4];
+                const scalar_t x2 = fff[2] + fff[4] + fff[5];
+                const scalar_t x3 = fff[1] * u0;
+                const scalar_t x4 = fff[2] * u0;
+                const scalar_t x5 = fff[4] * u0;
+                element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+                element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+                element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    const idx_t dof_i = ev[edof_i];
+                    #pragma omp atomic update
+                    u_out[dof_i] += element_vector[edof_i];
+                }
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t u3 = u[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t u3 = u[ev3 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_residual_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float *const SFEM_RESTRICT u,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        scalar_t element_vector[4];
+        idx_t ev[4];
+        scalar_t fff[6];
+        for (int k = 0; k < 6; ++k) {
+            fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+        }
+        #pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+        const scalar_t u0 = u[ev[0]];
+        const scalar_t u1 = u[ev[1]];
+        const scalar_t u2 = u[ev[2]];
+        const scalar_t u3 = u[ev[3]];
+        const scalar_t x0 = fff[0] + fff[1] + fff[2];
+        const scalar_t x1 = fff[1] + fff[3] + fff[4];
+        const scalar_t x2 = fff[2] + fff[4] + fff[5];
+        const scalar_t x3 = fff[1] * u0;
+        const scalar_t x4 = fff[2] * u0;
+        const scalar_t x5 = fff[4] * u0;
+        element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+        element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+        element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+        element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            #pragma omp atomic update
+            u_out[dof_i] += element_vector[edof_i];
+        }
+    }
+    return SFEM_SUCCESS;
 }
 
 namespace sfem {
@@ -870,86 +1412,170 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_q_weight = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::q_weight();
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_direction[0][lane] = u_direction[ev[0 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[1][lane] = u_direction[ev[1 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[2][lane] = u_direction[ev[2 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[3][lane] = u_direction[ev[3 * VECTOR_SIZE + lane] * direction_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-        }
-
-        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2], block_direction[3]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3]};
-        scalar_t block_geom_metric0_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric0 + evbegin, block_geom_metric0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric1_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric1 + evbegin, block_geom_metric1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric2_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric2 + evbegin, block_geom_metric2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric3_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric3 + evbegin, block_geom_metric3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric4_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric4 + evbegin, block_geom_metric4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_geom_metric5_data[VECTOR_SIZE];
-        const scalar_t *const block_geom_metric5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_geom_metric5 + evbegin, block_geom_metric5_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, block_geom_metric3, block_geom_metric2, block_geom_metric4, block_geom_metric5};
-        static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
-
-        laplace_d3_simplex_tet4_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, cached_affine_metric_q_weight, block_direction_streams, kappa, block_output_streams);
-
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t u3 = u_direction[ev3];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t u3 = u_direction[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
             }
         }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
             }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric3[i]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric4[i]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric5[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
                 #pragma omp atomic update
-                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+                u_out[ev0 * out_stride] += e0;
                 #pragma omp atomic update
-                u_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
             }
         }
     }
@@ -996,6 +1622,464 @@ extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_float(
         float *const SFEM_RESTRICT u_out
 ) {
     return sfem::codegen::laplace_tet4_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_aos(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                scalar_t element_vector[4];
+                idx_t ev[4];
+                scalar_t fff[6];
+                for (int k = 0; k < 6; ++k) {
+                    fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+                }
+                #pragma unroll(4)
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elements[v][i];
+                }
+                const scalar_t u0 = u_direction[ev[0]];
+                const scalar_t u1 = u_direction[ev[1]];
+                const scalar_t u2 = u_direction[ev[2]];
+                const scalar_t u3 = u_direction[ev[3]];
+                const scalar_t x0 = fff[0] + fff[1] + fff[2];
+                const scalar_t x1 = fff[1] + fff[3] + fff[4];
+                const scalar_t x2 = fff[2] + fff[4] + fff[5];
+                const scalar_t x3 = fff[1] * u0;
+                const scalar_t x4 = fff[2] * u0;
+                const scalar_t x5 = fff[4] * u0;
+                element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+                element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+                element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    const idx_t dof_i = ev[edof_i];
+                    #pragma omp atomic update
+                    u_out[dof_i] += element_vector[edof_i];
+                }
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t u3 = u_direction[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double *const SFEM_RESTRICT u_direction,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        scalar_t element_vector[4];
+        idx_t ev[4];
+        scalar_t fff[6];
+        for (int k = 0; k < 6; ++k) {
+            fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+        }
+        #pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+        const scalar_t u0 = u_direction[ev[0]];
+        const scalar_t u1 = u_direction[ev[1]];
+        const scalar_t u2 = u_direction[ev[2]];
+        const scalar_t u3 = u_direction[ev[3]];
+        const scalar_t x0 = fff[0] + fff[1] + fff[2];
+        const scalar_t x1 = fff[1] + fff[3] + fff[4];
+        const scalar_t x2 = fff[2] + fff[4] + fff[5];
+        const scalar_t x3 = fff[1] * u0;
+        const scalar_t x4 = fff[2] * u0;
+        const scalar_t x5 = fff[4] * u0;
+        element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+        element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+        element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+        element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            #pragma omp atomic update
+            u_out[dof_i] += element_vector[edof_i];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                scalar_t element_vector[4];
+                idx_t ev[4];
+                scalar_t fff[6];
+                for (int k = 0; k < 6; ++k) {
+                    fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+                }
+                #pragma unroll(4)
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elements[v][i];
+                }
+                const scalar_t u0 = u_direction[ev[0]];
+                const scalar_t u1 = u_direction[ev[1]];
+                const scalar_t u2 = u_direction[ev[2]];
+                const scalar_t u3 = u_direction[ev[3]];
+                const scalar_t x0 = fff[0] + fff[1] + fff[2];
+                const scalar_t x1 = fff[1] + fff[3] + fff[4];
+                const scalar_t x2 = fff[2] + fff[4] + fff[5];
+                const scalar_t x3 = fff[1] * u0;
+                const scalar_t x4 = fff[2] * u0;
+                const scalar_t x5 = fff[4] * u0;
+                element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+                element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+                element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    const idx_t dof_i = ev[edof_i];
+                    #pragma omp atomic update
+                    u_out[dof_i] += element_vector[edof_i];
+                }
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t u3 = u_direction[ev3];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+                #pragma omp atomic update
+                u_out[ev3] += e3;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const idx_t ev3 = elements[3][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t u3 = u_direction[ev3 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 6 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 6 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 6 + 2]);
+                const scalar_t fff3 = metric_factor * scalar_t(g_geom_metric[i * 6 + 3]);
+                const scalar_t fff4 = metric_factor * scalar_t(g_geom_metric[i * 6 + 4]);
+                const scalar_t fff5 = metric_factor * scalar_t(g_geom_metric[i * 6 + 5]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t grad2 = u3 - u0;
+                const scalar_t x0 = fff0 + fff1 + fff2;
+                const scalar_t x1 = fff1 + fff3 + fff4;
+                const scalar_t x2 = fff2 + fff4 + fff5;
+                const scalar_t x3 = fff1 * u0;
+                const scalar_t x4 = fff2 * u0;
+                const scalar_t x5 = fff4 * u0;
+                const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+                const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+                const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+                const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+                #pragma omp atomic update
+                u_out[ev3 * out_stride] += e3;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float *const SFEM_RESTRICT u_direction,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        scalar_t element_vector[4];
+        idx_t ev[4];
+        scalar_t fff[6];
+        for (int k = 0; k < 6; ++k) {
+            fff[k] = scalar_t(g_geom_metric[i * 6 + k]);
+        }
+        #pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+        const scalar_t u0 = u_direction[ev[0]];
+        const scalar_t u1 = u_direction[ev[1]];
+        const scalar_t u2 = u_direction[ev[2]];
+        const scalar_t u3 = u_direction[ev[3]];
+        const scalar_t x0 = fff[0] + fff[1] + fff[2];
+        const scalar_t x1 = fff[1] + fff[3] + fff[4];
+        const scalar_t x2 = fff[2] + fff[4] + fff[5];
+        const scalar_t x3 = fff[1] * u0;
+        const scalar_t x4 = fff[2] * u0;
+        const scalar_t x5 = fff[4] * u0;
+        element_vector[0] = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+        element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+        element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+        element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            #pragma omp atomic update
+            u_out[dof_i] += element_vector[edof_i];
+        }
+    }
+    return SFEM_SUCCESS;
 }
 
 namespace sfem {

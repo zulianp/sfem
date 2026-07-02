@@ -1441,6 +1441,174 @@ extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_float(
 namespace sfem {
 namespace codegen {
 
+template <typename scalar_t, typename jacobian_t>
+static SFEM_INLINE int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t u_stride,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT outx,
+        scalar_t *const SFEM_RESTRICT outy,
+        scalar_t *const SFEM_RESTRICT outz
+) {
+    (void)nnodes;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const idx_t ev0 = elements[0][element];
+        const idx_t ev1 = elements[1][element];
+        const idx_t ev2 = elements[2][element];
+        const idx_t ev3 = elements[3][element];
+
+        const scalar_t ux0 = ux[ev0 * u_stride];
+        const scalar_t ux1 = ux[ev1 * u_stride];
+        const scalar_t ux2 = ux[ev2 * u_stride];
+        const scalar_t ux3 = ux[ev3 * u_stride];
+        const scalar_t uy0 = uy[ev0 * u_stride];
+        const scalar_t uy1 = uy[ev1 * u_stride];
+        const scalar_t uy2 = uy[ev2 * u_stride];
+        const scalar_t uy3 = uy[ev3 * u_stride];
+        const scalar_t uz0 = uz[ev0 * u_stride];
+        const scalar_t uz1 = uz[ev1 * u_stride];
+        const scalar_t uz2 = uz[ev2 * u_stride];
+        const scalar_t uz3 = uz[ev3 * u_stride];
+
+        const jacobian_t *const SFEM_RESTRICT adjugate = g_jacobian_adjugate_aos + element * 9;
+        const scalar_t a0 = scalar_t(adjugate[0]);
+        const scalar_t a1 = scalar_t(adjugate[1]);
+        const scalar_t a2 = scalar_t(adjugate[2]);
+        const scalar_t a3 = scalar_t(adjugate[3]);
+        const scalar_t a4 = scalar_t(adjugate[4]);
+        const scalar_t a5 = scalar_t(adjugate[5]);
+        const scalar_t a6 = scalar_t(adjugate[6]);
+        const scalar_t a7 = scalar_t(adjugate[7]);
+        const scalar_t a8 = scalar_t(adjugate[8]);
+        const scalar_t inv_det = scalar_t(1) / scalar_t(g_jacobian_determinant0[element]);
+
+        const scalar_t x1 = ux0 - ux1;
+        const scalar_t x2 = ux0 - ux2;
+        const scalar_t x3 = ux0 - ux3;
+        const scalar_t x4 = uy0 - uy1;
+        const scalar_t x5 = uy0 - uy2;
+        const scalar_t x6 = uy0 - uy3;
+        const scalar_t x7 = uz0 - uz1;
+        const scalar_t x8 = uz0 - uz2;
+        const scalar_t x9 = uz0 - uz3;
+
+        scalar_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);
+        scalar_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);
+        scalar_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);
+        scalar_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);
+        scalar_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);
+        scalar_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);
+        scalar_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);
+        scalar_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);
+        scalar_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);
+
+        const scalar_t m0 = (scalar_t(1) / scalar_t(6)) * mu;
+        const scalar_t m1 = m0 * (p1 + p3);
+        const scalar_t m2 = m0 * (p2 + p6);
+        const scalar_t m3 = scalar_t(2) * mu;
+        const scalar_t m4 = lmbda * (p0 + p4 + p8);
+        const scalar_t m5 = (scalar_t(1) / scalar_t(6)) * p0 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+        const scalar_t m6 = m0 * (p5 + p7);
+        const scalar_t m7 = (scalar_t(1) / scalar_t(6)) * p4 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+        const scalar_t m8 = (scalar_t(1) / scalar_t(6)) * p8 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+
+        const scalar_t q0 = a0 * m5 + a1 * m1 + a2 * m2;
+        const scalar_t q1 = a3 * m5 + a4 * m1 + a5 * m2;
+        const scalar_t q2 = a6 * m5 + a7 * m1 + a8 * m2;
+        const scalar_t q3 = a0 * m1 + a1 * m7 + a2 * m6;
+        const scalar_t q4 = a3 * m1 + a4 * m7 + a5 * m6;
+        const scalar_t q5 = a6 * m1 + a7 * m7 + a8 * m6;
+        const scalar_t q6 = a0 * m2 + a1 * m6 + a2 * m8;
+        const scalar_t q7 = a3 * m2 + a4 * m6 + a5 * m8;
+        const scalar_t q8 = a6 * m2 + a7 * m6 + a8 * m8;
+
+        #pragma omp atomic update
+        outx[ev0 * out_stride] += -q0 - q1 - q2;
+        #pragma omp atomic update
+        outx[ev1 * out_stride] += q0;
+        #pragma omp atomic update
+        outx[ev2 * out_stride] += q1;
+        #pragma omp atomic update
+        outx[ev3 * out_stride] += q2;
+        #pragma omp atomic update
+        outy[ev0 * out_stride] += -q3 - q4 - q5;
+        #pragma omp atomic update
+        outy[ev1 * out_stride] += q3;
+        #pragma omp atomic update
+        outy[ev2 * out_stride] += q4;
+        #pragma omp atomic update
+        outy[ev3 * out_stride] += q5;
+        #pragma omp atomic update
+        outz[ev0 * out_stride] += -q6 - q7 - q8;
+        #pragma omp atomic update
+        outz[ev1 * out_stride] += q6;
+        #pragma omp atomic update
+        outz[ev2 * out_stride] += q7;
+        #pragma omp atomic update
+        outz[ev3 * out_stride] += q8;
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+) {
+    return sfem::codegen::linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+}
+
+extern "C" int linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+) {
+    return sfem::codegen::linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+}
+
+
+namespace sfem {
+namespace codegen {
+
 template <typename scalar_t, typename geometry_t>
 static SFEM_INLINE int linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
@@ -2025,6 +2193,174 @@ extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outz
 ) {
     return sfem::codegen::linear_elasticity_tet4_tet4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t, typename jacobian_t>
+static SFEM_INLINE int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const scalar_t mu,
+        const scalar_t lmbda,
+        const ptrdiff_t h_stride,
+        const scalar_t *const SFEM_RESTRICT hx,
+        const scalar_t *const SFEM_RESTRICT hy,
+        const scalar_t *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT outx,
+        scalar_t *const SFEM_RESTRICT outy,
+        scalar_t *const SFEM_RESTRICT outz
+) {
+    (void)nnodes;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const idx_t ev0 = elements[0][element];
+        const idx_t ev1 = elements[1][element];
+        const idx_t ev2 = elements[2][element];
+        const idx_t ev3 = elements[3][element];
+
+        const scalar_t ux0 = hx[ev0 * h_stride];
+        const scalar_t ux1 = hx[ev1 * h_stride];
+        const scalar_t ux2 = hx[ev2 * h_stride];
+        const scalar_t ux3 = hx[ev3 * h_stride];
+        const scalar_t uy0 = hy[ev0 * h_stride];
+        const scalar_t uy1 = hy[ev1 * h_stride];
+        const scalar_t uy2 = hy[ev2 * h_stride];
+        const scalar_t uy3 = hy[ev3 * h_stride];
+        const scalar_t uz0 = hz[ev0 * h_stride];
+        const scalar_t uz1 = hz[ev1 * h_stride];
+        const scalar_t uz2 = hz[ev2 * h_stride];
+        const scalar_t uz3 = hz[ev3 * h_stride];
+
+        const jacobian_t *const SFEM_RESTRICT adjugate = g_jacobian_adjugate_aos + element * 9;
+        const scalar_t a0 = scalar_t(adjugate[0]);
+        const scalar_t a1 = scalar_t(adjugate[1]);
+        const scalar_t a2 = scalar_t(adjugate[2]);
+        const scalar_t a3 = scalar_t(adjugate[3]);
+        const scalar_t a4 = scalar_t(adjugate[4]);
+        const scalar_t a5 = scalar_t(adjugate[5]);
+        const scalar_t a6 = scalar_t(adjugate[6]);
+        const scalar_t a7 = scalar_t(adjugate[7]);
+        const scalar_t a8 = scalar_t(adjugate[8]);
+        const scalar_t inv_det = scalar_t(1) / scalar_t(g_jacobian_determinant0[element]);
+
+        const scalar_t x1 = ux0 - ux1;
+        const scalar_t x2 = ux0 - ux2;
+        const scalar_t x3 = ux0 - ux3;
+        const scalar_t x4 = uy0 - uy1;
+        const scalar_t x5 = uy0 - uy2;
+        const scalar_t x6 = uy0 - uy3;
+        const scalar_t x7 = uz0 - uz1;
+        const scalar_t x8 = uz0 - uz2;
+        const scalar_t x9 = uz0 - uz3;
+
+        scalar_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);
+        scalar_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);
+        scalar_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);
+        scalar_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);
+        scalar_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);
+        scalar_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);
+        scalar_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);
+        scalar_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);
+        scalar_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);
+
+        const scalar_t m0 = (scalar_t(1) / scalar_t(6)) * mu;
+        const scalar_t m1 = m0 * (p1 + p3);
+        const scalar_t m2 = m0 * (p2 + p6);
+        const scalar_t m3 = scalar_t(2) * mu;
+        const scalar_t m4 = lmbda * (p0 + p4 + p8);
+        const scalar_t m5 = (scalar_t(1) / scalar_t(6)) * p0 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+        const scalar_t m6 = m0 * (p5 + p7);
+        const scalar_t m7 = (scalar_t(1) / scalar_t(6)) * p4 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+        const scalar_t m8 = (scalar_t(1) / scalar_t(6)) * p8 * m3 + (scalar_t(1) / scalar_t(6)) * m4;
+
+        const scalar_t q0 = a0 * m5 + a1 * m1 + a2 * m2;
+        const scalar_t q1 = a3 * m5 + a4 * m1 + a5 * m2;
+        const scalar_t q2 = a6 * m5 + a7 * m1 + a8 * m2;
+        const scalar_t q3 = a0 * m1 + a1 * m7 + a2 * m6;
+        const scalar_t q4 = a3 * m1 + a4 * m7 + a5 * m6;
+        const scalar_t q5 = a6 * m1 + a7 * m7 + a8 * m6;
+        const scalar_t q6 = a0 * m2 + a1 * m6 + a2 * m8;
+        const scalar_t q7 = a3 * m2 + a4 * m6 + a5 * m8;
+        const scalar_t q8 = a6 * m2 + a7 * m6 + a8 * m8;
+
+        #pragma omp atomic update
+        outx[ev0 * out_stride] += -q0 - q1 - q2;
+        #pragma omp atomic update
+        outx[ev1 * out_stride] += q0;
+        #pragma omp atomic update
+        outx[ev2 * out_stride] += q1;
+        #pragma omp atomic update
+        outx[ev3 * out_stride] += q2;
+        #pragma omp atomic update
+        outy[ev0 * out_stride] += -q3 - q4 - q5;
+        #pragma omp atomic update
+        outy[ev1 * out_stride] += q3;
+        #pragma omp atomic update
+        outy[ev2 * out_stride] += q4;
+        #pragma omp atomic update
+        outy[ev3 * out_stride] += q5;
+        #pragma omp atomic update
+        outz[ev0 * out_stride] += -q6 - q7 - q8;
+        #pragma omp atomic update
+        outz[ev1 * out_stride] += q6;
+        #pragma omp atomic update
+        outz[ev2 * out_stride] += q7;
+        #pragma omp atomic update
+        outz[ev3 * out_stride] += q8;
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+) {
+    return sfem::codegen::linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+}
+
+extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+) {
+    return sfem::codegen::linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 

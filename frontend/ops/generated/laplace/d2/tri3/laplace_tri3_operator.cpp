@@ -482,11 +482,9 @@ static SFEM_INLINE int laplace_tri3_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric1,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric2,
         const scalar_t kappa,
         const ptrdiff_t current_stride,
         const scalar_t *const SFEM_RESTRICT u,
@@ -499,76 +497,110 @@ static SFEM_INLINE int laplace_tri3_residual_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_q_weight = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::q_weight();
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_current[0][lane] = u[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_current[1][lane] = u[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_current[2][lane] = u[ev[2 * VECTOR_SIZE + lane] * current_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-        }
-
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2]};
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[4] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
-
-        laplace_d2_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_current_streams, kappa, block_output_streams);
-
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
             }
         }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
             }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
             }
         }
     }
@@ -583,36 +615,364 @@ extern "C" int laplace_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
         const double kappa,
         const ptrdiff_t current_stride,
         const double *const SFEM_RESTRICT u,
         const ptrdiff_t out_stride,
         double *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tri3_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
+    return sfem::codegen::laplace_tri3_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, current_stride, u, out_stride, u_out);
 }
 
 extern "C" int laplace_tri3_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
         const float kappa,
         const ptrdiff_t current_stride,
         const float *const SFEM_RESTRICT u,
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tri3_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
+    return sfem::codegen::laplace_tri3_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, current_stride, u, out_stride, u_out);
+}
+
+extern "C" int laplace_tri3_residual_affine_mesh_soa_aos(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t current_stride,
+        const double *const SFEM_RESTRICT u,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 3;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_residual_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double *const SFEM_RESTRICT u,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        const idx_t ev0 = elements[0][i];
+        const idx_t ev1 = elements[1][i];
+        const idx_t ev2 = elements[2][i];
+        const scalar_t u0 = u[ev0];
+        const scalar_t u1 = u[ev1];
+        const scalar_t u2 = u[ev2];
+        const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+        const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+        const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+        const scalar_t grad0 = u1 - u0;
+        const scalar_t grad1 = u2 - u0;
+        const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+        const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+        const scalar_t e0 = -(e1) - e2;
+        #pragma omp atomic update
+        u_out[ev0] += e0;
+        #pragma omp atomic update
+        u_out[ev1] += e1;
+        #pragma omp atomic update
+        u_out[ev2] += e2;
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_residual_affine_mesh_soa_aos_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float kappa,
+        const ptrdiff_t current_stride,
+        const float *const SFEM_RESTRICT u,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 3;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (current_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0];
+                const scalar_t u1 = u[ev1];
+                const scalar_t u2 = u[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u[ev0 * current_stride];
+                const scalar_t u1 = u[ev1 * current_stride];
+                const scalar_t u2 = u[ev2 * current_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_residual_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float *const SFEM_RESTRICT u,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        const idx_t ev0 = elements[0][i];
+        const idx_t ev1 = elements[1][i];
+        const idx_t ev2 = elements[2][i];
+        const scalar_t u0 = u[ev0];
+        const scalar_t u1 = u[ev1];
+        const scalar_t u2 = u[ev2];
+        const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+        const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+        const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+        const scalar_t grad0 = u1 - u0;
+        const scalar_t grad1 = u2 - u0;
+        const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+        const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+        const scalar_t e0 = -(e1) - e2;
+        #pragma omp atomic update
+        u_out[ev0] += e0;
+        #pragma omp atomic update
+        u_out[ev1] += e1;
+        #pragma omp atomic update
+        u_out[ev2] += e2;
+    }
+    return SFEM_SUCCESS;
 }
 
 namespace sfem {
@@ -809,11 +1169,9 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric1,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric2,
         const scalar_t kappa,
         const ptrdiff_t direction_stride,
         const scalar_t *const SFEM_RESTRICT u_direction,
@@ -826,76 +1184,110 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_affine_mesh_soa_impl(
     static constexpr int N_FIELDS = 1;
     static constexpr int VECTOR_SIZE = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_q_weight = sfem::codegen::laplace_tri3_affine_reference_data<scalar_t>::q_weight();
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_direction[0][lane] = u_direction[ev[0 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[1][lane] = u_direction[ev[1 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[2][lane] = u_direction[ev[2 * VECTOR_SIZE + lane] * direction_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-        }
-
-        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {block_direction[0], block_direction[1], block_direction[2]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2]};
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[4] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
-
-        laplace_d2_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_direction_streams, kappa, block_output_streams);
-
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
             }
         }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
             }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric1[i]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric2[i]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
                 #pragma omp atomic update
-                u_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
             }
         }
     }
@@ -910,36 +1302,364 @@ extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
         const double kappa,
         const ptrdiff_t direction_stride,
         const double *const SFEM_RESTRICT u_direction,
         const ptrdiff_t out_stride,
         double *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tri3_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
+    return sfem::codegen::laplace_tri3_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
         const float kappa,
         const ptrdiff_t direction_stride,
         const float *const SFEM_RESTRICT u_direction,
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tri3_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
+    return sfem::codegen::laplace_tri3_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa_aos(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 3;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double *const SFEM_RESTRICT u_direction,
+        double *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = double;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        const idx_t ev0 = elements[0][i];
+        const idx_t ev1 = elements[1][i];
+        const idx_t ev2 = elements[2][i];
+        const scalar_t u0 = u_direction[ev0];
+        const scalar_t u1 = u_direction[ev1];
+        const scalar_t u2 = u_direction[ev2];
+        const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+        const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+        const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+        const scalar_t grad0 = u1 - u0;
+        const scalar_t grad1 = u2 - u0;
+        const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+        const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+        const scalar_t e0 = -(e1) - e2;
+        #pragma omp atomic update
+        u_out[ev0] += e0;
+        #pragma omp atomic update
+        u_out[ev1] += e1;
+        #pragma omp atomic update
+        u_out[ev2] += e2;
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 3;
+    (void)DIM;
+    (void)N_QP;
+    (void)N_SHAPE;
+    (void)nnodes;
+    if (direction_stride == 1 && out_stride == 1) {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0];
+                const scalar_t u1 = u_direction[ev1];
+                const scalar_t u2 = u_direction[ev2];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0] += e0;
+                #pragma omp atomic update
+                u_out[ev1] += e1;
+                #pragma omp atomic update
+                u_out[ev2] += e2;
+            }
+        }
+    } else {
+        if ((kappa) == scalar_t(1)) {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        } else {
+
+            #pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nelements; ++i) {
+                const idx_t ev0 = elements[0][i];
+                const idx_t ev1 = elements[1][i];
+                const idx_t ev2 = elements[2][i];
+                const scalar_t u0 = u_direction[ev0 * direction_stride];
+                const scalar_t u1 = u_direction[ev1 * direction_stride];
+                const scalar_t u2 = u_direction[ev2 * direction_stride];
+                const scalar_t metric_factor = kappa;
+                const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric[i * 3 + 0]);
+                const scalar_t fff1 = metric_factor * scalar_t(g_geom_metric[i * 3 + 1]);
+                const scalar_t fff2 = metric_factor * scalar_t(g_geom_metric[i * 3 + 2]);
+                const scalar_t grad0 = u1 - u0;
+                const scalar_t grad1 = u2 - u0;
+                const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+                const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+                const scalar_t e0 = -(e1) - e2;
+                #pragma omp atomic update
+                u_out[ev0 * out_stride] += e0;
+                #pragma omp atomic update
+                u_out[ev1 * out_stride] += e1;
+                #pragma omp atomic update
+                u_out[ev2 * out_stride] += e2;
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const float *const SFEM_RESTRICT u_direction,
+        float *const SFEM_RESTRICT u_out
+) {
+    using scalar_t = float;
+    (void)nnodes;
+
+    #pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        const idx_t ev0 = elements[0][i];
+        const idx_t ev1 = elements[1][i];
+        const idx_t ev2 = elements[2][i];
+        const scalar_t u0 = u_direction[ev0];
+        const scalar_t u1 = u_direction[ev1];
+        const scalar_t u2 = u_direction[ev2];
+        const scalar_t fff0 = scalar_t(g_geom_metric[i * 3 + 0]);
+        const scalar_t fff1 = scalar_t(g_geom_metric[i * 3 + 1]);
+        const scalar_t fff2 = scalar_t(g_geom_metric[i * 3 + 2]);
+        const scalar_t grad0 = u1 - u0;
+        const scalar_t grad1 = u2 - u0;
+        const scalar_t e1 = fff0 * grad0 + fff1 * grad1;
+        const scalar_t e2 = fff1 * grad0 + fff2 * grad1;
+        const scalar_t e0 = -(e1) - e2;
+        #pragma omp atomic update
+        u_out[ev0] += e0;
+        #pragma omp atomic update
+        u_out[ev1] += e1;
+        #pragma omp atomic update
+        u_out[ev2] += e2;
+    }
+    return SFEM_SUCCESS;
 }
 
 namespace sfem {
