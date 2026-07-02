@@ -17,7 +17,7 @@
 		- Hessian/Jacobian application
 		- Gradient application
 		- Standard mesh format (see SFEM)
-		- Packed mesh format (see SFEM, in particular PackedLaplacian for nearly-optimal implementation style. Data-layouts can still be improved at set-up to fit directly the computational layout)
+		- Packed mesh format (see SFEM, in particular PackedLaplacian for nearly-optimal implementation style. Data-layouts can still be improved at set-up to fit directly the computational layout). Implement the two pass scheme (as well as the one pass) described in /Users/patrickzulian/Desktop/cloud/owncloud_USI/zulian/scientific_collaborator/papers/packedop_paper/main.tex
 		- Generate variants for per thread per-warp optimized set-ups and executation
 		- Patch based (overall and with index for specific nodes)
 		- Element base (as it is already)

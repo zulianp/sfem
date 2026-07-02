@@ -8,6 +8,7 @@ This package contains the experimental MLIR-based matrix-free lowering path.
 - `openmp.py`: SCF/OpenMP/LLVM/EmitC lowering and OpenMP runner support.
 - `opencl.py`: OpenCL lowering, SPIR-V inspection artifacts, and Apple OpenCL C source emission.
 - `runtime.py`: Python reference/threaded EBE executor helpers used by tests.
+- `sum_factorization.py`: tensor-product SFEM IR extraction plus linalg, generic GPU dialect MLIR, Metal smoke-test source emission, and fused Laplace tensor-product apply emission.
 - `cpp/`: benchmark C++ harnesses used by the MLIR benchmark script.
 - `scripts/`: MLIR benchmark drivers.
 

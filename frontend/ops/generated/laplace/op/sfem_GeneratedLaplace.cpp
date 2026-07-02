@@ -174,21 +174,39 @@ namespace sfem {
             return 0;
         }
 
+        struct AffineGeometryCache {
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
+            std::shared_ptr<smesh::FFF> metric;
+        };
+
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
+                                  MultiDomainOp &domains,
+                                  const bool needs_jacobian,
+                                  const bool needs_metric) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
-                if (entry.second.user_data) {
-                    continue;
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
+                        entry.second.user_data);
+                if (!cache) {
+                    cache = std::make_shared<AffineGeometryCache>();
                 }
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
+                if (needs_jacobian && !cache->jacobian) {
+                    cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian) {
+                        return SFEM_FAILURE;
+                    }
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if (needs_metric && !cache->metric) {
+                    cache->metric = smesh::FFF::create_SoA(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->metric) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -378,21 +396,17 @@ namespace sfem {
         SFEM_TRACE_SCOPE("GeneratedLaplace::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
         seed_material(*impl_->domains);
-        auto mesh = impl_->space->mesh_ptr();
-        const bool needs_affine_geometry =
-                impl_->residual_uses_affine ||
-                impl_->jacobian_action_uses_affine;
-        if (needs_affine_geometry) {
-            for (auto &entry : impl_->domains->domains()) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
-            }
+        const bool needs_affine_jacobian =
+                (impl_->residual_uses_affine && false) ||
+                (impl_->jacobian_action_uses_affine && false);
+        const bool needs_affine_metric =
+                (impl_->residual_uses_affine && true) ||
+                (impl_->jacobian_action_uses_affine && true);
+        if (needs_affine_jacobian || needs_affine_metric) {
+            return cache_affine_geometry(impl_->space,
+                                         *impl_->domains,
+                                         needs_affine_jacobian,
+                                         needs_affine_metric);
         }
         return SFEM_SUCCESS;
     }
@@ -421,17 +435,32 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
+            const geom_t *const *geom_metric = nullptr;
             if (impl_->residual_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache) {
                     SFEM_ERROR("GeneratedLaplace affine residual requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                if (false) {
+                    if (!cache->jacobian) {
+                        SFEM_ERROR("GeneratedLaplace affine residual requires cached jacobian geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate = reinterpret_cast<const geom_t *const *>(
+                            cache->jacobian->jacobian_adjugate_SoA()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian->jacobian_determinant()->data());
+                }
+                if (true) {
+                    if (!cache->metric) {
+                        SFEM_ERROR("GeneratedLaplace affine residual requires cached metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric = reinterpret_cast<const geom_t *const *>(
+                            cache->metric->fff_SoA()->data());
+                }
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters,
@@ -443,7 +472,7 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_data = state + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_tet4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    return impl_->residual_uses_affine ? laplace_tet4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                 }
                 default:
                     SFEM_ERROR("GeneratedLaplace does not support element type %d\n",
@@ -464,17 +493,32 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
+            const geom_t *const *geom_metric = nullptr;
             if (impl_->jacobian_action_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache) {
                     SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                if (false) {
+                    if (!cache->jacobian) {
+                        SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached jacobian geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate = reinterpret_cast<const geom_t *const *>(
+                            cache->jacobian->jacobian_adjugate_SoA()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian->jacobian_determinant()->data());
+                }
+                if (true) {
+                    if (!cache->metric) {
+                        SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric = reinterpret_cast<const geom_t *const *>(
+                            cache->metric->fff_SoA()->data());
+                }
             }
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters,
@@ -486,7 +530,7 @@ namespace sfem {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_tet4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    return impl_->jacobian_action_uses_affine ? laplace_tet4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                 }
                 default:
                     SFEM_ERROR("GeneratedLaplace does not support element type %d\n",
@@ -528,9 +572,19 @@ namespace sfem {
             {"apply_assume_affine", &impl_->jacobian_action_uses_affine},
         };
         const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains &&
-            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-            SFEM_ERROR("GeneratedLaplace failed to cache affine geometry\n");
+        if (matched && val && impl_->domains) {
+            const bool needs_affine_jacobian =
+                    (impl_->residual_uses_affine && false) ||
+                    (impl_->jacobian_action_uses_affine && false);
+            const bool needs_affine_metric =
+                    (impl_->residual_uses_affine && true) ||
+                    (impl_->jacobian_action_uses_affine && true);
+            if (cache_affine_geometry(impl_->space,
+                                      *impl_->domains,
+                                      needs_affine_jacobian,
+                                      needs_affine_metric) != SFEM_SUCCESS) {
+                SFEM_ERROR("GeneratedLaplace failed to cache affine geometry\n");
+            }
         }
     }
 

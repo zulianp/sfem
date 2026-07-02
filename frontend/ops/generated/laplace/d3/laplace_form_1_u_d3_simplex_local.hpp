@@ -45,21 +45,15 @@ static SFEM_INLINE void laplace_form_1_u_d3_simplex_residual_block(
     static constexpr int DIM = 3;
     static constexpr int N_FIELDS = 1;
     for (int q = 0; q < N_QP; ++q) {
-        scalar_t u_grad_0_ref_values[VECTOR_SIZE];
-        scalar_t u_grad_1_ref_values[VECTOR_SIZE];
-        scalar_t u_grad_2_ref_values[VECTOR_SIZE];
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const scalar_t coeff_current_u_0 = current[0][lane];
             const scalar_t coeff_current_u_1 = current[1][lane];
             const scalar_t coeff_current_u_2 = current[2][lane];
             const scalar_t coeff_current_u_3 = current[3][lane];
-            u_grad_0_ref_values[lane] = -(coeff_current_u_0) + coeff_current_u_1;
-            u_grad_1_ref_values[lane] = -(coeff_current_u_0) + coeff_current_u_2;
-            u_grad_2_ref_values[lane] = -(coeff_current_u_0) + coeff_current_u_3;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+            const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;
+            const scalar_t u_grad_1_ref_value = -(coeff_current_u_0) + coeff_current_u_2;
+            const scalar_t u_grad_2_ref_value = -(coeff_current_u_0) + coeff_current_u_3;
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
             const scalar_t geom_metric00 = (q_weight[q] * (kappa)) * geom_metric[0][geometry_offset];
             const scalar_t geom_metric01 = (q_weight[q] * (kappa)) * geom_metric[1][geometry_offset];
@@ -67,10 +61,13 @@ static SFEM_INLINE void laplace_form_1_u_d3_simplex_residual_block(
             const scalar_t geom_metric11 = (q_weight[q] * (kappa)) * geom_metric[2][geometry_offset];
             const scalar_t geom_metric12 = (q_weight[q] * (kappa)) * geom_metric[4][geometry_offset];
             const scalar_t geom_metric22 = (q_weight[q] * (kappa)) * geom_metric[5][geometry_offset];
-            output[0][lane] += -(geom_metric00 * u_grad_0_ref_values[lane]) - geom_metric01 * u_grad_1_ref_values[lane] - geom_metric02 * u_grad_2_ref_values[lane] - geom_metric01 * u_grad_0_ref_values[lane] - geom_metric11 * u_grad_1_ref_values[lane] - geom_metric12 * u_grad_2_ref_values[lane] - geom_metric02 * u_grad_0_ref_values[lane] - geom_metric12 * u_grad_1_ref_values[lane] - geom_metric22 * u_grad_2_ref_values[lane];
-            output[1][lane] += geom_metric00 * u_grad_0_ref_values[lane] + geom_metric01 * u_grad_1_ref_values[lane] + geom_metric02 * u_grad_2_ref_values[lane];
-            output[2][lane] += geom_metric01 * u_grad_0_ref_values[lane] + geom_metric11 * u_grad_1_ref_values[lane] + geom_metric12 * u_grad_2_ref_values[lane];
-            output[3][lane] += geom_metric02 * u_grad_0_ref_values[lane] + geom_metric12 * u_grad_1_ref_values[lane] + geom_metric22 * u_grad_2_ref_values[lane];
+            const scalar_t u_metric_grad_0_ref_value = geom_metric00 * u_grad_0_ref_value + geom_metric01 * u_grad_1_ref_value + geom_metric02 * u_grad_2_ref_value;
+            const scalar_t u_metric_grad_1_ref_value = geom_metric01 * u_grad_0_ref_value + geom_metric11 * u_grad_1_ref_value + geom_metric12 * u_grad_2_ref_value;
+            const scalar_t u_metric_grad_2_ref_value = geom_metric02 * u_grad_0_ref_value + geom_metric12 * u_grad_1_ref_value + geom_metric22 * u_grad_2_ref_value;
+            output[0][lane] += -(u_metric_grad_0_ref_value) - u_metric_grad_1_ref_value - u_metric_grad_2_ref_value;
+            output[1][lane] += u_metric_grad_0_ref_value;
+            output[2][lane] += u_metric_grad_1_ref_value;
+            output[3][lane] += u_metric_grad_2_ref_value;
         }
     }
 }

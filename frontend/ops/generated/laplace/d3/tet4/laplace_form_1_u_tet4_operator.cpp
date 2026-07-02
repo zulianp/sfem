@@ -542,16 +542,12 @@ static SFEM_INLINE int laplace_form_1_u_tet4_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric1,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric2,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric3,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric4,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric5,
         const scalar_t kappa,
         const ptrdiff_t current_stride,
         const scalar_t *const SFEM_RESTRICT u,
@@ -575,7 +571,6 @@ static SFEM_INLINE int laplace_form_1_u_tet4_residual_affine_mesh_soa_impl(
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
         idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_geom_metric_data[6][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
         #pragma omp simd
@@ -604,60 +599,28 @@ static SFEM_INLINE int laplace_form_1_u_tet4_residual_affine_mesh_soa_impl(
 
         const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3]};
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3]};
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[9] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        scalar_t block_geom_metric0_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric0 + evbegin, block_geom_metric0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_geom_metric1_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric1 + evbegin, block_geom_metric1_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_geom_metric2_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric2 + evbegin, block_geom_metric2_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_geom_metric3_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric3 + evbegin, block_geom_metric3_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_geom_metric4_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric4 + evbegin, block_geom_metric4_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t block_geom_metric5_data[VECTOR_SIZE];
+        const scalar_t *const block_geom_metric5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                nelems, g_geom_metric5 + evbegin, block_geom_metric5_data, std::is_same<jacobian_t, scalar_t>());
+        const scalar_t *const block_geom_metric[6] = {block_geom_metric0, block_geom_metric1, block_geom_metric3, block_geom_metric2, block_geom_metric4, block_geom_metric5};
+        static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const scalar_t metric_det = block_jacobian_determinant0[lane];
-            const scalar_t metric_adj0 = block_jacobian_adjugate0[lane];
-            const scalar_t metric_adj1 = block_jacobian_adjugate1[lane];
-            const scalar_t metric_adj2 = block_jacobian_adjugate2[lane];
-            const scalar_t metric_adj3 = block_jacobian_adjugate3[lane];
-            const scalar_t metric_adj4 = block_jacobian_adjugate4[lane];
-            const scalar_t metric_adj5 = block_jacobian_adjugate5[lane];
-            const scalar_t metric_adj6 = block_jacobian_adjugate6[lane];
-            const scalar_t metric_adj7 = block_jacobian_adjugate7[lane];
-            const scalar_t metric_adj8 = block_jacobian_adjugate8[lane];
-            block_geom_metric_data[0][lane] = (metric_adj0 * metric_adj0 + metric_adj1 * metric_adj1 + metric_adj2 * metric_adj2) / metric_det;
-            block_geom_metric_data[1][lane] = (metric_adj0 * metric_adj3 + metric_adj1 * metric_adj4 + metric_adj2 * metric_adj5) / metric_det;
-            block_geom_metric_data[3][lane] = (metric_adj0 * metric_adj6 + metric_adj1 * metric_adj7 + metric_adj2 * metric_adj8) / metric_det;
-            block_geom_metric_data[2][lane] = (metric_adj3 * metric_adj3 + metric_adj4 * metric_adj4 + metric_adj5 * metric_adj5) / metric_det;
-            block_geom_metric_data[4][lane] = (metric_adj3 * metric_adj6 + metric_adj4 * metric_adj7 + metric_adj5 * metric_adj8) / metric_det;
-            block_geom_metric_data[5][lane] = (metric_adj6 * metric_adj6 + metric_adj7 * metric_adj7 + metric_adj8 * metric_adj8) / metric_det;
-        }
-        const scalar_t *const block_geom_metric[6] = {block_geom_metric_data[0], block_geom_metric_data[1], block_geom_metric_data[2], block_geom_metric_data[3], block_geom_metric_data[4], block_geom_metric_data[5]};
-
-        laplace_form_1_u_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_form_1_u_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, cached_affine_metric_q_weight, block_current_streams, kappa, block_output_streams);
 
         {
             for (int scatter = 0; scatter < nelems; ++scatter) {
@@ -695,46 +658,38 @@ extern "C" int laplace_form_1_u_tet4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
+        const geom_t *const SFEM_RESTRICT g_geom_metric3,
+        const geom_t *const SFEM_RESTRICT g_geom_metric4,
+        const geom_t *const SFEM_RESTRICT g_geom_metric5,
         const double kappa,
         const ptrdiff_t current_stride,
         const double *const SFEM_RESTRICT u,
         const ptrdiff_t out_stride,
         double *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_form_1_u_tet4_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
+    return sfem::codegen::laplace_form_1_u_tet4_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, current_stride, u, out_stride, u_out);
 }
 
 extern "C" int laplace_form_1_u_tet4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
+        const geom_t *const SFEM_RESTRICT g_geom_metric3,
+        const geom_t *const SFEM_RESTRICT g_geom_metric4,
+        const geom_t *const SFEM_RESTRICT g_geom_metric5,
         const float kappa,
         const ptrdiff_t current_stride,
         const float *const SFEM_RESTRICT u,
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_form_1_u_tet4_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
+    return sfem::codegen::laplace_form_1_u_tet4_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, current_stride, u, out_stride, u_out);
 }
 
 namespace sfem {

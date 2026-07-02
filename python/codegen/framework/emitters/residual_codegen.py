@@ -34,9 +34,11 @@ from codegen.framework.emitters.quadrature_codegen import (
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.form_transformations import (
+    constant_p1_simplex_reference_gradients,
     simplex_gradient_metric_transformation,
     symmetric_metric_component_count,
     symmetric_metric_component_index,
+    symmetric_metric_storage_component_index,
 )
 from codegen.framework.symbolic.core import (
     GeneratedKernelFile,
@@ -87,8 +89,8 @@ def _work_item_loop_lines(indent):
     return _target().work_item_loop_lines(indent)
 
 
-def _affine_geometry_stream_conversion_lines(adjugate_streams, determinant_stream, indent):
-    streams = tuple(adjugate_streams) + (determinant_stream,)
+def _affine_geometry_stream_conversion_lines(streams, indent):
+    streams = tuple(streams)
     lines = []
     for stream in streams:
         lines.extend(
@@ -140,6 +142,14 @@ def _affine_geometry_stream_helper_lines():
         ]
     )
     return lines
+
+
+def _uses_cached_affine_metric(gradient_metric):
+    return (
+        gradient_metric is not None
+        and getattr(gradient_metric, "affine_geometry_storage", "")
+        == "symmetric_metric_soa"
+    )
 
 
 def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
@@ -1578,6 +1588,14 @@ def _simplex_local_body(system, rule, coefficients, dependencies, gradient_metri
         gradient_metric = simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
     if gradient_metric is not None:
         return _simplex_gradient_metric_body(system, rule, dependencies, gradient_metric)
+    reference_gradients = constant_p1_simplex_reference_gradients(rule)
+    if _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
+        return _constant_p1_gradient_expanded_body(
+            system,
+            coefficients,
+            dependencies,
+            reference_gradients,
+        )
 
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
@@ -1738,6 +1756,124 @@ def _simplex_local_body(system, rule, coefficients, dependencies, gradient_metri
     return lines
 
 
+def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
+    if reference_gradients is None:
+        return False
+    if any(dependencies.value_coefficients):
+        return False
+    if not dependencies.uses_test_gradients:
+        return False
+    if dependencies.current_value or dependencies.previous_value or dependencies.direction_value:
+        return False
+    if not dependencies.uses_trial_gradients:
+        return False
+    return len(reference_gradients) == system.dim + 1
+
+
+def _reference_gradient_expr(reference_gradients, shape, component):
+    return sp.sympify(reference_gradients[int(shape)][int(component)])
+
+
+def _constant_reference_gradient_sum(reference_gradients, n_shape, dim, expr_for_term):
+    terms = []
+    for shape in range(n_shape):
+        factor = _reference_gradient_expr(reference_gradients, shape, dim)
+        if factor == 0:
+            continue
+        terms.append(_scaled_cpp_term(factor, expr_for_term(shape)))
+    return _sum_cpp_terms(terms)
+
+
+def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
+    dim = system.dim
+    n_fields = len(system.fields)
+    groups = _dependency_stream_groups(dependencies)
+    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
+    lines.extend(_work_item_loop_lines("        "))
+    lines.extend(
+        [
+            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
+            "            const scalar_t det = determinant[geometry_offset];",
+        ]
+    )
+    if dependencies.uses_adjugate:
+        for i in range(dim * dim):
+            lines.append(
+                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
+                % (i, i)
+            )
+    for field_index, field in enumerate(system.fields):
+        for group in groups:
+            if not group.uses_gradient:
+                continue
+            for d in range(dim):
+                value = _constant_reference_gradient_sum(
+                    reference_gradients,
+                    dim + 1,
+                    d,
+                    lambda shape, group=group, field_index=field_index: "%s[%d][lane]"
+                    % (group.name, shape * n_fields + field_index),
+                )
+                lines.append(
+                    "            const scalar_t %s%s_grad_%d_ref = %s;"
+                    % (field.name, group.symbol_suffix, d, value)
+                )
+            lines.extend(
+                _physical_gradient_lines(
+                    field.name + group.symbol_suffix, dim, "            "
+                )
+            )
+    lines.extend(
+        _coefficient_evaluation_lines(
+            system,
+            coefficients,
+            "            ",
+            "q_weight[q]",
+            dependencies,
+        )
+    )
+    for row in range(n_fields):
+        for d in range(dim):
+            if dependencies.gradient_coefficients[row][d]:
+                lines.append(
+                    "            const scalar_t grad_coeff%d_%d_value = grad_coeff%d_%d;"
+                    % (row, d, row, d)
+                )
+    test_grad_names = {}
+    for test in range(dim + 1):
+        for d in range(dim):
+            if not any(row[d] for row in dependencies.gradient_coefficients):
+                continue
+            name = "test%d_grad%d" % (test, d)
+            test_grad_names[(test, d)] = name
+            terms = []
+            for k in range(dim):
+                factor = _reference_gradient_expr(reference_gradients, test, k)
+                if factor == 0:
+                    continue
+                terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
+            lines.append(
+                "            const scalar_t %s = (%s) / det;"
+                % (name, _sum_cpp_terms(terms))
+            )
+    for test in range(dim + 1):
+        for row in range(n_fields):
+            terms = []
+            for d in range(dim):
+                if dependencies.gradient_coefficients[row][d]:
+                    terms.append(
+                        "grad_coeff%d_%d_value * %s"
+                        % (row, d, test_grad_names[(test, d)])
+                    )
+            if terms:
+                lines.append(
+                    "            output[%d][lane] += q_weight[q] * det * (%s);"
+                    % (test * n_fields + row, _sum_cpp_terms(terms))
+                )
+    lines.extend(["        }", "    }"])
+    return lines
+
+
 def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
     dim = system.dim
     field = system.fields[0]
@@ -1745,11 +1881,6 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
     field_index = specialization.field_index
     scale = _sfem_ccode(specialization.scale)
     lines = ["    for (int q = 0; q < N_QP; ++q) {"]
-    for d in range(dim):
-        lines.append(
-            "        scalar_t %s%s_grad_%d_ref_values[VECTOR_SIZE];"
-            % (field.name, group.symbol_suffix, d)
-        )
     lines.extend(_work_item_loop_lines("        "))
     for trial in range(rule.n_shape):
         lines.append(
@@ -1776,11 +1907,9 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             )
         value = _sum_cpp_terms(terms)
         lines.append(
-            "            %s%s_grad_%d_ref_values[lane] = %s;"
+            "            const scalar_t %s%s_grad_%d_ref_value = %s;"
             % (field.name, group.symbol_suffix, d, value)
         )
-    lines.append("        }")
-    lines.extend(_work_item_loop_lines("        "))
     if scale == "1":
         metric_factor = "q_weight[q]"
     else:
@@ -1797,28 +1926,45 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
                     specialization.metric_component(left, right),
                 )
             )
+    for left in range(dim):
+        terms = []
+        for right in range(dim):
+            metric = "geom_metric%d%d" % (
+                min(left, right),
+                max(left, right),
+            )
+            trial_grad = "%s%s_grad_%d_ref_value" % (
+                field.name,
+                group.symbol_suffix,
+                right,
+            )
+            terms.append("%s * %s" % (metric, trial_grad))
+        lines.append(
+            "            const scalar_t %s%s_metric_grad_%d_ref_value = %s;"
+            % (
+                field.name,
+                group.symbol_suffix,
+                left,
+                _sum_cpp_terms(terms),
+            )
+        )
     for test in range(rule.n_shape):
         terms = []
         for left in range(dim):
             test_factor = specialization.reference_gradient(test, left)
             if test_factor == 0:
                 continue
-            for right in range(dim):
-                metric = "geom_metric%d%d" % (
-                    min(left, right),
-                    max(left, right),
+            terms.append(
+                _scaled_cpp_term(
+                    test_factor,
+                    "%s%s_metric_grad_%d_ref_value"
+                    % (
+                        field.name,
+                        group.symbol_suffix,
+                        left,
+                    ),
                 )
-                trial_grad = "%s%s_grad_%d_ref_values[lane]" % (
-                    field.name,
-                    group.symbol_suffix,
-                    right,
-                )
-                terms.append(
-                    _scaled_cpp_term(
-                        test_factor,
-                        "%s * %s" % (metric, trial_grad),
-                    )
-                )
+            )
         if terms:
             lines.append(
                 "            output[%d][lane] += %s;"
@@ -2104,6 +2250,24 @@ def _geometry_metric_stream_initializer(name, dim):
     return "{%s}" % ", ".join(
         "%s[%d]" % (name, index)
         for index in range(symmetric_metric_component_count(dim))
+    )
+
+
+def _numbered_geometry_metric_stream_initializer(prefix, dim, component_order):
+    entries = []
+    for left in range(dim):
+        for right in range(left, dim):
+            entries.append(
+                (
+                    symmetric_metric_component_index(left, right),
+                    symmetric_metric_storage_component_index(
+                        dim, left, right, component_order
+                    ),
+                )
+            )
+    return ", ".join(
+        "%s%d" % (prefix, storage_index)
+        for _, storage_index in sorted(entries)
     )
 
 
@@ -2760,10 +2924,12 @@ def _mixed_affine_function(
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     lines.extend(
         _affine_geometry_stream_conversion_lines(
-            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
-            if dependencies.uses_adjugate
-            else (),
-            "jacobian_determinant0",
+            (
+                tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+                if dependencies.uses_adjugate
+                else ()
+            )
+            + ("jacobian_determinant0",),
             "        ",
         )
     )
@@ -3439,6 +3605,7 @@ def _mesh_operator_source(
             dependencies,
         )
     )
+    uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
     shape_order = (
         tuple(range(n_shape))
         if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
@@ -3465,14 +3632,20 @@ def _mesh_operator_source(
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
     ]
-    if dependencies.uses_adjugate:
+    if uses_cached_affine_metric:
+        params.extend(
+            "const jacobian_t *const SFEM_RESTRICT g_geom_metric%d" % i
+            for i in range(gradient_metric.metric_components)
+        )
+    elif dependencies.uses_adjugate:
         params.extend(
             "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
             for i in range(dim * dim)
         )
-    params.append(
-        "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
-    )
+    if not uses_cached_affine_metric:
+        params.append(
+            "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
+        )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
@@ -3536,7 +3709,7 @@ def _mesh_operator_source(
         lines.append(
             "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
         )
-    if gradient_metric is not None:
+    if gradient_metric is not None and not uses_cached_affine_metric:
         lines.append(
             "        scalar_t block_geom_metric_data[%d][VECTOR_SIZE];"
             % gradient_metric.metric_components
@@ -3601,14 +3774,21 @@ def _mesh_operator_source(
     )
     lines.extend(
         _affine_geometry_stream_conversion_lines(
-            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
-            if dependencies.uses_adjugate
-            else (),
-            "jacobian_determinant0",
+            (
+                tuple(
+                    "geom_metric%d" % i
+                    for i in range(gradient_metric.metric_components)
+                )
+                if uses_cached_affine_metric
+                else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+                if dependencies.uses_adjugate
+                else ()
+            )
+            + (() if uses_cached_affine_metric else ("jacobian_determinant0",)),
             "        ",
         )
     )
-    if dependencies.uses_adjugate:
+    if dependencies.uses_adjugate and not uses_cached_affine_metric:
         lines.append(
             "        const scalar_t *const block_adjugate[%d] = {%s};"
             % (
@@ -3619,7 +3799,26 @@ def _mesh_operator_source(
                 ),
             )
         )
-    if gradient_metric is not None:
+    if uses_cached_affine_metric:
+        lines.append(
+            "        const scalar_t *const block_geom_metric[%d] = {%s};"
+            % (
+                gradient_metric.metric_components,
+                _numbered_geometry_metric_stream_initializer(
+                    "block_geom_metric",
+                    dim,
+                    getattr(
+                        gradient_metric,
+                        "affine_geometry_component_order",
+                        "upper_column_major",
+                    ),
+                ),
+            )
+        )
+        lines.append(
+            "        static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};"
+        )
+    elif gradient_metric is not None:
         lines.extend(["", *_work_item_loop_lines("        ")])
         lines.extend(
             _geometry_metric_grouping_lines(
@@ -3667,7 +3866,11 @@ def _mesh_operator_source(
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("affine", "q_weight"))
+        call_args.append(
+            "cached_affine_metric_q_weight"
+            if uses_cached_affine_metric
+            else _mesh_reference_name("affine", "q_weight")
+        )
     if dependencies.current:
         call_args.append("block_current_streams")
     if dependencies.previous:
@@ -3720,11 +3923,17 @@ def _mesh_operator_source(
                 % (param, "," if index + 1 < len(typed_params) else "")
             )
         call_args = ["nelements", "nnodes", "elements"]
-        if dependencies.uses_adjugate:
+        if uses_cached_affine_metric:
+            call_args.extend(
+                "g_geom_metric%d" % i
+                for i in range(gradient_metric.metric_components)
+            )
+        elif dependencies.uses_adjugate:
             call_args.extend(
                 "g_jacobian_adjugate%d" % i for i in range(dim * dim)
             )
-        call_args.append("g_jacobian_determinant0")
+        if not uses_cached_affine_metric:
+            call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
         if dependencies.current:
             call_args.append("current_stride")
