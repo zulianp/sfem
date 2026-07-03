@@ -1492,6 +1492,21 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         else:
             self.assertTrue(all(item["ok"] for item in manifest["iree_metal"]), manifest["iree_metal"])
             self.assertTrue(all(item["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb") for item in manifest["iree_metal"]))
+        self.assertEqual(len(manifest["iree_metal_executable_sources"]), 2)
+        iree_sources_by_name = {item["name"]: item for item in manifest["iree_metal_executable_sources"]}
+        self.assertIn("sum_factor_linalg_pipeline_to_metal_executable_sources", iree_sources_by_name)
+        self.assertIn("laplace_form_linalg_pipeline_to_metal_executable_sources", iree_sources_by_name)
+        if shutil.which("iree-compile") is None:
+            self.assertTrue(all(item["skipped"] for item in manifest["iree_metal_executable_sources"]))
+        else:
+            for item in manifest["iree_metal_executable_sources"]:
+                self.assertTrue(item["ok"], item)
+                self.assertTrue(item["output_mlir"].endswith(".executable_sources.mlir"), item)
+                self.assertEqual(item["missing_tokens"], [], item)
+                self.assertGreater(item["hal_executable_count"], 0, item)
+                self.assertGreater(item["stream_dispatch_count"], 0, item)
+                self.assertGreater(item["flow_tensor_load_count"], 0, item)
+                self.assertGreater(item["flow_tensor_store_count"], 0, item)
         self.assertEqual(len(manifest["iree_metal_gpu"]), 4)
         gpu_probe_by_group = {item["artifact_group"]: item for item in manifest["iree_metal_gpu"]}
         self.assertEqual(set(gpu_probe_by_group), {"sum_factor", "form", "ebe_map", "ebe_full"})
@@ -1500,11 +1515,23 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             self.assertTrue(all("iree-compile is not available" in item["reason"] for item in gpu_probe_by_group.values()))
         else:
             for group, gpu_probe in gpu_probe_by_group.items():
+                self.assertGreaterEqual(gpu_probe["attempt_count"], 1, gpu_probe)
+                self.assertEqual(gpu_probe["attempts"][0]["name"], "baseline", gpu_probe)
+                self.assertIn("--iree-hal-target-backends=metal-spirv", gpu_probe["command"])
                 if gpu_probe["ok"]:
                     self.assertTrue(gpu_probe["output_vmfb"].endswith(".metal.vmfb"))
                     continue
                 self.assertFalse(gpu_probe["skipped"], gpu_probe)
                 self.assertNotEqual(gpu_probe["returncode"], 0)
+                self.assertEqual(
+                    [attempt["name"] for attempt in gpu_probe["attempts"]],
+                    ["baseline", "vm_index_32", "spirv_index_32", "demote_i64_to_i32", "input_type_none"],
+                    gpu_probe,
+                )
+                self.assertIn("--iree-vm-target-index-bits=32", gpu_probe["attempts"][1]["command"])
+                self.assertIn("--iree-spirv-index-bits=32", gpu_probe["attempts"][2]["command"])
+                self.assertIn("--iree-input-demote-i64-to-i32", gpu_probe["attempts"][3]["command"])
+                self.assertIn("--iree-input-type=none", gpu_probe["attempts"][4]["command"])
                 self.assertEqual(
                     gpu_probe["diagnostic_kind"],
                     "iree_vm_generic_gpu_index_conversion",

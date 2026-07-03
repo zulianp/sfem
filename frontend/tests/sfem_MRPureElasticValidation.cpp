@@ -36,6 +36,7 @@
 #include <iomanip>
 
 #include "sfem_API.hpp"
+#include "sfem_context.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 
@@ -179,7 +180,6 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
            mode_names[mode], C10, C01, K, use_flexible ? "true" : "false");
     printf("========================================\n");
     
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto es = sfem::EXECUTION_SPACE_HOST;
     
     // Create 1x1x1 hex8 mesh
@@ -376,7 +376,7 @@ void generate_plot_data() {
 // ============================================================================
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    auto context__ = sfem::initialize(argc, argv);
     
     int total_failures = 0;
     
@@ -515,6 +515,5 @@ int main(int argc, char *argv[]) {
     printf("  Status: %s\n", total_failures == 0 ? "ALL PASSED" : "SOME FAILED");
     printf("==========================================================\n");
     
-    MPI_Finalize();
     return total_failures;
 }

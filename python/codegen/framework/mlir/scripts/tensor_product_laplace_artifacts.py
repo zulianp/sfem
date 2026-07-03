@@ -161,6 +161,7 @@ def main():
         "max_node_degree": args.max_node_degree,
         "artifacts": artifact_groups,
         "iree_metal": [],
+        "iree_metal_executable_sources": [],
         "iree_metal_gpu": [],
         "iree_metal_matrix_unit": [],
         "iree_metal_runtime": [],
@@ -188,12 +189,14 @@ def main():
         manifest["spirv_binary_validation"] = _validate_spirv_binaries(output_dir)
 
     if args.probe_iree_metal:
-        manifest["iree_metal"] = _probe_iree_metal(
-            output_dir / "iree_metal",
-            [
-                ("sum_factor_linalg_pipeline_to_metal_vmfb", sum_factor),
-                ("laplace_form_linalg_pipeline_to_metal_vmfb", form_linalg),
-            ],
+        linalg_iree_probes = [
+            ("sum_factor_linalg_pipeline_to_metal_vmfb", sum_factor),
+            ("laplace_form_linalg_pipeline_to_metal_vmfb", form_linalg),
+        ]
+        manifest["iree_metal"] = _probe_iree_metal(output_dir / "iree_metal", linalg_iree_probes)
+        manifest["iree_metal_executable_sources"] = _probe_iree_metal_executable_sources(
+            output_dir / "iree_metal_executable_sources",
+            linalg_iree_probes,
         )
 
     if args.probe_iree_metal_matrix_unit:
@@ -940,6 +943,101 @@ def _probe_iree_metal(output_dir, lowerings):
     return results
 
 
+def _probe_iree_metal_executable_sources(output_dir, lowerings):
+    iree_compile = shutil.which("iree-compile")
+    if iree_compile is None:
+        return [
+            {
+                "name": _iree_executable_source_probe_name(config),
+                "ok": False,
+                "skipped": True,
+                "reason": "iree-compile is not available",
+            }
+            for config in lowerings
+        ]
+    output_dir = Path(output_dir)
+    results = []
+    for lowering_config in lowerings:
+        name = _iree_executable_source_probe_name(lowering_config)
+        lowering = lowering_config[1]
+        probe_dir = output_dir / name
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        input_mlir = probe_dir / ("%s.linalg_pipeline.mlir" % lowering.ir.function_prefix)
+        output_mlir = probe_dir / ("%s.executable_sources.mlir" % lowering.ir.function_prefix)
+        input_mlir.write_text(lowering.render_linalg_pipeline_module())
+        command = [
+            iree_compile,
+            str(input_mlir),
+            "--iree-hal-target-backends=metal-spirv",
+            "--iree-metal-compile-to-metallib=false",
+            "--compile-to=executable-sources",
+            "-o",
+            str(output_mlir),
+        ]
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout_info = _write_probe_stream(probe_dir, "stdout", result.stdout or "")
+        stderr_info = _write_probe_stream(probe_dir, "stderr", result.stderr or "")
+        diagnostic = _classify_iree_probe_diagnostic(result.stderr or "")
+        source_info = _verify_iree_metal_executable_source(output_mlir)
+        ok = result.returncode == 0 and output_mlir.exists() and source_info["executable_source_ok"]
+        results.append(
+            {
+                "name": name,
+                "ok": ok,
+                "skipped": False,
+                "input_path": str(input_mlir),
+                "output_mlir": str(output_mlir) if output_mlir.exists() else "",
+                "command": command,
+                "returncode": result.returncode,
+                **diagnostic,
+                **source_info,
+                **stdout_info,
+                **stderr_info,
+            }
+        )
+    return results
+
+
+def _iree_executable_source_probe_name(config):
+    return _iree_probe_name(config).replace("_to_metal_vmfb", "_to_metal_executable_sources")
+
+
+def _verify_iree_metal_executable_source(path):
+    path = Path(path)
+    required_tokens = (
+        "hal.executable",
+        "hal.executable.variant",
+        "hal.executable.export",
+        "stream.cmd.dispatch",
+        "flow.dispatch.tensor.load",
+        "flow.dispatch.tensor.store",
+    )
+    if not path.exists():
+        return {
+            "executable_source_ok": False,
+            "missing_tokens": list(required_tokens),
+            "hal_executable_count": 0,
+            "stream_dispatch_count": 0,
+            "flow_tensor_load_count": 0,
+            "flow_tensor_store_count": 0,
+        }
+    text = path.read_text()
+    missing = [token for token in required_tokens if token not in text]
+    return {
+        "executable_source_ok": not missing,
+        "missing_tokens": missing,
+        "hal_executable_count": text.count("hal.executable private @"),
+        "stream_dispatch_count": text.count("stream.cmd.dispatch"),
+        "flow_tensor_load_count": text.count("flow.dispatch.tensor.load"),
+        "flow_tensor_store_count": text.count("flow.dispatch.tensor.store"),
+    }
+
+
 def _probe_iree_metal_gpu_artifacts(output_dir, gpu_artifacts):
     iree_compile = shutil.which("iree-compile")
     if iree_compile is None:
@@ -960,38 +1058,82 @@ def _probe_iree_metal_gpu_artifacts(output_dir, gpu_artifacts):
         name = _iree_gpu_probe_name(group, path)
         probe_dir = output_dir / name
         probe_dir.mkdir(parents=True, exist_ok=True)
-        output_vmfb = probe_dir / (Path(path).stem + ".metal.vmfb")
-        result = subprocess.run(
-            [
+        attempts = []
+        for attempt_name, extra_flags in _iree_metal_gpu_probe_attempts():
+            attempt_dir = probe_dir / attempt_name
+            attempt_dir.mkdir(parents=True, exist_ok=True)
+            output_vmfb = attempt_dir / (Path(path).stem + ".metal.vmfb")
+            command = [
                 iree_compile,
                 str(path),
                 "--iree-hal-target-backends=metal-spirv",
                 "--iree-metal-compile-to-metallib=false",
+                *extra_flags,
                 "-o",
                 str(output_vmfb),
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        stdout_info = _write_probe_stream(probe_dir, "stdout", result.stdout or "")
-        stderr_info = _write_probe_stream(probe_dir, "stderr", result.stderr or "")
-        diagnostic = _classify_iree_probe_diagnostic(result.stderr or "")
+            ]
+            result = subprocess.run(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout_info = _write_probe_stream(attempt_dir, "stdout", result.stdout or "")
+            stderr_info = _write_probe_stream(attempt_dir, "stderr", result.stderr or "")
+            diagnostic = _classify_iree_probe_diagnostic(result.stderr or "")
+            ok = result.returncode == 0 and output_vmfb.exists()
+            attempts.append(
+                {
+                    "name": attempt_name,
+                    "ok": ok,
+                    "returncode": result.returncode,
+                    "command": command,
+                    "extra_flags": list(extra_flags),
+                    "output_vmfb": str(output_vmfb) if output_vmfb.exists() else "",
+                    **diagnostic,
+                    **stdout_info,
+                    **stderr_info,
+                }
+            )
+            if ok:
+                break
+        selected = next((attempt for attempt in attempts if attempt["ok"]), attempts[0])
         results.append(
             {
                 "name": name,
-                "ok": result.returncode == 0 and output_vmfb.exists(),
+                "ok": selected["ok"],
                 "skipped": False,
                 "artifact_group": group,
                 "input_path": str(path),
-                "returncode": result.returncode,
-                "output_vmfb": str(output_vmfb) if output_vmfb.exists() else "",
-                **diagnostic,
-                **stdout_info,
-                **stderr_info,
+                "attempt_count": len(attempts),
+                "attempts": attempts,
+                "command": selected["command"],
+                "extra_flags": selected["extra_flags"],
+                "returncode": selected["returncode"],
+                "output_vmfb": selected["output_vmfb"],
+                "diagnostic_kind": selected["diagnostic_kind"],
+                "diagnostic_summary": selected["diagnostic_summary"],
+                "stdout_path": selected["stdout_path"],
+                "stdout_bytes": selected["stdout_bytes"],
+                "stdout_preview": selected["stdout_preview"],
+                "stdout_truncated": selected["stdout_truncated"],
+                "stderr_path": selected["stderr_path"],
+                "stderr_bytes": selected["stderr_bytes"],
+                "stderr_preview": selected["stderr_preview"],
+                "stderr_truncated": selected["stderr_truncated"],
             }
         )
     return results
+
+
+def _iree_metal_gpu_probe_attempts():
+    return (
+        ("baseline", ()),
+        ("vm_index_32", ("--iree-vm-target-index-bits=32",)),
+        ("spirv_index_32", ("--iree-spirv-index-bits=32",)),
+        ("demote_i64_to_i32", ("--iree-input-demote-i64-to-i32",)),
+        ("input_type_none", ("--iree-input-type=none",)),
+    )
 
 
 def _iree_gpu_probe_name(group, path):
