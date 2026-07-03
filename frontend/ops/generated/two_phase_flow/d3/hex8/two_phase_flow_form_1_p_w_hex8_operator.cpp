@@ -828,77 +828,30 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_residual_affine_mesh_soa_i
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+        const scalar_t *const current_components[N_FIELDS] = {p_w, p_c};
+        const scalar_t *const previous_components[N_FIELDS] = {p_w_old, p_c_old};
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
-            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
-            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
-            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_current[stream][lane] = current_components[field][node * current_stride];
+                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                }
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_current[0][lane] = p_w[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[0][lane] = p_w_old[ev[0 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[1][lane] = p_c[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[1][lane] = p_c_old[ev[0 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[2][lane] = p_w[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[2][lane] = p_w_old[ev[1 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[3][lane] = p_c[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[3][lane] = p_c_old[ev[1 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[4][lane] = p_w[ev[2 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[4][lane] = p_w_old[ev[2 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[5][lane] = p_c[ev[2 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[5][lane] = p_c_old[ev[2 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[6][lane] = p_w[ev[3 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[6][lane] = p_w_old[ev[3 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[7][lane] = p_c[ev[3 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[7][lane] = p_c_old[ev[3 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[8][lane] = p_w[ev[4 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[8][lane] = p_w_old[ev[4 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[9][lane] = p_c[ev[4 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[9][lane] = p_c_old[ev[4 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[10][lane] = p_w[ev[5 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[10][lane] = p_w_old[ev[5 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[11][lane] = p_c[ev[5 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[11][lane] = p_c_old[ev[5 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[12][lane] = p_w[ev[6 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[12][lane] = p_w_old[ev[6 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[13][lane] = p_c[ev[6 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[13][lane] = p_c_old[ev[6 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[14][lane] = p_w[ev[7 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[14][lane] = p_w_old[ev[7 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[15][lane] = p_c[ev[7 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[15][lane] = p_c_old[ev[7 * VECTOR_SIZE + lane] * previous_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-            block_output[4][lane] = scalar_t(0);
-            block_output[5][lane] = scalar_t(0);
-            block_output[6][lane] = scalar_t(0);
-            block_output[7][lane] = scalar_t(0);
-            block_output[8][lane] = scalar_t(0);
-            block_output[9][lane] = scalar_t(0);
-            block_output[10][lane] = scalar_t(0);
-            block_output[11][lane] = scalar_t(0);
-            block_output[12][lane] = scalar_t(0);
-            block_output[13][lane] = scalar_t(0);
-            block_output[14][lane] = scalar_t(0);
-            block_output[15][lane] = scalar_t(0);
+        for (int stream = 0; stream < 16; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
 
         const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
@@ -938,100 +891,16 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_residual_affine_mesh_soa_i
 
         two_phase_flow_form_1_p_w_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current_streams, block_previous_streams, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
+        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                scalar_t *const SFEM_RESTRICT out = output_components[field];
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }
@@ -1185,7 +1054,6 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mes
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
@@ -1193,96 +1061,38 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mes
         scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
-            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
-            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
-            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                }
+            }
+        }
+        const scalar_t *const current_components[N_FIELDS] = {p_w, p_c};
+        const scalar_t *const previous_components[N_FIELDS] = {p_w_old, p_c_old};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_current[stream][lane] = current_components[field][node * current_stride];
+                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                }
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[2][lane] = points[2][ev[0 * VECTOR_SIZE + lane]];
-            block_current[0][lane] = p_w[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[0][lane] = p_w_old[ev[0 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[1][lane] = p_c[ev[0 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[1][lane] = p_c_old[ev[0 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[3][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[4][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[5][lane] = points[2][ev[1 * VECTOR_SIZE + lane]];
-            block_current[2][lane] = p_w[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[2][lane] = p_w_old[ev[1 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[3][lane] = p_c[ev[1 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[3][lane] = p_c_old[ev[1 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[6][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[7][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[8][lane] = points[2][ev[2 * VECTOR_SIZE + lane]];
-            block_current[4][lane] = p_w[ev[2 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[4][lane] = p_w_old[ev[2 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[5][lane] = p_c[ev[2 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[5][lane] = p_c_old[ev[2 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[9][lane] = points[0][ev[3 * VECTOR_SIZE + lane]];
-            block_coordinates[10][lane] = points[1][ev[3 * VECTOR_SIZE + lane]];
-            block_coordinates[11][lane] = points[2][ev[3 * VECTOR_SIZE + lane]];
-            block_current[6][lane] = p_w[ev[3 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[6][lane] = p_w_old[ev[3 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[7][lane] = p_c[ev[3 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[7][lane] = p_c_old[ev[3 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[12][lane] = points[0][ev[4 * VECTOR_SIZE + lane]];
-            block_coordinates[13][lane] = points[1][ev[4 * VECTOR_SIZE + lane]];
-            block_coordinates[14][lane] = points[2][ev[4 * VECTOR_SIZE + lane]];
-            block_current[8][lane] = p_w[ev[4 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[8][lane] = p_w_old[ev[4 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[9][lane] = p_c[ev[4 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[9][lane] = p_c_old[ev[4 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[15][lane] = points[0][ev[5 * VECTOR_SIZE + lane]];
-            block_coordinates[16][lane] = points[1][ev[5 * VECTOR_SIZE + lane]];
-            block_coordinates[17][lane] = points[2][ev[5 * VECTOR_SIZE + lane]];
-            block_current[10][lane] = p_w[ev[5 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[10][lane] = p_w_old[ev[5 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[11][lane] = p_c[ev[5 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[11][lane] = p_c_old[ev[5 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[18][lane] = points[0][ev[6 * VECTOR_SIZE + lane]];
-            block_coordinates[19][lane] = points[1][ev[6 * VECTOR_SIZE + lane]];
-            block_coordinates[20][lane] = points[2][ev[6 * VECTOR_SIZE + lane]];
-            block_current[12][lane] = p_w[ev[6 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[12][lane] = p_w_old[ev[6 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[13][lane] = p_c[ev[6 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[13][lane] = p_c_old[ev[6 * VECTOR_SIZE + lane] * previous_stride];
-            block_coordinates[21][lane] = points[0][ev[7 * VECTOR_SIZE + lane]];
-            block_coordinates[22][lane] = points[1][ev[7 * VECTOR_SIZE + lane]];
-            block_coordinates[23][lane] = points[2][ev[7 * VECTOR_SIZE + lane]];
-            block_current[14][lane] = p_w[ev[7 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[14][lane] = p_w_old[ev[7 * VECTOR_SIZE + lane] * previous_stride];
-            block_current[15][lane] = p_c[ev[7 * VECTOR_SIZE + lane] * current_stride];
-            block_previous[15][lane] = p_c_old[ev[7 * VECTOR_SIZE + lane] * previous_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-            block_output[4][lane] = scalar_t(0);
-            block_output[5][lane] = scalar_t(0);
-            block_output[6][lane] = scalar_t(0);
-            block_output[7][lane] = scalar_t(0);
-            block_output[8][lane] = scalar_t(0);
-            block_output[9][lane] = scalar_t(0);
-            block_output[10][lane] = scalar_t(0);
-            block_output[11][lane] = scalar_t(0);
-            block_output[12][lane] = scalar_t(0);
-            block_output[13][lane] = scalar_t(0);
-            block_output[14][lane] = scalar_t(0);
-            block_output[15][lane] = scalar_t(0);
+        for (int stream = 0; stream < 16; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[18], block_coordinates[19], block_coordinates[20]};
@@ -1303,100 +1113,16 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mes
 
         two_phase_flow_form_1_p_w_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current_streams, block_previous_streams, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
 
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
+        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                scalar_t *const SFEM_RESTRICT out = output_components[field];
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }
@@ -1553,39 +1279,13 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_jacobian_action_affine_mes
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
-            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
-            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
-            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-            block_output[4][lane] = scalar_t(0);
-            block_output[5][lane] = scalar_t(0);
-            block_output[6][lane] = scalar_t(0);
-            block_output[7][lane] = scalar_t(0);
-            block_output[8][lane] = scalar_t(0);
-            block_output[9][lane] = scalar_t(0);
-            block_output[10][lane] = scalar_t(0);
-            block_output[11][lane] = scalar_t(0);
-            block_output[12][lane] = scalar_t(0);
-            block_output[13][lane] = scalar_t(0);
-            block_output[14][lane] = scalar_t(0);
-            block_output[15][lane] = scalar_t(0);
+        for (int stream = 0; stream < 16; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
 
         scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
@@ -1595,100 +1295,16 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_jacobian_action_affine_mes
 
         two_phase_flow_form_1_p_w_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, affine_shape_1d, affine_q_weight_1d, block_output_streams);
 
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
+        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                scalar_t *const SFEM_RESTRICT out = output_components[field];
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }
@@ -1749,70 +1365,28 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparamet
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
         scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
-            ev[3 * VECTOR_SIZE + lane] = elements[3][evbegin + lane];
-            ev[4 * VECTOR_SIZE + lane] = elements[4][evbegin + lane];
-            ev[5 * VECTOR_SIZE + lane] = elements[5][evbegin + lane];
-            ev[6 * VECTOR_SIZE + lane] = elements[6][evbegin + lane];
-            ev[7 * VECTOR_SIZE + lane] = elements[7][evbegin + lane];
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                }
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[2][lane] = points[2][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[3][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[4][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[5][lane] = points[2][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[6][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[7][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[8][lane] = points[2][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[9][lane] = points[0][ev[3 * VECTOR_SIZE + lane]];
-            block_coordinates[10][lane] = points[1][ev[3 * VECTOR_SIZE + lane]];
-            block_coordinates[11][lane] = points[2][ev[3 * VECTOR_SIZE + lane]];
-            block_coordinates[12][lane] = points[0][ev[4 * VECTOR_SIZE + lane]];
-            block_coordinates[13][lane] = points[1][ev[4 * VECTOR_SIZE + lane]];
-            block_coordinates[14][lane] = points[2][ev[4 * VECTOR_SIZE + lane]];
-            block_coordinates[15][lane] = points[0][ev[5 * VECTOR_SIZE + lane]];
-            block_coordinates[16][lane] = points[1][ev[5 * VECTOR_SIZE + lane]];
-            block_coordinates[17][lane] = points[2][ev[5 * VECTOR_SIZE + lane]];
-            block_coordinates[18][lane] = points[0][ev[6 * VECTOR_SIZE + lane]];
-            block_coordinates[19][lane] = points[1][ev[6 * VECTOR_SIZE + lane]];
-            block_coordinates[20][lane] = points[2][ev[6 * VECTOR_SIZE + lane]];
-            block_coordinates[21][lane] = points[0][ev[7 * VECTOR_SIZE + lane]];
-            block_coordinates[22][lane] = points[1][ev[7 * VECTOR_SIZE + lane]];
-            block_coordinates[23][lane] = points[2][ev[7 * VECTOR_SIZE + lane]];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
-            block_output[3][lane] = scalar_t(0);
-            block_output[4][lane] = scalar_t(0);
-            block_output[5][lane] = scalar_t(0);
-            block_output[6][lane] = scalar_t(0);
-            block_output[7][lane] = scalar_t(0);
-            block_output[8][lane] = scalar_t(0);
-            block_output[9][lane] = scalar_t(0);
-            block_output[10][lane] = scalar_t(0);
-            block_output[11][lane] = scalar_t(0);
-            block_output[12][lane] = scalar_t(0);
-            block_output[13][lane] = scalar_t(0);
-            block_output[14][lane] = scalar_t(0);
-            block_output[15][lane] = scalar_t(0);
+        for (int stream = 0; stream < 16; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
 
         const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[18], block_coordinates[19], block_coordinates[20]};
@@ -1830,100 +1404,16 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparamet
 
         two_phase_flow_form_1_p_w_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape_1d, isoparametric_q_weight_1d, block_output_streams);
 
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[3][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[4][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[5][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[6][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[3 * VECTOR_SIZE + scatter] * out_stride] += block_output[7][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[8][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[4 * VECTOR_SIZE + scatter] * out_stride] += block_output[9][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[10][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[5 * VECTOR_SIZE + scatter] * out_stride] += block_output[11][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[12][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[6 * VECTOR_SIZE + scatter] * out_stride] += block_output[13][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_w_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[14][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_c_out[ev[7 * VECTOR_SIZE + scatter] * out_stride] += block_output[15][scatter];
+        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int field = 0; field < N_FIELDS; ++field) {
+                const int stream = shape * N_FIELDS + field;
+                scalar_t *const SFEM_RESTRICT out = output_components[field];
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }

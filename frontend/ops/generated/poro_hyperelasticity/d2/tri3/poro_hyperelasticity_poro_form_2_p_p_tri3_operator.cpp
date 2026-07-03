@@ -460,29 +460,24 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
+        for (int local_shape = 0; local_shape < 3; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const int stream = 0 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_direction[stream][lane] = p_direction_data[node * direction_stride];
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_direction[0][lane] = p_direction_data[ev[0 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[1][lane] = p_direction_data[ev[1 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[2][lane] = p_direction_data[ev[2 * VECTOR_SIZE + lane] * direction_stride];
-        }
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
+        for (int stream = 0; stream < 3; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
         scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
         const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
@@ -500,27 +495,26 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
         const scalar_t *const block_adjugate[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
-        const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {block_direction[0], block_direction[1], block_direction[2]};
-        scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2]};
+        const scalar_t *block_direction_streams[N_FIELD_STREAMS];
+        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+            block_direction_streams[stream] = block_direction[stream];
+        }
+        scalar_t *block_output_streams[N_FIELD_STREAMS];
+        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+            block_output_streams[stream] = block_output[stream];
+        }
 
         poro_hyperelasticity_poro_form_2_p_p_d2_simplex_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_affine_reference_data<scalar_t>::q_weight(), block_direction_streams, dt, hydraulic_conductivity, storage, block_output_streams);
 
         {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
+            scalar_t *const SFEM_RESTRICT out = p_out;
+            for (int local_shape = 0; local_shape < 3; ++local_shape) {
+                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const int stream = 0 + local_shape;
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }
@@ -600,38 +594,39 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];
         scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
         scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
         scalar_t block_determinant[N_QP * VECTOR_SIZE];
         scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            ev[0 * VECTOR_SIZE + lane] = elements[0][evbegin + lane];
-            ev[1 * VECTOR_SIZE + lane] = elements[1][evbegin + lane];
-            ev[2 * VECTOR_SIZE + lane] = elements[2][evbegin + lane];
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                }
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_coordinates[0][lane] = points[0][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[1][lane] = points[1][ev[0 * VECTOR_SIZE + lane]];
-            block_coordinates[2][lane] = points[0][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[3][lane] = points[1][ev[1 * VECTOR_SIZE + lane]];
-            block_coordinates[4][lane] = points[0][ev[2 * VECTOR_SIZE + lane]];
-            block_coordinates[5][lane] = points[1][ev[2 * VECTOR_SIZE + lane]];
-            block_direction[0][lane] = p_direction_data[ev[0 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[1][lane] = p_direction_data[ev[1 * VECTOR_SIZE + lane] * direction_stride];
-            block_direction[2][lane] = p_direction_data[ev[2 * VECTOR_SIZE + lane] * direction_stride];
+        for (int local_shape = 0; local_shape < 3; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const int stream = 0 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_direction[stream][lane] = p_direction_data[node * direction_stride];
+            }
         }
 
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_output[0][lane] = scalar_t(0);
-            block_output[1][lane] = scalar_t(0);
-            block_output[2][lane] = scalar_t(0);
+        for (int stream = 0; stream < 3; ++stream) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                block_output[stream][lane] = scalar_t(0);
+            }
         }
 
         scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
@@ -650,27 +645,26 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action
         const scalar_t *const field_shape[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::tri3_shape()};
         const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::tri3_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::tri3_grad_ref_y()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        const scalar_t *const block_direction_streams[N_FIELD_STREAMS] = {block_direction[0], block_direction[1], block_direction[2]};
-        scalar_t *const block_output_streams[N_FIELD_STREAMS] = {block_output[0], block_output[1], block_output[2]};
+        const scalar_t *block_direction_streams[N_FIELD_STREAMS];
+        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+            block_direction_streams[stream] = block_direction[stream];
+        }
+        scalar_t *block_output_streams[N_FIELD_STREAMS];
+        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+            block_output_streams[stream] = block_output[stream];
+        }
 
         poro_hyperelasticity_poro_form_2_p_p_d2_simplex_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_p_p_isoparametric_reference_data<scalar_t>::q_weight(), block_direction_streams, dt, hydraulic_conductivity, storage, block_output_streams);
 
         {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[0 * VECTOR_SIZE + scatter] * out_stride] += block_output[0][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[1 * VECTOR_SIZE + scatter] * out_stride] += block_output[1][scatter];
-            }
-        }
-        {
-            for (int scatter = 0; scatter < nelems; ++scatter) {
-                #pragma omp atomic update
-                p_out[ev[2 * VECTOR_SIZE + scatter] * out_stride] += block_output[2][scatter];
+            scalar_t *const SFEM_RESTRICT out = p_out;
+            for (int local_shape = 0; local_shape < 3; ++local_shape) {
+                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const int stream = 0 + local_shape;
+                for (int scatter = 0; scatter < nelems; ++scatter) {
+                    #pragma omp atomic update
+                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                }
             }
         }
     }
