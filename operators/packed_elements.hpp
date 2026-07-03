@@ -79,6 +79,9 @@ static SFEM_INLINE void sshex8_SoA_unpack_add_elements(const int                
 
 // BLAS function declaration
 #ifdef SFEM_ENABLE_BLAS
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern void dgemm_(const char   *transa,
                    const char   *transb,
                    const int    *m,
@@ -106,13 +109,16 @@ extern void sgemm_(const char  *transa,
                    const float *beta,
                    float       *c,
                    const int   *ldc);
+#ifdef __cplusplus
+}
+#endif
 
-static SFEM_INLINE void packed_elements_matmul(const int                       m,
-                                               const int                       n,
-                                               const int                       k,
-                                               const void *const SFEM_RESTRICT element_matrix,
-                                               const void *const SFEM_RESTRICT X,
-                                               void *const SFEM_RESTRICT       Y) {
+static SFEM_INLINE void packed_elements_matmul(const int                           m,
+                                               const int                           n,
+                                               const int                           k,
+                                               const scalar_t *const SFEM_RESTRICT element_matrix,
+                                               const scalar_t *const SFEM_RESTRICT X,
+                                               scalar_t *const SFEM_RESTRICT       Y) {
     char transa = 'N';
     char transb = 'N';
     int  ldm    = k;
@@ -122,11 +128,35 @@ static SFEM_INLINE void packed_elements_matmul(const int                       m
     if (sizeof(scalar_t) == 8) {
         double alpha = 1;
         double beta  = 0;
-        dgemm_(&transa, &transb, &m, &n, &k, &alpha, element_matrix, &ldm, X, &ldx, &beta, Y, &ldy);
+        dgemm_(&transa,
+               &transb,
+               &m,
+               &n,
+               &k,
+               &alpha,
+               reinterpret_cast<const double *>(element_matrix),
+               &ldm,
+               reinterpret_cast<const double *>(X),
+               &ldx,
+               &beta,
+               reinterpret_cast<double *>(Y),
+               &ldy);
     } else {
         float alpha = 1;
         float beta  = 0;
-        sgemm_(&transa, &transb, &m, &n, &k, &alpha, element_matrix, &ldm, X, &ldx, &beta, Y, &ldy);
+        sgemm_(&transa,
+               &transb,
+               &m,
+               &n,
+               &k,
+               &alpha,
+               reinterpret_cast<const float *>(element_matrix),
+               &ldm,
+               reinterpret_cast<const float *>(X),
+               &ldx,
+               &beta,
+               reinterpret_cast<float *>(Y),
+               &ldy);
     }
 }
 

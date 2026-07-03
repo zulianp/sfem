@@ -1365,6 +1365,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 item["artifact_group"]: bool(item.get("stderr_path")) and Path(item["stderr_path"]).is_file()
                 for item in manifest.get("iree_metal_gpu", [])
             }
+            pipeline_evidence_path_exists = Path(manifest["pipeline_evidence"]["path"]).is_file()
 
         self.assertEqual(manifest["material"], "laplace")
         self.assertEqual(manifest["element"], "QUAD4")
@@ -1396,6 +1397,14 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(len(sum_factor_ir["test_gradient_stages"]), 4)
         self.assertEqual(form_ir["form"], "laplace")
         self.assertEqual(form_ir["parameter_name"], "kappa")
+        pipeline_evidence = manifest["pipeline_evidence"]
+        self.assertEqual(pipeline_evidence["name"], "tensor_product_laplace_pipeline_evidence")
+        self.assertTrue(pipeline_evidence_path_exists, pipeline_evidence)
+        self.assertEqual(pipeline_evidence["sfem_ir_files"], 2)
+        self.assertEqual(
+            set(pipeline_evidence["gpu_artifact_groups"]),
+            {"sum_factor", "form", "ebe_map", "ebe_full"},
+        )
         self.assertEqual(len(manifest["reference_verification"]), 2)
         sum_factor_reference = next(
             item for item in manifest["reference_verification"] if item["name"] == "tensor_product_sum_factor_pipeline_reference"
@@ -1507,6 +1516,37 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 self.assertGreater(item["stream_dispatch_count"], 0, item)
                 self.assertGreater(item["flow_tensor_load_count"], 0, item)
                 self.assertGreater(item["flow_tensor_store_count"], 0, item)
+        self.assertEqual(len(manifest["iree_metal_executable_files"]), 2)
+        iree_files_by_name = {item["name"]: item for item in manifest["iree_metal_executable_files"]}
+        self.assertIn("sum_factor_linalg_pipeline_to_metal_executable_files", iree_files_by_name)
+        self.assertIn("laplace_form_linalg_pipeline_to_metal_executable_files", iree_files_by_name)
+        if shutil.which("iree-compile") is None:
+            self.assertTrue(all(item["skipped"] for item in manifest["iree_metal_executable_files"]))
+        else:
+            for item in manifest["iree_metal_executable_files"]:
+                self.assertTrue(item["ok"], item)
+                self.assertTrue(item["output_vmfb"].endswith(".executable_files.metal.vmfb"), item)
+                self.assertEqual(item["missing_outputs"], [], item)
+                self.assertGreater(item["configured_mlir_count"], 0, item)
+                self.assertGreater(item["target_mlir_count"], 0, item)
+                self.assertGreater(item["metal_source_count"], 0, item)
+                self.assertGreater(item["spirv_binary_count"], 0, item)
+                self.assertGreater(item["spirv_binary_total_bytes"], 0, item)
+                self.assertEqual(item["empty_spirv_binary_paths"], [], item)
+                self.assertEqual(len(item["spirv_deserialization"]), item["spirv_binary_count"], item)
+                if item["spirv_deserialization"] and item["spirv_deserialization"][0].get("skipped"):
+                    self.assertTrue(
+                        all(spv.get("skipped") for spv in item["spirv_deserialization"]),
+                        item,
+                    )
+                else:
+                    self.assertTrue(all(spv["ok"] for spv in item["spirv_deserialization"]), item)
+                    self.assertTrue(all(spv["missing_tokens"] == [] for spv in item["spirv_deserialization"]), item)
+                self.assertTrue(item["metal_source_checks"]["ok"], item)
+                self.assertEqual(item["metal_source_checks"]["missing_tokens"], [], item)
+                self.assertEqual(item["metal_source_checks"]["missing_by_file"], [], item)
+                self.assertEqual(item["metal_source_checks"]["checked_files"], item["metal_source_count"], item)
+                self.assertGreaterEqual(item["metal_source_checks"]["kernel_count"], item["metal_source_count"], item)
         self.assertEqual(len(manifest["iree_metal_gpu"]), 4)
         gpu_probe_by_group = {item["artifact_group"]: item for item in manifest["iree_metal_gpu"]}
         self.assertEqual(set(gpu_probe_by_group), {"sum_factor", "form", "ebe_map", "ebe_full"})
@@ -1540,6 +1580,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 self.assertGreater(gpu_probe["stderr_bytes"], 0)
                 self.assertTrue(gpu_probe["stderr_preview"], gpu_probe)
                 self.assertTrue(gpu_probe_stderr_paths_exist[group], gpu_probe)
+            self.assertIn("iree_vm_generic_gpu_index_conversion", pipeline_evidence["raw_gpu_iree_diagnostics"])
         self.assertEqual(len(manifest["iree_metal_matrix_unit"]), 3)
         matrix_unit_by_kind = {item["input_kind"]: item for item in manifest["iree_metal_matrix_unit"]}
         self.assertEqual(
@@ -1566,6 +1607,10 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 self.assertGreater(matrix_unit_probe["stderr_bytes"], 0)
                 self.assertTrue(matrix_unit_probe["stderr_preview"], matrix_unit_probe)
                 self.assertTrue(matrix_unit_stderr_paths_exist[input_kind], matrix_unit_probe)
+            self.assertIn(
+                "iree_vm_matrix_unit_abi_conversion",
+                pipeline_evidence["matrix_unit_iree_diagnostics"],
+            )
         self.assertEqual(len(manifest["iree_metal_runtime"]), 2)
         runtime_by_name = {item["name"]: item for item in manifest["iree_metal_runtime"]}
         self.assertIn("sum_factor_linalg_pipeline_metal_runtime", runtime_by_name)
@@ -1592,6 +1637,17 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             self.assertTrue(all(item["skipped"] for item in manifest["metal_toolchain"]))
         else:
             self.assertTrue(all("returncode" in item for item in manifest["metal_toolchain"]))
+            output_air_paths = [item["output_air"] for item in manifest["metal_toolchain"]]
+            self.assertEqual(len(output_air_paths), len(set(output_air_paths)), manifest["metal_toolchain"])
+            toolchain_source_kinds = {item["source_kind"] for item in manifest["metal_toolchain"]}
+            self.assertIn("sfem_generated_metal", toolchain_source_kinds)
+            self.assertIn("iree_metal_executable_file", toolchain_source_kinds)
+            iree_toolchain = [
+                item for item in manifest["metal_toolchain"] if item["source_kind"] == "iree_metal_executable_file"
+            ]
+            self.assertTrue(iree_toolchain)
+            self.assertTrue(all(item["source_group"].endswith("_to_metal_executable_files") for item in iree_toolchain))
+            self.assertTrue(all("/iree_metal_executable_files/" in item["output_air"] for item in iree_toolchain))
         self.assertTrue(manifest["mlir_validation"])
         self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
 
