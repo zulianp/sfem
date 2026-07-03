@@ -39,7 +39,6 @@ struct KVFunctionBundle {
 };
 
 KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = false) {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};

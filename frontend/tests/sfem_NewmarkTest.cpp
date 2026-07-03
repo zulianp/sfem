@@ -6,7 +6,6 @@
 #include "sfem_Function.hpp"
 
 std::shared_ptr<sfem::Function> create_elasticity_function() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};

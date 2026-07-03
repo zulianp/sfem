@@ -175,7 +175,7 @@ int test_cube() {
     auto restricted  = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
     auto Ax_coarse   = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     OP_HEADERS();
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
@@ -183,7 +183,7 @@ int test_cube() {
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     printf("#elements %ld #ndofs fine %ld coarse %ld\nTTS: %g [s]\n",
            m->n_elements(),

@@ -24,6 +24,7 @@
 #include <cstring>
 
 #include "sfem_API.hpp"
+#include "sfem_context.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 
@@ -184,7 +185,6 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     printf("Strain Rate Test: ε̇ = %g s⁻¹\n", strain_rate);
     printf("========================================\n");
     
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto es = sfem::EXECUTION_SPACE_HOST;
     
     // Create mesh (1x1x1 cube)
@@ -343,7 +343,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
 // ============================================================================
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    auto context__ = sfem::initialize(argc, argv);
     
     printf("==========================================================\n");
     printf("  Hyper-Viscoelastic Strain Rate Validation\n");
@@ -393,7 +393,6 @@ int main(int argc, char *argv[]) {
     printf("  Combined results: strain_rate_all_results.csv\n");
     printf("==========================================================\n");
     
-    MPI_Finalize();
     return 0;
 }
 

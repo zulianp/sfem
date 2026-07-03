@@ -11,7 +11,6 @@
 #include "sshex8_laplacian.hpp"
 
 int test_hyperelasticity_partial_assembly(const std::string &op_name) {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -85,7 +84,6 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
 }
 
 int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_name) {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};

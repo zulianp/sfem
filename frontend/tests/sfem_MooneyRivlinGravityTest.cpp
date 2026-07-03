@@ -650,7 +650,6 @@ void export_hemisphere_obstacle_mesh(const smesh::Path& output_dir,
 }
 
 int test_mooney_rivlin_gravity() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_BASE_RESOLUTION = 4;
@@ -762,7 +761,7 @@ int test_mooney_rivlin_gravity() {
 
         if (g_prony.size() != tau_prony.size()) {
             printf("Error: SFEM_PRONY_G and SFEM_PRONY_TAU must have the same number of terms!\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            exit(EXIT_FAILURE);
         }
 
         printf("Prony series from environment: %zu terms\n", g_prony.size());

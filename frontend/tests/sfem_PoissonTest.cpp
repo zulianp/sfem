@@ -192,7 +192,6 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const smesh::
 }
 
 int test_poisson() {
-    MPI_Comm comm                      = MPI_COMM_WORLD;
     auto     es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     int      SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
     int      SFEM_BASE_RESOLUTION      = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 1);
@@ -316,7 +315,6 @@ int test_poisson_and_boundary_selector_aux(const char                        *te
 }
 
 int test_poisson_and_boundary_selector() {
-    MPI_Comm comm          = MPI_COMM_WORLD;
     auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
@@ -346,7 +344,6 @@ int test_poisson_and_boundary_selector() {
 }
 
 int test_poisson_and_boundary_selector_checkerboard() {
-    MPI_Comm comm          = MPI_COMM_WORLD;
     auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
@@ -371,7 +368,6 @@ int test_poisson_and_boundary_selector_checkerboard() {
 }
 
 int test_poisson_and_boundary_selector_bidomain() {
-    MPI_Comm comm          = MPI_COMM_WORLD;
     auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
@@ -418,7 +414,6 @@ int test_generic_operator_with_boundary_conditions(const std::string            
 }
 
 int test_linear_elasticity() {
-    MPI_Comm comm                      = MPI_COMM_WORLD;
     auto     es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     int      SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
 
@@ -456,7 +451,6 @@ int test_linear_elasticity() {
 
 // Example of how to create additional tests using the generic function
 int test_poisson_simple() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
 
     auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world());
@@ -494,7 +488,6 @@ int test_poisson_simple() {
 }
 
 int test_bidomain_elasticity() {
-    MPI_Comm comm          = MPI_COMM_WORLD;
     auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
@@ -548,7 +541,6 @@ int test_bidomain_elasticity() {
 }
 
 int test_boundary_layer_elasticity() {
-    MPI_Comm comm          = MPI_COMM_WORLD;
     auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
@@ -635,7 +627,6 @@ dirichlet_conditions:
 )";
 
 int test_poisson_yaml() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world());

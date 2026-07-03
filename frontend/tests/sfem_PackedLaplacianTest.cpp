@@ -3,7 +3,6 @@
 #include "sfem_API.hpp"
 
 int test_packed_laplacian() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     enum smesh::ElemType SFEM_ELEM_TYPE = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
     constexpr int        N              = 40;

@@ -53,7 +53,6 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const smesh::P
 }
 
 int test_ssgmg_poisson_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -112,7 +111,6 @@ int test_ssgmg_poisson_cube() {
 }
 
 int test_ssgmg_linear_elasticity_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
