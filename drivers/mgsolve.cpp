@@ -10,7 +10,6 @@
 #include "sfem_cg.hpp"
 // 
 
-#include "matrixio_array.h"
 
 #include "sfem_API.hpp"
 
@@ -22,16 +21,8 @@
 
 #include <vector>
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int mgsolve(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -43,7 +34,7 @@ int main(int argc, char *argv[]) {
 
     smesh::Path output_path{argv[2]};
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -59,7 +50,7 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
     const char *folder = argv[1];
-    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto        m      = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     const char *SFEM_OPERATOR       = "Laplacian";
     const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
@@ -168,8 +159,8 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    double compute_tick = MPI_Wtime();
-    double init_tick    = MPI_Wtime();
+    double compute_tick = smesh::time_seconds();
+    double init_tick    = smesh::time_seconds();
     double init_tock;
     double solve_tick, solve_tock;
 
@@ -258,9 +249,9 @@ int main(int argc, char *argv[]) {
         fflush(stderr);
         fflush(stdout);
 
-        init_tock = MPI_Wtime();
+        init_tock = smesh::time_seconds();
 
-        solve_tick = MPI_Wtime();
+        solve_tick = smesh::time_seconds();
 
         if (SFEM_USE_MG_PRECONDITIONER) {
             auto linear_op  = sfem::make_linear_op(f);
@@ -277,7 +268,7 @@ int main(int argc, char *argv[]) {
             mg->apply(rhs->data(), x->data());
         }
 
-        solve_tock = MPI_Wtime();
+        solve_tock = smesh::time_seconds();
 
     } else {
         auto solver = sfem::create_cg<real_t>(linear_op, es);
@@ -298,13 +289,13 @@ int main(int argc, char *argv[]) {
 
         solver->set_op(linear_op);
 
-        init_tock  = MPI_Wtime();
-        solve_tick = MPI_Wtime();
+        init_tock  = smesh::time_seconds();
+        solve_tick = smesh::time_seconds();
         solver->apply(rhs->data(), x->data());
-        solve_tock = MPI_Wtime();
+        solve_tock = smesh::time_seconds();
     }
 
-    double compute_tock = MPI_Wtime();
+    double compute_tock = smesh::time_seconds();
 
     auto   r   = smesh::create_buffer<real_t>(fs->n_dofs(), es);
     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
@@ -329,8 +320,8 @@ int main(int argc, char *argv[]) {
         output->write("residual", h_r->data());
     }
 
-    double tock = MPI_Wtime();
-    if (!rank) {
+    double tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
@@ -344,5 +335,10 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return mgsolve(ctx->communicator(), argc, argv);
 }

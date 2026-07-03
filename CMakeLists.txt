@@ -324,6 +324,14 @@ if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
 endif()
 
+if(NOT SFEM_ENABLE_MPI)
+    # These drivers depend on distributed/MPI-only headers (e.g. smesh_distributed_aura.hpp)
+    list(APPEND SFEM_EXCLUDED_EXEC "partition")
+endif()
+
+# Empty placeholder driver (no implementation yet)
+list(APPEND SFEM_EXCLUDED_EXEC "neohookean_assemble")
+
 if(SFEM_ENABLE_RESAMPLING)
     file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
     file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
@@ -387,8 +395,11 @@ if(SFEM_ENABLE_TESTING)
         mesh/tests
         frontend/tests
         ssmg/tests
-        amg/tests
     )
+
+    if(SFEM_ENABLE_AMG)
+        list(APPEND SFEM_UNIT_TESTS amg/tests)
+    endif()
 
     if(SFEM_ENABLE_CUDA)
         list(APPEND SFEM_UNIT_TESTS

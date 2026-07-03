@@ -75,7 +75,7 @@ int test_ssgmg_poisson_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -136,7 +136,7 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,

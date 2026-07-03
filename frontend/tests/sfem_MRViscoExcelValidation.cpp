@@ -148,7 +148,7 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
     auto es = sfem::EXECUTION_SPACE_HOST;
     
     auto mesh = sfem::Mesh::create_hex8_cube(
-        sfem::Communicator::wrap(comm),
+        sfem::Communicator::world(),
         1, 1, 1,
         0.0, 0.0, 0.0,
         1.0, 1.0, 1.0

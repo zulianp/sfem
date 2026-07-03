@@ -5,8 +5,6 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 
-#include "matrixio_array.h"
-
 #include "sfem_API.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -25,10 +23,10 @@
 #define OP_TIME(op, x, y)                                      \
     do {                                                       \
         sfem::device_synchronize();                            \
-        double start = MPI_Wtime();                            \
+        double start = smesh::time_seconds();                            \
         op->apply(x, y);                                       \
         sfem::device_synchronize();                            \
-        double stop    = MPI_Wtime();                          \
+        double stop    = smesh::time_seconds();                          \
         double elapsed = stop - start;                         \
         printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
                #op,                                            \
@@ -40,16 +38,8 @@
         fflush(stdout);                                        \
     } while (0)
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int test_galerkin_assembly(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -90,7 +80,7 @@ int main(int argc, char *argv[]) {
     smesh::Path folder{argv[1]};
     smesh::Path output_path{argv[2]};
 
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto m = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
@@ -163,7 +153,7 @@ int main(int argc, char *argv[]) {
     auto restricted  = smesh::create_buffer<real_t>(fs_coarse->n_dofs(), es);
     auto Ax_coarse   = smesh::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     OP_HEADERS();
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
@@ -171,7 +161,7 @@ int main(int argc, char *argv[]) {
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
     printf("#elements %ld #ndofs fine %ld coarse %ld\nTTS: %g [s]\n",
            m->n_elements(),
@@ -254,5 +244,10 @@ int main(int argc, char *argv[]) {
         output->write("error", error->data());
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return test_galerkin_assembly(ctx->communicator(), argc, argv);
 }

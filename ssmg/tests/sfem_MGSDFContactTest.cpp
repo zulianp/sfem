@@ -286,7 +286,7 @@ int test_contact() {
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                              SFEM_BASE_RESOLUTION * resolution_ratio,
                                              SFEM_BASE_RESOLUTION * 1,
                                              SFEM_BASE_RESOLUTION * resolution_ratio,

@@ -9,7 +9,7 @@
 int test_single_block_mesh() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     // Test basic properties
@@ -35,7 +35,7 @@ int test_single_block_mesh() {
 int test_multi_block_fallback() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
     
     // Test with different block sizes
     auto space1 = sfem::FunctionSpace::create(mesh, 1);
@@ -57,7 +57,7 @@ int test_multi_block_fallback() {
 int test_semi_structured_promotion() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
     
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
@@ -83,7 +83,7 @@ int test_semi_structured_promotion() {
 int test_vector_creation() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     ptrdiff_t nlocal, nglobal;
@@ -106,7 +106,7 @@ int test_vector_creation() {
 // int test_lor_function_space() {
     
 //     MPI_Comm comm = MPI_COMM_WORLD;
-//     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+//     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
 //     auto space = sfem::FunctionSpace::create(mesh, 1);
     
 //     // Create LOR function space
@@ -126,7 +126,7 @@ int test_vector_creation() {
 int test_derefine_function_space() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
     mesh = smesh::to_semistructured(2, mesh, true, false);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
@@ -145,7 +145,7 @@ int test_derefine_function_space() {
 int test_edge_cases() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 1, 1, 1);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 1, 1, 1);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     // Test with minimal mesh

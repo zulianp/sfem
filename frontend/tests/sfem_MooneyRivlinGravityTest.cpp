@@ -660,14 +660,14 @@ int test_mooney_rivlin_gravity() {
     const char*                 mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
-        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path(mesh_path));
     } else {
         // Default cube mesh with configurable initial gap
         real_t SFEM_INIT_GAP = 0.05;  // Default gap above contact plane
         SFEM_READ_ENV(SFEM_INIT_GAP, atof);
 
         printf("Creating default cube mesh with SFEM_INIT_GAP=%.4f\n", SFEM_INIT_GAP);
-        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,  // Grid

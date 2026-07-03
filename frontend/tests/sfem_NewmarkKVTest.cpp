@@ -55,7 +55,7 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION,

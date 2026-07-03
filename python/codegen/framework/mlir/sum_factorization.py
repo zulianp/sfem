@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -7,6 +8,7 @@ from codegen.framework.fem.basis import BasisFamily
 from codegen.framework.fem.tensor_product import TensorProductOperation
 
 from .common import CodeInspectionArtifacts
+from .tools import _extract_single_top_level_operation, _serialize_spirv_module
 
 
 @dataclass(frozen=True)
@@ -776,6 +778,78 @@ class TensorProductSumFactorMLIRLowering:
         lines.append("}")
         return "\n".join(lines) + "\n"
 
+    def render_spirv_opencl_module(self):
+        lines = [
+            "module {",
+            "  spirv.module Logical OpenCL requires #spirv.vce<v1.0, [Kernel, Addresses], []> attributes "
+            '{sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_spirv_opencl", '
+            'sfem.opencl.execution_model = "Kernel", sfem.opencl.memory_model = "OpenCL"} {'
+            % (self.ir.material_name, self.ir.element_type),
+        ]
+        for stage in self.ir.stages:
+            for kind, size in (
+                ("basis", stage.lhs_rows * stage.lhs_cols),
+                ("operand", stage.lhs_cols * stage.rhs_cols),
+                ("result", stage.result_rows * stage.result_cols),
+            ):
+                lines.append(
+                    "    spirv.GlobalVariable @%s : !spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>"
+                    % (self._spirv_opencl_global_name(stage, kind), size)
+                )
+        lines.append("    spirv.GlobalVariable @gid : !spirv.ptr<vector<3xi64>, Input>")
+        for stage in self.ir.stages:
+            lines.extend(self._render_spirv_opencl_stage_function(stage))
+        for stage in self.ir.stages:
+            lines.append(
+                '    spirv.EntryPoint "Kernel" @%s, @%s, @%s, @%s, @gid'
+                % (
+                    self._spirv_opencl_kernel_name(stage),
+                    self._spirv_opencl_global_name(stage, "basis"),
+                    self._spirv_opencl_global_name(stage, "operand"),
+                    self._spirv_opencl_global_name(stage, "result"),
+                )
+            )
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_spirv_opencl_module_op(self):
+        return _extract_single_top_level_operation(self.render_spirv_opencl_module(), "spirv.module")
+
+    def spirv_opencl_dispatch_manifest(self):
+        stages = []
+        for index, stage in enumerate(self.ir.stages):
+            stages.append(
+                {
+                    "index": index,
+                    "stage": stage.name,
+                    "operation": stage.operation,
+                    "derivative": stage.derivative,
+                    "axis": stage.axis,
+                    "basis": stage.basis,
+                    "kernel": self._spirv_opencl_kernel_name(stage),
+                    "global_work_items": stage.result_rows * stage.result_cols,
+                    "result_rows": stage.result_rows,
+                    "result_cols": stage.result_cols,
+                    "lhs_rows": stage.lhs_rows,
+                    "lhs_cols": stage.lhs_cols,
+                    "rhs_cols": stage.rhs_cols,
+                    "basis_elements": stage.lhs_rows * stage.lhs_cols,
+                    "operand_elements": stage.lhs_cols * stage.rhs_cols,
+                    "result_elements": stage.result_rows * stage.result_cols,
+                }
+            )
+        return {
+            "lowering": "tensor_product_sum_factor_spirv_opencl",
+            "material": self.ir.material_name,
+            "element": self.ir.element_type,
+            "function_prefix": self.ir.function_prefix,
+            "dim": self.ir.dim,
+            "n_stages": len(stages),
+            "stages": stages,
+        }
+
     def render_metal_source(self):
         lines = [
             "#include <metal_stdlib>",
@@ -792,6 +866,8 @@ class TensorProductSumFactorMLIRLowering:
         *,
         include_metal_source=True,
         include_metal_smoke_harness=True,
+        include_spirv_binary=True,
+        mlir_translate=None,
     ):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -804,6 +880,10 @@ class TensorProductSumFactorMLIRLowering:
         matrix_unit_memref_path = prefix.with_suffix(".matrix_unit_memref.mlir")
         matrix_unit_pipeline_path = prefix.with_suffix(".matrix_unit_pipeline.mlir")
         gpu_path = prefix.with_suffix(".gpu.mlir")
+        spirv_opencl_path = prefix.with_suffix(".spirv.opencl.mlir")
+        spirv_opencl_op_path = prefix.with_suffix(".spirv.opencl.op.mlir")
+        spirv_opencl_binary_path = prefix.with_suffix(".spirv.opencl.spv")
+        spirv_opencl_dispatch_path = prefix.with_suffix(".spirv.opencl.dispatch.json")
         metal_path = prefix.with_suffix(".metal")
         harness_path = prefix.with_suffix(".metal_smoke.mm")
 
@@ -814,6 +894,11 @@ class TensorProductSumFactorMLIRLowering:
         matrix_unit_memref_path.write_text(self.render_matrix_unit_memref_module())
         matrix_unit_pipeline_path.write_text(self.render_matrix_unit_pipeline_module())
         gpu_path.write_text(self.render_gpu_module())
+        spirv_opencl_path.write_text(self.render_spirv_opencl_module())
+        spirv_opencl_op_path.write_text(self.render_spirv_opencl_module_op())
+        spirv_opencl_dispatch_path.write_text(
+            json.dumps(self.spirv_opencl_dispatch_manifest(), indent=2, sort_keys=True) + "\n"
+        )
 
         files = [
             linalg_path,
@@ -823,7 +908,17 @@ class TensorProductSumFactorMLIRLowering:
             matrix_unit_memref_path,
             matrix_unit_pipeline_path,
             gpu_path,
+            spirv_opencl_path,
+            spirv_opencl_op_path,
+            spirv_opencl_dispatch_path,
         ]
+        if include_spirv_binary:
+            _serialize_spirv_module(
+                spirv_opencl_op_path,
+                spirv_opencl_binary_path,
+                mlir_translate=mlir_translate,
+            )
+            files.append(spirv_opencl_binary_path)
         if include_metal_source:
             metal_path.write_text(self.render_metal_source())
             files.append(metal_path)
@@ -837,18 +932,35 @@ class TensorProductSumFactorMLIRLowering:
         )
 
     def render_metal_smoke_test_harness(self, stage=None):
-        stage = self.ir.stages[0] if stage is None else stage
-        kernel_name = self._metal_kernel_name(stage)
+        stages = self.ir.stages if stage is None else (stage,)
         source = _objc_string_literal(self.render_metal_source())
-        basis = _float_initializer(
-            _deterministic_values(stage.lhs_rows * stage.lhs_cols, scale=0.25, offset=1.0)
-        )
-        operand = _float_initializer(
-            _deterministic_values(stage.rhs_rows * stage.rhs_cols, scale=0.125, offset=2.0)
-        )
         return _METAL_SMOKE_TEST_TEMPLATE % {
             "source": source,
-            "kernel_name": kernel_name,
+            "stage_count": len(stages),
+            "stage_calls": "\n".join(
+                self._render_metal_smoke_stage_call(index, stage) for index, stage in enumerate(stages)
+            ),
+        }
+
+    def _render_metal_smoke_stage_call(self, index, stage):
+        basis = _float_initializer(
+            _deterministic_values(stage.lhs_rows * stage.lhs_cols, scale=0.25, offset=1.0 + index)
+        )
+        operand = _float_initializer(
+            _deterministic_values(stage.rhs_rows * stage.rhs_cols, scale=0.125, offset=2.0 + index)
+        )
+        return (
+            "        static const float basis_%(index)d[%(lhs_size)d] = {%(basis)s};\n"
+            "        static const float operand_%(index)d[%(rhs_size)d] = {%(operand)s};\n"
+            "        status = run_stage(device, library, queue, @\"%(kernel_name)s\", "
+            "basis_%(index)d, sizeof(basis_%(index)d), operand_%(index)d, sizeof(operand_%(index)d), "
+            "%(result_size)d, %(lhs_cols)d, %(rhs_cols)d, %(result_rows)d, %(result_cols)d);\n"
+            "        if (status != 0) {\n"
+            "            return status;\n"
+            "        }\n"
+        ) % {
+            "index": index,
+            "kernel_name": self._metal_kernel_name(stage),
             "lhs_size": stage.lhs_rows * stage.lhs_cols,
             "rhs_size": stage.rhs_rows * stage.rhs_cols,
             "result_size": stage.result_rows * stage.result_cols,
@@ -962,6 +1074,92 @@ class TensorProductSumFactorMLIRLowering:
             run_result.stdout,
             run_result.stderr,
         )
+
+    def _spirv_opencl_kernel_name(self, stage):
+        return "%s_%s_spirv_opencl" % (self.ir.function_prefix, stage.name)
+
+    def _spirv_opencl_global_name(self, stage, kind):
+        return "%s_%s_%s" % (self.ir.function_prefix, stage.name, kind)
+
+    def _render_spirv_opencl_stage_function(self, stage):
+        names = _SSANamer()
+        basis_name = self._spirv_opencl_global_name(stage, "basis")
+        operand_name = self._spirv_opencl_global_name(stage, "operand")
+        result_name = self._spirv_opencl_global_name(stage, "result")
+        basis_array_type = "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % (stage.lhs_rows * stage.lhs_cols)
+        operand_array_type = "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % (stage.lhs_cols * stage.rhs_cols)
+        result_array_type = "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % (stage.result_rows * stage.result_cols)
+        scalar_ptr_type = "!spirv.ptr<f32, CrossWorkgroup>"
+        lines = [
+            "    spirv.func @%s() \"None\" {" % self._spirv_opencl_kernel_name(stage),
+            "      %gid_addr = spirv.mlir.addressof @gid : !spirv.ptr<vector<3xi64>, Input>",
+            "      %gid_vec = spirv.Load \"Input\" %gid_addr : vector<3xi64>",
+            "      %gid_x64 = spirv.CompositeExtract %gid_vec[0 : i32] : vector<3xi64>",
+            "      %idx = spirv.UConvert %gid_x64 : i64 to i32",
+            "      %%basis_addr = spirv.mlir.addressof @%s : %s" % (basis_name, basis_array_type),
+            "      %%operand_addr = spirv.mlir.addressof @%s : %s" % (operand_name, operand_array_type),
+            "      %%result_addr = spirv.mlir.addressof @%s : %s" % (result_name, result_array_type),
+        ]
+
+        result_cols = names.value("result_cols")
+        lhs_cols = names.value("lhs_cols")
+        rhs_cols = names.value("rhs_cols")
+        row = names.value("row")
+        col = names.value("col")
+        acc = names.value("acc")
+        lines.extend(
+            [
+                "      %s = spirv.Constant %d : i32" % (result_cols, stage.result_cols),
+                "      %s = spirv.Constant %d : i32" % (lhs_cols, stage.lhs_cols),
+                "      %s = spirv.Constant %d : i32" % (rhs_cols, stage.rhs_cols),
+                "      %s = spirv.UDiv %%idx, %s : i32" % (row, result_cols),
+                "      %s = spirv.UMod %%idx, %s : i32" % (col, result_cols),
+                "      %s = spirv.Constant 0.0 : f32" % acc,
+            ]
+        )
+        acc_value = acc
+        for k in range(stage.lhs_cols):
+            k_value = names.value("k")
+            lhs_row_offset = names.value("lhs_row_offset")
+            lhs_index = names.value("lhs_index")
+            rhs_row_offset = names.value("rhs_row_offset")
+            rhs_index = names.value("rhs_index")
+            lhs_ptr = names.value("lhs_ptr")
+            rhs_ptr = names.value("rhs_ptr")
+            lhs = names.value("lhs")
+            rhs = names.value("rhs")
+            product = names.value("product")
+            next_acc = names.value("acc")
+            lines.extend(
+                [
+                    "      %s = spirv.Constant %d : i32" % (k_value, k),
+                    "      %s = spirv.IMul %s, %s : i32" % (lhs_row_offset, row, lhs_cols),
+                    "      %s = spirv.IAdd %s, %s : i32" % (lhs_index, lhs_row_offset, k_value),
+                    "      %s = spirv.IMul %s, %s : i32" % (rhs_row_offset, k_value, rhs_cols),
+                    "      %s = spirv.IAdd %s, %s : i32" % (rhs_index, rhs_row_offset, col),
+                    "      %s = spirv.AccessChain %%basis_addr[%s] : %s, i32 -> %s"
+                    % (lhs_ptr, lhs_index, basis_array_type, scalar_ptr_type),
+                    "      %s = spirv.AccessChain %%operand_addr[%s] : %s, i32 -> %s"
+                    % (rhs_ptr, rhs_index, operand_array_type, scalar_ptr_type),
+                    "      %s = spirv.Load \"CrossWorkgroup\" %s : f32" % (lhs, lhs_ptr),
+                    "      %s = spirv.Load \"CrossWorkgroup\" %s : f32" % (rhs, rhs_ptr),
+                    "      %s = spirv.FMul %s, %s : f32" % (product, lhs, rhs),
+                    "      %s = spirv.FAdd %s, %s : f32" % (next_acc, acc_value, product),
+                ]
+            )
+            acc_value = next_acc
+
+        result_ptr = names.value("result_ptr")
+        lines.extend(
+            [
+                "      %s = spirv.AccessChain %%result_addr[%%idx] : %s, i32 -> %s"
+                % (result_ptr, result_array_type, scalar_ptr_type),
+                "      spirv.Store \"CrossWorkgroup\" %s, %s : f32" % (result_ptr, acc_value),
+                "      spirv.Return",
+                "    }",
+            ]
+        )
+        return lines
 
     def _render_stage_function(self, stage):
         function_name = "%s_%s" % (self.ir.function_prefix, stage.name)
@@ -2773,6 +2971,16 @@ def _gpu_kernel_argument(name, memref_type, binding, descriptor_set=0):
     )
 
 
+class _SSANamer:
+    def __init__(self):
+        self._next_id = 0
+
+    def value(self, hint):
+        name = "%%%s%d" % (hint, self._next_id)
+        self._next_id += 1
+        return name
+
+
 def _product(values):
     result = 1
     for value in values:
@@ -2879,6 +3087,82 @@ _METAL_SMOKE_TEST_TEMPLATE = r'''#import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+
+static int run_stage(id<MTLDevice> device,
+                     id<MTLLibrary> library,
+                     id<MTLCommandQueue> queue,
+                     NSString *kernel_name,
+                     const float *basis,
+                     size_t basis_bytes,
+                     const float *operand,
+                     size_t operand_bytes,
+                     unsigned result_size,
+                     unsigned lhs_cols,
+                     unsigned rhs_cols,
+                     unsigned result_rows,
+                     unsigned result_cols) {
+    NSError *error = nil;
+    id<MTLFunction> function = [library newFunctionWithName:kernel_name];
+    if (!function) {
+        std::fprintf(stderr, "Metal function lookup failed: %%s\n", [kernel_name UTF8String]);
+        return 79;
+    }
+
+    id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
+    if (!pipeline) {
+        std::fprintf(stderr, "Metal pipeline creation failed for %%s: %%s\n",
+                     [kernel_name UTF8String], [[error localizedDescription] UTF8String]);
+        return 80;
+    }
+
+    float *expected = static_cast<float *>(std::calloc(result_size, sizeof(float)));
+    if (!expected) {
+        return 83;
+    }
+    for (unsigned row = 0; row < result_rows; ++row) {
+        for (unsigned col = 0; col < result_cols; ++col) {
+            float acc = 0.0f;
+            for (unsigned k = 0; k < lhs_cols; ++k) {
+                acc += basis[row * lhs_cols + k] * operand[k * rhs_cols + col];
+            }
+            expected[row * result_cols + col] = acc;
+        }
+    }
+
+    id<MTLBuffer> basis_buffer = [device newBufferWithBytes:basis length:basis_bytes options:MTLResourceStorageModeShared];
+    id<MTLBuffer> operand_buffer = [device newBufferWithBytes:operand length:operand_bytes options:MTLResourceStorageModeShared];
+    id<MTLBuffer> result_buffer = [device newBufferWithLength:result_size * sizeof(float) options:MTLResourceStorageModeShared];
+    id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+    id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+    [encoder setComputePipelineState:pipeline];
+    [encoder setBuffer:basis_buffer offset:0 atIndex:0];
+    [encoder setBuffer:operand_buffer offset:0 atIndex:1];
+    [encoder setBuffer:result_buffer offset:0 atIndex:2];
+    [encoder dispatchThreads:MTLSizeMake(result_cols, result_rows, 1)
+        threadsPerThreadgroup:MTLSizeMake(result_cols, result_rows, 1)];
+    [encoder endEncoding];
+    [command_buffer commit];
+    [command_buffer waitUntilCompleted];
+
+    if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
+        std::fprintf(stderr, "Metal command failed for %%s\n", [kernel_name UTF8String]);
+        std::free(expected);
+        return 81;
+    }
+
+    const float *result = static_cast<const float *>([result_buffer contents]);
+    for (unsigned i = 0; i < result_size; ++i) {
+        if (std::fabs(result[i] - expected[i]) > 1.0e-5f) {
+            std::fprintf(stderr, "Mismatch in %%s at %%u: got %%g expected %%g\n",
+                         [kernel_name UTF8String], i, result[i], expected[i]);
+            std::free(expected);
+            return 82;
+        }
+    }
+    std::free(expected);
+    return 0;
+}
 
 int main() {
     @autoreleasepool {
@@ -2896,59 +3180,10 @@ int main() {
             return 78;
         }
 
-        id<MTLFunction> function = [library newFunctionWithName:@"%(kernel_name)s"];
-        if (!function) {
-            std::fprintf(stderr, "Metal function lookup failed\n");
-            return 79;
-        }
-
-        id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
-        if (!pipeline) {
-            std::fprintf(stderr, "Metal pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
-            return 80;
-        }
-
-        const float basis[%(lhs_size)d] = {%(basis)s};
-        const float operand[%(rhs_size)d] = {%(operand)s};
-        float expected[%(result_size)d] = {0.0f};
-        for (unsigned row = 0; row < %(result_rows)d; ++row) {
-            for (unsigned col = 0; col < %(result_cols)d; ++col) {
-                float acc = 0.0f;
-                for (unsigned k = 0; k < %(lhs_cols)d; ++k) {
-                    acc += basis[row * %(lhs_cols)d + k] * operand[k * %(rhs_cols)d + col];
-                }
-                expected[row * %(result_cols)d + col] = acc;
-            }
-        }
-
-        id<MTLBuffer> basis_buffer = [device newBufferWithBytes:basis length:sizeof(basis) options:MTLResourceStorageModeShared];
-        id<MTLBuffer> operand_buffer = [device newBufferWithBytes:operand length:sizeof(operand) options:MTLResourceStorageModeShared];
-        id<MTLBuffer> result_buffer = [device newBufferWithLength:sizeof(expected) options:MTLResourceStorageModeShared];
         id<MTLCommandQueue> queue = [device newCommandQueue];
-        id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
-        [encoder setComputePipelineState:pipeline];
-        [encoder setBuffer:basis_buffer offset:0 atIndex:0];
-        [encoder setBuffer:operand_buffer offset:0 atIndex:1];
-        [encoder setBuffer:result_buffer offset:0 atIndex:2];
-        [encoder dispatchThreads:MTLSizeMake(%(result_cols)d, %(result_rows)d, 1)
-            threadsPerThreadgroup:MTLSizeMake(%(result_cols)d, %(result_rows)d, 1)];
-        [encoder endEncoding];
-        [command_buffer commit];
-        [command_buffer waitUntilCompleted];
-
-        if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
-            std::fprintf(stderr, "Metal command failed\n");
-            return 81;
-        }
-
-        const float *result = static_cast<const float *>([result_buffer contents]);
-        for (unsigned i = 0; i < %(result_size)d; ++i) {
-            if (std::fabs(result[i] - expected[i]) > 1.0e-5f) {
-                std::fprintf(stderr, "Mismatch at %%u: got %%g expected %%g\n", i, result[i], expected[i]);
-                return 82;
-            }
-        }
+        int status = 0;
+%(stage_calls)s
+        std::printf("sum_factor_stage_count=%%d\n", %(stage_count)d);
         return 0;
     }
 }

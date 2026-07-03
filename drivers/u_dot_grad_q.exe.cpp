@@ -3,30 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
 #include "operators/div.hpp"
 
-
-
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int compute_u_dot_grad_q(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -36,44 +22,49 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
-    const char *path_u[3] = {argv[2], argv[3], argv[4]};
+    const char *folder      = argv[1];
+    const char *path_u[3]   = {argv[2], argv[3], argv[4]};
     const char *path_output = argv[5];
 
     printf("%s %s %s %s %s %s\n", argv[0], folder, path_u[0], path_u[1], path_u[2], path_output);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements  = mesh->n_elements();
+    const ptrdiff_t nnodes     = mesh->n_nodes();
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
-
-    real_t *u[3];
-
-    ptrdiff_t _nope_, nu_p0_or_p1;
+    std::shared_ptr<sfem::Buffer<real_t>> u_bufs[3];
+    real_t                               *u[3];
+    ptrdiff_t                             nu_p0_or_p1 = 0;
 
     for (int d = 0; d < 3; ++d) {
-        array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &_nope_, &nu_p0_or_p1);
+        u_bufs[d] = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[d]));
+        if (!u_bufs[d]) {
+            SFEM_ERROR("Failed to read file %s\n", path_u[d]);
+        }
+        u[d] = u_bufs[d]->data();
+        if (d == 0) {
+            nu_p0_or_p1 = (ptrdiff_t)u_bufs[d]->size();
+        }
     }
 
-    assert(nu_p0_or_p1 == mesh->n_elements() || nu_p0_or_p1 == mesh->n_nodes());
+    assert(nu_p0_or_p1 == nelements || nu_p0_or_p1 == nnodes);
 
-    real_t *div_u = (real_t *)malloc(mesh->n_nodes() * sizeof(real_t));
-    memset(div_u, 0, mesh->n_nodes() * sizeof(real_t));
+    auto div_u_buf = sfem::create_host_buffer<real_t>(nnodes);
+    real_t *div_u  = div_u_buf->data();
 
-    if(nu_p0_or_p1 == mesh->n_elements()) {
-        p0_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
+    if (nu_p0_or_p1 == nelements) {
+        p0_u_dot_grad_q_apply(nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     } else {
-        p1_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
+        p1_u_dot_grad_q_apply(nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     }
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
     if (SFEM_SCALE != 1) {
-        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
             div_u[i] *= SFEM_SCALE;
         }
     }
@@ -83,30 +74,29 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_VERBOSE) {
         real_t integral = 0.;
-        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
             integral += div_u[i];
         }
 
-        if (!rank) {
+        if (!comm->rank()) {
             printf("integral div(u) = %g\n", (double)integral);
         }
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, mesh->n_nodes(), mesh->n_nodes());
+    div_u_buf->to_file(smesh::Path(path_output));
 
-    for (int d = 0; d < 3; ++d) {
-        free(u[d]);
-    }
+    const double tock = smesh::time_seconds();
 
-    free(div_u);
-
-    double tock = MPI_Wtime();
-
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return compute_u_dot_grad_q(ctx->communicator(), argc, argv);
 }

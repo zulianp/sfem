@@ -22,16 +22,8 @@
 
 #include <vector>
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -45,7 +37,7 @@ int main(int argc, char *argv[]) {
     sfem::register_device_ops();
 #endif
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     // -------------------------------
     // Read inputs
@@ -75,7 +67,7 @@ int main(int argc, char *argv[]) {
     // Create discretization
     // -------------------------------
 
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto m = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
@@ -197,7 +189,7 @@ int main(int argc, char *argv[]) {
     // Solve
     // -------------------------------
 
-    double solve_tick = MPI_Wtime();
+    double solve_tick = smesh::time_seconds();
 
     for (int i = 0; i < fs->n_dofs(); i++) {
         x->data()[i] = 1.0;
@@ -208,7 +200,7 @@ int main(int argc, char *argv[]) {
 
     solver->apply(rhs->data(), x->data());
 
-    double solve_tock = MPI_Wtime();
+    double solve_tock = smesh::time_seconds();
 
     // -------------------------------
     // Write output
@@ -224,12 +216,17 @@ int main(int argc, char *argv[]) {
 #endif
     output->write("x", h_x->data());
 
-    double tock = MPI_Wtime();
-    if (!rank) {
+    double tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #dofs %ld\n", (long)m->n_elements(), (long)m->n_nodes(), (long)fs->n_dofs());
         printf("TTS:\t\t\t%g seconds (solve: %g)\n", tock - tick, solve_tock - solve_tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return steady_state_sim(ctx->communicator(), argc, argv);
 }

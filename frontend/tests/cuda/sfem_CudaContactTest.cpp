@@ -171,7 +171,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
     int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 2);
     if (refine_level > 1) {
