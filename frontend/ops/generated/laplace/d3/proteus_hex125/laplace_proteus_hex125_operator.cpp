@@ -526,47 +526,19 @@ static SFEM_INLINE int laplace_proteus_hex125_residual_affine_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
+        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[10];
+        for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[9];
+        for (int component = 0; component < 9; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[9] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 
-        laplace_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current_streams, kappa, block_output_streams);
+        laplace_d3_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -700,28 +672,19 @@ static SFEM_INLINE int laplace_proteus_hex125_residual_isoparametric_mesh_soa_im
             }
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[18], block_coordinates[19], block_coordinates[20], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[24], block_coordinates[25], block_coordinates[26], block_coordinates[27], block_coordinates[28], block_coordinates[29], block_coordinates[30], block_coordinates[31], block_coordinates[32], block_coordinates[33], block_coordinates[34], block_coordinates[35], block_coordinates[36], block_coordinates[37], block_coordinates[38], block_coordinates[39], block_coordinates[40], block_coordinates[41], block_coordinates[42], block_coordinates[43], block_coordinates[44], block_coordinates[45], block_coordinates[46], block_coordinates[47], block_coordinates[48], block_coordinates[49], block_coordinates[50], block_coordinates[51], block_coordinates[52], block_coordinates[53], block_coordinates[54], block_coordinates[55], block_coordinates[56], block_coordinates[57], block_coordinates[58], block_coordinates[59], block_coordinates[60], block_coordinates[61], block_coordinates[62], block_coordinates[63], block_coordinates[64], block_coordinates[65], block_coordinates[66], block_coordinates[67], block_coordinates[68], block_coordinates[69], block_coordinates[70], block_coordinates[71], block_coordinates[72], block_coordinates[73], block_coordinates[74], block_coordinates[75], block_coordinates[76], block_coordinates[77], block_coordinates[78], block_coordinates[79], block_coordinates[80], block_coordinates[81], block_coordinates[82], block_coordinates[83], block_coordinates[84], block_coordinates[85], block_coordinates[86], block_coordinates[87], block_coordinates[88], block_coordinates[89], block_coordinates[90], block_coordinates[91], block_coordinates[92], block_coordinates[93], block_coordinates[94], block_coordinates[95], block_coordinates[96], block_coordinates[97], block_coordinates[98], block_coordinates[99], block_coordinates[100], block_coordinates[101], block_coordinates[102], block_coordinates[103], block_coordinates[104], block_coordinates[105], block_coordinates[106], block_coordinates[107], block_coordinates[108], block_coordinates[109], block_coordinates[110], block_coordinates[111], block_coordinates[112], block_coordinates[113], block_coordinates[114], block_coordinates[115], block_coordinates[116], block_coordinates[117], block_coordinates[118], block_coordinates[119], block_coordinates[120], block_coordinates[121], block_coordinates[122], block_coordinates[123], block_coordinates[124], block_coordinates[125], block_coordinates[126], block_coordinates[127], block_coordinates[128], block_coordinates[129], block_coordinates[130], block_coordinates[131], block_coordinates[132], block_coordinates[133], block_coordinates[134], block_coordinates[135], block_coordinates[136], block_coordinates[137], block_coordinates[138], block_coordinates[139], block_coordinates[140], block_coordinates[141], block_coordinates[142], block_coordinates[143], block_coordinates[144], block_coordinates[145], block_coordinates[146], block_coordinates[147], block_coordinates[148], block_coordinates[149], block_coordinates[150], block_coordinates[151], block_coordinates[152], block_coordinates[153], block_coordinates[154], block_coordinates[155], block_coordinates[156], block_coordinates[157], block_coordinates[158], block_coordinates[159], block_coordinates[160], block_coordinates[161], block_coordinates[162], block_coordinates[163], block_coordinates[164], block_coordinates[165], block_coordinates[166], block_coordinates[167], block_coordinates[168], block_coordinates[169], block_coordinates[170], block_coordinates[171], block_coordinates[172], block_coordinates[173], block_coordinates[174], block_coordinates[175], block_coordinates[176], block_coordinates[177], block_coordinates[178], block_coordinates[179], block_coordinates[180], block_coordinates[181], block_coordinates[182], block_coordinates[183], block_coordinates[184], block_coordinates[185], block_coordinates[186], block_coordinates[187], block_coordinates[188], block_coordinates[189], block_coordinates[190], block_coordinates[191], block_coordinates[192], block_coordinates[193], block_coordinates[194], block_coordinates[195], block_coordinates[196], block_coordinates[197], block_coordinates[198], block_coordinates[199], block_coordinates[200], block_coordinates[201], block_coordinates[202], block_coordinates[203], block_coordinates[204], block_coordinates[205], block_coordinates[206], block_coordinates[207], block_coordinates[208], block_coordinates[209], block_coordinates[210], block_coordinates[211], block_coordinates[212], block_coordinates[213], block_coordinates[214], block_coordinates[215], block_coordinates[216], block_coordinates[217], block_coordinates[218], block_coordinates[219], block_coordinates[220], block_coordinates[221], block_coordinates[222], block_coordinates[223], block_coordinates[224], block_coordinates[225], block_coordinates[226], block_coordinates[227], block_coordinates[228], block_coordinates[229], block_coordinates[230], block_coordinates[231], block_coordinates[232], block_coordinates[233], block_coordinates[234], block_coordinates[235], block_coordinates[236], block_coordinates[237], block_coordinates[238], block_coordinates[239], block_coordinates[240], block_coordinates[241], block_coordinates[242], block_coordinates[243], block_coordinates[244], block_coordinates[245], block_coordinates[246], block_coordinates[247], block_coordinates[248], block_coordinates[249], block_coordinates[250], block_coordinates[251], block_coordinates[252], block_coordinates[253], block_coordinates[254], block_coordinates[255], block_coordinates[256], block_coordinates[257], block_coordinates[258], block_coordinates[259], block_coordinates[260], block_coordinates[261], block_coordinates[262], block_coordinates[263], block_coordinates[264], block_coordinates[265], block_coordinates[266], block_coordinates[267], block_coordinates[268], block_coordinates[269], block_coordinates[270], block_coordinates[271], block_coordinates[272], block_coordinates[273], block_coordinates[274], block_coordinates[275], block_coordinates[276], block_coordinates[277], block_coordinates[278], block_coordinates[279], block_coordinates[280], block_coordinates[281], block_coordinates[282], block_coordinates[283], block_coordinates[284], block_coordinates[285], block_coordinates[286], block_coordinates[287], block_coordinates[288], block_coordinates[289], block_coordinates[290], block_coordinates[291], block_coordinates[292], block_coordinates[293], block_coordinates[294], block_coordinates[295], block_coordinates[296], block_coordinates[297], block_coordinates[298], block_coordinates[299], block_coordinates[300], block_coordinates[301], block_coordinates[302], block_coordinates[303], block_coordinates[304], block_coordinates[305], block_coordinates[306], block_coordinates[307], block_coordinates[308], block_coordinates[309], block_coordinates[310], block_coordinates[311], block_coordinates[312], block_coordinates[313], block_coordinates[314], block_coordinates[315], block_coordinates[316], block_coordinates[317], block_coordinates[318], block_coordinates[319], block_coordinates[320], block_coordinates[321], block_coordinates[322], block_coordinates[323], block_coordinates[324], block_coordinates[325], block_coordinates[326], block_coordinates[327], block_coordinates[328], block_coordinates[329], block_coordinates[330], block_coordinates[331], block_coordinates[332], block_coordinates[333], block_coordinates[334], block_coordinates[335], block_coordinates[336], block_coordinates[337], block_coordinates[338], block_coordinates[339], block_coordinates[340], block_coordinates[341], block_coordinates[342], block_coordinates[343], block_coordinates[344], block_coordinates[345], block_coordinates[346], block_coordinates[347], block_coordinates[348], block_coordinates[349], block_coordinates[350], block_coordinates[351], block_coordinates[352], block_coordinates[353], block_coordinates[354], block_coordinates[355], block_coordinates[356], block_coordinates[357], block_coordinates[358], block_coordinates[359], block_coordinates[360], block_coordinates[361], block_coordinates[362], block_coordinates[363], block_coordinates[364], block_coordinates[365], block_coordinates[366], block_coordinates[367], block_coordinates[368], block_coordinates[369], block_coordinates[370], block_coordinates[371], block_coordinates[372], block_coordinates[373], block_coordinates[374]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
-        tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams,
+        tensor_evaluate_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates,
                 coordinate_value, coordinate_grad_ref);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        laplace_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current_streams, kappa, block_output_streams);
+        laplace_d3_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -881,47 +844,19 @@ static SFEM_INLINE int laplace_proteus_hex125_jacobian_action_affine_mesh_soa_im
             }
         }
 
-        const scalar_t * block_direction_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
+        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[10];
+        for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[9];
+        for (int component = 0; component < 9; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[9] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 
-        laplace_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_direction_streams, kappa, block_output_streams);
+        laplace_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_direction, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1055,28 +990,19 @@ static SFEM_INLINE int laplace_proteus_hex125_jacobian_action_isoparametric_mesh
             }
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[18], block_coordinates[19], block_coordinates[20], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[24], block_coordinates[25], block_coordinates[26], block_coordinates[27], block_coordinates[28], block_coordinates[29], block_coordinates[30], block_coordinates[31], block_coordinates[32], block_coordinates[33], block_coordinates[34], block_coordinates[35], block_coordinates[36], block_coordinates[37], block_coordinates[38], block_coordinates[39], block_coordinates[40], block_coordinates[41], block_coordinates[42], block_coordinates[43], block_coordinates[44], block_coordinates[45], block_coordinates[46], block_coordinates[47], block_coordinates[48], block_coordinates[49], block_coordinates[50], block_coordinates[51], block_coordinates[52], block_coordinates[53], block_coordinates[54], block_coordinates[55], block_coordinates[56], block_coordinates[57], block_coordinates[58], block_coordinates[59], block_coordinates[60], block_coordinates[61], block_coordinates[62], block_coordinates[63], block_coordinates[64], block_coordinates[65], block_coordinates[66], block_coordinates[67], block_coordinates[68], block_coordinates[69], block_coordinates[70], block_coordinates[71], block_coordinates[72], block_coordinates[73], block_coordinates[74], block_coordinates[75], block_coordinates[76], block_coordinates[77], block_coordinates[78], block_coordinates[79], block_coordinates[80], block_coordinates[81], block_coordinates[82], block_coordinates[83], block_coordinates[84], block_coordinates[85], block_coordinates[86], block_coordinates[87], block_coordinates[88], block_coordinates[89], block_coordinates[90], block_coordinates[91], block_coordinates[92], block_coordinates[93], block_coordinates[94], block_coordinates[95], block_coordinates[96], block_coordinates[97], block_coordinates[98], block_coordinates[99], block_coordinates[100], block_coordinates[101], block_coordinates[102], block_coordinates[103], block_coordinates[104], block_coordinates[105], block_coordinates[106], block_coordinates[107], block_coordinates[108], block_coordinates[109], block_coordinates[110], block_coordinates[111], block_coordinates[112], block_coordinates[113], block_coordinates[114], block_coordinates[115], block_coordinates[116], block_coordinates[117], block_coordinates[118], block_coordinates[119], block_coordinates[120], block_coordinates[121], block_coordinates[122], block_coordinates[123], block_coordinates[124], block_coordinates[125], block_coordinates[126], block_coordinates[127], block_coordinates[128], block_coordinates[129], block_coordinates[130], block_coordinates[131], block_coordinates[132], block_coordinates[133], block_coordinates[134], block_coordinates[135], block_coordinates[136], block_coordinates[137], block_coordinates[138], block_coordinates[139], block_coordinates[140], block_coordinates[141], block_coordinates[142], block_coordinates[143], block_coordinates[144], block_coordinates[145], block_coordinates[146], block_coordinates[147], block_coordinates[148], block_coordinates[149], block_coordinates[150], block_coordinates[151], block_coordinates[152], block_coordinates[153], block_coordinates[154], block_coordinates[155], block_coordinates[156], block_coordinates[157], block_coordinates[158], block_coordinates[159], block_coordinates[160], block_coordinates[161], block_coordinates[162], block_coordinates[163], block_coordinates[164], block_coordinates[165], block_coordinates[166], block_coordinates[167], block_coordinates[168], block_coordinates[169], block_coordinates[170], block_coordinates[171], block_coordinates[172], block_coordinates[173], block_coordinates[174], block_coordinates[175], block_coordinates[176], block_coordinates[177], block_coordinates[178], block_coordinates[179], block_coordinates[180], block_coordinates[181], block_coordinates[182], block_coordinates[183], block_coordinates[184], block_coordinates[185], block_coordinates[186], block_coordinates[187], block_coordinates[188], block_coordinates[189], block_coordinates[190], block_coordinates[191], block_coordinates[192], block_coordinates[193], block_coordinates[194], block_coordinates[195], block_coordinates[196], block_coordinates[197], block_coordinates[198], block_coordinates[199], block_coordinates[200], block_coordinates[201], block_coordinates[202], block_coordinates[203], block_coordinates[204], block_coordinates[205], block_coordinates[206], block_coordinates[207], block_coordinates[208], block_coordinates[209], block_coordinates[210], block_coordinates[211], block_coordinates[212], block_coordinates[213], block_coordinates[214], block_coordinates[215], block_coordinates[216], block_coordinates[217], block_coordinates[218], block_coordinates[219], block_coordinates[220], block_coordinates[221], block_coordinates[222], block_coordinates[223], block_coordinates[224], block_coordinates[225], block_coordinates[226], block_coordinates[227], block_coordinates[228], block_coordinates[229], block_coordinates[230], block_coordinates[231], block_coordinates[232], block_coordinates[233], block_coordinates[234], block_coordinates[235], block_coordinates[236], block_coordinates[237], block_coordinates[238], block_coordinates[239], block_coordinates[240], block_coordinates[241], block_coordinates[242], block_coordinates[243], block_coordinates[244], block_coordinates[245], block_coordinates[246], block_coordinates[247], block_coordinates[248], block_coordinates[249], block_coordinates[250], block_coordinates[251], block_coordinates[252], block_coordinates[253], block_coordinates[254], block_coordinates[255], block_coordinates[256], block_coordinates[257], block_coordinates[258], block_coordinates[259], block_coordinates[260], block_coordinates[261], block_coordinates[262], block_coordinates[263], block_coordinates[264], block_coordinates[265], block_coordinates[266], block_coordinates[267], block_coordinates[268], block_coordinates[269], block_coordinates[270], block_coordinates[271], block_coordinates[272], block_coordinates[273], block_coordinates[274], block_coordinates[275], block_coordinates[276], block_coordinates[277], block_coordinates[278], block_coordinates[279], block_coordinates[280], block_coordinates[281], block_coordinates[282], block_coordinates[283], block_coordinates[284], block_coordinates[285], block_coordinates[286], block_coordinates[287], block_coordinates[288], block_coordinates[289], block_coordinates[290], block_coordinates[291], block_coordinates[292], block_coordinates[293], block_coordinates[294], block_coordinates[295], block_coordinates[296], block_coordinates[297], block_coordinates[298], block_coordinates[299], block_coordinates[300], block_coordinates[301], block_coordinates[302], block_coordinates[303], block_coordinates[304], block_coordinates[305], block_coordinates[306], block_coordinates[307], block_coordinates[308], block_coordinates[309], block_coordinates[310], block_coordinates[311], block_coordinates[312], block_coordinates[313], block_coordinates[314], block_coordinates[315], block_coordinates[316], block_coordinates[317], block_coordinates[318], block_coordinates[319], block_coordinates[320], block_coordinates[321], block_coordinates[322], block_coordinates[323], block_coordinates[324], block_coordinates[325], block_coordinates[326], block_coordinates[327], block_coordinates[328], block_coordinates[329], block_coordinates[330], block_coordinates[331], block_coordinates[332], block_coordinates[333], block_coordinates[334], block_coordinates[335], block_coordinates[336], block_coordinates[337], block_coordinates[338], block_coordinates[339], block_coordinates[340], block_coordinates[341], block_coordinates[342], block_coordinates[343], block_coordinates[344], block_coordinates[345], block_coordinates[346], block_coordinates[347], block_coordinates[348], block_coordinates[349], block_coordinates[350], block_coordinates[351], block_coordinates[352], block_coordinates[353], block_coordinates[354], block_coordinates[355], block_coordinates[356], block_coordinates[357], block_coordinates[358], block_coordinates[359], block_coordinates[360], block_coordinates[361], block_coordinates[362], block_coordinates[363], block_coordinates[364], block_coordinates[365], block_coordinates[366], block_coordinates[367], block_coordinates[368], block_coordinates[369], block_coordinates[370], block_coordinates[371], block_coordinates[372], block_coordinates[373], block_coordinates[374]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
         scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
-        tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams,
+        tensor_evaluate_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates,
                 coordinate_value, coordinate_grad_ref);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
-        const scalar_t * block_direction_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        laplace_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction_streams, kappa, block_output_streams);
+        laplace_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {

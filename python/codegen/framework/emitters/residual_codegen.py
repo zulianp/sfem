@@ -57,6 +57,23 @@ def _target():
     return OpenMPTarget()
 
 
+def _tensor_product_coordinate_stream_layout(dim, n_shape, element_type, storage_name):
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+        else None
+    )
+    ordered_streams = tensor_product_ordered_coordinate_streams(
+        dim,
+        n_shape,
+        tuple(range(dim * n_shape)),
+        shape_order=shape_order,
+    )
+    if ordered_streams == tuple(range(dim * n_shape)):
+        return storage_name, True
+    return tuple("%s[%d]" % (storage_name, stream) for stream in ordered_streams), False
+
+
 def _inline_qualifier():
     return _target().inline_qualifier()
 
@@ -91,18 +108,26 @@ def _work_item_loop_lines(indent):
 
 def _affine_geometry_stream_conversion_lines(streams, indent):
     streams = tuple(streams)
-    lines = []
-    for stream in streams:
-        lines.extend(
-            [
-                "%sscalar_t block_%s_data[VECTOR_SIZE];" % (indent, stream),
-                "%sconst scalar_t *const block_%s = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>("
-                % (indent, stream),
-                "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<jacobian_t, scalar_t>());"
-                % (indent, stream, stream),
-            ]
-        )
-    return lines
+    n_streams = len(streams)
+    return [
+        "%sconst jacobian_t *const affine_geometry_sources[%d] = {%s};"
+        % (
+            indent,
+            n_streams,
+            ", ".join("g_%s + evbegin" % stream for stream in streams),
+        ),
+        "%sscalar_t block_affine_geometry_data[%d][VECTOR_SIZE];"
+        % (indent, n_streams),
+        "%sconst scalar_t *block_affine_geometry_streams[%d];"
+        % (indent, n_streams),
+        "%sfor (int geometry_stream = 0; geometry_stream < %d; ++geometry_stream) {"
+        % (indent, n_streams),
+        "%s    block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>("
+        % indent,
+        "%s            nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());"
+        % indent,
+        "%s}" % indent,
+    ]
 
 
 def _affine_geometry_stream_helper_lines():
@@ -197,19 +222,18 @@ def _simplex_metric_scalar_affine_loop_lines(
             "%s%s" % (indent, _parallel_for_pragma("static").strip()),
             "%sfor (ptrdiff_t i = 0; i < nelements; ++i) {" % indent,
             "%s    scalar_t element_vector[4];" % indent,
-            "%s    idx_t ev[4];" % indent,
             "%s    scalar_t fff[6];" % indent,
             "%s    for (int k = 0; k < 6; ++k) {" % indent,
             "%s        fff[k] = scalar_t(g_geom_metric[i * 6 + k]);" % indent,
             "%s    }" % indent,
-            "%s    #pragma unroll(4)" % indent,
-            "%s    for (int v = 0; v < 4; ++v) {" % indent,
-            "%s        ev[v] = elements[v][i];" % indent,
-            "%s    }" % indent,
-            "%s    const scalar_t u0 = %s[ev[0]];" % (indent, input_name),
-            "%s    const scalar_t u1 = %s[ev[1]];" % (indent, input_name),
-            "%s    const scalar_t u2 = %s[ev[2]];" % (indent, input_name),
-            "%s    const scalar_t u3 = %s[ev[3]];" % (indent, input_name),
+            "%s    const idx_t ev0 = elements[0][i];" % indent,
+            "%s    const idx_t ev1 = elements[1][i];" % indent,
+            "%s    const idx_t ev2 = elements[2][i];" % indent,
+            "%s    const idx_t ev3 = elements[3][i];" % indent,
+            "%s    const scalar_t u0 = %s[ev0];" % (indent, input_name),
+            "%s    const scalar_t u1 = %s[ev1];" % (indent, input_name),
+            "%s    const scalar_t u2 = %s[ev2];" % (indent, input_name),
+            "%s    const scalar_t u3 = %s[ev3];" % (indent, input_name),
             "%s    const scalar_t x0 = fff[0] + fff[1] + fff[2];" % indent,
             "%s    const scalar_t x1 = fff[1] + fff[3] + fff[4];" % indent,
             "%s    const scalar_t x2 = fff[2] + fff[4] + fff[5];" % indent,
@@ -220,11 +244,14 @@ def _simplex_metric_scalar_affine_loop_lines(
             "%s    element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;" % indent,
             "%s    element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;" % indent,
             "%s    element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;" % indent,
-            "%s    for (int edof_i = 0; edof_i < 4; ++edof_i) {" % indent,
-            "%s        const idx_t dof_i = ev[edof_i];" % indent,
             "%s        %s" % (indent, _atomic_update_pragma()),
-            "%s        %s[dof_i] += element_vector[edof_i];" % (indent, output_name),
-            "%s    }" % indent,
+            "%s        %s[ev0] += element_vector[0];" % (indent, output_name),
+            "%s        %s" % (indent, _atomic_update_pragma()),
+            "%s        %s[ev1] += element_vector[1];" % (indent, output_name),
+            "%s        %s" % (indent, _atomic_update_pragma()),
+            "%s        %s[ev2] += element_vector[2];" % (indent, output_name),
+            "%s        %s" % (indent, _atomic_update_pragma()),
+            "%s        %s[ev3] += element_vector[3];" % (indent, output_name),
             "%s}" % indent,
         ]
         return lines
@@ -671,22 +698,40 @@ def _zero_block_output_lines(name, n_streams, indent):
 
 def _stream_pointer_array_lines(pointer_type, array_name, storage_name, n_streams, stream_order, indent):
     if tuple(stream_order) == tuple(range(n_streams)):
-        return [
-            "%s%s %s[N_FIELDS * N_SHAPE];" % (indent, pointer_type, array_name),
-            "%sfor (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {" % indent,
-            "%s    %s[stream] = %s[stream];" % (indent, array_name, storage_name),
-            "%s}" % indent,
-        ]
+        return []
 
     return [
-        "%s%sconst %s[N_FIELDS * N_SHAPE] = {%s};"
+        "%s%sconst %s[%d] = {%s};"
         % (
             indent,
             pointer_type,
             array_name,
+            n_streams,
             ", ".join("%s[%d]" % (storage_name, i) for i in stream_order),
         )
     ]
+
+
+def _block_stream_argument(
+    pointer_type,
+    array_name,
+    storage_name,
+    n_streams,
+    stream_order,
+    indent,
+    mutable,
+):
+    lines = _stream_pointer_array_lines(
+        pointer_type,
+        array_name,
+        storage_name,
+        n_streams,
+        stream_order,
+        indent,
+    )
+    if lines:
+        return lines, array_name
+    return [], storage_name
 
 
 @dataclass(frozen=True)
@@ -1293,52 +1338,65 @@ def _mixed_block_stream_pointer_lines(
         basis_family,
     )
     lines = []
-    identity_order = field_stream_order == tuple(range(layout.total_streams))
+    args = {}
     for group in _dependency_stream_groups(dependencies):
-        if identity_order:
-            lines.extend(
-                [
-                    "%sconst scalar_t *block_%s_streams[N_FIELD_STREAMS];"
-                    % (indent, group.name),
-                    "%sfor (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {" % indent,
-                    "%s    block_%s_streams[stream] = block_%s[stream];"
-                    % (indent, group.name, group.name),
-                    "%s}" % indent,
-                ]
-            )
-        else:
-            lines.append(
-                "%sconst scalar_t *const block_%s_streams[N_FIELD_STREAMS] = {%s};"
-                % (
-                    indent,
-                    group.name,
-                    ", ".join(
-                        "block_%s[%d]" % (group.name, stream)
-                        for stream in field_stream_order
-                    ),
-                )
-            )
-    if identity_order:
-        lines.extend(
-            [
-                "%sscalar_t *block_output_streams[N_FIELD_STREAMS];" % indent,
-                "%sfor (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {" % indent,
-                "%s    block_output_streams[stream] = block_output[stream];" % indent,
-                "%s}" % indent,
-            ]
+        group_lines, group_arg = _block_stream_argument(
+            "const scalar_t *",
+            "block_%s_streams" % group.name,
+            "block_%s" % group.name,
+            layout.total_streams,
+            field_stream_order,
+            indent,
+            mutable=False,
         )
-    else:
-        lines.append(
-            "%sscalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
-            % (
-                indent,
-                ", ".join(
-                    "block_output[%d]" % stream
-                    for stream in field_stream_order
-                ),
-            )
+        lines.extend(group_lines)
+        args[group.name] = group_arg
+    output_lines, output_arg = _block_stream_argument(
+        "scalar_t *",
+        "block_output_streams",
+        "block_output",
+        layout.total_streams,
+        field_stream_order,
+        indent,
+        mutable=True,
+    )
+    lines.extend(output_lines)
+    args["output"] = output_arg
+    return lines, args
+
+
+def _single_field_block_stream_arguments(
+    dependencies,
+    n_streams,
+    field_stream_order,
+    indent,
+):
+    lines = []
+    args = {}
+    for group in _dependency_stream_groups(dependencies):
+        group_lines, group_arg = _block_stream_argument(
+            "const scalar_t *",
+            "block_%s_streams" % group.name,
+            "block_%s" % group.name,
+            n_streams,
+            field_stream_order,
+            indent,
+            mutable=False,
         )
-    return lines
+        lines.extend(group_lines)
+        args[group.name] = group_arg
+    output_lines, output_arg = _block_stream_argument(
+        "scalar_t *",
+        "block_output_streams",
+        "block_output",
+        n_streams,
+        field_stream_order,
+        indent,
+        mutable=True,
+    )
+    lines.extend(output_lines)
+    args["output"] = output_arg
+    return lines, args
 
 
 def _mixed_field_gather_lines(system, layout, dependencies, indent):
@@ -1773,6 +1831,21 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
         )
     )
     lines.append("")
+    lines.extend(
+        _local_function(
+            system,
+            "%s_residual_block_contiguous" % local_prefix,
+            specialization,
+            residual_coeffs,
+            dependencies=residual_dependencies,
+            local_prefix=local_prefix,
+            basis_family=basis_family,
+            allow_simplex_gradient_metric=False,
+            constant_p1_gradient_expansion=False,
+            stream_layout="contiguous",
+        )
+    )
+    lines.append("")
     specialized = _constant_p1_affine_specialized_local(
         local_prefix,
         specialization,
@@ -1794,6 +1867,21 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             )
         )
         lines.append("")
+        lines.extend(
+            _local_function(
+                system,
+                "%s_residual_block_contiguous" % specialized_prefix,
+                specialized_specialization,
+                residual_coeffs,
+                dependencies=residual_dependencies,
+                local_prefix=local_prefix,
+                basis_family=basis_family,
+                allow_simplex_gradient_metric=True,
+                constant_p1_gradient_expansion=True,
+                stream_layout="contiguous",
+            )
+        )
+        lines.append("")
     lines.extend(
         _local_function(
             system,
@@ -1805,6 +1893,21 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
             basis_family=basis_family,
             allow_simplex_gradient_metric=False,
             constant_p1_gradient_expansion=False,
+        )
+    )
+    lines.append("")
+    lines.extend(
+        _local_function(
+            system,
+            "%s_jacobian_action_block_contiguous" % local_prefix,
+            specialization,
+            action_coeffs,
+            dependencies=action_dependencies,
+            local_prefix=local_prefix,
+            basis_family=basis_family,
+            allow_simplex_gradient_metric=False,
+            constant_p1_gradient_expansion=False,
+            stream_layout="contiguous",
         )
     )
     if specialized_prefix is not None:
@@ -1820,6 +1923,21 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
                 basis_family=basis_family,
                 allow_simplex_gradient_metric=True,
                 constant_p1_gradient_expansion=True,
+            )
+        )
+        lines.append("")
+        lines.extend(
+            _local_function(
+                system,
+                "%s_jacobian_action_block_contiguous" % specialized_prefix,
+                specialized_specialization,
+                action_coeffs,
+                dependencies=action_dependencies,
+                local_prefix=local_prefix,
+                basis_family=basis_family,
+                allow_simplex_gradient_metric=True,
+                constant_p1_gradient_expansion=True,
+                stream_layout="contiguous",
             )
         )
     lines.extend(
@@ -1933,12 +2051,38 @@ def _mixed_local_header(
     lines.extend(
         _mixed_local_function(
             system,
+            "%s_residual_block_contiguous" % local_prefix,
+            specialization,
+            field_element_types,
+            residual_coeffs,
+            dependencies=residual_dependencies,
+            basis_family=basis_family,
+            stream_layout="contiguous",
+        )
+    )
+    lines.append("")
+    lines.extend(
+        _mixed_local_function(
+            system,
             "%s_jacobian_action_block" % local_prefix,
             specialization,
             field_element_types,
             action_coeffs,
             dependencies=action_dependencies,
             basis_family=basis_family,
+        )
+    )
+    lines.append("")
+    lines.extend(
+        _mixed_local_function(
+            system,
+            "%s_jacobian_action_block_contiguous" % local_prefix,
+            specialization,
+            field_element_types,
+            action_coeffs,
+            dependencies=action_dependencies,
+            basis_family=basis_family,
+            stream_layout="contiguous",
         )
     )
     lines.extend(
@@ -1955,6 +2099,7 @@ def _mixed_local_function(
     coefficients,
     dependencies,
     basis_family=None,
+    stream_layout="pointer",
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -1970,25 +2115,52 @@ def _mixed_local_function(
         )
     params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies, basis_family))
     if dependencies.current:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT current[%d]" % layout.total_streams
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t current[%d][VECTOR_SIZE]" % layout.total_streams
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT current[%d]"
+                % layout.total_streams
+            )
     if dependencies.previous:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT previous[%d]" % layout.total_streams
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t previous[%d][VECTOR_SIZE]" % layout.total_streams
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT previous[%d]"
+                % layout.total_streams
+            )
     if dependencies.direction:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT direction[%d]" % layout.total_streams
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t direction[%d][VECTOR_SIZE]" % layout.total_streams
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT direction[%d]"
+                % layout.total_streams
+            )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    params.append(
-        "scalar_t *const SFEM_RESTRICT output[%d]" % layout.total_streams
-    )
+    if stream_layout == "contiguous":
+        params.append("scalar_t output[%d][VECTOR_SIZE]" % layout.total_streams)
+    else:
+        params.append(
+            "scalar_t *const SFEM_RESTRICT output[%d]" % layout.total_streams
+        )
+    template_params = [
+        "typename scalar_t",
+        "int N_QP",
+        "int CELL_N_SHAPE",
+        "int VECTOR_SIZE",
+    ]
     lines = [
-        "template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>",
+        "template <%s>" % ", ".join(template_params),
         "%s void %s(" % (_function_qualifier(), function_name),
     ]
     for index, param in enumerate(params):
@@ -2015,6 +2187,7 @@ def _mixed_local_function(
                 layout,
                 coefficients,
                 dependencies,
+                stream_layout=stream_layout,
             )
         )
     else:
@@ -2094,7 +2267,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     return lines
 
 
-def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
+def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_layout="pointer"):
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
     uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
@@ -2117,6 +2290,22 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         )
     if not dependencies.uses_test_coefficients:
         return lines
+    tensor_evaluate_name = (
+        "tensor_evaluate_contiguous" if stream_layout == "contiguous" else "tensor_evaluate"
+    )
+    tensor_evaluate_value_name = (
+        "tensor_evaluate_value_contiguous"
+        if stream_layout == "contiguous"
+        else "tensor_evaluate_value"
+    )
+    tensor_integrate_name = (
+        "tensor_integrate_contiguous" if stream_layout == "contiguous" else "tensor_integrate"
+    )
+    tensor_integrate_value_name = (
+        "tensor_integrate_value_contiguous"
+        if stream_layout == "contiguous"
+        else "tensor_integrate_value"
+    )
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -2144,8 +2333,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
             if group.uses_gradient:
                 lines.extend(
                     [
-                        "    tensor_evaluate<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
-                        % shape_name,
+                        "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
+                        % (tensor_evaluate_name, shape_name),
                         "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_%s_streams, %s_%s_value, %s_%s_grad_ref);"
                         % (
                             reference_index,
@@ -2162,8 +2351,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
             elif group.uses_value:
                 lines.extend(
                     [
-                        "    tensor_evaluate_value<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
-                        % shape_name,
+                        "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
+                        % (tensor_evaluate_value_name, shape_name),
                         "            nelems, field_shape_1d[%d], %s_%s_streams, %s_%s_value);"
                         % (reference_index, group.name, field.name, group.name, field.name),
                     ]
@@ -2276,8 +2465,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         if dependencies.uses_test_gradients:
             lines.extend(
                 [
-                    "    tensor_integrate<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
-                    % shape_name,
+                    "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
+                    % (tensor_integrate_name, shape_name),
                     "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s_output_streams);"
                     % (reference_index, reference_index, field.name, field.name, field.name),
                 ]
@@ -2285,8 +2474,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies):
         else:
             lines.extend(
                 [
-                    "    tensor_integrate_value<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
-                    % shape_name,
+                    "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
+                    % (tensor_integrate_value_name, shape_name),
                     "            nelems, field_shape_1d[%d], %s_value_coeff, %s_output_streams);"
                     % (reference_index, field.name, field.name),
                 ]
@@ -2397,6 +2586,7 @@ def _local_function(
     basis_family=None,
     allow_simplex_gradient_metric=True,
     constant_p1_gradient_expansion=True,
+    stream_layout="pointer",
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -2439,28 +2629,55 @@ def _local_function(
                 )
         params.append("const scalar_t *const SFEM_RESTRICT q_weight")
     if dependencies.current:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT current[%d * N_SHAPE]"
-            % n_fields
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t current[%d * N_SHAPE][VECTOR_SIZE]"
+                % n_fields
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT current[%d * N_SHAPE]"
+                % n_fields
+            )
     if dependencies.previous:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT previous[%d * N_SHAPE]"
-            % n_fields
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t previous[%d * N_SHAPE][VECTOR_SIZE]"
+                % n_fields
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT previous[%d * N_SHAPE]"
+                % n_fields
+            )
     if dependencies.direction:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT direction[%d * N_SHAPE]"
-            % n_fields
-        )
+        if stream_layout == "contiguous":
+            params.append(
+                "const scalar_t direction[%d * N_SHAPE][VECTOR_SIZE]"
+                % n_fields
+            )
+        else:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT direction[%d * N_SHAPE]"
+                % n_fields
+            )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    params.append(
-        "scalar_t *const SFEM_RESTRICT output[%d * N_SHAPE]" % n_fields
-    )
+    if stream_layout == "contiguous":
+        params.append("scalar_t output[%d * N_SHAPE][VECTOR_SIZE]" % n_fields)
+    else:
+        params.append(
+            "scalar_t *const SFEM_RESTRICT output[%d * N_SHAPE]" % n_fields
+        )
+    template_params = [
+        "typename scalar_t",
+        "int N_QP",
+        "int N_SHAPE",
+        "int VECTOR_SIZE",
+    ]
     lines = [
-        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "template <%s>" % ", ".join(template_params),
         "%s void %s(" % (_function_qualifier(), function_name),
     ]
     for index, param in enumerate(params):
@@ -2479,6 +2696,7 @@ def _local_function(
                 local_prefix,
                 coefficients,
                 dependencies,
+                stream_layout=stream_layout,
             )
         )
     else:
@@ -2917,7 +3135,7 @@ def _sum_cpp_terms(terms):
     return expression
 
 
-def _tensor_local_body(system, prefix, coefficients, dependencies):
+def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout="pointer"):
     dim = system.dim
     n_fields = len(system.fields)
     uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
@@ -2925,6 +3143,22 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
     lines = []
     if not dependencies.uses_test_coefficients:
         return lines
+    tensor_evaluate_name = (
+        "tensor_evaluate_contiguous" if stream_layout == "contiguous" else "tensor_evaluate"
+    )
+    tensor_evaluate_value_name = (
+        "tensor_evaluate_value_contiguous"
+        if stream_layout == "contiguous"
+        else "tensor_evaluate_value"
+    )
+    tensor_integrate_name = (
+        "tensor_integrate_contiguous" if stream_layout == "contiguous" else "tensor_integrate"
+    )
+    tensor_integrate_value_name = (
+        "tensor_integrate_value_contiguous"
+        if stream_layout == "contiguous"
+        else "tensor_integrate_value"
+    )
     for group, enabled in (
         ("current", dependencies.current),
         ("previous", dependencies.previous),
@@ -2946,7 +3180,8 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
         if uses_gradient:
             lines.extend(
                 [
-                    "    tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(",
+                    "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
+                    % tensor_evaluate_name,
                     "            nelems, shape_1d, grad_1d, %s, %s_value, %s_grad_ref);"
                     % (group, group, group),
                 ]
@@ -2954,7 +3189,8 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
         else:
             lines.extend(
                 [
-                    "    tensor_evaluate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(",
+                    "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
+                    % tensor_evaluate_value_name,
                     "            nelems, shape_1d, %s, %s_value);" % (group, group),
                 ]
             )
@@ -3026,14 +3262,16 @@ def _tensor_local_body(system, prefix, coefficients, dependencies):
     if dependencies.uses_test_gradients:
         lines.extend(
             [
-                "    tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(",
+                "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
+                % tensor_integrate_name,
                 "            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);",
             ]
         )
     else:
         lines.extend(
             [
-                "    tensor_integrate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(",
+                "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
+                % tensor_integrate_value_name,
                 "            nelems, shape_1d, value_coeff, output);",
             ]
         )
@@ -3188,6 +3426,24 @@ def _numbered_geometry_metric_stream_initializer(prefix, dim, component_order):
             )
     return ", ".join(
         "%s%d" % (prefix, storage_index)
+        for _, storage_index in sorted(entries)
+    )
+
+
+def _indexed_geometry_metric_stream_initializer(name, dim, component_order):
+    entries = []
+    for left in range(dim):
+        for right in range(left, dim):
+            entries.append(
+                (
+                    symmetric_metric_component_index(left, right),
+                    symmetric_metric_storage_component_index(
+                        dim, left, right, component_order
+                    ),
+                )
+            )
+    return ", ".join(
+        "%s[%d]" % (name, storage_index)
         for _, storage_index in sorted(entries)
     )
 
@@ -3808,51 +4064,57 @@ def _mixed_affine_function(
     if field_gather:
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
-    lines.extend(
-        _affine_geometry_stream_conversion_lines(
-            (
-                tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
-                if dependencies.uses_adjugate
-                else ()
-            )
-            + ("jacobian_determinant0",),
-            "        ",
+    affine_geometry_streams = (
+        (
+            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            if dependencies.uses_adjugate
+            else ()
         )
+        + ("jacobian_determinant0",)
     )
+    affine_geometry_stream_indices = {
+        stream: index for index, stream in enumerate(affine_geometry_streams)
+    }
+    lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
     if dependencies.uses_adjugate:
-        lines.append(
-            "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
-            % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim))
+        lines.extend(
+            [
+                "        const scalar_t *block_adjugate[DIM * DIM];",
+                "        for (int component = 0; component < DIM * DIM; ++component) {",
+                "            block_adjugate[component] = block_affine_geometry_streams[component];",
+                "        }",
+            ]
         )
-    lines.extend(
-        _mixed_block_stream_pointer_lines(
-            layout,
-            dependencies,
-            "        ",
-            cell_rule,
-            field_element_types,
-            basis_family,
-        )
+    block_stream_lines, block_stream_args = _mixed_block_stream_pointer_lines(
+        layout,
+        dependencies,
+        "        ",
+        cell_rule,
+        field_element_types,
+        basis_family,
     )
+    lines.extend(block_stream_lines)
+    block_function = "%s_contiguous" % block if not block_stream_lines else block
     call_args = [
         "nelems",
         "0",
-        "block_jacobian_determinant0",
+        "block_affine_geometry_streams[%d]"
+        % affine_geometry_stream_indices["jacobian_determinant0"],
     ]
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
-        "block_%s_streams" % group.name
+        block_stream_args[group.name]
         for group in _dependency_stream_groups(dependencies)
     )
     call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output_streams")
+    call_args.append(block_stream_args["output"])
     lines.extend(
         [
             "",
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
-            % (block, ", ".join(call_args)),
+            % (block_function, ", ".join(call_args)),
             "",
         ]
     )
@@ -4002,6 +4264,14 @@ def _mixed_isoparametric_function(
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     if tensor_product_geometry:
+        coordinate_streams, contiguous_coordinate_streams = (
+            _tensor_product_coordinate_stream_layout(
+                dim,
+                cell_rule.n_shape,
+                cell_rule.element_type,
+                "block_coordinates",
+            )
+        )
         lines.append("")
         lines.extend(
             tensor_product_evaluated_isoparametric_geometry_lines(
@@ -4009,15 +4279,8 @@ def _mixed_isoparametric_function(
                 n_shape=cell_rule.n_shape,
                 n_qp=cell_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=tensor_product_ordered_coordinate_streams(
-                    dim,
-                    cell_rule.n_shape,
-                    tuple(range(dim * cell_rule.n_shape)),
-                    lambda stream: "block_coordinates[%d]" % stream,
-                    shape_order=tuple(range(cell_rule.n_shape))
-                    if sfem_tensor_product_hex_uses_cartesian_ordering(cell_rule.element_type)
-                    else None,
-                ),
+                coordinate_streams=coordinate_streams,
+                contiguous_coordinate_streams=contiguous_coordinate_streams,
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
                 ),
@@ -4080,16 +4343,16 @@ def _mixed_isoparametric_function(
         "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
         % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
     )
-    lines.extend(
-        _mixed_block_stream_pointer_lines(
-            layout,
-            dependencies,
-            "        ",
-            cell_rule,
-            field_element_types,
-            basis_family,
-        )
+    block_stream_lines, block_stream_args = _mixed_block_stream_pointer_lines(
+        layout,
+        dependencies,
+        "        ",
+        cell_rule,
+        field_element_types,
+        basis_family,
     )
+    lines.extend(block_stream_lines)
+    block_function = "%s_contiguous" % block if not block_stream_lines else block
     call_args = [
         "nelems",
         "VECTOR_SIZE",
@@ -4099,16 +4362,16 @@ def _mixed_isoparametric_function(
         call_args.append("block_adjugate")
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
-        "block_%s_streams" % group.name
+        block_stream_args[group.name]
         for group in _dependency_stream_groups(dependencies)
     )
     call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output_streams")
+    call_args.append(block_stream_args["output"])
     lines.extend(
         [
             "",
             "        %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
-            % (block, ", ".join(call_args)),
+            % (block_function, ", ".join(call_args)),
             "",
         ]
     )
@@ -4642,83 +4905,48 @@ def _mesh_operator_source(
     )
     lines.extend(_field_gather_lines(system, dependencies, "        "))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
-    if dependencies.current:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_current_streams",
-                "block_current",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    if dependencies.previous:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_previous_streams",
-                "block_previous",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    if dependencies.direction:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_direction_streams",
-                "block_direction",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    lines.extend(
-        _stream_pointer_array_lines(
-            "scalar_t *",
-            "block_output_streams",
-            "block_output",
-            n_fields * n_shape,
-            field_stream_order,
-            "        ",
-        )
+    block_stream_lines, block_stream_args = _single_field_block_stream_arguments(
+        dependencies,
+        n_fields * n_shape,
+        field_stream_order,
+        "        ",
     )
-    lines.extend(
-        _affine_geometry_stream_conversion_lines(
-            (
-                tuple(
-                    "geom_metric%d" % i
-                    for i in range(gradient_metric.metric_components)
-                )
-                if uses_cached_affine_metric
-                else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
-                if dependencies.uses_adjugate
-                else ()
+    lines.extend(block_stream_lines)
+    block_function = "%s_contiguous" % block if not block_stream_lines else block
+    affine_geometry_streams = (
+        (
+            tuple(
+                "geom_metric%d" % i
+                for i in range(gradient_metric.metric_components)
             )
-            + (() if uses_cached_affine_metric else ("jacobian_determinant0",)),
-            "        ",
+            if uses_cached_affine_metric
+            else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            if dependencies.uses_adjugate
+            else ()
         )
+        + (() if uses_cached_affine_metric else ("jacobian_determinant0",))
     )
+    affine_geometry_stream_indices = {
+        stream: index for index, stream in enumerate(affine_geometry_streams)
+    }
+    lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
     if dependencies.uses_adjugate and not uses_cached_affine_metric:
-        lines.append(
-            "        const scalar_t *const block_adjugate[%d] = {%s};"
-            % (
-                dim * dim,
-                ", ".join(
-                    "block_jacobian_adjugate%d" % i
-                    for i in range(dim * dim)
-                ),
-            )
+        lines.extend(
+            [
+                "        const scalar_t *block_adjugate[%d];" % (dim * dim),
+                "        for (int component = 0; component < %d; ++component) {"
+                % (dim * dim),
+                "            block_adjugate[component] = block_affine_geometry_streams[component];",
+                "        }",
+            ]
         )
     if uses_cached_affine_metric:
         lines.append(
             "        const scalar_t *const block_geom_metric[%d] = {%s};"
             % (
                 gradient_metric.metric_components,
-                _numbered_geometry_metric_stream_initializer(
-                    "block_geom_metric",
+                _indexed_geometry_metric_stream_initializer(
+                    "block_affine_geometry_streams",
                     dim,
                     getattr(
                         gradient_metric,
@@ -4736,8 +4964,10 @@ def _mesh_operator_source(
         lines.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                "block_jacobian_determinant0[lane]",
-                lambda component: "block_jacobian_adjugate%d[lane]" % component,
+                "block_affine_geometry_streams[%d][lane]"
+                % affine_geometry_stream_indices["jacobian_determinant0"],
+                lambda component: "block_affine_geometry_streams[%d][lane]"
+                % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
                 lambda component: "block_geom_metric_data[%d][lane]" % component,
                 "            ",
                 "metric",
@@ -4761,7 +4991,10 @@ def _mesh_operator_source(
     if gradient_metric is not None:
         call_args.append("block_geom_metric")
     else:
-        call_args.append("block_jacobian_determinant0")
+        call_args.append(
+            "block_affine_geometry_streams[%d]"
+            % affine_geometry_stream_indices["jacobian_determinant0"]
+        )
     if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
@@ -4786,18 +5019,18 @@ def _mesh_operator_source(
             else _mesh_reference_name("affine", "q_weight")
         )
     if dependencies.current:
-        call_args.append("block_current_streams")
+        call_args.append(block_stream_args["current"])
     if dependencies.previous:
-        call_args.append("block_previous_streams")
+        call_args.append(block_stream_args["previous"])
     if dependencies.direction:
-        call_args.append("block_direction_streams")
+        call_args.append(block_stream_args["direction"])
     call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output_streams")
+    call_args.append(block_stream_args["output"])
     lines.extend(
         [
             "",
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
-            % (block, ", ".join(call_args)),
+            % (block_function, ", ".join(call_args)),
             "",
         ]
     )
@@ -5073,6 +5306,14 @@ def _isoparametric_mesh_operator_source(
     lines.extend(_field_gather_lines(system, dependencies, "        "))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        ")])
     if tensor_product_geometry:
+        coordinate_streams, contiguous_coordinate_streams = (
+            _tensor_product_coordinate_stream_layout(
+                dim,
+                n_shape,
+                rule.element_type,
+                "block_coordinates",
+            )
+        )
         lines.append("")
         lines.extend(
             tensor_product_evaluated_isoparametric_geometry_lines(
@@ -5080,15 +5321,8 @@ def _isoparametric_mesh_operator_source(
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=tensor_product_ordered_coordinate_streams(
-                    dim,
-                    n_shape,
-                    tuple(range(dim * n_shape)),
-                    lambda stream: "block_coordinates[%d]" % stream,
-                    shape_order=tuple(range(n_shape))
-                    if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-                    else None,
-                ),
+                coordinate_streams=coordinate_streams,
+                contiguous_coordinate_streams=contiguous_coordinate_streams,
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
                 ),
@@ -5158,49 +5392,14 @@ def _isoparametric_mesh_operator_source(
         )
         lines.extend(["            }", "        }"])
     lines.append("")
-    if dependencies.current:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_current_streams",
-                "block_current",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    if dependencies.previous:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_previous_streams",
-                "block_previous",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    if dependencies.direction:
-        lines.extend(
-            _stream_pointer_array_lines(
-                "const scalar_t *",
-                "block_direction_streams",
-                "block_direction",
-                n_fields * n_shape,
-                field_stream_order,
-                "        ",
-            )
-        )
-    lines.extend(
-        _stream_pointer_array_lines(
-            "scalar_t *",
-            "block_output_streams",
-            "block_output",
-            n_fields * n_shape,
-            field_stream_order,
-            "        ",
-        )
+    block_stream_lines, block_stream_args = _single_field_block_stream_arguments(
+        dependencies,
+        n_fields * n_shape,
+        field_stream_order,
+        "        ",
     )
+    lines.extend(block_stream_lines)
+    block_function = "%s_contiguous" % block if not block_stream_lines else block
     if dependencies.uses_adjugate:
         lines.append(
             "        const scalar_t *const block_adjugate[%d] = {%s};"
@@ -5249,18 +5448,18 @@ def _isoparametric_mesh_operator_source(
             )
         call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
     if dependencies.current:
-        call_args.append("block_current_streams")
+        call_args.append(block_stream_args["current"])
     if dependencies.previous:
-        call_args.append("block_previous_streams")
+        call_args.append(block_stream_args["previous"])
     if dependencies.direction:
-        call_args.append("block_direction_streams")
+        call_args.append(block_stream_args["direction"])
     call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output_streams")
+    call_args.append(block_stream_args["output"])
     lines.extend(
         [
             "",
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
-            % (block, ", ".join(call_args)),
+            % (block_function, ", ".join(call_args)),
             "",
         ]
     )

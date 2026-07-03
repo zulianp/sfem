@@ -530,32 +530,19 @@ static SFEM_INLINE int laplace_tri6_residual_affine_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
+        const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[5];
+        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[4];
+        for (int component = 0; component < 4; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[4] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
 
-        laplace_d2_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_d2_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_current, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -693,17 +680,9 @@ static SFEM_INLINE int laplace_tri6_residual_isoparametric_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
-        laplace_d2_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_d2_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_current, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -859,32 +838,19 @@ static SFEM_INLINE int laplace_tri6_jacobian_action_affine_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_direction_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
+        const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[5];
+        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[4];
+        for (int component = 0; component < 4; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[4] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
 
-        laplace_d2_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_direction_streams, kappa, block_output_streams);
+        laplace_d2_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_direction, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1022,17 +988,9 @@ static SFEM_INLINE int laplace_tri6_jacobian_action_isoparametric_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_direction_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
-        laplace_d2_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_direction_streams, kappa, block_output_streams);
+        laplace_d2_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_direction, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {

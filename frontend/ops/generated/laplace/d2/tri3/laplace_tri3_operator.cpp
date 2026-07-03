@@ -1055,17 +1055,9 @@ static SFEM_INLINE int laplace_tri3_residual_isoparametric_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
-        laplace_d2_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_current_streams, kappa, block_output_streams);
+        laplace_d2_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_current, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1746,17 +1738,9 @@ static SFEM_INLINE int laplace_tri3_jacobian_action_isoparametric_mesh_soa_impl(
             }
         }
 
-        const scalar_t * block_direction_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
-        laplace_d2_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_direction_streams, kappa, block_output_streams);
+        laplace_d2_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_direction, kappa, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {u_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {

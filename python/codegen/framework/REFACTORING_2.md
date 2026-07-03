@@ -385,7 +385,7 @@ Task:
 7. Create a new folder in sfem/drivers called verification and replicate the studies (on per driver) from this paper: https://cea.hal.science/cea-02434556/document using our code generated stokes (ignore unsteady / Navier Stokes problems for now), measure error and collect for convergence plots. Create also extraction and plotting scripts to visualize  against the anlytical solution and show convergence rates. Create a reusable help for the different cases.
 
 Status update:
-- Mesh gather/scatter emission now uses unified mesh-block helpers, direct SoA connectivity access, and basis-function loops around SIMD lane loops. Generated operators no longer unroll basis-function gather/scatter or copy connectivity into blocked `ev` arrays.
+- Mesh gather/scatter emission now uses unified mesh-block helpers, direct SoA connectivity access, compact affine geometry-stream loops, generator-selected concrete pointer/contiguous tensor-product stream calls, and basis-function loops around SIMD lane loops. Generated operators no longer unroll basis-function gather/scatter, emit per-component affine geometry conversion blocks, emit identity field/coordinate stream-copy loops, emit residual `StreamContainer` dispatch or proxy stream wrappers, or copy connectivity into blocked `ev` arrays.
 
 ## M9. Complete Regression Coverage
 
