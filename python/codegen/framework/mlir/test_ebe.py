@@ -296,6 +296,16 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(last.lhs_tensor_type, "tensor<2x2xf32>")
         self.assertEqual(last.result_tensor_type, "tensor<2x4xf32>")
 
+    def test_laplace_sum_factor_ir_rejects_non_laplace_form_source(self):
+        from codegen.framework.materials.linear_elasticity import material
+
+        with self.assertRaisesRegex(ValueError, "laplace form only"):
+            tensor_product_sum_factor_ir_from_material(
+                material,
+                element="HEX8",
+                vector_size=8,
+            )
+
     def test_laplace_hex8_sum_factor_reference_pipeline_matches_direct_tensor_product(self):
         from codegen.framework.materials.laplace import material
 
@@ -565,6 +575,15 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(first.result_tensor_type, "tensor<3x9xf32>")
 
         lowering = TensorProductSumFactorMLIRLowering(ir)
+        linalg_pipeline_module = lowering.render_linalg_pipeline_module()
+        self.assertEqual(linalg_pipeline_module.count("linalg.matmul"), 18)
+        self.assertEqual(linalg_pipeline_module.count("func.call @"), 18)
+        self.assertEqual(linalg_pipeline_module.count("linalg.generic"), 12)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_linalg_pipeline"', linalg_pipeline_module)
+        self.assertIn("@sfem_laplace_hex27_sum_factor_field_gradient_d2_linalg_pipeline", linalg_pipeline_module)
+        self.assertIn("@sfem_laplace_hex27_sum_factor_test_gradient_d2_linalg_pipeline", linalg_pipeline_module)
+        self._run_mlir_opt(linalg_pipeline_module)
+
         vector_module = lowering.render_vector_module()
         self.assertEqual(vector_module.count("= vector.matrix_multiply"), 18)
         self.assertIn("vector<9xf32>", vector_module)
@@ -652,6 +671,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             artifacts = lowering.write_inspection_artifacts(tmp)
 
             linalg_module = artifacts.file_for_suffix(".linalg.mlir").read_text()
+            linalg_pipeline_module = artifacts.file_for_suffix(".linalg_pipeline.mlir").read_text()
             vector_module = artifacts.file_for_suffix(".vector.mlir").read_text()
             matrix_unit_module = artifacts.file_for_suffix(".matrix_unit.mlir").read_text()
             matrix_unit_memref_module = artifacts.file_for_suffix(".matrix_unit_memref.mlir").read_text()
@@ -661,6 +681,9 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             harness = artifacts.file_for_suffix(".metal_smoke.mm").read_text()
 
         self.assertIn("linalg.matmul", linalg_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_linalg_pipeline"', linalg_pipeline_module)
+        self.assertIn("func.call @", linalg_pipeline_module)
+        self.assertIn("linalg.generic", linalg_pipeline_module)
         self.assertIn("vector.matrix_multiply", vector_module)
         self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit"', matrix_unit_module)
         self.assertIn("sfem.matrix_unit.tile_size = 8 : i64", matrix_unit_module)
@@ -679,6 +702,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertNotIn("if (", metal_source)
 
         self._run_mlir_opt(linalg_module)
+        self._run_mlir_opt(linalg_pipeline_module)
         self._run_mlir_opt(vector_module)
         self._run_mlir_opt(matrix_unit_module)
         self._run_mlir_opt(matrix_unit_memref_module)
@@ -1150,6 +1174,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("ebe_metal", manifest["artifacts"])
         self.assertTrue(any(path.endswith(".sum_factor.ir.json") for path in manifest["artifacts"]["sfem_ir"]))
         self.assertTrue(any(path.endswith(".laplace_form.ir.json") for path in manifest["artifacts"]["sfem_ir"]))
+        self.assertTrue(any(path.endswith(".linalg_pipeline.mlir") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".vector.mlir") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".matrix_unit.mlir") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".matrix_unit_memref.mlir") for path in manifest["artifacts"]["sum_factor"]))
@@ -1180,6 +1205,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(manifest["performance_shape"])
         self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
         self.assertTrue(any(item["name"] == "linalg_matmul" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "linalg_pipeline_calls" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "linalg_pipeline_bridges" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "vector_matrix_multiply" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_vector_matrix_multiply" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_memref_transfer_read" for item in manifest["performance_shape"]))
@@ -1194,13 +1221,13 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(ebe_topology["missing_tokens"], [])
         self.assertEqual(ebe_topology["found_tokens"], [])
         self.assertEqual(len(manifest["iree_metal"]), 1)
-        self.assertEqual(manifest["iree_metal"][0]["name"], "sum_factor_matrix_unit_pipeline_to_metal_vmfb")
+        self.assertEqual(manifest["iree_metal"][0]["name"], "sum_factor_linalg_pipeline_to_metal_vmfb")
         if shutil.which("iree-compile") is None:
             self.assertTrue(manifest["iree_metal"][0]["skipped"])
             self.assertIn("iree-compile is not available", manifest["iree_metal"][0]["reason"])
         else:
             self.assertTrue(manifest["iree_metal"][0]["ok"], manifest["iree_metal"][0])
-            self.assertTrue(manifest["iree_metal"][0]["output_vmfb"].endswith(".matrix_unit_pipeline.metal.vmfb"))
+            self.assertTrue(manifest["iree_metal"][0]["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb"))
         self.assertTrue(manifest["metal_toolchain"])
         if shutil.which("xcrun") is None:
             self.assertTrue(all(item["skipped"] for item in manifest["metal_toolchain"]))
@@ -1352,13 +1379,16 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         )
 
         self.assertEqual(command[0], "iree-compile")
-        self.assertIn("--iree-hal-target-backends=metal", command)
+        self.assertIn("--iree-hal-target-backends=metal-spirv", command)
+        self.assertIn("--iree-metal-compile-to-metallib=false", command)
         self.assertEqual(command[-1], "laplace_hex8.metal.vmfb")
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):
                 lowering.compile_with_iree_metal(tmp, iree_compile="/does/not/exist/iree-compile")
             output_dir = Path(tmp)
+            default_input = output_dir / ("%s.linalg_pipeline.mlir" % ir.function_prefix)
+            default_output = output_dir / ("%s.linalg_pipeline.metal.vmfb" % ir.function_prefix)
             pipeline_input = output_dir / ("%s.matrix_unit_pipeline.mlir" % ir.function_prefix)
             pipeline_output = output_dir / ("%s.matrix_unit_pipeline.metal.vmfb" % ir.function_prefix)
             memref_input = output_dir / ("%s.matrix_unit_memref.mlir" % ir.function_prefix)
@@ -1367,6 +1397,15 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             matrix_output = output_dir / ("%s.matrix_unit.metal.vmfb" % ir.function_prefix)
             raw_input = output_dir / ("%s.linalg.mlir" % ir.function_prefix)
             raw_output = output_dir / ("%s.linalg.metal.vmfb" % ir.function_prefix)
+            self.assertTrue(default_input.exists())
+            self.assertIn('sfem.lowering = "tensor_product_sum_factor_linalg_pipeline"', default_input.read_text())
+            self.assertTrue(str(default_output).endswith(".linalg_pipeline.metal.vmfb"))
+            with self.assertRaises(FileNotFoundError):
+                lowering.compile_with_iree_metal(
+                    tmp,
+                    iree_compile="/does/not/exist/iree-compile",
+                    input_kind="matrix_unit_pipeline",
+                )
             self.assertTrue(pipeline_input.exists())
             self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit_pipeline"', pipeline_input.read_text())
             self.assertTrue(str(pipeline_output).endswith(".matrix_unit_pipeline.metal.vmfb"))
@@ -1402,7 +1441,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             self.skipTest("iree-compile is not available for Apple Metal integration test")
         with tempfile.TemporaryDirectory() as tmp:
             output_vmfb, result = lowering.compile_with_iree_metal(tmp)
-        self.assertTrue(output_vmfb.name.endswith(".matrix_unit_pipeline.metal.vmfb"))
+        self.assertTrue(output_vmfb.name.endswith(".linalg_pipeline.metal.vmfb"))
         self.assertEqual(result.returncode, 0)
 
     def _run_mlir_opt(self, module, *passes):
