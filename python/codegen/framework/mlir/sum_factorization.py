@@ -981,9 +981,12 @@ class TensorProductSumFactorMLIRLowering:
                 stage.derivative,
             ),
             f"    %empty = tensor.empty() : {stage.result_tensor_type}",
+            "    %zero = arith.constant 0.0 : f32",
+            "    %init = linalg.fill ins(%zero : f32) "
+            f"outs(%empty : {stage.result_tensor_type}) -> {stage.result_tensor_type}",
             "    %result = linalg.matmul ins(%basis, %operand : "
             f"{stage.lhs_tensor_type}, {stage.rhs_tensor_type}) "
-            f"outs(%empty : {stage.result_tensor_type}) -> {stage.result_tensor_type}",
+            f"outs(%init : {stage.result_tensor_type}) -> {stage.result_tensor_type}",
             f"    return %result : {stage.result_tensor_type}",
             "  }",
         ]
@@ -2510,7 +2513,15 @@ def tensor_product_sum_factor_ir_from_material(
         int(vector_size),
         quadrature_order,
     )
-    context = user_input.element_contexts[0]
+    return tensor_product_sum_factor_ir_from_user_input_stage(user_input)
+
+
+def tensor_product_sum_factor_ir_from_user_input_stage(user_input):
+    material = user_input.material
+    contexts = tuple(user_input.element_contexts)
+    if len(contexts) != 1:
+        raise ValueError("tensor-product SFEM IR lowering requires a single element context")
+    context = contexts[0]
     basis = context.basis_plan("cell")
     if basis.family is not BasisFamily.TENSOR_PRODUCT:
         raise ValueError("element '%s' does not use tensor-product basis evaluation" % context.element_type)
@@ -2581,7 +2592,6 @@ def tensor_product_laplace_form_ir_from_material(
     vector_size=8,
     quadrature_order=None,
 ):
-    parameter_defaults = dict(getattr(material, "parameter_defaults", ()))
     return TensorProductLaplaceFormIR(
         tensor_product_sum_factor_ir_from_material(
             material,
@@ -2590,7 +2600,16 @@ def tensor_product_laplace_form_ir_from_material(
             quadrature_order=quadrature_order,
         ),
         "kappa",
-        parameter_defaults.get("kappa", 1.0),
+        dict(getattr(material, "parameter_defaults", ())).get("kappa", 1.0),
+    )
+
+
+def tensor_product_laplace_form_ir_from_user_input_stage(user_input):
+    material = user_input.material
+    return TensorProductLaplaceFormIR(
+        tensor_product_sum_factor_ir_from_user_input_stage(user_input),
+        "kappa",
+        dict(getattr(material, "parameter_defaults", ())).get("kappa", 1.0),
     )
 
 

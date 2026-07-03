@@ -121,7 +121,6 @@ FLAG_NAMES=(
     OPENMP
     MPI
     METIS
-    ISOLVER
     PYTHON
     BLAS
     LAPACK
@@ -143,7 +142,6 @@ flag_cmake_name() {
         OPENMP) echo SFEM_ENABLE_OPENMP ;;
         MPI) echo SFEM_ENABLE_MPI ;;
         METIS) echo SFEM_ENABLE_METIS ;;
-        ISOLVER) echo SFEM_ENABLE_ISOLVER ;;
         PYTHON) echo SFEM_ENABLE_PYTHON ;;
         BLAS) echo SFEM_ENABLE_BLAS ;;
         LAPACK) echo SFEM_ENABLE_LAPACK ;;
@@ -208,12 +206,6 @@ have_metis() {
         || { command -v brew >/dev/null 2>&1 && brew --prefix metis >/dev/null 2>&1; }
 }
 
-have_isolver() {
-    local root="${ISOLVER_ROOT:-${REPO_ROOT}/../isolver}"
-    [[ -f "${root}/isolver_function/isolver_function.h" ]] \
-        || [[ -f "${root}/isolver_lsolve/isolver_lsolve.h" ]]
-}
-
 have_python_bindings() {
     [[ -f "${REPO_ROOT}/venv/bin/python" || -n "${VIRTUAL_ENV:-}" ]] \
         && python3 -c "import nanobind" >/dev/null 2>&1
@@ -259,9 +251,6 @@ probe_externals() {
     fi
     if ! have_metis; then
         note_missing "METIS (set METIS_DIR)"
-    fi
-    if ! have_isolver; then
-        note_missing "ISolver (clone ../isolver)"
     fi
     if ! have_python_bindings; then
         note_missing "Python nanobind (venv + pip install nanobind)"
@@ -337,7 +326,6 @@ config_needs_skip() {
         name="${ACTIVE_FLAGS[$i]}"
         case "$name" in
             METIS) have_metis || return 0 ;;
-            ISOLVER) have_isolver || return 0 ;;
             PYTHON) have_python_bindings || return 0 ;;
             OPENMP|HXTSORT) have_openmp || return 0 ;;
             MPI) have_mpi || return 0 ;;

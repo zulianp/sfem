@@ -33,6 +33,7 @@
 #include "sfem_context.hpp"
 #include "sfem_CRS.hpp"
 #include "sfem_logger.hpp"
+#include "smesh_graph.hpp"
 #include "smesh_output.hpp"
 
 
@@ -120,6 +121,22 @@ static void shift_diag(const ptrdiff_t                    n,
 #define INVERSE_MASS_MATRIX 2
 #define INVERSE_POISSON_MATRIX 0
 
+static void crs_diag(const ptrdiff_t                    n,
+                     const count_t *const SFEM_RESTRICT rowptr,
+                     const idx_t *const SFEM_RESTRICT   colidx,
+                     const real_t *const SFEM_RESTRICT  values,
+                     real_t *const SFEM_RESTRICT        diag) {
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        diag[i] = 0;
+        for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+            if (colidx[k] == static_cast<idx_t>(i)) {
+                diag[i] = values[k];
+                break;
+            }
+        }
+    }
+}
+
 static std::shared_ptr<sfem::BiCGStab<real_t>> make_crs_bcgs_solver(const ptrdiff_t                    n,
                                                                     const sfem::SharedBuffer<count_t> &rowptr,
                                                                     const sfem::SharedBuffer<idx_t>   &colidx,
@@ -127,7 +144,7 @@ static std::shared_ptr<sfem::BiCGStab<real_t>> make_crs_bcgs_solver(const ptrdif
                                                                     const int                          max_it,
                                                                     const real_t                       tol,
                                                                     const bool                         verbose) {
-    auto op = sfem::h_crs_spmv<count_t, idx_t, real_t>(n, n, rowptr, colidx, values, 0);
+    auto op = sfem::h_crs_spmv<count_t, idx_t, real_t>(n, n, rowptr, colidx, values, real_t(0));
 
     auto diag = sfem::create_host_buffer<real_t>(n);
     crs_diag(n, rowptr->data(), colidx->data(), values->data(), diag->data());
@@ -342,7 +359,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t p1_nnz    = 0;
     count_t  *p1_rowptr = 0;
     idx_t    *p1_colidx = 0;
-    build_crs_graph_for_elem_type(p1_type, mesh_nelements, p1_nnodes, mesh_elements, &p1_rowptr, &p1_colidx);
+    smesh::create_crs_graph_for_elem_type(p1_type, mesh_nelements, p1_nnodes, mesh_elements, &p1_rowptr, &p1_colidx);
     p1_nnz                   = p1_rowptr[p1_nnodes];
     real_t *p1_values        = (real_t *)calloc(p1_nnz, sizeof(real_t));
     auto    p1_rowptr_buffer = sfem::manage_host_buffer<count_t>(p1_nnodes + 1, p1_rowptr);
@@ -415,7 +432,7 @@ int main(int argc, char *argv[]) {
     int implicit_momentum = 0;
 
     if (!SFEM_LUMPED_MASS || implicit_momentum) {
-        build_crs_graph_for_elem_type(mesh_element_type, mesh_nelements, mesh_nnodes, mesh_elements, &p2_rowptr, &p2_colidx);
+        smesh::create_crs_graph_for_elem_type(mesh_element_type, mesh_nelements, mesh_nnodes, mesh_elements, &p2_rowptr, &p2_colidx);
 
         p2_nnz           = p2_rowptr[mesh_nnodes];
         p2_rowptr_buffer = sfem::manage_host_buffer<count_t>(mesh_nnodes + 1, p2_rowptr);
