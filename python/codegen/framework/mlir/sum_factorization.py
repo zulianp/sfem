@@ -246,6 +246,204 @@ class TensorProductLaplaceFormIR:
         return values
 
 
+class TensorProductLaplaceFormLinalgLowering:
+    def __init__(self, ir):
+        if not isinstance(ir, TensorProductLaplaceFormIR):
+            raise TypeError("ir must be a TensorProductLaplaceFormIR")
+        self.ir = ir
+        self.sum_factor_lowering = TensorProductSumFactorMLIRLowering(ir.sum_factor)
+
+    def render_linalg_pipeline_module(self):
+        sf = self.ir.sum_factor
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_laplace_form_linalg_pipeline", sfem.form = "laplace"} {'
+            % (sf.material_name, sf.element_type)
+        ]
+        lines.extend(self.sum_factor_lowering._render_linalg_pipeline_body())
+        lines.extend(self._render_apply_function())
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def write_inspection_artifacts(self, output_dir):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        path = output_dir / ("%s.linalg_pipeline.mlir" % self.ir.function_prefix)
+        path.write_text(self.render_linalg_pipeline_module())
+        return CodeInspectionArtifacts(
+            output_dir=str(output_dir),
+            files=(str(path),),
+        )
+
+    def iree_metal_compile_command(self, input_mlir, output_vmfb):
+        return [
+            "iree-compile",
+            str(input_mlir),
+            "--iree-hal-target-backends=metal-spirv",
+            "--iree-metal-compile-to-metallib=false",
+            "-o",
+            str(output_vmfb),
+        ]
+
+    def compile_with_iree_metal(self, output_dir, *, iree_compile=None):
+        iree_compile = iree_compile or shutil.which("iree-compile")
+        if iree_compile is None:
+            raise FileNotFoundError("iree-compile is not available")
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        input_mlir = output_dir / ("%s.linalg_pipeline.mlir" % self.ir.function_prefix)
+        input_mlir.write_text(self.render_linalg_pipeline_module())
+        output_vmfb = output_dir / ("%s.linalg_pipeline.metal.vmfb" % self.ir.function_prefix)
+        command = self.iree_metal_compile_command(input_mlir, output_vmfb)
+        command[0] = iree_compile
+        result = subprocess.run(
+            command,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return output_vmfb, result
+
+    def _render_apply_function(self):
+        sf = self.ir.sum_factor
+        field_stages = tuple(stage for stage in sf.field_gradient_stages if stage.derivative == 0)
+        test_stages = tuple(stage for stage in sf.test_gradient_stages if stage.derivative == 0)
+        input_type = field_stages[0].rhs_tensor_type
+        output_type = test_stages[-1].result_tensor_type
+        q_by_s = "tensor<%dx%dxf32>" % (sf.n_qp_1d, sf.n_shape_1d)
+        s_by_q = "tensor<%dx%dxf32>" % (sf.n_shape_1d, sf.n_qp_1d)
+        weight_type = "tensor<%dxf32>" % sf.n_qp_1d
+        kappa_type = "tensor<1xf32>"
+        signature = (
+            "%%shape_1d: %s, %%grad_1d: %s, %%shape_1d_t: %s, %%grad_1d_t: %s, "
+            "%%weights_1d: %s, %%kappa: %s, %%u: %s"
+            % (q_by_s, q_by_s, s_by_q, s_by_q, weight_type, kappa_type, input_type)
+        )
+        lines = [
+            "",
+            "  func.func @%s_linalg_pipeline(%s) -> %s attributes "
+            '{sfem.form = "laplace", sfem.parameter = "kappa", sfem.linalg.pipeline = "tensor"} {'
+            % (self.ir.function_prefix, signature, output_type)
+        ]
+        residuals = []
+        for derivative in range(sf.dim):
+            field_result = "%%field_d%d" % derivative
+            lines.extend(self._render_field_pipeline_call(derivative, field_result, input_type))
+            weighted_result = "%%weighted_d%d" % derivative
+            lines.extend(self._render_weighted_gradient(derivative, field_result, weighted_result))
+            test_result = "%%test_d%d" % derivative
+            lines.extend(self._render_test_pipeline_call(derivative, weighted_result, test_result))
+            residuals.append(test_result)
+        lines.extend(self._render_sum_residuals(residuals, output_type))
+        lines.extend(["    return %%result : %s" % output_type, "  }"])
+        return lines
+
+    def _render_field_pipeline_call(self, derivative, result, input_type):
+        sf = self.ir.sum_factor
+        stages = tuple(stage for stage in sf.field_gradient_stages if stage.derivative == derivative)
+        basis_args = ["%grad_1d" if stage.basis == "grad_1d" else "%shape_1d" for stage in stages]
+        function_name = "%s_field_gradient_d%d_linalg_pipeline" % (sf.function_prefix, derivative)
+        arg_values = basis_args + ["%u"]
+        arg_types = [stage.lhs_tensor_type for stage in stages] + [input_type]
+        return [
+            "    %s = func.call @%s(%s) : (%s) -> %s"
+            % (
+                result,
+                function_name,
+                ", ".join(arg_values),
+                ", ".join(arg_types),
+                stages[-1].result_tensor_type,
+            )
+        ]
+
+    def _render_test_pipeline_call(self, derivative, weighted, result):
+        sf = self.ir.sum_factor
+        stages = tuple(stage for stage in sf.test_gradient_stages if stage.derivative == derivative)
+        basis_args = ["%grad_1d_t" if stage.basis == "grad_1d_t" else "%shape_1d_t" for stage in stages]
+        function_name = "%s_test_gradient_d%d_linalg_pipeline" % (sf.function_prefix, derivative)
+        arg_values = basis_args + [weighted]
+        arg_types = [stage.lhs_tensor_type for stage in stages] + [stages[0].rhs_tensor_type]
+        return [
+            "    %s = func.call @%s(%s) : (%s) -> %s"
+            % (
+                result,
+                function_name,
+                ", ".join(arg_values),
+                ", ".join(arg_types),
+                stages[-1].result_tensor_type,
+            )
+        ]
+
+    def _render_weighted_gradient(self, derivative, source, result):
+        sf = self.ir.sum_factor
+        stages = tuple(stage for stage in sf.field_gradient_stages if stage.derivative == derivative)
+        tensor_type = stages[-1].result_tensor_type
+        extents = _stage_output_extents(sf, stages[-1])
+        axes = _stage_view_axes(sf.dim, stages[-1].axis)
+        weight_maps = [
+            "affine_map<(d0, d1) -> (%s)>" % _axis_coordinate_affine_expr(axis, axes, extents)
+            for axis in range(sf.dim)
+        ]
+        indexing_maps = ["affine_map<(d0, d1) -> (d0, d1)>"] + weight_maps
+        indexing_maps.append("affine_map<(d0, d1) -> (0)>")
+        indexing_maps.append("affine_map<(d0, d1) -> (d0, d1)>")
+        ins_values = [source] + ["%weights_1d" for _ in range(sf.dim)] + ["%kappa"]
+        ins_types = [tensor_type] + ["tensor<%dxf32>" % sf.n_qp_1d for _ in range(sf.dim)] + ["tensor<1xf32>"]
+        block_args = ["%grad: f32"] + ["%%w%d: f32" % axis for axis in range(sf.dim)] + ["%kappa_value: f32", "%out: f32"]
+        lines = [
+            "    %s_empty = tensor.empty() : %s" % (result, tensor_type),
+            "    %s = linalg.generic {" % result,
+            "      indexing_maps = [%s]," % ", ".join(indexing_maps),
+            '      iterator_types = ["parallel", "parallel"]} ins(%s : %s) outs(%s_empty : %s) {'
+            % (", ".join(ins_values), ", ".join(ins_types), result, tensor_type),
+            "    ^bb0(%s):" % ", ".join(block_args),
+            "      %weighted_kappa = arith.mulf %grad, %kappa_value : f32",
+        ]
+        previous = "%weighted_kappa"
+        for axis in range(sf.dim):
+            current = "%%weighted_axis%d" % axis
+            lines.append("      %s = arith.mulf %s, %%w%d : f32" % (current, previous, axis))
+            previous = current
+        lines.extend(
+            [
+                "      linalg.yield %s : f32" % previous,
+                "    } -> %s" % tensor_type,
+            ]
+        )
+        return lines
+
+    def _render_sum_residuals(self, residuals, output_type):
+        if len(residuals) < 1:
+            raise ValueError("laplace form requires at least one derivative residual")
+        if len(residuals) == 1:
+            return ["    %%result = tensor.cast %s : %s to %s" % (residuals[0], output_type, output_type)]
+        indexing_maps = ["affine_map<(d0, d1) -> (d0, d1)>"] * (len(residuals) + 1)
+        ins_types = [output_type for _ in residuals]
+        block_args = ["%%r%d: f32" % index for index in range(len(residuals))] + ["%out: f32"]
+        lines = [
+            "    %%result_empty = tensor.empty() : %s" % output_type,
+            "    %result = linalg.generic {",
+            "      indexing_maps = [%s]," % ", ".join(indexing_maps),
+            '      iterator_types = ["parallel", "parallel"]} ins(%s : %s) outs(%%result_empty : %s) {'
+            % (", ".join(residuals), ", ".join(ins_types), output_type),
+            "    ^bb0(%s):" % ", ".join(block_args),
+            "      %sum0 = arith.addf %r0, %r1 : f32",
+        ]
+        previous = "%sum0"
+        for index in range(2, len(residuals)):
+            current = "%%sum%d" % (index - 1)
+            lines.append("      %s = arith.addf %s, %%r%d : f32" % (current, previous, index))
+            previous = current
+        lines.extend(
+            [
+                "      linalg.yield %s : f32" % previous,
+                "    } -> %s" % output_type,
+            ]
+        )
+        return lines
+
+
 class TensorProductLaplaceReferenceEvaluator:
     def __init__(self, ir):
         if not isinstance(ir, TensorProductLaplaceFormIR):
@@ -474,6 +672,31 @@ class TensorProductSumFactorMLIRLowering:
         lines.append("}")
         return "\n".join(lines) + "\n"
 
+    def render_linalg_pipeline_module(self):
+        self._check_pipeline_stage_types()
+        lines = [
+            'module attributes {sfem.material = "%s", sfem.element = "%s", '
+            'sfem.lowering = "tensor_product_sum_factor_linalg_pipeline"} {'
+            % (self.ir.material_name, self.ir.element_type)
+        ]
+        lines.extend(self._render_linalg_pipeline_body())
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def _render_linalg_pipeline_body(self):
+        self._check_pipeline_stage_types()
+        lines = []
+        for stage in self.ir.stages:
+            lines.extend(self._render_stage_function(stage))
+        for operation, stages in (
+            ("field_gradient", self.ir.field_gradient_stages),
+            ("test_gradient_contraction", self.ir.test_gradient_stages),
+        ):
+            for derivative in range(self.ir.dim):
+                derivative_stages = tuple(stage for stage in stages if stage.derivative == derivative)
+                lines.extend(self._render_linalg_pipeline_function(operation, derivative, derivative_stages))
+        return lines
+
     def render_vector_module(self):
         lines = [
             'module attributes {sfem.material = "%s", sfem.element = "%s", '
@@ -575,6 +798,7 @@ class TensorProductSumFactorMLIRLowering:
         prefix = output_dir / self.ir.function_prefix
 
         linalg_path = prefix.with_suffix(".linalg.mlir")
+        linalg_pipeline_path = prefix.with_suffix(".linalg_pipeline.mlir")
         vector_path = prefix.with_suffix(".vector.mlir")
         matrix_unit_path = prefix.with_suffix(".matrix_unit.mlir")
         matrix_unit_memref_path = prefix.with_suffix(".matrix_unit_memref.mlir")
@@ -584,6 +808,7 @@ class TensorProductSumFactorMLIRLowering:
         harness_path = prefix.with_suffix(".metal_smoke.mm")
 
         linalg_path.write_text(self.render_linalg_module())
+        linalg_pipeline_path.write_text(self.render_linalg_pipeline_module())
         vector_path.write_text(self.render_vector_module())
         matrix_unit_path.write_text(self.render_matrix_unit_module())
         matrix_unit_memref_path.write_text(self.render_matrix_unit_memref_module())
@@ -592,6 +817,7 @@ class TensorProductSumFactorMLIRLowering:
 
         files = [
             linalg_path,
+            linalg_pipeline_path,
             vector_path,
             matrix_unit_path,
             matrix_unit_memref_path,
@@ -638,18 +864,20 @@ class TensorProductSumFactorMLIRLowering:
         return [
             "iree-compile",
             str(input_mlir),
-            "--iree-hal-target-backends=metal",
+            "--iree-hal-target-backends=metal-spirv",
+            "--iree-metal-compile-to-metallib=false",
             "-o",
             str(output_vmfb),
         ]
 
-    def compile_with_iree_metal(self, output_dir, *, iree_compile=None, input_kind="matrix_unit_pipeline"):
+    def compile_with_iree_metal(self, output_dir, *, iree_compile=None, input_kind="linalg_pipeline"):
         iree_compile = iree_compile or shutil.which("iree-compile")
         if iree_compile is None:
             raise FileNotFoundError("iree-compile is not available")
-        if input_kind not in ("linalg", "matrix_unit", "matrix_unit_memref", "matrix_unit_pipeline"):
+        if input_kind not in ("linalg", "linalg_pipeline", "matrix_unit", "matrix_unit_memref", "matrix_unit_pipeline"):
             raise ValueError(
-                "IREE Metal input_kind must be 'linalg', 'matrix_unit', 'matrix_unit_memref', or 'matrix_unit_pipeline'"
+                "IREE Metal input_kind must be 'linalg', 'linalg_pipeline', 'matrix_unit', "
+                "'matrix_unit_memref', or 'matrix_unit_pipeline'"
             )
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -657,6 +885,10 @@ class TensorProductSumFactorMLIRLowering:
             input_mlir = output_dir / ("%s.matrix_unit_pipeline.mlir" % self.ir.function_prefix)
             input_mlir.write_text(self.render_matrix_unit_pipeline_module())
             output_vmfb = output_dir / ("%s.matrix_unit_pipeline.metal.vmfb" % self.ir.function_prefix)
+        elif input_kind == "linalg_pipeline":
+            input_mlir = output_dir / ("%s.linalg_pipeline.mlir" % self.ir.function_prefix)
+            input_mlir.write_text(self.render_linalg_pipeline_module())
+            output_vmfb = output_dir / ("%s.linalg_pipeline.metal.vmfb" % self.ir.function_prefix)
         elif input_kind == "matrix_unit_memref":
             input_mlir = output_dir / ("%s.matrix_unit_memref.mlir" % self.ir.function_prefix)
             input_mlir.write_text(self.render_matrix_unit_memref_module())
@@ -754,6 +986,75 @@ class TensorProductSumFactorMLIRLowering:
             f"outs(%empty : {stage.result_tensor_type}) -> {stage.result_tensor_type}",
             f"    return %result : {stage.result_tensor_type}",
             "  }",
+        ]
+
+    def _render_linalg_pipeline_function(self, operation, derivative, stages):
+        if not stages:
+            raise ValueError("sum-factorization pipeline requires at least one stage")
+        label = "field_gradient" if operation == "field_gradient" else "test_gradient"
+        function_name = "%s_%s_d%d_linalg_pipeline" % (self.ir.function_prefix, label, derivative)
+        signature = []
+        for index, stage in enumerate(stages):
+            signature.append("%%basis%d: %s" % (index, stage.lhs_tensor_type))
+        signature.append("%%input: %s" % stages[0].rhs_tensor_type)
+        return_type = stages[-1].result_tensor_type
+
+        lines = [
+            "",
+            "  func.func @%s(%s) -> %s attributes "
+            '{sfem.sum_factor.operation = "%s", sfem.sum_factor.derivative = %d : i64, '
+            'sfem.linalg.pipeline = "tensor"} {'
+            % (function_name, ", ".join(signature), return_type, operation, derivative),
+        ]
+        operand = "%input"
+        operand_type = stages[0].rhs_tensor_type
+        previous_stage = None
+        for index, stage in enumerate(stages):
+            call_operand = operand
+            if previous_stage is not None:
+                call_operand = "%%bridge%d" % index
+                lines.extend(self._render_linalg_pipeline_bridge(index, previous_stage, stage, operand, operand_type))
+            result = "%%stage%d" % index
+            stage_function_name = "%s_%s" % (self.ir.function_prefix, stage.name)
+            lines.append(
+                "    %s = func.call @%s(%%basis%d, %s) : (%s, %s) -> %s"
+                % (
+                    result,
+                    stage_function_name,
+                    index,
+                    call_operand,
+                    stage.lhs_tensor_type,
+                    stage.rhs_tensor_type,
+                    stage.result_tensor_type,
+                )
+            )
+            operand = result
+            operand_type = stage.result_tensor_type
+            previous_stage = stage
+        lines.extend(["    return %s : %s" % (operand, return_type), "  }"])
+        return lines
+
+    def _render_linalg_pipeline_bridge(self, bridge_index, previous_stage, next_stage, source, source_type):
+        sf = self.ir
+        source_extents = _stage_output_extents(sf, previous_stage)
+        target_extents = _stage_input_extents(sf, next_stage)
+        if source_extents != target_extents:
+            raise ValueError("adjacent sum-factor stages do not have matching canonical extents")
+        source_axes = _stage_view_axes(sf.dim, previous_stage.axis)
+        target_axes = _stage_view_axes(sf.dim, next_stage.axis)
+        if source_axes == target_axes and source_type == next_stage.rhs_tensor_type:
+            return ["    %%bridge%d = tensor.cast %s : %s to %s" % (bridge_index, source, source_type, source_type)]
+
+        source_map = _stage_view_affine_map(source_axes, target_axes, target_extents)
+        return [
+            "    %%bridge%d_empty = tensor.empty() : %s" % (bridge_index, next_stage.rhs_tensor_type),
+            "    %%bridge%d = linalg.generic {" % bridge_index,
+            "      indexing_maps = [%s, affine_map<(d0, d1) -> (d0, d1)>]," % source_map,
+            '      iterator_types = ["parallel", "parallel"]} ins(%s : %s) outs(%%bridge%d_empty : %s) {'
+            % (source, source_type, bridge_index, next_stage.rhs_tensor_type),
+            "    ^bb0(%in: f32, %out: f32):",
+            "      linalg.yield %in : f32",
+            "    } -> %s" % next_stage.rhs_tensor_type,
         ]
 
     def _render_vector_stage_function(self, stage):
@@ -2220,6 +2521,7 @@ def tensor_product_sum_factor_ir_from_material(
     if TensorProductOperation.TEST_GRADIENT_CONTRACTION not in test_plan.operations:
         raise ValueError("tensor-product test gradient contraction plan is required")
     rule = context.specialization.quadrature_rule
+    _validate_laplace_form_source(material, basis.dim)
     return TensorProductSumFactorIR(
         material_name=material.name,
         element_type=context.element_type,
@@ -2237,6 +2539,39 @@ def tensor_product_sum_factor_ir_from_material(
         field_gradient_stages=_field_gradient_stages(basis.dim, basis.n_shape_1d, basis.n_qp_1d),
         test_gradient_stages=_test_gradient_stages(basis.dim, basis.n_shape_1d, basis.n_qp_1d),
     )
+
+
+def _validate_laplace_form_source(material, dim):
+    from codegen.framework.symbolic.forms import FormKind, StandardFormName
+
+    if getattr(material, "name", None) != "laplace":
+        raise ValueError("tensor-product sum-factorization IR currently supports the laplace form only")
+    systems = getattr(material, "systems", None)
+    if systems is None:
+        raise ValueError("laplace tensor-product IR requires material equation systems")
+    system = systems.for_dim(int(dim))
+    collections = tuple(system.form_collections())
+    residual_collections = tuple(
+        collection
+        for collection in collections
+        if collection.kind is FormKind.RESIDUAL
+        and len(collection.fields) == 1
+        and collection.fields[0].name == "u"
+    )
+    if len(residual_collections) != 1:
+        raise ValueError("laplace tensor-product IR requires one residual form for field 'u'")
+    residual = residual_collections[0].standard_form(StandardFormName.ONE)
+    expression = str(residual.expression)
+    required_tokens = ["kappa"]
+    for axis in range(int(dim)):
+        required_tokens.append("u_grad_%d" % axis)
+        required_tokens.append("u_test_grad_%d" % axis)
+    missing = tuple(token for token in required_tokens if token not in expression)
+    if missing:
+        raise ValueError(
+            "laplace residual form is missing expected gradient tokens: %s"
+            % ", ".join(missing)
+        )
 
 
 def tensor_product_laplace_form_ir_from_material(
@@ -2349,6 +2684,47 @@ def _stage_output_extents(sf, stage):
     if stage.operation == "test_gradient_contraction":
         return tuple(sf.n_qp_1d if axis < stage.axis else sf.n_shape_1d for axis in range(sf.dim))
     raise ValueError("unsupported sum-factorization stage operation")
+
+
+def _stage_view_affine_map(source_axes, target_axes, extents):
+    source_row = _axis_coordinate_affine_expr(source_axes[0], target_axes, extents)
+    source_col = _stage_view_col_affine_expr(source_axes[1:], target_axes, extents)
+    return "affine_map<(d0, d1) -> (%s, %s)>" % (source_row, source_col)
+
+
+def _stage_view_col_affine_expr(col_axes, target_axes, extents):
+    terms = []
+    for index, axis in enumerate(col_axes):
+        stride = _product(extents[col_axis] for col_axis in col_axes[index + 1 :])
+        coordinate = _axis_coordinate_affine_expr(axis, target_axes, extents)
+        if coordinate == "0":
+            continue
+        if stride == 1:
+            terms.append(coordinate)
+        else:
+            terms.append("%s * %d" % (_affine_expr_term(coordinate), stride))
+    return " + ".join(terms) if terms else "0"
+
+
+def _axis_coordinate_affine_expr(axis, target_axes, extents):
+    axis = int(axis)
+    if axis == target_axes[0]:
+        return "d0"
+    col_axes = target_axes[1:]
+    col_index = col_axes.index(axis)
+    extent = int(extents[axis])
+    if extent == 1:
+        return "0"
+    stride = _product(extents[col_axis] for col_axis in col_axes[col_index + 1 :])
+    if stride == 1:
+        return "d1 mod %d" % extent
+    return "(d1 floordiv %d) mod %d" % (stride, extent)
+
+
+def _affine_expr_term(expr):
+    if " " in expr or "+" in expr:
+        return "(%s)" % expr
+    return expr
 
 
 def _product(values):

@@ -12,6 +12,7 @@ from codegen.framework.mlir import (
     TensorProductLaplaceFormEBEGPULowering,
     TensorProductLaplaceFormEBEMetalLowering,
     TensorProductLaplaceFormGPULowering,
+    TensorProductLaplaceFormLinalgLowering,
     TensorProductLaplaceFormMetalLowering,
     TensorProductLaplaceReferenceEvaluator,
     TensorProductSumFactorReferenceEvaluator,
@@ -39,7 +40,7 @@ def main():
         help="check branch-free/no-atomic generated GPU and Metal kernel artifacts",
     )
     parser.add_argument("--validate-mlir", action="store_true", help="run mlir-opt --verify-diagnostics on .mlir files")
-    parser.add_argument("--probe-iree-metal", action="store_true", help="try iree-compile --iree-hal-target-backends=metal")
+    parser.add_argument("--probe-iree-metal", action="store_true", help="try iree-compile --iree-hal-target-backends=metal-spirv")
     parser.add_argument("--probe-metal-toolchain", action="store_true", help="try offline xcrun metal compilation for generated .metal files")
     parser.add_argument("--run-metal-smoke", action="store_true", help="compile and run local and EBE Metal smoke tests")
     parser.add_argument(
@@ -86,6 +87,11 @@ def main():
     form_gpu = TensorProductLaplaceFormGPULowering(form_ir)
     artifact_groups["form"] = _write_artifacts(
         form_gpu.write_inspection_artifacts(output_dir / "form")
+    )
+
+    form_linalg = TensorProductLaplaceFormLinalgLowering(form_ir)
+    artifact_groups["form_linalg"] = _write_artifacts(
+        form_linalg.write_inspection_artifacts(output_dir / "form_linalg")
     )
 
     ebe_map = TensorProductLaplaceFormBatchedGPULowering(
@@ -154,9 +160,13 @@ def main():
         manifest["mlir_validation"] = _validate_mlir_files(output_dir)
 
     if args.probe_iree_metal:
-        manifest["iree_metal"] = [
-            _probe_iree_metal(output_dir / "iree_metal", sum_factor)
-        ]
+        manifest["iree_metal"] = _probe_iree_metal(
+            output_dir / "iree_metal",
+            [
+                ("sum_factor_linalg_pipeline_to_metal_vmfb", sum_factor),
+                ("laplace_form_linalg_pipeline_to_metal_vmfb", form_linalg),
+            ],
+        )
 
     if args.probe_metal_toolchain:
         manifest["metal_toolchain"] = _probe_metal_toolchain(output_dir)
@@ -329,6 +339,7 @@ def _verify_performance_shape(output_dir):
     output_dir = Path(output_dir)
     results = []
     linalg_files = sorted(output_dir.rglob("*.linalg.mlir"))
+    linalg_pipeline_files = sorted(output_dir.rglob("*.linalg_pipeline.mlir"))
     vector_files = sorted(output_dir.rglob("*.vector.mlir"))
     matrix_unit_files = sorted(output_dir.rglob("*.matrix_unit.mlir"))
     matrix_unit_memref_files = sorted(output_dir.rglob("*.matrix_unit_memref.mlir"))
@@ -337,6 +348,8 @@ def _verify_performance_shape(output_dir):
     metal_files = sorted(output_dir.rglob("*.metal"))
 
     results.append(_require_token("linalg_matmul", linalg_files, "linalg.matmul"))
+    results.append(_require_token("linalg_pipeline_calls", linalg_pipeline_files, "func.call"))
+    results.append(_require_token("linalg_pipeline_bridges", linalg_pipeline_files, "linalg.generic"))
     results.append(_require_token("vector_matrix_multiply", vector_files, "vector.matrix_multiply"))
     results.append(_require_token("matrix_unit_vector_matrix_multiply", matrix_unit_files, "vector.matrix_multiply"))
     results.append(_require_token("matrix_unit_memref_transfer_read", matrix_unit_memref_files, "vector.transfer_read"))
@@ -484,38 +497,49 @@ def _validate_mlir_files(output_dir):
     return results
 
 
-def _probe_iree_metal(output_dir, sum_factor_lowering):
+def _probe_iree_metal(output_dir, lowerings):
     iree_compile = shutil.which("iree-compile")
     if iree_compile is None:
-        return {
-            "name": "sum_factor_matrix_unit_pipeline_to_metal_vmfb",
-            "ok": False,
-            "skipped": True,
-            "reason": "iree-compile is not available",
-        }
-    try:
-        output_vmfb, result = sum_factor_lowering.compile_with_iree_metal(
-            output_dir,
-            iree_compile=iree_compile,
+        return [
+            {
+                "name": name,
+                "ok": False,
+                "skipped": True,
+                "reason": "iree-compile is not available",
+            }
+            for name, _ in lowerings
+        ]
+    results = []
+    for name, lowering in lowerings:
+        try:
+            output_vmfb, result = lowering.compile_with_iree_metal(
+                output_dir / name,
+                iree_compile=iree_compile,
+            )
+        except subprocess.CalledProcessError as exc:
+            results.append(
+                {
+                    "name": name,
+                    "ok": False,
+                    "skipped": False,
+                    "returncode": exc.returncode,
+                    "stdout": exc.stdout or "",
+                    "stderr": exc.stderr or "",
+                }
+            )
+            continue
+        results.append(
+            {
+                "name": name,
+                "ok": result.returncode == 0 and output_vmfb.exists(),
+                "skipped": False,
+                "returncode": result.returncode,
+                "output_vmfb": str(output_vmfb),
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
         )
-    except subprocess.CalledProcessError as exc:
-        return {
-            "name": "sum_factor_matrix_unit_pipeline_to_metal_vmfb",
-            "ok": False,
-            "skipped": False,
-            "returncode": exc.returncode,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
-        }
-    return {
-        "name": "sum_factor_matrix_unit_pipeline_to_metal_vmfb",
-        "ok": result.returncode == 0 and output_vmfb.exists(),
-        "skipped": False,
-        "returncode": result.returncode,
-        "output_vmfb": str(output_vmfb),
-        "stdout": result.stdout,
-        "stderr": result.stderr,
-    }
+    return results
 
 
 def _probe_metal_toolchain(output_dir):
