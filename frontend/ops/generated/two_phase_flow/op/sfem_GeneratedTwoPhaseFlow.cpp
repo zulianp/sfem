@@ -76,6 +76,35 @@ namespace sfem {
             return matched;
         }
 
+        void material_defaults(real_t *const values) {
+            values[0] = 0.10000000000000001;
+            values[1] = 0.39000000000000001;
+            values[2] = 0.095000000000000001;
+            values[3] = 4.2000000000000002;
+            values[4] = 1100;
+            values[5] = 0.000455;
+            values[6] = 1;
+            values[7] = 0.044010000000000001;
+            values[8] = 0.42520000000000002;
+            values[9] = 8.3140000000000004e-06;
+            values[10] = 333;
+            values[11] = 5.2000000000000002;
+            values[12] = 1.5;
+            values[13] = 0.52000000000000002;
+            values[14] = 1.8;
+            values[15] = 0.34999999999999998;
+            values[16] = 1;
+            values[17] = 86.400000000000006;
+            values[18] = 0;
+            values[19] = 0;
+            values[20] = 0;
+            values[21] = 86.400000000000006;
+            values[22] = 0;
+            values[23] = 0;
+            values[24] = 0;
+            values[25] = 86.400000000000006;
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = 26;
         constexpr int N_MATERIAL_PARAMETERS = 26;
@@ -111,35 +140,6 @@ namespace sfem {
         std::string yaml_read_string(const ryml::ConstNodeRef &node) {
             const auto value = node.val();
             return std::string(value.str, value.len);
-        }
-
-        void material_defaults(real_t *const values) {
-            values[0] = 0.10000000000000001;
-            values[1] = 0.39000000000000001;
-            values[2] = 0.095000000000000001;
-            values[3] = 4.2000000000000002;
-            values[4] = 1100;
-            values[5] = 0.000455;
-            values[6] = 1;
-            values[7] = 0.044010000000000001;
-            values[8] = 0.42520000000000002;
-            values[9] = 8.3140000000000004e-06;
-            values[10] = 333;
-            values[11] = 5.2000000000000002;
-            values[12] = 1.5;
-            values[13] = 0.52000000000000002;
-            values[14] = 1.8;
-            values[15] = 0.34999999999999998;
-            values[16] = 1;
-            values[17] = 86.400000000000006;
-            values[18] = 0;
-            values[19] = 0;
-            values[20] = 0;
-            values[21] = 86.400000000000006;
-            values[22] = 0;
-            values[23] = 0;
-            values[24] = 0;
-            values[25] = 86.400000000000006;
         }
 
         void copy_material_parameters(const real_t *const src,
@@ -226,13 +226,15 @@ namespace sfem {
 
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
-            std::shared_ptr<smesh::FFF> metric;
+            std::shared_ptr<smesh::FFF> metric_soa;
+            std::shared_ptr<smesh::FFF> metric_aos;
         };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool needs_jacobian,
-                                  const bool needs_metric) {
+                                  const bool needs_metric_soa,
+                                  const bool needs_metric_aos) {
             auto mesh = space->mesh_ptr();
             for (auto &entry : domains.domains()) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -249,10 +251,17 @@ namespace sfem {
                         return SFEM_FAILURE;
                     }
                 }
-                if (needs_metric && !cache->metric) {
-                    cache->metric = smesh::FFF::create_SoA(
+                if (needs_metric_soa && !cache->metric_soa) {
+                    cache->metric_soa = smesh::FFF::create_SoA(
                             mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric) {
+                    if (!cache->metric_soa) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                if (needs_metric_aos && !cache->metric_aos) {
+                    cache->metric_aos = smesh::FFF::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->metric_aos) {
                         return SFEM_FAILURE;
                     }
                 }
@@ -559,13 +568,20 @@ namespace sfem {
                 (impl_->residual_uses_affine && true) ||
                 (impl_->jacobian_action_uses_affine && true);
         const bool needs_affine_metric =
+                (impl_->residual_uses_affine && (false || false)) ||
+                (impl_->jacobian_action_uses_affine && (false || false));
+        const bool needs_affine_metric_soa =
+                (impl_->residual_uses_affine && false) ||
+                (impl_->jacobian_action_uses_affine && false);
+        const bool needs_affine_metric_aos =
                 (impl_->residual_uses_affine && false) ||
                 (impl_->jacobian_action_uses_affine && false);
         if (needs_affine_jacobian || needs_affine_metric) {
             return cache_affine_geometry(impl_->space,
                                          *impl_->domains,
                                          needs_affine_jacobian,
-                                         needs_affine_metric);
+                                         needs_affine_metric_soa,
+                                         needs_affine_metric_aos);
         }
         return SFEM_SUCCESS;
     }
@@ -598,6 +614,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->residual_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -616,12 +633,20 @@ namespace sfem {
                             cache->jacobian->jacobian_determinant()->data());
                 }
                 if (false) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached metric geometry\n");
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached SoA metric geometry\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (false) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine residual requires cached AoS metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -693,6 +718,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             const geom_t *const *geom_metric = nullptr;
+            const geom_t *geom_metric_aos = nullptr;
             if (impl_->jacobian_action_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
@@ -711,12 +737,20 @@ namespace sfem {
                             cache->jacobian->jacobian_determinant()->data());
                 }
                 if (false) {
-                    if (!cache->metric) {
-                        SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached metric geometry\n");
+                    if (!cache->metric_soa) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached SoA metric geometry\n");
                         return SFEM_FAILURE;
                     }
                     geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric->fff_SoA()->data());
+                            cache->metric_soa->fff_SoA()->data());
+                }
+                if (false) {
+                    if (!cache->metric_aos) {
+                        SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached AoS metric geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    geom_metric_aos = reinterpret_cast<const geom_t *>(
+                            cache->metric_aos->fff_AoS()->data());
                 }
             }
             real_t storage[MAX_PARAMETERS];
@@ -810,12 +844,19 @@ namespace sfem {
                     (impl_->residual_uses_affine && true) ||
                     (impl_->jacobian_action_uses_affine && true);
             const bool needs_affine_metric =
+                    (impl_->residual_uses_affine && (false || false)) ||
+                    (impl_->jacobian_action_uses_affine && (false || false));
+            const bool needs_affine_metric_soa =
+                    (impl_->residual_uses_affine && false) ||
+                    (impl_->jacobian_action_uses_affine && false);
+            const bool needs_affine_metric_aos =
                     (impl_->residual_uses_affine && false) ||
                     (impl_->jacobian_action_uses_affine && false);
             if (cache_affine_geometry(impl_->space,
                                       *impl_->domains,
                                       needs_affine_jacobian,
-                                      needs_affine_metric) != SFEM_SUCCESS) {
+                                      needs_affine_metric_soa,
+                                      needs_affine_metric_aos) != SFEM_SUCCESS) {
                 SFEM_ERROR("GeneratedTwoPhaseFlow failed to cache affine geometry\n");
             }
         }

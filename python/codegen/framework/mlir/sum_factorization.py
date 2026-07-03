@@ -1345,20 +1345,24 @@ class TensorProductSumFactorMLIRLowering:
 
     def _render_gpu_kernel(self, stage):
         kernel_name = self._gpu_kernel_name(stage)
+        basis = _gpu_kernel_argument("basis", stage.lhs_memref_type, 0)
+        operand = _gpu_kernel_argument("operand", stage.rhs_memref_type, 1)
+        result = _gpu_kernel_argument("result", stage.result_memref_type, 2)
         return [
             "",
-            "    gpu.func @%s(%%basis: %s, %%operand: %s, %%result: %s) kernel attributes "
+            "    gpu.func @%s(%s, %s, %s) kernel attributes "
             '{sfem.sum_factor.operation = "%s", sfem.sum_factor.basis = "%s", '
-            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64} {"
+            "sfem.sum_factor.axis = %d : i64, sfem.sum_factor.derivative = %d : i64, %s} {"
             % (
                 kernel_name,
-                stage.lhs_memref_type,
-                stage.rhs_memref_type,
-                stage.result_memref_type,
+                basis,
+                operand,
+                result,
                 stage.operation,
                 stage.basis,
                 stage.axis,
                 stage.derivative,
+                _spirv_entry_point_abi(stage.result_rows, stage.result_cols, 1),
             ),
             "      %tx = gpu.thread_id x",
             "      %ty = gpu.thread_id y",
@@ -1812,17 +1816,17 @@ class TensorProductLaplaceFormGPULowering:
     def _kernel_signature(self):
         sf = self.ir.sum_factor
         return (
-            "    gpu.func @%s_kernel(%%u: memref<%dxf32>, %%out: memref<%dxf32>, "
-            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
-            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
-            "attributes {sfem.form = \"laplace\", sfem.parameter = \"kappa\"} {"
+            "    gpu.func @%s_kernel(%s, %s, %s, %s, %s, %s) kernel "
+            "attributes {sfem.form = \"laplace\", sfem.parameter = \"kappa\", %s} {"
             % (
                 self.ir.function_prefix,
-                sf.n_shape,
-                sf.n_shape,
-                len(sf.shape_values_1d),
-                len(sf.shape_gradients_1d),
-                len(sf.weights_1d),
+                _gpu_kernel_argument("u", "memref<%dxf32>" % sf.n_shape, 0),
+                _gpu_kernel_argument("out", "memref<%dxf32>" % sf.n_shape, 1),
+                _gpu_kernel_argument("kappa_ref", "memref<1xf32>", 2),
+                _gpu_kernel_argument("shape_1d", "memref<%dxf32>" % len(sf.shape_values_1d), 3),
+                _gpu_kernel_argument("grad_1d", "memref<%dxf32>" % len(sf.shape_gradients_1d), 4),
+                _gpu_kernel_argument("weight_1d", "memref<%dxf32>" % len(sf.weights_1d), 5),
+                _spirv_entry_point_abi(sf.n_shape, 1, 1),
             )
         )
 
@@ -2094,19 +2098,19 @@ class TensorProductLaplaceFormBatchedGPULowering(TensorProductLaplaceFormGPULowe
     def _kernel_signature(self):
         sf = self.ir.sum_factor
         return (
-            "    gpu.func @%s_ebe_kernel(%%connectivity: %s, %%u: %s, %%element_out: %s, "
-            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
-            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
+            "    gpu.func @%s_ebe_kernel(%s, %s, %s, %s, %s, %s, %s) kernel "
             "attributes {sfem.form = \"laplace\", sfem.mesh_phase = \"ebe_map\", "
-            'sfem.parameter = "kappa"} {'
+            'sfem.parameter = "kappa", %s} {'
             % (
                 self.ir.function_prefix,
-                self.connectivity_memref_type,
-                self.u_memref_type,
-                self.element_out_memref_type,
-                len(sf.shape_values_1d),
-                len(sf.shape_gradients_1d),
-                len(sf.weights_1d),
+                _gpu_kernel_argument("connectivity", self.connectivity_memref_type, 0),
+                _gpu_kernel_argument("u", self.u_memref_type, 1),
+                _gpu_kernel_argument("element_out", self.element_out_memref_type, 2),
+                _gpu_kernel_argument("kappa_ref", "memref<1xf32>", 3),
+                _gpu_kernel_argument("shape_1d", "memref<%dxf32>" % len(sf.shape_values_1d), 4),
+                _gpu_kernel_argument("grad_1d", "memref<%dxf32>" % len(sf.shape_gradients_1d), 5),
+                _gpu_kernel_argument("weight_1d", "memref<%dxf32>" % len(sf.weights_1d), 6),
+                _spirv_entry_point_abi(sf.n_shape, 1, 1),
             )
         )
 
@@ -2256,35 +2260,35 @@ class TensorProductLaplaceFormEBEGPULowering(TensorProductLaplaceFormBatchedGPUL
     def _kernel_signature(self):
         sf = self.ir.sum_factor
         return (
-            "    gpu.func @%s_ebe_map_kernel(%%connectivity: %s, %%u: %s, %%element_out: %s, "
-            "%%kappa_ref: memref<1xf32>, %%shape_1d: memref<%dxf32>, "
-            "%%grad_1d: memref<%dxf32>, %%weight_1d: memref<%dxf32>) kernel "
+            "    gpu.func @%s_ebe_map_kernel(%s, %s, %s, %s, %s, %s, %s) kernel "
             "attributes {sfem.form = \"laplace\", sfem.mesh_phase = \"ebe_map\", "
-            'sfem.parameter = "kappa"} {'
+            'sfem.parameter = "kappa", %s} {'
             % (
                 self.ir.function_prefix,
-                self.connectivity_memref_type,
-                self.u_memref_type,
-                self.element_out_memref_type,
-                len(sf.shape_values_1d),
-                len(sf.shape_gradients_1d),
-                len(sf.weights_1d),
+                _gpu_kernel_argument("connectivity", self.connectivity_memref_type, 0),
+                _gpu_kernel_argument("u", self.u_memref_type, 1),
+                _gpu_kernel_argument("element_out", self.element_out_memref_type, 2),
+                _gpu_kernel_argument("kappa_ref", "memref<1xf32>", 3),
+                _gpu_kernel_argument("shape_1d", "memref<%dxf32>" % len(sf.shape_values_1d), 4),
+                _gpu_kernel_argument("grad_1d", "memref<%dxf32>" % len(sf.shape_gradients_1d), 5),
+                _gpu_kernel_argument("weight_1d", "memref<%dxf32>" % len(sf.weights_1d), 6),
+                _spirv_entry_point_abi(sf.n_shape, 1, 1),
             )
         )
 
     def _render_reduce_kernel(self):
         return [
             "",
-            "    gpu.func @%s_ebe_reduce_kernel(%%element_out: %s, %%node_degree: %s, "
-            "%%node_to_element_map: %s, %%node_to_local_idx: %s, %%out: %s) kernel "
-            'attributes {sfem.form = "laplace", sfem.mesh_phase = "ebe_reduce"} {'
+            "    gpu.func @%s_ebe_reduce_kernel(%s, %s, %s, %s, %s) kernel "
+            'attributes {sfem.form = "laplace", sfem.mesh_phase = "ebe_reduce", %s} {'
             % (
                 self.ir.function_prefix,
-                self.element_out_memref_type,
-                self.node_degree_memref_type,
-                self.inverse_topology_memref_type,
-                self.inverse_topology_memref_type,
-                self.output_memref_type,
+                _gpu_kernel_argument("element_out", self.element_out_memref_type, 0),
+                _gpu_kernel_argument("node_degree", self.node_degree_memref_type, 1),
+                _gpu_kernel_argument("node_to_element_map", self.inverse_topology_memref_type, 2),
+                _gpu_kernel_argument("node_to_local_idx", self.inverse_topology_memref_type, 3),
+                _gpu_kernel_argument("out", self.output_memref_type, 4),
+                _spirv_entry_point_abi(self.max_nodes, 1, 1),
             ),
             "      %node = gpu.thread_id x",
             "      %c0 = arith.constant 0 : index",
@@ -2744,6 +2748,29 @@ def _affine_expr_term(expr):
     if " " in expr or "+" in expr:
         return "(%s)" % expr
     return expr
+
+
+def _spirv_entry_point_abi(x, y, z):
+    return "spirv.entry_point_abi = #spirv.entry_point_abi<workgroup_size = [%d, %d, %d]>" % (
+        int(x),
+        int(y),
+        int(z),
+    )
+
+
+def _spirv_interface_var_abi(binding, descriptor_set=0):
+    return "spirv.interface_var_abi = #spirv.interface_var_abi<(%d, %d)>" % (
+        int(descriptor_set),
+        int(binding),
+    )
+
+
+def _gpu_kernel_argument(name, memref_type, binding, descriptor_set=0):
+    return "%%%s: %s {%s}" % (
+        name,
+        memref_type,
+        _spirv_interface_var_abi(binding, descriptor_set),
+    )
 
 
 def _product(values):

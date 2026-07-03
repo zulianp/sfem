@@ -52,6 +52,11 @@ namespace sfem {
             return matched;
         }
 
+        void material_defaults(real_t *const values) {
+            values[0] = 1;
+            values[1] = 1;
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = 2;
         constexpr int N_MATERIAL_PARAMETERS = 2;
@@ -87,11 +92,6 @@ namespace sfem {
         std::string yaml_read_string(const ryml::ConstNodeRef &node) {
             const auto value = node.val();
             return std::string(value.str, value.len);
-        }
-
-        void material_defaults(real_t *const values) {
-            values[0] = 1;
-            values[1] = 1;
         }
 
         void copy_material_parameters(const real_t *const src,
@@ -176,18 +176,34 @@ namespace sfem {
             return 0;
         }
 
+        struct AffineGeometryCache {
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+        };
+
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
             auto mesh = space->mesh_ptr();
+            const bool needs_jacobian_aos =
+                    false ||
+                    false;
             for (auto &entry : domains.domains()) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if (needs_jacobian_aos) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -700,12 +716,21 @@ namespace sfem {
             if (needs_affine_geometry) {
                 const smesh::block_idx_t block_id =
                         block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+                auto cache = std::make_shared<AffineGeometryCache>();
+                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
                         mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
+                if (!cache->jacobian_soa) {
                     return SFEM_FAILURE;
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+                if ((impl_->gradient_uses_affine && false) ||
+                    (impl_->apply_uses_affine && false)) {
+                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+                    if (!cache->jacobian_aos) {
+                        return SFEM_FAILURE;
+                    }
+                }
+                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
@@ -718,18 +743,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->gradient_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedNeoHookeanOgden affine gradient requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (false) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("GeneratedNeoHookeanOgden affine gradient requires cached AoS geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
                 case smesh::TRI3:
@@ -772,18 +808,29 @@ namespace sfem {
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
+            const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedNeoHookeanOgden affine hessian action requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
+                if (false) {
+                    if (!cache->jacobian_aos) {
+                        SFEM_ERROR("GeneratedNeoHookeanOgden affine hessian action requires cached AoS geometry\n");
+                        return SFEM_FAILURE;
+                    }
+                    adjugate_aos = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+                    determinant = reinterpret_cast<const geom_t *>(
+                            cache->jacobian_aos->jacobian_determinant()->data());
+                }
             }
             switch (domain.element_type) {
                 case smesh::TRI3:
@@ -828,16 +875,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedNeoHookeanOgden affine objective requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             std::fill(impl_->element_values.get(),
                       impl_->element_values.get() + nelements,
@@ -913,16 +960,16 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
             if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
-                if (!jacobian) {
+                if (!cache || !cache->jacobian_soa) {
                     SFEM_ERROR("GeneratedNeoHookeanOgden affine objective_steps requires cached geometry\n");
                     return SFEM_FAILURE;
                 }
                 adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
+                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+                        cache->jacobian_soa->jacobian_determinant()->data());
             }
             if (nvalues > impl_->element_capacity) {
                 impl_->element_values.reset(new real_t[nvalues]);

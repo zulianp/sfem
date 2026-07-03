@@ -42,12 +42,18 @@ def main():
     )
     parser.add_argument("--validate-mlir", action="store_true", help="run mlir-opt --verify-diagnostics on .mlir files")
     parser.add_argument("--probe-iree-metal", action="store_true", help="try iree-compile --iree-hal-target-backends=metal-spirv")
+    parser.add_argument("--run-iree-metal-runtime", action="store_true", help="compile and dispatch the full-form IREE Metal VMFB")
     parser.add_argument("--probe-metal-toolchain", action="store_true", help="try offline xcrun metal compilation for generated .metal files")
     parser.add_argument("--run-metal-smoke", action="store_true", help="compile and run local and EBE Metal smoke tests")
     parser.add_argument(
         "--require-iree-metal",
         action="store_true",
         help="return nonzero when the IREE Metal probe is skipped or fails",
+    )
+    parser.add_argument(
+        "--require-iree-metal-runtime",
+        action="store_true",
+        help="return nonzero when the IREE Metal runtime smoke test is skipped or fails",
     )
     parser.add_argument(
         "--require-metal-device",
@@ -135,6 +141,7 @@ def main():
         "max_node_degree": args.max_node_degree,
         "artifacts": artifact_groups,
         "iree_metal": [],
+        "iree_metal_runtime": [],
         "mlir_validation": [],
         "metal_smoke": [],
         "metal_toolchain": [],
@@ -165,6 +172,11 @@ def main():
             ],
         )
 
+    if args.run_iree_metal_runtime:
+        manifest["iree_metal_runtime"] = [
+            _run_iree_metal_runtime_smoke(output_dir / "iree_metal_runtime", form_ir, form_linalg)
+        ]
+
     if args.probe_metal_toolchain:
         manifest["metal_toolchain"] = _probe_metal_toolchain(output_dir)
 
@@ -186,6 +198,9 @@ def main():
     if args.require_iree_metal:
         if not manifest["iree_metal"] or any(not item.get("ok", False) for item in manifest["iree_metal"]):
             return 5
+    if args.require_iree_metal_runtime:
+        if not manifest["iree_metal_runtime"] or any(not item.get("ok", False) for item in manifest["iree_metal_runtime"]):
+            return 9
     if args.require_metal_toolchain:
         if not manifest["metal_toolchain"] or any(not item.get("ok", False) for item in manifest["metal_toolchain"]):
             return 8
@@ -345,6 +360,7 @@ def _verify_performance_shape(output_dir):
     metal_files = sorted(output_dir.rglob("*.metal"))
 
     results.append(_require_token("linalg_matmul", linalg_files, "linalg.matmul"))
+    results.append(_require_token("linalg_fill_accumulators", linalg_files + linalg_pipeline_files, "linalg.fill"))
     results.append(_require_token("linalg_pipeline_calls", linalg_pipeline_files, "func.call"))
     results.append(_require_token("linalg_pipeline_bridges", linalg_pipeline_files, "linalg.generic"))
     results.append(_require_token("vector_matrix_multiply", vector_files, "vector.matrix_multiply"))
@@ -356,6 +372,8 @@ def _verify_performance_shape(output_dir):
     results.extend(_verify_matrix_unit_alignment(path) for path in matrix_unit_files)
     results.extend(_verify_matrix_unit_alignment(path) for path in matrix_unit_memref_files)
     results.extend(_verify_matrix_unit_alignment(path) for path in matrix_unit_pipeline_files)
+    results.append(_require_token("gpu_spirv_entry_point_abi", gpu_files, "spirv.entry_point_abi"))
+    results.append(_require_token("gpu_spirv_interface_var_abi", gpu_files, "spirv.interface_var_abi"))
     for path in gpu_files:
         results.append(_forbid_tokens("gpu_hot_loop_shape", path, ("scf.if", "arith.cmpi", "atomic")))
         if path.name.endswith(".ebe.full.gpu.mlir"):
@@ -537,6 +555,107 @@ def _probe_iree_metal(output_dir, lowerings):
             }
         )
     return results
+
+
+def _run_iree_metal_runtime_smoke(output_dir, form_ir, form_linalg_lowering):
+    try:
+        import numpy as np
+        import iree.runtime as iree_runtime
+    except ImportError as exc:
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": True,
+            "reason": "iree-runtime is not available: %s" % exc,
+        }
+    iree_compile = shutil.which("iree-compile")
+    if iree_compile is None:
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": True,
+            "reason": "iree-compile is not available",
+        }
+    if "metal" not in iree_runtime.query_available_drivers():
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": True,
+            "reason": "IREE runtime metal driver is not available",
+        }
+    try:
+        iree_runtime.get_driver("metal").create_default_device()
+    except Exception as exc:
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": True,
+            "no_default_device": True,
+            "reason": str(exc),
+        }
+    try:
+        output_vmfb, compile_result = form_linalg_lowering.compile_with_iree_metal(
+            output_dir,
+            iree_compile=iree_compile,
+        )
+        module = iree_runtime.load_vm_flatbuffer_file(str(output_vmfb), driver="metal")
+        function = getattr(module, form_ir.function_prefix + "_linalg_pipeline")
+        sf = form_ir.sum_factor
+        shape = np.array(sf.shape_values_1d, dtype=np.float32).reshape(sf.n_qp_1d, sf.n_shape_1d)
+        grad = np.array(sf.shape_gradients_1d, dtype=np.float32).reshape(sf.n_qp_1d, sf.n_shape_1d)
+        weights = np.array(sf.weights_1d, dtype=np.float32)
+        kappa = np.array([form_ir.parameter_default], dtype=np.float32)
+        u_values = np.array(
+            [0.5 + 0.03125 * (index + 1) for index in range(sf.n_shape)],
+            dtype=np.float32,
+        )
+        u = u_values.reshape(sf.n_shape_1d, sf.n_shape // sf.n_shape_1d)
+        result = np.asarray(
+            function(
+                shape,
+                grad,
+                shape.T.copy(),
+                grad.T.copy(),
+                weights,
+                kappa,
+                u,
+            )
+        )
+        reference = np.array(
+            TensorProductLaplaceReferenceEvaluator(form_ir).apply_local(tuple(float(value) for value in u_values)),
+            dtype=np.float32,
+        ).reshape(result.shape)
+    except subprocess.CalledProcessError as exc:
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": False,
+            "phase": "compile",
+            "returncode": exc.returncode,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        }
+    except Exception as exc:
+        return {
+            "name": "laplace_form_linalg_pipeline_metal_runtime",
+            "ok": False,
+            "skipped": False,
+            "phase": "runtime",
+            "reason": str(exc),
+        }
+    max_abs_diff = float(np.max(np.abs(result - reference))) if result.size else 0.0
+    return {
+        "name": "laplace_form_linalg_pipeline_metal_runtime",
+        "ok": compile_result.returncode == 0 and output_vmfb.exists() and max_abs_diff <= 1.0e-5,
+        "skipped": False,
+        "returncode": compile_result.returncode,
+        "output_vmfb": str(output_vmfb),
+        "stdout": compile_result.stdout,
+        "stderr": compile_result.stderr,
+        "driver": "metal",
+        "max_abs_diff": max_abs_diff,
+        "result_shape": list(result.shape),
+    }
 
 
 def _probe_metal_toolchain(output_dir):

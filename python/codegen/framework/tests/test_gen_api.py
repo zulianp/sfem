@@ -4278,6 +4278,13 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];", op_source)
             self.assertIn("condition.values->data()[0]", op_source)
             self.assertIn("void GeneratedNeumann::add_sideset", op_source)
+            ryaml_idx = op_source.index("#ifdef SFEM_ENABLE_RYAML")
+            material_defaults_idx = op_source.index("void material_defaults")
+            self.assertLess(
+                material_defaults_idx,
+                ryaml_idx,
+                "material_defaults must be available when SFEM_ENABLE_RYAML is disabled",
+            )
             self.assertIn(
                 "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
                 op_source,

@@ -3780,6 +3780,10 @@ def _yaml_helpers(defaults):
             return matched;
         }
 
+        void material_defaults(real_t *const values) {
+%(default_lines)s
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
         constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
@@ -3815,10 +3819,6 @@ def _yaml_helpers(defaults):
         std::string yaml_read_string(const ryml::ConstNodeRef &node) {
             const auto value = node.val();
             return std::string(value.str, value.len);
-        }
-
-        void material_defaults(real_t *const values) {
-%(default_lines)s
         }
 
         void copy_material_parameters(const real_t *const src,

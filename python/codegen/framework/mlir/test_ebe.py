@@ -711,9 +711,11 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             harness = artifacts.file_for_suffix(".metal_smoke.mm").read_text()
 
         self.assertIn("linalg.matmul", linalg_module)
+        self.assertIn("linalg.fill", linalg_module)
         self.assertIn('sfem.lowering = "tensor_product_sum_factor_linalg_pipeline"', linalg_pipeline_module)
         self.assertIn("func.call @", linalg_pipeline_module)
         self.assertIn("linalg.generic", linalg_pipeline_module)
+        self.assertIn("linalg.fill", linalg_pipeline_module)
         self.assertIn("vector.matrix_multiply", vector_module)
         self.assertIn('sfem.lowering = "tensor_product_sum_factor_matrix_unit"', matrix_unit_module)
         self.assertIn("sfem.matrix_unit.tile_size = 8 : i64", matrix_unit_module)
@@ -725,6 +727,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("memref.alloc", matrix_unit_pipeline_module)
         self.assertIn('sfem.lowering = "tensor_product_sum_factor_gpu"', gpu_module)
         self.assertIn("gpu.launch_func", gpu_module)
+        self.assertIn("spirv.entry_point_abi", gpu_module)
+        self.assertIn("spirv.interface_var_abi", gpu_module)
         self.assertIn("kernel void sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_metal", metal_source)
         self.assertIn("newLibraryWithSource", harness)
         self.assertNotIn("scf.if", gpu_module)
@@ -810,6 +814,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(module.count("gpu.func @"), 1)
         self.assertIn("memref<4xf32>", module)
         self.assertIn("memref<1xf32>", module)
+        self.assertIn("spirv.entry_point_abi = #spirv.entry_point_abi<workgroup_size = [4, 1, 1]>", module)
+        self.assertIn("spirv.interface_var_abi = #spirv.interface_var_abi<(0, 0)>", module)
         self.assertIn("scf.for %qy", module)
         self.assertIn("scf.for %sx", module)
         self.assertNotIn("scf.if", module)
@@ -1197,6 +1203,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 "--verify-performance-shape",
                 "--validate-mlir",
                 "--probe-iree-metal",
+                "--run-iree-metal-runtime",
                 "--probe-metal-toolchain",
             ]
             result = subprocess.run(
@@ -1260,6 +1267,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(manifest["performance_shape"])
         self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
         self.assertTrue(any(item["name"] == "linalg_matmul" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "linalg_fill_accumulators" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "linalg_pipeline_calls" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "linalg_pipeline_bridges" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "vector_matrix_multiply" for item in manifest["performance_shape"]))
@@ -1269,6 +1277,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(any(item["name"] == "matrix_unit_pipeline_calls" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_pipeline_scratch" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_alignment" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "gpu_spirv_entry_point_abi" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "gpu_spirv_interface_var_abi" for item in manifest["performance_shape"]))
         ebe_topology = next(
             item for item in manifest["performance_shape"] if item["name"] == "ebe_gpu_topology"
         )
@@ -1285,6 +1295,15 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         else:
             self.assertTrue(all(item["ok"] for item in manifest["iree_metal"]), manifest["iree_metal"])
             self.assertTrue(all(item["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb") for item in manifest["iree_metal"]))
+        self.assertEqual(len(manifest["iree_metal_runtime"]), 1)
+        runtime = manifest["iree_metal_runtime"][0]
+        if runtime.get("skipped"):
+            self.assertIn("reason", runtime)
+        else:
+            self.assertTrue(runtime["ok"], runtime)
+            self.assertEqual(runtime["driver"], "metal")
+            self.assertLessEqual(runtime["max_abs_diff"], 1.0e-5)
+            self.assertTrue(runtime["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb"))
         self.assertTrue(manifest["metal_toolchain"])
         if shutil.which("xcrun") is None:
             self.assertTrue(all(item["skipped"] for item in manifest["metal_toolchain"]))

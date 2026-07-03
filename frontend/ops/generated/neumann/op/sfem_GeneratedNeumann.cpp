@@ -57,6 +57,12 @@ namespace sfem {
             return matched;
         }
 
+        void material_defaults(real_t *const values) {
+            values[0] = 0;
+            values[1] = 0;
+            values[2] = 0;
+        }
+
 #ifdef SFEM_ENABLE_RYAML
         constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
         constexpr int N_MATERIAL_PARAMETERS = 3;
@@ -92,12 +98,6 @@ namespace sfem {
         std::string yaml_read_string(const ryml::ConstNodeRef &node) {
             const auto value = node.val();
             return std::string(value.str, value.len);
-        }
-
-        void material_defaults(real_t *const values) {
-            values[0] = 0;
-            values[1] = 0;
-            values[2] = 0;
         }
 
         void copy_material_parameters(const real_t *const src,
