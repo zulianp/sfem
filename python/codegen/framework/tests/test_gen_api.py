@@ -3311,7 +3311,7 @@ class GenApiTest(unittest.TestCase):
                 contents,
             )
             self.assertIn(
-                "const scalar_t *const block_current_streams[N_FIELD_STREAMS] = {"
+                "const scalar_t *const block_current_streams[89] = {"
                 "block_current[0], block_current[8], block_current[1]",
                 contents,
             )
@@ -3321,7 +3321,7 @@ class GenApiTest(unittest.TestCase):
                 contents,
             )
             self.assertIn(
-                "scalar_t *const block_output_streams[N_FIELD_STREAMS] = {"
+                "scalar_t *const block_output_streams[89] = {"
                 "block_output[0], block_output[8], block_output[1]",
                 contents,
             )
@@ -3450,6 +3450,15 @@ class GenApiTest(unittest.TestCase):
             self.assertNotIn("idx_t ev[VECTOR_SIZE * CELL_N_SHAPE]", operator_source)
             self.assertNotIn("ev[lane * CELL_N_SHAPE", operator_source)
             self.assertNotIn("ev[scatter * CELL_N_SHAPE", operator_source)
+            self.assertIn("const jacobian_t *const affine_geometry_sources", operator_source)
+            self.assertIn("for (int geometry_stream = 0;", operator_source)
+            self.assertIn("block_affine_geometry_streams[geometry_stream]", operator_source)
+            self.assertNotIn("block_jacobian_adjugate0_data", operator_source)
+            self.assertNotIn("const scalar_t *const block_jacobian_adjugate0", operator_source)
+            self.assertIn("block_direction, mu, block_output", operator_source)
+            self.assertNotIn("ContiguousBlockStreams", operator_source)
+            self.assertNotIn("block_direction_streams[stream] = block_direction[stream]", operator_source)
+            self.assertNotIn("block_output_streams[stream] = block_output[stream]", operator_source)
             subprocess.run(
                 [
                     compiler,
@@ -3658,7 +3667,10 @@ class GenApiTest(unittest.TestCase):
                 "laplace_tet4_residual_isoparametric_mesh_soa("
             )
             isoparametric_source = operator_source[isoparametric_begin:isoparametric_end]
-            self.assertIn("laplace_d3_simplex_residual_block<", isoparametric_source)
+            self.assertIn(
+                "laplace_d3_simplex_residual_block_contiguous<",
+                isoparametric_source,
+            )
             self.assertNotIn(
                 "laplace_d3_simplex_tet4_residual_block<",
                 isoparametric_source,

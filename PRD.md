@@ -674,4 +674,4 @@ These examples demonstrate:
 - Backend C entry points: `hex8_neohookean_smith_active_strain_*` mirroring Ogden active-strain with extra `lmda` argument.
 
 ### Codegen M8 Requirements
-- Generated mesh gather/scatter must use unified mesh-block emitters, direct SoA `elements[shape][evbegin + lane]` access, and basis-function loops around SIMD lane loops; it must not emit per-basis unrolled gather/scatter code or stage connectivity into blocked `ev` arrays.
+- Generated mesh gather/scatter must use unified mesh-block emitters, direct SoA `elements[shape][evbegin + lane]` access, compact affine geometry-stream loops, generator-selected concrete pointer/contiguous tensor-product stream calls, and basis-function loops around SIMD lane loops; it must not emit per-basis unrolled gather/scatter code, per-component affine geometry conversion blocks, identity field/coordinate stream-copy loops, residual `StreamContainer` dispatch, proxy stream wrappers, or blocked `ev` connectivity staging.

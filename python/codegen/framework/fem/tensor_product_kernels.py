@@ -1,6 +1,102 @@
 from codegen.framework.backends.targets import OpenMPTarget
 
 
+def _matching_brace_index(text, open_brace):
+    depth = 0
+    for index in range(open_brace, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    raise RuntimeError("unmatched brace while expanding tensor-product kernels")
+
+
+def _residual_stream_method_end(text, start):
+    open_brace = text.find("{", start)
+    if open_brace < 0:
+        raise RuntimeError("missing residual stream method body")
+    close_brace = _matching_brace_index(text, open_brace)
+    semicolon = close_brace + 1
+    while semicolon < len(text) and text[semicolon].isspace():
+        if text[semicolon] == "\n":
+            break
+        semicolon += 1
+    return close_brace + 1
+
+
+def _expand_residual_stream_method(method):
+    pointer_method = method.replace(
+        "template <int N_FIELDS, typename StreamContainer>",
+        "template <int N_FIELDS>",
+        1,
+    )
+    pointer_method = pointer_method.replace(
+        "const StreamContainer streams,",
+        "const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],",
+        1,
+    )
+    pointer_method = pointer_method.replace(
+        "StreamContainer output)",
+        "scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE])",
+        1,
+    )
+
+    contiguous_method = method.replace(
+        "template <int N_FIELDS, typename StreamContainer>",
+        "template <int N_FIELDS>",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "void evaluate(",
+        "void evaluate_contiguous(",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "void evaluate_value(",
+        "void evaluate_value_contiguous(",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "void integrate(",
+        "void integrate_contiguous(",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "void integrate_value(",
+        "void integrate_value_contiguous(",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "const StreamContainer streams,",
+        "const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],",
+        1,
+    )
+    contiguous_method = contiguous_method.replace(
+        "StreamContainer output)",
+        "scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE])",
+        1,
+    )
+    return "%s\n\n%s" % (pointer_method, contiguous_method)
+
+
+def _expand_residual_stream_layouts(header):
+    generic_template = "    template <int N_FIELDS, typename StreamContainer>\n"
+    chunks = []
+    cursor = 0
+    while True:
+        start = header.find(generic_template, cursor)
+        if start < 0:
+            chunks.append(header[cursor:])
+            return "".join(chunks)
+        end = _residual_stream_method_end(header, start)
+        chunks.append(header[cursor:start])
+        chunks.append(_expand_residual_stream_method(header[start:end]))
+        cursor = end
+
+
 def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     if single_work_item:
         return "%s{" % indent
@@ -57,7 +153,7 @@ def sfem_tensor_product_kernels_header_source(
             simd_lines,
             single_work_item,
         )
-    return _TENSOR_PRODUCT_KERNELS_TEMPLATE % values
+    return _expand_residual_stream_layouts(_TENSOR_PRODUCT_KERNELS_TEMPLATE % values)
 
 
 _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
@@ -364,12 +460,12 @@ struct TensorProductResidualOps;
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void evaluate(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            const StreamContainer streams,
             scalar_t *const value,
             scalar_t *const gradient) {
         static constexpr int Q = integer_root(N_QP, 2);
@@ -410,11 +506,11 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void evaluate_value(
             const int nelems,
             const scalar_t *const shape_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            const StreamContainer streams,
             scalar_t *const value) {
         static constexpr int Q = integer_root(N_QP, 2);
         static constexpr int S = integer_root(N_SHAPE, 2);
@@ -441,14 +537,14 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void integrate(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const value_coeff,
             const scalar_t *const grad_coeff,
-            scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+            StreamContainer output) {
         static constexpr int Q = integer_root(N_QP, 2);
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
@@ -481,12 +577,12 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void integrate_value(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
-            scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+            StreamContainer output) {
         static constexpr int Q = integer_root(N_QP, 2);
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
@@ -515,12 +611,12 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void evaluate(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            const StreamContainer streams,
             scalar_t *const value,
             scalar_t *const gradient) {
         static constexpr int Q = integer_root(N_QP, 3);
@@ -584,11 +680,11 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void evaluate_value(
             const int nelems,
             const scalar_t *const shape_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            const StreamContainer streams,
             scalar_t *const value) {
         static constexpr int Q = integer_root(N_QP, 3);
         static constexpr int S = integer_root(N_SHAPE, 3);
@@ -625,14 +721,14 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void integrate(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const value_coeff,
             const scalar_t *const grad_coeff,
-            scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+            StreamContainer output) {
         static constexpr int Q = integer_root(N_QP, 3);
         static constexpr int S = integer_root(N_SHAPE, 3);
         scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
@@ -685,12 +781,12 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
         }
     }
 
-    template <int N_FIELDS>
+    template <int N_FIELDS, typename StreamContainer>
     static %(inline_qualifier)s void integrate_value(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
-            scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+            StreamContainer output) {
         static constexpr int Q = integer_root(N_QP, 3);
         static constexpr int S = integer_root(N_SHAPE, 3);
         scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
@@ -740,12 +836,34 @@ static %(inline_qualifier)s void tensor_evaluate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static %(inline_qualifier)s void tensor_evaluate_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const grad_1d,
+        const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+        scalar_t *const value,
+        scalar_t *const gradient) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_contiguous<N_FIELDS>(
+            nelems, shape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_evaluate_value(
         const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
         scalar_t *const value) {
     TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_value<N_FIELDS>(
+            nelems, shape_1d, streams, value);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static %(inline_qualifier)s void tensor_evaluate_value_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+        scalar_t *const value) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_value_contiguous<N_FIELDS>(
             nelems, shape_1d, streams, value);
 }
 
@@ -762,12 +880,34 @@ static %(inline_qualifier)s void tensor_integrate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static %(inline_qualifier)s void tensor_integrate_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const grad_1d,
+        const scalar_t *const value_coeff,
+        const scalar_t *const grad_coeff,
+        scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_contiguous<N_FIELDS>(
+            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static %(inline_qualifier)s void tensor_integrate_value(
         const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const value_coeff,
         scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
     TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_value<N_FIELDS>(
+            nelems, shape_1d, value_coeff, output);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static %(inline_qualifier)s void tensor_integrate_value_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const value_coeff,
+        scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_value_contiguous<N_FIELDS>(
             nelems, shape_1d, value_coeff, output);
 }
 

@@ -307,6 +307,7 @@ def tensor_product_isoparametric_geometry_lines(
     determinant_target,
     adjugate_streams=None,
     determinant_stream=None,
+    contiguous_coordinate_streams=False,
 ):
     if dim not in (2, 3):
         raise ValueError("tensor-product geometry supports dimensions 2 and 3")
@@ -327,18 +328,25 @@ def tensor_product_isoparametric_geometry_lines(
         n_qp_1d,
     )
 
-    lines = coordinate_stream_array_lines(
-        coordinate_streams,
-        stream_array_name=stream_array_name,
-        indent=indent,
-    )
+    if contiguous_coordinate_streams:
+        if not isinstance(coordinate_streams, str):
+            raise ValueError("contiguous coordinate streams require a storage name")
+        lines = []
+        evaluator_streams = coordinate_streams
+    else:
+        lines = coordinate_stream_array_lines(
+            coordinate_streams,
+            stream_array_name=stream_array_name,
+            indent=indent,
+        )
+        evaluator_streams = stream_array_name
     lines.extend([
         "%sscalar_t %s[DIM * N_QP * DIM * VECTOR_SIZE];"
         % (indent, gradient_name),
     ])
     lines.extend(
         evaluator_lines(
-            stream_array_name,
+            evaluator_streams,
             gradient_name,
             indent,
         )
@@ -405,13 +413,19 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
     determinant_target,
     adjugate_streams=None,
     determinant_stream=None,
+    contiguous_coordinate_streams=False,
 ):
     def evaluator_lines(streams, gradient, evaluator_indent):
+        tensor_evaluate = (
+            "tensor_evaluate_contiguous"
+            if contiguous_coordinate_streams
+            else "tensor_evaluate"
+        )
         return [
             "%sscalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];"
             % evaluator_indent,
-            "%stensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>("
-            % evaluator_indent,
+            "%s%s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>("
+            % (evaluator_indent, tensor_evaluate),
             "%s        nelems, %s, %s, %s,"
             % (evaluator_indent, shape_name, grad_name, streams),
             "%s        coordinate_value, %s);" % (evaluator_indent, gradient),
@@ -430,6 +444,7 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
         determinant_target=determinant_target,
         adjugate_streams=adjugate_streams,
         determinant_stream=determinant_stream,
+        contiguous_coordinate_streams=contiguous_coordinate_streams,
     )
 
 
