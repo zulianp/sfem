@@ -471,6 +471,10 @@ def _build_pipeline_evidence(manifest):
             manifest.get("mlir_gpu_to_spirv", []),
             "host_launch_ok",
         ),
+        "raw_gpu_spirv_host_wrapper_ok": _all_optional_key_ok(
+            manifest.get("mlir_gpu_to_spirv", []),
+            "host_wrapper_ok",
+        ),
         "raw_gpu_spirv_diagnostics": raw_gpu_spirv_diagnostics,
         "matrix_unit_iree_probe_ok": _all_required_ok(manifest.get("iree_metal_matrix_unit", [])),
         "matrix_unit_iree_diagnostics": matrix_unit_diagnostics,
@@ -1600,21 +1604,19 @@ def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     results = []
-    pass_pipeline = [
-        "--spirv-attach-target=client_api=OpenCL",
-        "--map-memref-spirv-storage-class=client-api=opencl",
-        "--convert-gpu-to-spirv",
-        "--convert-scf-to-spirv",
-        "--convert-memref-to-spirv",
-        "--convert-arith-to-spirv",
-        "--verify-diagnostics",
-    ]
+    pass_pipeline = (
+        "builtin.module("
+        "spirv-attach-target{client_api=OpenCL},"
+        "map-memref-spirv-storage-class{client-api=opencl},"
+        "convert-to-spirv{convert-gpu-modules}"
+        ")"
+    )
     for group, path in gpu_artifacts:
         name = _mlir_gpu_to_spirv_probe_name(group, path)
         probe_dir = output_dir / name
         probe_dir.mkdir(parents=True, exist_ok=True)
         output_mlir = probe_dir / ("%s.gpu_to_spirv.mlir" % Path(path).stem)
-        command = [mlir_opt, str(path), *pass_pipeline]
+        command = [mlir_opt, str(path), "--pass-pipeline=%s" % pass_pipeline, "--verify-diagnostics"]
         result = subprocess.run(
             command,
             text=True,
@@ -1629,6 +1631,8 @@ def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
         diagnostic = _classify_mlir_gpu_to_spirv_diagnostic(result.stderr or "", output_text)
         remaining_gpu_launch_count = output_text.count("gpu.launch_func")
         remaining_gpu_module_count = output_text.count("gpu.module @")
+        host_func_count = output_text.count("func.func @")
+        host_wrapper_ok = result.returncode == 0 and host_func_count > 0 and remaining_gpu_launch_count > 0
         memref_load_count = output_text.count("memref.load")
         memref_store_count = output_text.count("memref.store")
         kernel_module_info = _probe_extracted_spirv_kernel_modules(
@@ -1641,8 +1645,7 @@ def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
             result.returncode == 0
             and "spirv.module" in output_text
             and output_text.count("spirv.func") > 0
-            and memref_load_count == 0
-            and memref_store_count == 0
+            and kernel_module_info.get("kernel_module_ok", False)
         )
         host_launch_ok = remaining_gpu_launch_count == 0 and remaining_gpu_module_count == 0
         results.append(
@@ -1651,6 +1654,7 @@ def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
                 "ok": kernel_ok and host_launch_ok,
                 "kernel_ok": kernel_ok,
                 "host_launch_ok": host_launch_ok,
+                "host_wrapper_ok": host_wrapper_ok,
                 "skipped": False,
                 "artifact_group": group,
                 "input_path": str(path),
@@ -1664,6 +1668,7 @@ def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
                 **kernel_module_info,
                 "remaining_gpu_launch_count": remaining_gpu_launch_count,
                 "remaining_gpu_module_count": remaining_gpu_module_count,
+                "remaining_host_func_count": host_func_count,
                 "remaining_memref_load_count": memref_load_count,
                 "remaining_memref_store_count": memref_store_count,
                 **diagnostic,
