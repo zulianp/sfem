@@ -1,39 +1,46 @@
 #!/usr/bin/env bash
 #
-# Compile SFEM under many CPU CMake option combinations (optional dependencies on/off).
-# Intended for macOS workstations and CSCS Alps (Piz Daint) login/compile nodes.
+# Compile SFEM under many CUDA CMake option combinations (SFEM_ENABLE_CUDA=ON).
+# Sweeps optional CPU dependencies together with CUDA-specific dimensions:
+# memory model (host/managed/unified) and line-info.
+# Intended for CUDA-capable Linux workstations and CSCS Alps (GH200) nodes.
 #
 # Usage:
-#   ./scripts/testing/test_CPU_configs.sh              # quick sweep (default)
-#   ./scripts/testing/test_CPU_configs.sh --all        # full 2^N valid combinations
-#   ./scripts/testing/test_CPU_configs.sh --pairwise   # pairwise flag combinations
-#   ./scripts/testing/test_CPU_configs.sh --list       # print configs, do not build
-#   ./scripts/testing/test_CPU_configs.sh --config 42  # build one entry from --list
+#   ./scripts/testing/test_CUDA_configs.sh              # quick sweep (default)
+#   ./scripts/testing/test_CUDA_configs.sh --all        # full 2^N valid combinations
+#   ./scripts/testing/test_CUDA_configs.sh --pairwise   # pairwise flag combinations
+#   ./scripts/testing/test_CUDA_configs.sh --list       # print configs, do not build
+#   ./scripts/testing/test_CUDA_configs.sh --config 42  # build one entry from --list
 #
 # Alps (CSCS) example:
-#   cd $SCRATCH/sfem && SFEM_USE_UENV=1 JOBS=32 ./scripts/testing/test_CPU_configs.sh --quick
-#   sbatch --wrap='cd $SCRATCH/sfem && SFEM_USE_UENV=1 ./scripts/testing/test_CPU_configs.sh --all'
+#   cd $SCRATCH/sfem && SFEM_USE_UENV=1 JOBS=32 ./scripts/testing/test_CUDA_configs.sh --quick
+#   sbatch --wrap='cd $SCRATCH/sfem && SFEM_USE_UENV=1 ./scripts/testing/test_CUDA_configs.sh --all'
 #
 # Environment (optional):
 #   MODE=quick|pairwise|all     # sweep mode (default quick)
 #   CONFIG_INDEX=42              # build only this index from the sweep list
-#   BUILD_ROOT=...           # default: <repo>/build_cpu_configs
+#   BUILD_ROOT=...           # default: <repo>/build_cuda_configs
 #   JOBS=8
 #   RUN_TESTS=0|1            # run ctest after each successful build (default 0)
 #   CMAKE_BUILD_TYPE=Release
 #   MATRIXIO_DIR, METIS_DIR  # forwarded to CMake when set
 #   SFEM_USE_UENV=auto|0|1   # Alps: wrap cmake/make in CSCS uenv (default auto)
 #   UENV_IMAGE=prgenv-gnu/24.7:v3
-#   OPENMP_DIR               # macOS Homebrew libomp prefix, e.g. /opt/homebrew/opt/libomp
+#   OPENMP_DIR               # Homebrew libomp prefix on macOS (rarely relevant for CUDA)
 #   SKIP_MISSING_DEPS=1      # skip configs needing unavailable externals (default 1)
 #   ONLY_FLAGS=OPENMP,METIS  # limit which toggles enter the combination matrix
 #   EXCLUDE_FLAGS=PYTHON     # never turn these ON in generated configs
+#   CUDA_MEMORY_MODELS=host,managed,unified  # memory models to sweep (default host;
+#                                            #   quick mode always covers all three on minimal)
+#   CUDA_LINEINFO=0|1        # -DSFEM_ENABLE_CUDA_LINEINFO (default 0)
+#   SFEM_CUDA_ARCH=90        # -DCMAKE_CUDA_ARCHITECTURES (default: CMake/nvcc auto-detect)
+#   CUDACXX / CMAKE_CUDA_COMPILER  # override nvcc path
 #
 
 set -euo pipefail
 
 usage() {
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 log() { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
@@ -45,13 +52,15 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." >/dev/null 2>&1 && pwd -P)"
 MODE="${MODE:-quick}"
 SWEEP_MODE="${SWEEP_MODE:-}"
 CONFIG_INDEX="${CONFIG_INDEX:-}"
-BUILD_ROOT="${BUILD_ROOT:-${REPO_ROOT}/build_cpu_configs}"
+BUILD_ROOT="${BUILD_ROOT:-${REPO_ROOT}/build_cuda_configs}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 RUN_TESTS="${RUN_TESTS:-0}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 SKIP_MISSING_DEPS="${SKIP_MISSING_DEPS:-1}"
 SFEM_USE_UENV="${SFEM_USE_UENV:-auto}"
 UENV_IMAGE="${UENV_IMAGE:-prgenv-gnu/24.7:v3}"
+CUDA_LINEINFO="${CUDA_LINEINFO:-0}"
+SFEM_CUDA_ARCH="${SFEM_CUDA_ARCH:-}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -114,7 +123,7 @@ if [[ "$SFEM_USE_UENV" == auto ]]; then
     fi
 fi
 
-# CPU optional toggles (SFEM_ENABLE_CUDA is always OFF in this script).
+# Optional CPU toggles swept alongside CUDA (SFEM_ENABLE_CUDA is always ON here).
 # MPI OFF still injects MPI include/link flags for MatrixIO (<mpi.h>).
 FLAG_NAMES=(
     AMG
@@ -190,9 +199,26 @@ filter_flag_names() {
 
 filter_flag_names
 
+# Memory models to sweep.
+IFS=',' read -r -a MEM_MODELS <<< "${CUDA_MEMORY_MODELS:-host}"
+for mm in "${MEM_MODELS[@]}"; do
+    case "$mm" in
+        host|managed|unified) ;;
+        *) die "invalid CUDA memory model '${mm}' (expected host|managed|unified)" ;;
+    esac
+done
+
 # ---------------------------------------------------------------------------
 # External dependency probes
 # ---------------------------------------------------------------------------
+
+have_cuda() {
+    [[ -n "${CUDACXX:-}" && -x "${CUDACXX}" ]] \
+        || [[ -n "${CMAKE_CUDA_COMPILER:-}" && -x "${CMAKE_CUDA_COMPILER}" ]] \
+        || command -v nvcc >/dev/null 2>&1 \
+        || [[ -x /usr/local/cuda/bin/nvcc ]] \
+        || { [[ "$SFEM_USE_UENV" == 1 ]]; }  # uenv provides nvcc at build time
+}
 
 have_matrixio() {
     [[ -n "${MATRIXIO_DIR:-}" && -f "${MATRIXIO_DIR}/matrixio_array.h" ]] \
@@ -221,12 +247,14 @@ have_openmp() {
     else
         [[ -f /usr/include/omp.h ]] \
             || [[ -f /usr/lib/x86_64-linux-gnu/openmp/include/omp.h ]] \
-            || { command -v brew >/dev/null 2>&1 && brew --prefix libomp >/dev/null 2>&1; }
+            || { command -v brew >/dev/null 2>&1 && brew --prefix libomp >/dev/null 2>&1; } \
+            || { [[ "$SFEM_USE_UENV" == 1 ]]; }
     fi
 }
 
 have_mpi() {
-    command -v mpicc >/dev/null 2>&1 && command -v mpicxx >/dev/null 2>&1
+    { command -v mpicc >/dev/null 2>&1 && command -v mpicxx >/dev/null 2>&1; } \
+        || { [[ "$SFEM_USE_UENV" == 1 ]]; }
 }
 
 have_submodules() {
@@ -241,6 +269,7 @@ note_missing() {
 
 probe_externals() {
     MISSING_NOTE=()
+    have_cuda || note_missing "CUDA toolkit (nvcc not found; set CUDACXX or use SFEM_USE_UENV=1)"
     have_matrixio || note_missing "MatrixIO (set MATRIXIO_DIR or clone ../matrix.io)"
     have_submodules || note_missing "git submodule update --init --recursive"
     if ! have_mpi; then
@@ -339,10 +368,10 @@ mask_slug() {
     local mask=$1
     mask_to_on_flags "$mask"
     if [[ ${#MASK_ON[@]} -eq 0 ]]; then
-        echo "none"
+        echo "cuda"
         return
     fi
-    local slug=""
+    local slug="cuda+"
     local f
     for f in "${MASK_ON[@]}"; do
         slug+="$(tolower "$f")+"
@@ -354,10 +383,10 @@ config_label() {
     local mask=$1
     mask_to_on_flags "$mask"
     if [[ ${#MASK_ON[@]} -eq 0 ]]; then
-        echo "minimal"
+        echo "CUDA"
         return
     fi
-    local out=""
+    local out="CUDA+"
     local f
     for f in "${MASK_ON[@]}"; do
         out+="${f}+"
@@ -370,11 +399,11 @@ generate_masks_quick() {
     local i mask
     GENERATED_MASKS=()
 
-    # minimal: all optional toggles OFF
+    # minimal: CUDA only, all optional toggles OFF
     GENERATED_MASKS+=(0)
 
-    # defaults-ish: common CPU release flags
-  local default_mask=0
+    # defaults-ish: common GPU release flags
+    local default_mask=0
     for i in "${!ACTIVE_FLAGS[@]}"; do
         case "${ACTIVE_FLAGS[$i]}" in
             AMG|MPI|RYAML|EXPLICIT_VECTORIZATION) default_mask=$((default_mask | (1 << i))) ;;
@@ -438,8 +467,7 @@ generate_masks_all() {
 }
 
 dedupe_masks() {
-    local sorted unique=()
-    local m
+    local sorted
     IFS=$'\n' sorted=($(printf '%s\n' "${GENERATED_MASKS[@]}" | sort -n | uniq))
     GENERATED_MASKS=("${sorted[@]}")
 }
@@ -453,24 +481,59 @@ esac
 
 dedupe_masks
 
-if [[ -n "$CONFIG_INDEX" ]]; then
-    if [[ "$CONFIG_INDEX" -lt 0 || "$CONFIG_INDEX" -ge ${#GENERATED_MASKS[@]} ]]; then
-        die "CONFIG_INDEX ${CONFIG_INDEX} out of range (0..$(( ${#GENERATED_MASKS[@]} - 1 )))"
+# ---------------------------------------------------------------------------
+# Expand (mask) -> (mask, memory-model) jobs
+# ---------------------------------------------------------------------------
+# In quick mode the minimal config (mask 0) always exercises all three memory
+# models so those code paths get covered even with the default CUDA_MEMORY_MODELS.
+# Every other config uses the requested memory models (default: host only).
+
+JOB_MASKS=()
+JOB_MEMS=()
+
+add_job() {
+    JOB_MASKS+=("$1")
+    JOB_MEMS+=("$2")
+}
+
+for mask in "${GENERATED_MASKS[@]}"; do
+    if [[ "$MODE" == quick && "$mask" -eq 0 ]]; then
+        add_job 0 host
+        add_job 0 managed
+        add_job 0 unified
+        continue
     fi
-    GENERATED_MASKS=("${GENERATED_MASKS[$CONFIG_INDEX]}")
+    for mem in "${MEM_MODELS[@]}"; do
+        add_job "$mask" "$mem"
+    done
+done
+
+if [[ -n "$CONFIG_INDEX" ]]; then
+    if [[ "$CONFIG_INDEX" -lt 0 || "$CONFIG_INDEX" -ge ${#JOB_MASKS[@]} ]]; then
+        die "CONFIG_INDEX ${CONFIG_INDEX} out of range (0..$(( ${#JOB_MASKS[@]} - 1 )))"
+    fi
+    local_mask="${JOB_MASKS[$CONFIG_INDEX]}"
+    local_mem="${JOB_MEMS[$CONFIG_INDEX]}"
+    JOB_MASKS=("$local_mask")
+    JOB_MEMS=("$local_mem")
 fi
 
+MEM_MODELS_DISPLAY="$(printf '%s,' "${MEM_MODELS[@]}")"
+MEM_MODELS_DISPLAY="${MEM_MODELS_DISPLAY%,}"
 log "Platform: ${UNAME_S}/${UNAME_M}  Alps=${IS_ALPS}  x86=${IS_X86}  uenv=${SFEM_USE_UENV}"
-log "Mode=${MODE}  active toggles=${#ACTIVE_FLAGS[@]}  configs=${#GENERATED_MASKS[@]}"
+log "Mode=${MODE}  active toggles=${#ACTIVE_FLAGS[@]}  memory models=${MEM_MODELS_DISPLAY}  configs=${#JOB_MASKS[@]}"
+log "CUDA arch=${SFEM_CUDA_ARCH:-auto}  lineinfo=${CUDA_LINEINFO}"
 log "Build root: ${BUILD_ROOT}"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     list_idx=0
-    for mask in "${GENERATED_MASKS[@]}"; do
+    for j in "${!JOB_MASKS[@]}"; do
+        mask="${JOB_MASKS[$j]}"
+        mem="${JOB_MEMS[$j]}"
         if config_needs_skip "$mask"; then
-            printf '%4d  SKIP  %s\n' "$list_idx" "$(config_label "$mask")"
+            printf '%4d  SKIP  %-40s mem=%s\n' "$list_idx" "$(config_label "$mask")" "$mem"
         else
-            printf '%4d  BUILD %s\n' "$list_idx" "$(config_label "$mask")"
+            printf '%4d  BUILD %-40s mem=%s\n' "$list_idx" "$(config_label "$mask")" "$mem"
         fi
         list_idx=$((list_idx + 1))
     done
@@ -555,13 +618,31 @@ mask_mpi_enabled() {
 
 cmake_args_for_mask() {
     local mask=$1
+    local mem=$2
     local args=(
         -S "${REPO_ROOT}"
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
-        -DSFEM_ENABLE_CUDA=OFF
+        -DSFEM_ENABLE_CUDA=ON
         -DSFEM_ENABLE_TESTING=ON
+        "-DSFEM_CUDA_MEMORY=${mem}"
     )
     local i name cmake_name
+
+    if [[ "$CUDA_LINEINFO" == 1 ]]; then
+        args+=(-DSFEM_ENABLE_CUDA_LINEINFO=ON)
+    else
+        args+=(-DSFEM_ENABLE_CUDA_LINEINFO=OFF)
+    fi
+
+    if [[ -n "$SFEM_CUDA_ARCH" ]]; then
+        args+=("-DCMAKE_CUDA_ARCHITECTURES=${SFEM_CUDA_ARCH}")
+    fi
+
+    if [[ -n "${CUDACXX:-}" ]]; then
+        args+=("-DCMAKE_CUDA_COMPILER=${CUDACXX}")
+    elif [[ -n "${CMAKE_CUDA_COMPILER:-}" ]]; then
+        args+=("-DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}")
+    fi
 
     for i in "${!ACTIVE_FLAGS[@]}"; do
         name="${ACTIVE_FLAGS[$i]}"
@@ -574,7 +655,7 @@ cmake_args_for_mask() {
     done
 
     if mask_mpi_enabled "$mask"; then
-        if have_mpi; then
+        if have_mpi && command -v mpicc >/dev/null 2>&1; then
             args+=(
                 -DCMAKE_C_COMPILER=mpicc
                 -DCMAKE_CXX_COMPILER=mpicxx
@@ -636,28 +717,29 @@ index_of_flag() {
 build_config() {
     local idx=$1
     local mask=$2
+    local mem=$3
     local label slug build_dir log_file
     label="$(config_label "$mask")"
     slug="$(mask_slug "$mask")"
-    build_dir="${BUILD_ROOT}/$(printf '%04d' "$idx")_${slug}"
-    log_file="${build_dir}/test_CPU_configs.log"
+    build_dir="${BUILD_ROOT}/$(printf '%04d' "$idx")_${slug}_${mem}"
+    log_file="${build_dir}/test_CUDA_configs.log"
 
     if config_needs_skip "$mask"; then
-        log "SKIP [${idx}] ${label} (missing external dependency)"
+        log "SKIP [${idx}] ${label} mem=${mem} (missing external dependency)"
         SKIPPED=$((SKIPPED + 1))
         return 0
     fi
 
-    log "BUILD [${idx}] ${label} -> ${build_dir}"
+    log "BUILD [${idx}] ${label} mem=${mem} -> ${build_dir}"
     mkdir -p "${build_dir}"
 
     local -a cmake_args=()
     while IFS= read -r line; do
         cmake_args+=("$line")
-    done < <(cmake_args_for_mask "$mask")
+    done < <(cmake_args_for_mask "$mask" "$mem")
 
     {
-        echo "=== $(date '+%Y-%m-%dT%H:%M:%S%z') config ${idx} mask=${mask} label=${label} ==="
+        echo "=== $(date '+%Y-%m-%dT%H:%M:%S%z') config ${idx} mask=${mask} mem=${mem} label=${label} ==="
         printf 'cmake'
         local arg
         for arg in "${cmake_args[@]}"; do
@@ -667,27 +749,26 @@ build_config() {
     } >"${log_file}"
 
     if ! run_cmd cmake "${cmake_args[@]}" -B "${build_dir}" >>"${log_file}" 2>&1; then
-        log "FAIL [${idx}] configure (${label})"
+        log "FAIL [${idx}] configure (${label} mem=${mem})"
         FAILED=$((FAILED + 1))
         return 0
     fi
 
     if ! run_cmd cmake --build "${build_dir}" -j "${JOBS}" >>"${log_file}" 2>&1; then
-        log "FAIL [${idx}] compile (${label})"
+        log "FAIL [${idx}] compile (${label} mem=${mem})"
         FAILED=$((FAILED + 1))
         return 0
     fi
 
     if [[ "$RUN_TESTS" == 1 ]]; then
-        if ! run_cmd cmake --build "${build_dir}" --target test >>"${log_file}" 2>&1 \
-            || ! run_cmd ctest --test-dir "${build_dir}" --output-on-failure -j "${JOBS}" >>"${log_file}" 2>&1; then
-            log "FAIL [${idx}] ctest (${label})"
+        if ! run_cmd ctest --test-dir "${build_dir}" --output-on-failure -j "${JOBS}" >>"${log_file}" 2>&1; then
+            log "FAIL [${idx}] ctest (${label} mem=${mem})"
             FAILED=$((FAILED + 1))
             return 0
         fi
     fi
 
-    log "PASS [${idx}] ${label}"
+    log "PASS [${idx}] ${label} mem=${mem}"
     PASSED=$((PASSED + 1))
 }
 
@@ -695,6 +776,7 @@ build_config() {
 # Main
 # ---------------------------------------------------------------------------
 
+have_cuda || die "CUDA toolkit not found (set CUDACXX/CMAKE_CUDA_COMPILER, install nvcc, or SFEM_USE_UENV=1)"
 have_matrixio || die "MatrixIO not found (clone ../matrix.io or set MATRIXIO_DIR)"
 have_submodules || die "Run: git -C \"${REPO_ROOT}\" submodule update --init --recursive"
 have_mpi || die "MPI SDK required (mpicc for MatrixIO headers even when SFEM_ENABLE_MPI=OFF)"
@@ -702,13 +784,10 @@ have_mpi || die "MPI SDK required (mpicc for MatrixIO headers even when SFEM_ENA
 PASSED=0
 FAILED=0
 SKIPPED=0
-idx=0
 
-for mask in "${GENERATED_MASKS[@]}"; do
-    build_config "$idx" "$mask"
-    idx=$((idx + 1))
+for j in "${!JOB_MASKS[@]}"; do
+    build_config "$j" "${JOB_MASKS[$j]}" "${JOB_MEMS[$j]}"
 done
 
-log "Done: passed=${PASSED} failed=${FAILED} skipped=${SKIPPED} total=${#GENERATED_MASKS[@]}"
+log "Done: passed=${PASSED} failed=${FAILED} skipped=${SKIPPED} total=${#JOB_MASKS[@]}"
 [[ "$FAILED" -eq 0 ]]
-

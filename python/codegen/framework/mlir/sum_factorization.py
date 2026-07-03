@@ -39,6 +39,9 @@ class MetalSmokeTestResult:
         return self.run_returncode == 77
 
 
+_METAL_SMOKE_TIMING_ITERATIONS = 64
+
+
 @dataclass(frozen=True)
 class TensorProductContractionStage:
     name: str
@@ -937,6 +940,7 @@ class TensorProductSumFactorMLIRLowering:
         return _METAL_SMOKE_TEST_TEMPLATE % {
             "source": source,
             "stage_count": len(stages),
+            "timing_iterations": _METAL_SMOKE_TIMING_ITERATIONS,
             "stage_calls": "\n".join(
                 self._render_metal_smoke_stage_call(index, stage) for index, stage in enumerate(stages)
             ),
@@ -1640,6 +1644,7 @@ class TensorProductLaplaceFormMetalLowering:
             "source": source,
             "kernel_name": self._metal_kernel_name(),
             "n_shape": sf.n_shape,
+            "timing_iterations": _METAL_SMOKE_TIMING_ITERATIONS,
             "u": _float_initializer(u),
             "kappa": _c_float_literal(self.ir.parameter_default),
             "host_reference": self._render_host_reference_function(),
@@ -1985,18 +1990,41 @@ class TensorProductLaplaceFormGPULowering:
         *,
         include_metal_source=True,
         include_metal_smoke_harness=True,
+        include_spirv_binary=True,
+        mlir_translate=None,
     ):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         prefix = output_dir / self.ir.function_prefix
 
         gpu_path = prefix.with_suffix(".gpu.mlir")
+        spirv_opencl_path = prefix.with_suffix(".spirv.opencl.mlir")
+        spirv_opencl_op_path = prefix.with_suffix(".spirv.opencl.op.mlir")
+        spirv_opencl_binary_path = prefix.with_suffix(".spirv.opencl.spv")
+        spirv_opencl_dispatch_path = prefix.with_suffix(".spirv.opencl.dispatch.json")
         metal_path = prefix.with_suffix(".metal")
         harness_path = prefix.with_suffix(".metal_smoke.mm")
 
         gpu_path.write_text(self.render_gpu_module())
+        spirv_opencl_path.write_text(self.render_spirv_opencl_module())
+        spirv_opencl_op_path.write_text(self.render_spirv_opencl_module_op())
+        spirv_opencl_dispatch_path.write_text(
+            json.dumps(self.spirv_opencl_dispatch_manifest(), indent=2, sort_keys=True) + "\n"
+        )
 
-        files = [gpu_path]
+        files = [
+            gpu_path,
+            spirv_opencl_path,
+            spirv_opencl_op_path,
+            spirv_opencl_dispatch_path,
+        ]
+        if include_spirv_binary:
+            _serialize_spirv_module(
+                spirv_opencl_op_path,
+                spirv_opencl_binary_path,
+                mlir_translate=mlir_translate,
+            )
+            files.append(spirv_opencl_binary_path)
         if include_metal_source or include_metal_smoke_harness:
             metal = TensorProductLaplaceFormMetalLowering(self.ir)
             if include_metal_source:
@@ -2010,6 +2038,225 @@ class TensorProductLaplaceFormGPULowering:
             output_dir=str(output_dir),
             files=tuple(str(path) for path in files),
         )
+
+    def render_spirv_opencl_module(self):
+        sf = self.ir.sum_factor
+        prefix = self.ir.function_prefix
+        lines = [
+            "module {",
+            "  spirv.module Logical OpenCL requires #spirv.vce<v1.0, [Kernel, Addresses], []> attributes "
+            '{sfem.material = "%s", sfem.element = "%s", sfem.form = "laplace", '
+            'sfem.lowering = "tensor_product_laplace_form_spirv_opencl", '
+            'sfem.opencl.execution_model = "Kernel", sfem.opencl.memory_model = "OpenCL"} {'
+            % (sf.material_name, sf.element_type),
+        ]
+        for name, size in (
+            ("u", sf.n_shape),
+            ("out", sf.n_shape),
+            ("kappa", 1),
+            ("shape_1d", len(sf.shape_values_1d)),
+            ("grad_1d", len(sf.shape_gradients_1d)),
+            ("weight_1d", len(sf.weights_1d)),
+        ):
+            lines.append(
+                "    spirv.GlobalVariable @%s_%s : !spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>"
+                % (prefix, name, size)
+            )
+        lines.append("    spirv.GlobalVariable @gid : !spirv.ptr<vector<3xi64>, Input>")
+        lines.extend(self._render_spirv_opencl_form_function())
+        lines.append(
+            '    spirv.EntryPoint "Kernel" @%s_spirv_opencl, @%s_u, @%s_out, @%s_kappa, '
+            "@%s_shape_1d, @%s_grad_1d, @%s_weight_1d, @gid"
+            % (prefix, prefix, prefix, prefix, prefix, prefix, prefix)
+        )
+        lines.append("  }")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
+    def render_spirv_opencl_module_op(self):
+        return _extract_single_top_level_operation(self.render_spirv_opencl_module(), "spirv.module")
+
+    def spirv_opencl_dispatch_manifest(self):
+        sf = self.ir.sum_factor
+        return {
+            "lowering": "tensor_product_laplace_form_spirv_opencl",
+            "material": sf.material_name,
+            "element": sf.element_type,
+            "function_prefix": self.ir.function_prefix,
+            "form": "laplace",
+            "kernel": "%s_spirv_opencl" % self.ir.function_prefix,
+            "global_work_items": sf.n_shape,
+            "result_elements": sf.n_shape,
+            "dim": sf.dim,
+            "n_shape": sf.n_shape,
+            "n_qp": sf.n_qp,
+            "n_shape_1d": sf.n_shape_1d,
+            "n_qp_1d": sf.n_qp_1d,
+        }
+
+    def _render_spirv_opencl_form_function(self):
+        sf = self.ir.sum_factor
+        if sf.dim not in (2, 3):
+            raise ValueError("unsupported laplace tensor-product dimension")
+        names = _SSANamer()
+        prefix = self.ir.function_prefix
+        arrays = {
+            "u": ("!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % sf.n_shape, "%s_u" % prefix),
+            "out": ("!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % sf.n_shape, "%s_out" % prefix),
+            "kappa": ("!spirv.ptr<!spirv.array<1 x f32>, CrossWorkgroup>", "%s_kappa" % prefix),
+            "shape": (
+                "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % len(sf.shape_values_1d),
+                "%s_shape_1d" % prefix,
+            ),
+            "grad": (
+                "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % len(sf.shape_gradients_1d),
+                "%s_grad_1d" % prefix,
+            ),
+            "weight": (
+                "!spirv.ptr<!spirv.array<%d x f32>, CrossWorkgroup>" % len(sf.weights_1d),
+                "%s_weight_1d" % prefix,
+            ),
+        }
+        scalar_ptr_type = "!spirv.ptr<f32, CrossWorkgroup>"
+        lines = [
+            "    spirv.func @%s_spirv_opencl() \"None\" {" % prefix,
+            "      %gid_addr = spirv.mlir.addressof @gid : !spirv.ptr<vector<3xi64>, Input>",
+            "      %gid_vec = spirv.Load \"Input\" %gid_addr : vector<3xi64>",
+            "      %gid_x64 = spirv.CompositeExtract %gid_vec[0 : i32] : vector<3xi64>",
+            "      %idx = spirv.UConvert %gid_x64 : i64 to i32",
+        ]
+        for key, (array_type, symbol) in arrays.items():
+            lines.append("      %%%s_addr = spirv.mlir.addressof @%s : %s" % (key, symbol, array_type))
+
+        s_const = self._spirv_i32_constant(lines, names, sf.n_shape_1d, "S")
+        row_coords = []
+        if sf.dim == 2:
+            row_coords.append(self._spirv_umod(lines, names, "%idx", s_const, "rx"))
+            row_coords.append(self._spirv_udiv(lines, names, "%idx", s_const, "ry"))
+        else:
+            ss_const = self._spirv_i32_constant(lines, names, sf.n_shape_1d * sf.n_shape_1d, "SS")
+            row_coords.append(self._spirv_umod(lines, names, "%idx", s_const, "rx"))
+            row_div_s = self._spirv_udiv(lines, names, "%idx", s_const, "row_div_s")
+            row_coords.append(self._spirv_umod(lines, names, row_div_s, s_const, "ry"))
+            row_coords.append(self._spirv_udiv(lines, names, "%idx", ss_const, "rz"))
+
+        zero_i32 = self._spirv_i32_constant(lines, names, 0, "zero_i32")
+        zero_f32 = self._spirv_f32_constant(lines, names, 0.0, "zero")
+        kappa = self._spirv_load(lines, names, "kappa", arrays["kappa"][0], zero_i32, scalar_ptr_type, "kappa")
+        residual = zero_f32
+        for q_linear in range(sf.n_qp):
+            q_idx = _tensor_product_multi_index(q_linear, sf.n_qp_1d, sf.dim)
+            test_values = [
+                self._spirv_dynamic_tensor_basis(lines, names, arrays, q_idx, row_coords, derivative)
+                for derivative in range(sf.dim)
+            ]
+            grad_values = []
+            for derivative in range(sf.dim):
+                grad = zero_f32
+                for trial_linear in range(sf.n_shape):
+                    trial_idx = _tensor_product_multi_index(trial_linear, sf.n_shape_1d, sf.dim)
+                    trial_index = self._spirv_i32_constant(lines, names, trial_linear, "trial")
+                    coeff = self._spirv_load(lines, names, "u", arrays["u"][0], trial_index, scalar_ptr_type, "coeff")
+                    basis = self._spirv_static_tensor_basis(lines, names, arrays, q_idx, trial_idx, derivative)
+                    term = self._spirv_fmul(lines, names, coeff, basis, "grad_term")
+                    grad = self._spirv_fadd(lines, names, grad, term, "grad")
+                grad_values.append(grad)
+            dot = zero_f32
+            for derivative in range(sf.dim):
+                term = self._spirv_fmul(lines, names, test_values[derivative], grad_values[derivative], "dot_term")
+                dot = self._spirv_fadd(lines, names, dot, term, "dot")
+            weight = self._spirv_weight(lines, names, arrays, q_idx)
+            scaled = self._spirv_fmul(lines, names, kappa, weight, "scaled")
+            scaled = self._spirv_fmul(lines, names, scaled, dot, "scaled")
+            residual = self._spirv_fadd(lines, names, residual, scaled, "residual")
+
+        out_ptr = self._spirv_access_chain(lines, names, "out", arrays["out"][0], "%idx", scalar_ptr_type, "out_ptr")
+        lines.extend(
+            [
+                "      spirv.Store \"CrossWorkgroup\" %s, %s : f32" % (out_ptr, residual),
+                "      spirv.Return",
+                "    }",
+            ]
+        )
+        return lines
+
+    def _spirv_dynamic_tensor_basis(self, lines, names, arrays, q_idx, row_coords, derivative):
+        value = None
+        for axis in range(self.ir.sum_factor.dim):
+            base = self._spirv_i32_constant(lines, names, q_idx[axis] * self.ir.sum_factor.n_shape_1d, "basis_base")
+            index = self._spirv_iadd(lines, names, base, row_coords[axis], "basis_i")
+            key = "grad" if axis == derivative else "shape"
+            factor = self._spirv_load(lines, names, key, arrays[key][0], index, "!spirv.ptr<f32, CrossWorkgroup>", "basis")
+            value = factor if value is None else self._spirv_fmul(lines, names, value, factor, "basis_product")
+        return value
+
+    def _spirv_static_tensor_basis(self, lines, names, arrays, q_idx, shape_idx, derivative):
+        value = None
+        sf = self.ir.sum_factor
+        for axis in range(sf.dim):
+            index_value = q_idx[axis] * sf.n_shape_1d + shape_idx[axis]
+            index = self._spirv_i32_constant(lines, names, index_value, "basis_i")
+            key = "grad" if axis == derivative else "shape"
+            factor = self._spirv_load(lines, names, key, arrays[key][0], index, "!spirv.ptr<f32, CrossWorkgroup>", "basis")
+            value = factor if value is None else self._spirv_fmul(lines, names, value, factor, "basis_product")
+        return value
+
+    def _spirv_weight(self, lines, names, arrays, q_idx):
+        value = None
+        for q_axis in q_idx:
+            index = self._spirv_i32_constant(lines, names, q_axis, "weight_i")
+            factor = self._spirv_load(lines, names, "weight", arrays["weight"][0], index, "!spirv.ptr<f32, CrossWorkgroup>", "weight")
+            value = factor if value is None else self._spirv_fmul(lines, names, value, factor, "weight_product")
+        return value
+
+    def _spirv_i32_constant(self, lines, names, value, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.Constant %d : i32" % (result, int(value)))
+        return result
+
+    def _spirv_f32_constant(self, lines, names, value, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.Constant %s : f32" % (result, _c_float_literal(value)))
+        return result
+
+    def _spirv_iadd(self, lines, names, lhs, rhs, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.IAdd %s, %s : i32" % (result, lhs, rhs))
+        return result
+
+    def _spirv_umod(self, lines, names, lhs, rhs, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.UMod %s, %s : i32" % (result, lhs, rhs))
+        return result
+
+    def _spirv_udiv(self, lines, names, lhs, rhs, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.UDiv %s, %s : i32" % (result, lhs, rhs))
+        return result
+
+    def _spirv_fmul(self, lines, names, lhs, rhs, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.FMul %s, %s : f32" % (result, lhs, rhs))
+        return result
+
+    def _spirv_fadd(self, lines, names, lhs, rhs, hint):
+        result = names.value(hint)
+        lines.append("      %s = spirv.FAdd %s, %s : f32" % (result, lhs, rhs))
+        return result
+
+    def _spirv_access_chain(self, lines, names, key, array_type, index, scalar_ptr_type, hint):
+        result = names.value(hint)
+        lines.append(
+            "      %s = spirv.AccessChain %%%s_addr[%s] : %s, i32 -> %s"
+            % (result, key, index, array_type, scalar_ptr_type)
+        )
+        return result
+
+    def _spirv_load(self, lines, names, key, array_type, index, scalar_ptr_type, hint):
+        ptr = self._spirv_access_chain(lines, names, key, array_type, index, scalar_ptr_type, hint + "_ptr")
+        result = names.value(hint)
+        lines.append("      %s = spirv.Load \"CrossWorkgroup\" %s : f32" % (result, ptr))
+        return result
 
     def _kernel_signature(self):
         sf = self.ir.sum_factor
@@ -2574,6 +2821,7 @@ class TensorProductLaplaceFormEBEMetalLowering(TensorProductLaplaceFormMetalLowe
             "max_elements": fixture_elements,
             "max_nodes": fixture_nodes,
             "max_node_degree": self.max_node_degree,
+            "timing_iterations": _METAL_SMOKE_TIMING_ITERATIONS,
             "connectivity": _uint_initializer(connectivity),
             "node_degree": _uint_initializer(node_degree),
             "node_to_element_map": _uint_initializer(node_to_element_map),
@@ -3160,6 +3408,35 @@ static int run_stage(id<MTLDevice> device,
             return 82;
         }
     }
+
+    const unsigned timing_iterations = %(timing_iterations)d;
+    double total_gpu_seconds = 0.0;
+    for (unsigned iter = 0; iter < timing_iterations; ++iter) {
+        id<MTLCommandBuffer> timing_command_buffer = [queue commandBuffer];
+        id<MTLComputeCommandEncoder> timing_encoder = [timing_command_buffer computeCommandEncoder];
+        [timing_encoder setComputePipelineState:pipeline];
+        [timing_encoder setBuffer:basis_buffer offset:0 atIndex:0];
+        [timing_encoder setBuffer:operand_buffer offset:0 atIndex:1];
+        [timing_encoder setBuffer:result_buffer offset:0 atIndex:2];
+        [timing_encoder dispatchThreads:MTLSizeMake(result_cols, result_rows, 1)
+            threadsPerThreadgroup:MTLSizeMake(result_cols, result_rows, 1)];
+        [timing_encoder endEncoding];
+        [timing_command_buffer commit];
+        [timing_command_buffer waitUntilCompleted];
+        if ([timing_command_buffer status] != MTLCommandBufferStatusCompleted) {
+            std::fprintf(stderr, "Metal timing command failed for %%s\n", [kernel_name UTF8String]);
+            std::free(expected);
+            return 84;
+        }
+        const double gpu_seconds = [timing_command_buffer GPUEndTime] - [timing_command_buffer GPUStartTime];
+        if (gpu_seconds > 0.0) {
+            total_gpu_seconds += gpu_seconds;
+        }
+    }
+    const double total_gpu_us = total_gpu_seconds * 1.0e6;
+    const double avg_gpu_us = total_gpu_us / static_cast<double>(timing_iterations);
+    std::printf("metal_timing name=%%s iterations=%%u total_gpu_us=%%.6f avg_gpu_us=%%.6f\n",
+                [kernel_name UTF8String], timing_iterations, total_gpu_us, avg_gpu_us);
     std::free(expected);
     return 0;
 }
@@ -3183,7 +3460,7 @@ int main() {
         id<MTLCommandQueue> queue = [device newCommandQueue];
         int status = 0;
 %(stage_calls)s
-        std::printf("sum_factor_stage_count=%%d\n", %(stage_count)d);
+        std::printf("sum_factor_stage_count=%%d timing_iterations=%%d\n", %(stage_count)d, %(timing_iterations)d);
         return 0;
     }
 }
@@ -3258,6 +3535,34 @@ int main() {
                 return 82;
             }
         }
+
+        const unsigned timing_iterations = %(timing_iterations)d;
+        double total_gpu_seconds = 0.0;
+        for (unsigned iter = 0; iter < timing_iterations; ++iter) {
+            id<MTLCommandBuffer> timing_command_buffer = [queue commandBuffer];
+            id<MTLComputeCommandEncoder> timing_encoder = [timing_command_buffer computeCommandEncoder];
+            [timing_encoder setComputePipelineState:pipeline];
+            [timing_encoder setBuffer:u_buffer offset:0 atIndex:0];
+            [timing_encoder setBuffer:out_buffer offset:0 atIndex:1];
+            [timing_encoder setBuffer:kappa_buffer offset:0 atIndex:2];
+            [timing_encoder dispatchThreads:MTLSizeMake(%(n_shape)d, 1, 1)
+                threadsPerThreadgroup:MTLSizeMake(%(n_shape)d, 1, 1)];
+            [timing_encoder endEncoding];
+            [timing_command_buffer commit];
+            [timing_command_buffer waitUntilCompleted];
+            if ([timing_command_buffer status] != MTLCommandBufferStatusCompleted) {
+                std::fprintf(stderr, "Metal timing command failed\n");
+                return 84;
+            }
+            const double gpu_seconds = [timing_command_buffer GPUEndTime] - [timing_command_buffer GPUStartTime];
+            if (gpu_seconds > 0.0) {
+                total_gpu_seconds += gpu_seconds;
+            }
+        }
+        const double total_gpu_us = total_gpu_seconds * 1.0e6;
+        const double avg_gpu_us = total_gpu_us / static_cast<double>(timing_iterations);
+        std::printf("metal_timing name=%(kernel_name)s iterations=%%u total_gpu_us=%%.6f avg_gpu_us=%%.6f\n",
+                    timing_iterations, total_gpu_us, avg_gpu_us);
         return 0;
     }
 }
@@ -3384,6 +3689,48 @@ int main() {
                 return 83;
             }
         }
+
+        const unsigned timing_iterations = %(timing_iterations)d;
+        double total_gpu_seconds = 0.0;
+        for (unsigned iter = 0; iter < timing_iterations; ++iter) {
+            id<MTLCommandBuffer> timing_command_buffer = [queue commandBuffer];
+
+            id<MTLComputeCommandEncoder> timing_map_encoder = [timing_command_buffer computeCommandEncoder];
+            [timing_map_encoder setComputePipelineState:map_pipeline];
+            [timing_map_encoder setBuffer:connectivity_buffer offset:0 atIndex:0];
+            [timing_map_encoder setBuffer:u_buffer offset:0 atIndex:1];
+            [timing_map_encoder setBuffer:element_out_buffer offset:0 atIndex:2];
+            [timing_map_encoder setBuffer:kappa_buffer offset:0 atIndex:3];
+            [timing_map_encoder dispatchThreads:MTLSizeMake(%(n_shape)d, %(max_elements)d, 1)
+                threadsPerThreadgroup:MTLSizeMake(%(n_shape)d, 1, 1)];
+            [timing_map_encoder endEncoding];
+
+            id<MTLComputeCommandEncoder> timing_reduce_encoder = [timing_command_buffer computeCommandEncoder];
+            [timing_reduce_encoder setComputePipelineState:reduce_pipeline];
+            [timing_reduce_encoder setBuffer:element_out_buffer offset:0 atIndex:0];
+            [timing_reduce_encoder setBuffer:node_degree_buffer offset:0 atIndex:1];
+            [timing_reduce_encoder setBuffer:node_to_element_buffer offset:0 atIndex:2];
+            [timing_reduce_encoder setBuffer:node_to_local_buffer offset:0 atIndex:3];
+            [timing_reduce_encoder setBuffer:out_buffer offset:0 atIndex:4];
+            [timing_reduce_encoder dispatchThreads:MTLSizeMake(%(max_nodes)d, 1, 1)
+                threadsPerThreadgroup:MTLSizeMake(%(max_nodes)d, 1, 1)];
+            [timing_reduce_encoder endEncoding];
+
+            [timing_command_buffer commit];
+            [timing_command_buffer waitUntilCompleted];
+            if ([timing_command_buffer status] != MTLCommandBufferStatusCompleted) {
+                std::fprintf(stderr, "Metal EBE timing command failed\n");
+                return 85;
+            }
+            const double gpu_seconds = [timing_command_buffer GPUEndTime] - [timing_command_buffer GPUStartTime];
+            if (gpu_seconds > 0.0) {
+                total_gpu_seconds += gpu_seconds;
+            }
+        }
+        const double total_gpu_us = total_gpu_seconds * 1.0e6;
+        const double avg_gpu_us = total_gpu_us / static_cast<double>(timing_iterations);
+        std::printf("metal_timing name=%(map_kernel_name)s+%(reduce_kernel_name)s iterations=%%u total_gpu_us=%%.6f avg_gpu_us=%%.6f\n",
+                    timing_iterations, total_gpu_us, avg_gpu_us);
         return 0;
     }
 }

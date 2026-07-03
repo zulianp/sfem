@@ -139,7 +139,7 @@ if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
-if(SFEM_ENABLE_SCCD)
+if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/collisions)
 endif()
 
@@ -407,7 +407,7 @@ if(SFEM_ENABLE_TESTING)
         )
     endif()
 
-    if(SFEM_ENABLE_SCCD)
+    if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
         list(APPEND SFEM_UNIT_TESTS
             frontend/collisions/tests
         )
@@ -432,6 +432,9 @@ if(SFEM_ENABLE_TESTING)
     foreach(TEST_DRIVER ${TEST_DRIVERS})
         get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
         if(TEST_DRIVER_NAME STREQUAL "sfem_MaMALTest" AND NOT SFEM_ENABLE_SSDF)
+            continue()
+        endif()
+        if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
