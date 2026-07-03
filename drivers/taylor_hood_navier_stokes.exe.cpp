@@ -535,7 +535,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_RESTART_FOLDER) {
         for (int d = 0; d < sdim; d++) {
-            sprintf(path, "%s/u%d.%09d.raw", SFEM_RESTART_FOLDER, d, SFEM_RESTART_ID);
+            snprintf(path, sizeof(path), "%s/u%d.%09d.raw", SFEM_RESTART_FOLDER, d, SFEM_RESTART_ID);
 
             if (array_read(comm, path, SFEM_MPI_REAL_T, (void *)vel[d], mesh_nnodes, mesh_nnodes)) {
                 fprintf(stderr, "Error reading restart file: %s\n", SFEM_RESTART_FOLDER);
@@ -559,7 +559,7 @@ int main(int argc, char *argv[]) {
         write_output_step(pressure_output, "div", export_counter, p);
         write_output_step(pressure_output, "div_pre", export_counter, p);
 
-        sprintf(path, "%s/time.txt", output_folder);
+        snprintf(path, sizeof(path), "%s/time.txt", output_folder);
         log_create_file(&time_logger, path, "w");
         log_write_double(&time_logger, 0);
         export_counter++;
@@ -833,3 +833,4 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
+
