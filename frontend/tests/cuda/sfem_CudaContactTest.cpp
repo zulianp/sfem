@@ -165,7 +165,6 @@ struct TestOutput {
 };
 
 struct TestOutput gen_test_data(enum ExecutionSpace es) {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);

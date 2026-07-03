@@ -27,7 +27,6 @@ namespace smesh {
 #endif
 
 int test_amg_poisson() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -94,7 +93,6 @@ int test_amg_poisson() {
 }
 
 int test_amg_sqp() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 

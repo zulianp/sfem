@@ -438,14 +438,14 @@ namespace {
 }  // namespace
 
 int test_linear_elasticity_sa_vector_amg() {
-    MPI_Comm comm = MPI_COMM_WORLD;
+    auto comm = sfem::Communicator::world();
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     ptrdiff_t SFEM_MESH_RESOLUTION = 10;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::wrap(comm),
+    auto mesh = sfem::Mesh::create_cube(comm,
                                         smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4),
                                         SFEM_MESH_RESOLUTION,
                                         SFEM_MESH_RESOLUTION,
