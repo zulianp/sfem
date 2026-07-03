@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 
-from codegen.framework.materials.laplace import material
+from codegen.framework.materials import laplace as laplace_material_module
 from codegen.framework.mlir import (
     TensorProductLaplaceFormBatchedGPULowering,
     TensorProductLaplaceFormEBEGPULowering,
@@ -20,7 +20,14 @@ from codegen.framework.mlir import (
     tensor_product_laplace_form_ir_from_user_input_stage,
     tensor_product_sum_factor_ir_from_user_input_stage,
 )
+from codegen.framework.mlir.sum_factorization import (
+    _c_float_literal,
+    _float_initializer,
+    _objc_string_literal,
+)
 from sfem import gen
+
+material = laplace_material_module.material
 
 
 def main():
@@ -51,6 +58,11 @@ def main():
         "--probe-iree-metal-gpu",
         action="store_true",
         help="try iree-compile on generated generic GPU dialect artifacts",
+    )
+    parser.add_argument(
+        "--probe-mlir-gpu-to-spirv",
+        action="store_true",
+        help="try the standard MLIR GPU-to-SPIR-V pass pipeline on generated generic GPU dialect artifacts",
     )
     parser.add_argument("--run-iree-metal-runtime", action="store_true", help="compile and dispatch the full-form IREE Metal VMFB")
     parser.add_argument("--probe-metal-toolchain", action="store_true", help="try offline xcrun metal compilation for generated .metal files")
@@ -153,6 +165,8 @@ def main():
 
     manifest = {
         "material": material.name,
+        "form_module": laplace_material_module.__name__,
+        "form_source": _module_source_path(laplace_material_module),
         "element": sum_factor_ir.element_type,
         "vector_size": sum_factor_ir.vector_size,
         "quadrature_order": sum_factor_ir.quadrature_order,
@@ -171,6 +185,8 @@ def main():
         "iree_metal_gpu": [],
         "iree_metal_matrix_unit": [],
         "iree_metal_runtime": [],
+        "generated_sfem_comparison": [],
+        "mlir_gpu_to_spirv": [],
         "mlir_validation": [],
         "metal_smoke": [],
         "metal_toolchain": [],
@@ -238,6 +254,12 @@ def main():
             _gpu_artifact_paths(artifact_groups),
         )
 
+    if args.probe_mlir_gpu_to_spirv:
+        manifest["mlir_gpu_to_spirv"] = _probe_mlir_gpu_to_spirv(
+            output_dir / "mlir_gpu_to_spirv",
+            _gpu_artifact_paths(artifact_groups),
+        )
+
     if args.run_iree_metal_runtime:
         manifest["iree_metal_runtime"] = [
             _run_sum_factor_iree_metal_runtime_smoke(
@@ -252,12 +274,21 @@ def main():
         manifest["metal_toolchain"] = _probe_metal_toolchain(output_dir)
 
     if args.run_metal_smoke:
+        local_metal = TensorProductLaplaceFormMetalLowering(form_ir)
         manifest["metal_smoke"] = _run_metal_smoke_tests(
             output_dir,
             sum_factor,
-            TensorProductLaplaceFormMetalLowering(form_ir),
+            local_metal,
             ebe_metal,
         )
+        manifest["generated_sfem_comparison"] = [
+            _run_generated_sfem_laplace_comparison(
+                output_dir / "generated_sfem_comparison",
+                args,
+                form_ir,
+                local_metal,
+            )
+        ]
 
     manifest["pipeline_evidence"] = _write_pipeline_evidence(output_dir, manifest)
 
@@ -293,6 +324,11 @@ def main():
         return 10
     if any(not item.get("ok", False) and not item.get("no_default_device", False) for item in manifest["metal_smoke"]):
         return 4
+    if any(
+        not item.get("ok", False) and not item.get("skipped", False)
+        for item in manifest["generated_sfem_comparison"]
+    ):
+        return 14
     if any(not item.get("ok", False) for item in manifest["reference_verification"]):
         return 6
     if any(not item.get("ok", False) for item in manifest["performance_shape"]):
@@ -302,6 +338,14 @@ def main():
 
 def _write_artifacts(artifacts):
     return [str(path) for path in artifacts.paths]
+
+
+def _module_source_path(module):
+    path = Path(getattr(module, "__file__", "")).resolve()
+    try:
+        return str(path.relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
 
 
 def _gpu_artifact_paths(artifact_groups):
@@ -336,6 +380,13 @@ def _build_pipeline_evidence(manifest):
     artifacts = manifest.get("artifacts", {})
     metal_toolchain = manifest.get("metal_toolchain", [])
     iree_backend_files = manifest.get("iree_metal_executable_files", [])
+    form_source = manifest.get("form_source", "")
+    metal_smoke_timings = [
+        timing
+        for result in manifest.get("metal_smoke", [])
+        for timing in result.get("timings", [])
+    ]
+    generated_sfem_comparison = manifest.get("generated_sfem_comparison", [])
     iree_backend_source_counts = {}
     for item in metal_toolchain:
         source_kind = item.get("source_kind", "")
@@ -346,6 +397,13 @@ def _build_pipeline_evidence(manifest):
         {
             item.get("diagnostic_kind", "")
             for item in manifest.get("iree_metal_gpu", [])
+            if item.get("diagnostic_kind")
+        }
+    )
+    raw_gpu_spirv_diagnostics = sorted(
+        {
+            item.get("diagnostic_kind", "")
+            for item in manifest.get("mlir_gpu_to_spirv", [])
             if item.get("diagnostic_kind")
         }
     )
@@ -360,6 +418,9 @@ def _build_pipeline_evidence(manifest):
     evidence = {
         "name": "tensor_product_laplace_pipeline_evidence",
         "material": manifest.get("material"),
+        "form_module": manifest.get("form_module"),
+        "form_source": form_source,
+        "form_source_ok": _form_source_matches_material(form_source, manifest.get("material")),
         "element": manifest.get("element"),
         "quadrature_order": manifest.get("quadrature_order"),
         "n_shape": manifest.get("n_shape"),
@@ -389,14 +450,34 @@ def _build_pipeline_evidence(manifest):
         "metal_toolchain_ok": _all_required_ok(metal_toolchain),
         "metal_toolchain_source_counts": iree_backend_source_counts,
         "metal_smoke_ok": _all_required_ok(manifest.get("metal_smoke", []), allowed_skip_key="no_default_device"),
+        "metal_smoke_timing_count": len(metal_smoke_timings),
+        "generated_sfem_comparison_ok": _all_required_ok(generated_sfem_comparison)
+        if generated_sfem_comparison
+        else None,
         "iree_metal_runtime_ok": _all_required_ok(manifest.get("iree_metal_runtime", [])),
         "raw_gpu_iree_probe_ok": _all_required_ok(manifest.get("iree_metal_gpu", [])),
         "raw_gpu_iree_diagnostics": raw_gpu_diagnostics,
+        "raw_gpu_spirv_pass_ok": _all_required_ok(manifest.get("mlir_gpu_to_spirv", [])),
+        "raw_gpu_spirv_kernel_ok": _all_optional_key_ok(manifest.get("mlir_gpu_to_spirv", []), "kernel_ok"),
+        "raw_gpu_spirv_kernel_module_ok": _all_optional_key_ok(
+            manifest.get("mlir_gpu_to_spirv", []),
+            "kernel_module_ok",
+        ),
+        "raw_gpu_spirv_kernel_binary_ok": _all_optional_key_ok(
+            manifest.get("mlir_gpu_to_spirv", []),
+            "kernel_binary_ok",
+        ),
+        "raw_gpu_spirv_host_launch_ok": _all_optional_key_ok(
+            manifest.get("mlir_gpu_to_spirv", []),
+            "host_launch_ok",
+        ),
+        "raw_gpu_spirv_diagnostics": raw_gpu_spirv_diagnostics,
         "matrix_unit_iree_probe_ok": _all_required_ok(manifest.get("iree_metal_matrix_unit", [])),
         "matrix_unit_iree_diagnostics": matrix_unit_diagnostics,
     }
     required_keys = (
         "reference_ok",
+        "form_source_ok",
         "performance_shape_ok",
         "mlir_validation_ok",
         "direct_spirv_validation_ok",
@@ -411,6 +492,13 @@ def _build_pipeline_evidence(manifest):
     return evidence
 
 
+def _form_source_matches_material(form_source, material_name):
+    if not form_source or not material_name:
+        return False
+    path = Path(form_source)
+    return path.name == "%s.py" % material_name and "materials" in path.parts
+
+
 def _all_required_ok(items, allowed_skip_key=None):
     if not items:
         return False
@@ -423,6 +511,10 @@ def _all_required_ok(items, allowed_skip_key=None):
             return False
         return False
     return True
+
+
+def _all_optional_key_ok(items, key):
+    return bool(items) and all(item.get(key, False) for item in items)
 
 
 def _verify_reference(form_ir, max_elements, max_nodes, max_node_degree):
@@ -631,9 +723,31 @@ def _verify_spirv_opencl_dispatch(path):
             "ok": False,
             "reason": str(exc),
         }
+    lowering = payload.get("lowering")
+    if lowering == "tensor_product_laplace_form_spirv_opencl":
+        missing = []
+        for key in ("kernel", "form", "global_work_items", "result_elements", "n_shape", "n_qp"):
+            if key not in payload:
+                missing.append(key)
+        if payload.get("form") != "laplace":
+            missing.append("form")
+        if int(payload.get("global_work_items", -1)) != int(payload.get("result_elements", -2)):
+            missing.append("global_work_items")
+        if int(payload.get("global_work_items", -1)) != int(payload.get("n_shape", -2)):
+            missing.append("n_shape")
+        return {
+            "name": "spirv_opencl_dispatch_metadata",
+            "path": str(path),
+            "ok": not missing,
+            "lowering": lowering,
+            "n_stages": 0,
+            "kernel": payload.get("kernel", ""),
+            "global_work_items": payload.get("global_work_items", 0),
+            "missing_tokens": missing,
+        }
     stages = payload.get("stages", [])
     missing = []
-    if payload.get("lowering") != "tensor_product_sum_factor_spirv_opencl":
+    if lowering != "tensor_product_sum_factor_spirv_opencl":
         missing.append("lowering")
     if not stages:
         missing.append("stages")
@@ -649,6 +763,7 @@ def _verify_spirv_opencl_dispatch(path):
         "name": "spirv_opencl_dispatch_metadata",
         "path": str(path),
         "ok": not missing,
+        "lowering": lowering,
         "n_stages": len(stages),
         "missing_tokens": missing,
     }
@@ -921,7 +1036,12 @@ def _verify_ebe_gpu_topology(path):
 
 def _validate_mlir_files(output_dir):
     mlir_opt = shutil.which("mlir-opt") or "/opt/homebrew/opt/llvm/bin/mlir-opt"
-    files = sorted(Path(output_dir).rglob("*.mlir"))
+    output_dir = Path(output_dir)
+    files = sorted(
+        path
+        for path in output_dir.rglob("*.mlir")
+        if _is_sfem_generated_mlir_artifact(output_dir, path)
+    )
     if not mlir_opt or not Path(mlir_opt).exists():
         return [
             {
@@ -950,6 +1070,22 @@ def _validate_mlir_files(output_dir):
             }
         )
     return results
+
+
+def _is_sfem_generated_mlir_artifact(output_dir, path):
+    probe_dirs = {
+        "iree_metal",
+        "iree_metal_executable_files",
+        "iree_metal_executable_sources",
+        "iree_metal_gpu",
+        "iree_metal_matrix_unit",
+        "iree_metal_runtime",
+    }
+    try:
+        parts = Path(path).relative_to(output_dir).parts
+    except ValueError:
+        return True
+    return not any(part in probe_dirs for part in parts)
 
 
 def _validate_spirv_binaries(output_dir):
@@ -1446,6 +1582,324 @@ def _probe_iree_metal_gpu_artifacts(output_dir, gpu_artifacts):
     return results
 
 
+def _probe_mlir_gpu_to_spirv(output_dir, gpu_artifacts):
+    mlir_opt = shutil.which("mlir-opt") or "/opt/homebrew/opt/llvm/bin/mlir-opt"
+    mlir_translate = shutil.which("mlir-translate") or "/opt/homebrew/opt/llvm/bin/mlir-translate"
+    if not mlir_opt or not Path(mlir_opt).exists():
+        return [
+            {
+                "name": _mlir_gpu_to_spirv_probe_name(group, path),
+                "ok": False,
+                "skipped": True,
+                "artifact_group": group,
+                "input_path": str(path),
+                "reason": "mlir-opt is not available",
+            }
+            for group, path in gpu_artifacts
+        ]
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results = []
+    pass_pipeline = [
+        "--spirv-attach-target=client_api=OpenCL",
+        "--map-memref-spirv-storage-class=client-api=opencl",
+        "--convert-gpu-to-spirv",
+        "--convert-scf-to-spirv",
+        "--convert-memref-to-spirv",
+        "--convert-arith-to-spirv",
+        "--verify-diagnostics",
+    ]
+    for group, path in gpu_artifacts:
+        name = _mlir_gpu_to_spirv_probe_name(group, path)
+        probe_dir = output_dir / name
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        output_mlir = probe_dir / ("%s.gpu_to_spirv.mlir" % Path(path).stem)
+        command = [mlir_opt, str(path), *pass_pipeline]
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if result.stdout:
+            output_mlir.write_text(result.stdout)
+        stdout_info = _write_probe_stream(probe_dir, "stdout", result.stdout or "")
+        stderr_info = _write_probe_stream(probe_dir, "stderr", result.stderr or "")
+        output_text = result.stdout or ""
+        diagnostic = _classify_mlir_gpu_to_spirv_diagnostic(result.stderr or "", output_text)
+        remaining_gpu_launch_count = output_text.count("gpu.launch_func")
+        remaining_gpu_module_count = output_text.count("gpu.module @")
+        memref_load_count = output_text.count("memref.load")
+        memref_store_count = output_text.count("memref.store")
+        kernel_module_info = _probe_extracted_spirv_kernel_modules(
+            probe_dir,
+            output_text,
+            mlir_opt=mlir_opt,
+            mlir_translate=mlir_translate,
+        )
+        kernel_ok = (
+            result.returncode == 0
+            and "spirv.module" in output_text
+            and output_text.count("spirv.func") > 0
+            and memref_load_count == 0
+            and memref_store_count == 0
+        )
+        host_launch_ok = remaining_gpu_launch_count == 0 and remaining_gpu_module_count == 0
+        results.append(
+            {
+                "name": name,
+                "ok": kernel_ok and host_launch_ok,
+                "kernel_ok": kernel_ok,
+                "host_launch_ok": host_launch_ok,
+                "skipped": False,
+                "artifact_group": group,
+                "input_path": str(path),
+                "output_mlir": str(output_mlir) if output_mlir.exists() else "",
+                "command": command,
+                "returncode": result.returncode,
+                "spirv_module_count": output_text.count("spirv.module"),
+                "spirv_func_count": output_text.count("spirv.func"),
+                "entry_point_count": output_text.count('spirv.EntryPoint "GLCompute"')
+                + output_text.count('spirv.EntryPoint "Kernel"'),
+                **kernel_module_info,
+                "remaining_gpu_launch_count": remaining_gpu_launch_count,
+                "remaining_gpu_module_count": remaining_gpu_module_count,
+                "remaining_memref_load_count": memref_load_count,
+                "remaining_memref_store_count": memref_store_count,
+                **diagnostic,
+                **stdout_info,
+                **stderr_info,
+            }
+        )
+    return results
+
+
+def _probe_extracted_spirv_kernel_modules(output_dir, output_text, *, mlir_opt, mlir_translate):
+    modules = _extract_nested_spirv_modules(output_text)
+    if not modules:
+        return {
+            "kernel_module_ok": False,
+            "kernel_module_count": 0,
+            "kernel_module_paths": [],
+            "kernel_module_verification": [],
+            "kernel_binary_ok": False,
+            "kernel_binary_count": 0,
+            "kernel_binary_total_bytes": 0,
+            "kernel_binary_paths": [],
+            "kernel_binary_serialization": [],
+        }
+    output_dir = Path(output_dir)
+    verification = []
+    serialization = []
+    binary_paths = []
+    module_paths = []
+    for index, module_text in enumerate(modules):
+        module_path = output_dir / ("kernel_%d.spirv.mlir" % index)
+        binary_path = output_dir / ("kernel_%d.spv" % index)
+        module_path.write_text(module_text)
+        module_paths.append(str(module_path))
+        verify_result = subprocess.run(
+            [mlir_opt, str(module_path), "--verify-diagnostics"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        verification.append(
+            {
+                "path": str(module_path),
+                "ok": verify_result.returncode == 0,
+                "returncode": verify_result.returncode,
+                "stdout_preview": verify_result.stdout[:1000],
+                "stderr_preview": verify_result.stderr[:1000],
+            }
+        )
+        if not mlir_translate or not Path(mlir_translate).exists():
+            serialization.append(
+                {
+                    "path": str(module_path),
+                    "output_path": str(binary_path),
+                    "ok": False,
+                    "skipped": True,
+                    "reason": "mlir-translate is not available",
+                }
+            )
+            continue
+        serialize_result = subprocess.run(
+            [
+                mlir_translate,
+                str(module_path),
+                "--no-implicit-module",
+                "--serialize-spirv",
+                "-o",
+                str(binary_path),
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        binary_size = binary_path.stat().st_size if binary_path.exists() else 0
+        binary_ok = serialize_result.returncode == 0 and binary_size > 0
+        if binary_ok:
+            binary_paths.append(str(binary_path))
+        serialization.append(
+            {
+                "path": str(module_path),
+                "output_path": str(binary_path),
+                "ok": binary_ok,
+                "skipped": False,
+                "returncode": serialize_result.returncode,
+                "size": binary_size,
+                **_classify_spirv_serialization_diagnostic(serialize_result.stderr or ""),
+                "stdout_preview": serialize_result.stdout[:1000],
+                "stderr_preview": serialize_result.stderr[:1000],
+            }
+        )
+    binary_total_bytes = sum(Path(path).stat().st_size for path in binary_paths)
+    return {
+        "kernel_module_ok": bool(verification) and all(item["ok"] for item in verification),
+        "kernel_module_count": len(modules),
+        "kernel_module_paths": module_paths,
+        "kernel_module_verification": verification,
+        "kernel_binary_ok": bool(serialization) and all(item["ok"] for item in serialization),
+        "kernel_binary_count": len(binary_paths),
+        "kernel_binary_total_bytes": binary_total_bytes,
+        "kernel_binary_paths": binary_paths,
+        "kernel_binary_serialization": serialization,
+    }
+
+
+def _extract_nested_spirv_modules(module_text):
+    modules = []
+    search_from = 0
+    needle = "spirv.module"
+    while True:
+        start = module_text.find(needle, search_from)
+        if start < 0:
+            break
+        if start > 0 and (module_text[start - 1].isalnum() or module_text[start - 1] in "._"):
+            search_from = start + len(needle)
+            continue
+        brace = module_text.find("{", start)
+        if brace < 0:
+            break
+        end = _find_balanced_brace_end(module_text, brace)
+        if end < 0:
+            break
+        module_op = module_text[start:end].rstrip() + "\n"
+        modules.append(_normalize_extracted_spirv_module(module_op))
+        search_from = end
+    return modules
+
+
+def _find_balanced_brace_end(text, open_brace):
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(open_brace, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return -1
+
+
+def _normalize_extracted_spirv_module(module_op):
+    lines = module_op.splitlines()
+    if not lines:
+        return module_op
+    header = lines[0].lstrip()
+    header = re.sub(r"^spirv\.module\s+@[^ ]+\s+", "spirv.module ", header, count=1)
+    if " requires #spirv.vce<" not in header:
+        header = _attach_spirv_vce_triple(header)
+    return "\n".join([header, *lines[1:]]) + "\n"
+
+
+def _attach_spirv_vce_triple(header):
+    if header.startswith("spirv.module Logical GLSL450"):
+        return header.replace(
+            "spirv.module Logical GLSL450",
+            "spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>",
+            1,
+        )
+    if header.startswith("spirv.module Logical OpenCL"):
+        return header.replace(
+            "spirv.module Logical OpenCL",
+            "spirv.module Logical OpenCL requires #spirv.vce<v1.0, [Kernel, Addresses], []>",
+            1,
+        )
+    return header
+
+
+def _classify_spirv_serialization_diagnostic(stderr):
+    if "module must have 'vce_triple' attribute" in stderr:
+        return {
+            "diagnostic_kind": "spirv_serialization_missing_vce_triple",
+            "diagnostic_summary": "SPIR-V module lacks the vce_triple metadata required for binary serialization",
+        }
+    if "missing 'spirv.target_env' attribute" in stderr or "missing SPIR-V target env attribute" in stderr:
+        return {
+            "diagnostic_kind": "spirv_serialization_missing_target_env",
+            "diagnostic_summary": "SPIR-V module lacks target environment metadata required for ABI/VCE lowering",
+        }
+    if "expected a 'spirv.module' op" in stderr:
+        return {
+            "diagnostic_kind": "spirv_serialization_module_boundary",
+            "diagnostic_summary": "mlir-translate did not receive a standalone top-level spirv.module operation",
+        }
+    return {
+        "diagnostic_kind": "",
+        "diagnostic_summary": stderr.splitlines()[0] if stderr.splitlines() else "",
+    }
+
+
+def _mlir_gpu_to_spirv_probe_name(group, path):
+    return "%s_%s_gpu_to_spirv" % (group, Path(path).stem.replace(".", "_"))
+
+
+def _classify_mlir_gpu_to_spirv_diagnostic(stderr, output_text=""):
+    if "failed to legalize operation 'memref.load'" in stderr:
+        return {
+            "diagnostic_kind": "mlir_gpu_to_spirv_memref_load_legalization",
+            "diagnostic_summary": "standard GPU-to-SPIR-V pass pipeline did not legalize memref.load",
+        }
+    if "failed to legalize operation 'memref.store'" in stderr:
+        return {
+            "diagnostic_kind": "mlir_gpu_to_spirv_memref_store_legalization",
+            "diagnostic_summary": "standard GPU-to-SPIR-V pass pipeline did not legalize memref.store",
+        }
+    if "failed to legalize operation" in stderr:
+        match = re.search(r"failed to legalize operation '([^']+)'", stderr)
+        operation = match.group(1) if match else "unknown"
+        return {
+            "diagnostic_kind": "mlir_gpu_to_spirv_operation_legalization",
+            "diagnostic_summary": "standard GPU-to-SPIR-V pass pipeline did not legalize %s" % operation,
+        }
+    if output_text and "spirv.module" in output_text and (
+        "gpu.launch_func" in output_text or "gpu.module @" in output_text
+    ):
+        return {
+            "diagnostic_kind": "mlir_gpu_to_spirv_host_launch_boundary",
+            "diagnostic_summary": "GPU kernels lowered to SPIR-V but host gpu.launch_func/gpu.module remains",
+        }
+    return {
+        "diagnostic_kind": "",
+        "diagnostic_summary": stderr.splitlines()[0] if stderr.splitlines() else "",
+    }
+
+
 def _iree_metal_gpu_probe_attempts():
     return (
         ("baseline", ()),
@@ -1847,6 +2301,204 @@ def _metal_toolchain_source_info(output_dir, path):
     }
 
 
+_METAL_TIMING_RE = re.compile(
+    r"^metal_timing name=(?P<name>\S+) iterations=(?P<iterations>\d+) "
+    r"total_gpu_us=(?P<total_gpu_us>[0-9.+\-eE]+) avg_gpu_us=(?P<avg_gpu_us>[0-9.+\-eE]+)$"
+)
+_GENERATED_SFEM_TIMING_RE = re.compile(
+    r"^generated_sfem_timing name=(?P<name>\S+) iterations=(?P<iterations>\d+) "
+    r"total_cpu_us=(?P<total_cpu_us>[0-9.+\-eE]+) avg_cpu_us=(?P<avg_cpu_us>[0-9.+\-eE]+)$"
+)
+_GENERATED_SFEM_COMPARE_RE = re.compile(
+    r"^generated_sfem_compare target=(?P<target>\S+) output_max_abs_diff=(?P<max_abs_diff>[0-9.+\-eE]+) "
+    r"tolerance=(?P<tolerance>[0-9.+\-eE]+) ok=(?P<ok>[01])$"
+)
+
+
+def _parse_metal_timing_stdout(stdout):
+    timings = []
+    for line in stdout.splitlines():
+        match = _METAL_TIMING_RE.match(line.strip())
+        if match is None:
+            continue
+        timings.append(
+            {
+                "name": match.group("name"),
+                "iterations": int(match.group("iterations")),
+                "total_gpu_us": float(match.group("total_gpu_us")),
+                "avg_gpu_us": float(match.group("avg_gpu_us")),
+            }
+        )
+    return timings
+
+
+def _parse_generated_sfem_timing_stdout(stdout):
+    timings = []
+    for line in stdout.splitlines():
+        match = _GENERATED_SFEM_TIMING_RE.match(line.strip())
+        if match is None:
+            continue
+        timings.append(
+            {
+                "name": match.group("name"),
+                "iterations": int(match.group("iterations")),
+                "total_cpu_us": float(match.group("total_cpu_us")),
+                "avg_cpu_us": float(match.group("avg_cpu_us")),
+            }
+        )
+    return timings
+
+
+def _parse_generated_sfem_compare_stdout(stdout):
+    for line in stdout.splitlines():
+        match = _GENERATED_SFEM_COMPARE_RE.match(line.strip())
+        if match is None:
+            continue
+        return {
+            "target": match.group("target"),
+            "max_abs_diff": float(match.group("max_abs_diff")),
+            "tolerance": float(match.group("tolerance")),
+            "ok": match.group("ok") == "1",
+        }
+    return {}
+
+
+def _run_generated_sfem_laplace_comparison(output_dir, args, form_ir, local_metal):
+    xcrun = shutil.which("xcrun")
+    if xcrun is None:
+        return {
+            "name": "generated_sfem_laplace_local_apply_comparison",
+            "ok": False,
+            "skipped": True,
+            "reason": "xcrun is not available",
+        }
+    sf = form_ir.sum_factor
+    if sf.dim != 3:
+        return {
+            "name": "generated_sfem_laplace_local_apply_comparison",
+            "ok": False,
+            "skipped": True,
+            "reason": "generated SFEM comparison harness currently covers 3D tensor-product elements",
+        }
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generated_dir = output_dir / "generated_laplace"
+    try:
+        gen.generate(
+            material,
+            generated_dir,
+            elements=(sf.element_type,),
+            vector_size=sf.vector_size,
+            quadrature_order=sf.quadrature_order,
+            clean=True,
+            dump_plan=True,
+            target="openmp",
+        )
+    except Exception as exc:
+        return {
+            "name": "generated_sfem_laplace_local_apply_comparison",
+            "ok": False,
+            "phase": "generate",
+            "reason": str(exc),
+            "generated_dir": str(generated_dir),
+        }
+
+    element_slug = sf.element_type.lower()
+    generated_operator = generated_dir / "d3" / element_slug / ("laplace_%s_operator.cpp" % element_slug)
+    if not generated_operator.is_file():
+        return {
+            "name": "generated_sfem_laplace_local_apply_comparison",
+            "ok": False,
+            "phase": "generate",
+            "reason": "generated SFEM operator source was not emitted",
+            "generated_dir": str(generated_dir),
+            "generated_operator": str(generated_operator),
+        }
+
+    harness = output_dir / ("%s_generated_sfem_compare.mm" % form_ir.function_prefix)
+    executable = output_dir / ("%s_generated_sfem_compare" % form_ir.function_prefix)
+    harness.write_text(_render_generated_sfem_laplace_comparison_harness(form_ir, local_metal, generated_operator))
+    compile_result = subprocess.run(
+        [
+            xcrun,
+            "clang++",
+            "-std=c++17",
+            "-O3",
+            str(harness),
+            "-fobjc-arc",
+            "-framework",
+            "Foundation",
+            "-framework",
+            "Metal",
+            "-o",
+            str(executable),
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if compile_result.returncode != 0:
+        return {
+            "name": "generated_sfem_laplace_local_apply_comparison",
+            "ok": False,
+            "phase": "compile",
+            "generated_dir": str(generated_dir),
+            "generated_operator": str(generated_operator),
+            "harness_path": str(harness),
+            "executable_path": str(executable),
+            "compile_returncode": compile_result.returncode,
+            "compile_stdout": compile_result.stdout,
+            "compile_stderr": compile_result.stderr,
+        }
+
+    run_result = subprocess.run(
+        [str(executable)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    comparison = _parse_generated_sfem_compare_stdout(run_result.stdout)
+    return {
+        "name": "generated_sfem_laplace_local_apply_comparison",
+        "ok": run_result.returncode == 0 and comparison.get("ok", False),
+        "phase": "runtime",
+        "generated_dir": str(generated_dir),
+        "generated_operator": str(generated_operator),
+        "harness_path": str(harness),
+        "executable_path": str(executable),
+        "compile_returncode": compile_result.returncode,
+        "run_returncode": run_result.returncode,
+        "compile_stdout": compile_result.stdout,
+        "compile_stderr": compile_result.stderr,
+        "run_stdout": run_result.stdout,
+        "run_stderr": run_result.stderr,
+        "comparison": comparison,
+        "metal_timings": _parse_metal_timing_stdout(run_result.stdout),
+        "generated_sfem_timings": _parse_generated_sfem_timing_stdout(run_result.stdout),
+    }
+
+
+def _render_generated_sfem_laplace_comparison_harness(form_ir, local_metal, generated_operator):
+    sf = form_ir.sum_factor
+    element_slug = sf.element_type.lower()
+    generated_kernel = "laplace_%s_residual_element_soa_float" % element_slug
+    u = tuple(float(0.5 + 0.03125 * (i + 1)) for i in range(sf.n_shape))
+    return _GENERATED_SFEM_LAPLACE_COMPARISON_TEMPLATE % {
+        "generated_operator": str(generated_operator),
+        "source": _objc_string_literal(local_metal.render_metal_source()),
+        "metal_kernel_name": local_metal._metal_kernel_name(),
+        "generated_kernel": generated_kernel,
+        "n_shape": sf.n_shape,
+        "n_qp": sf.n_qp,
+        "u": _float_initializer(u),
+        "kappa": _c_float_literal(form_ir.parameter_default),
+        "metal_iterations": 64,
+        "generated_iterations": 4096,
+        "tolerance": _c_float_literal(5.0e-4),
+    }
+
+
 def _run_metal_smoke_tests(output_dir, sum_factor_metal, local_metal, ebe_metal):
     xcrun = shutil.which("xcrun")
     if xcrun is None:
@@ -1890,9 +2542,216 @@ def _run_metal_smoke_tests(output_dir, sum_factor_metal, local_metal, ebe_metal)
                 "compile_stderr": result.compile_stderr,
                 "run_stdout": result.run_stdout,
                 "run_stderr": result.run_stderr,
+                "timings": _parse_metal_timing_stdout(result.run_stdout),
             }
         )
     return results
+
+
+_GENERATED_SFEM_LAPLACE_COMPARISON_TEMPLATE = r'''#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+
+#include "%(generated_operator)s"
+
+static constexpr unsigned N_SHAPE = %(n_shape)d;
+static constexpr unsigned N_QP = %(n_qp)d;
+static constexpr unsigned METAL_TIMING_ITERATIONS = %(metal_iterations)d;
+static constexpr unsigned GENERATED_SFEM_TIMING_ITERATIONS = %(generated_iterations)d;
+static constexpr float COMPARISON_TOLERANCE = %(tolerance)sf;
+
+struct GeneratedSfemFixture {
+    float determinant[N_QP];
+    float adjugate_storage[9][N_QP];
+    const float *adjugate[9];
+    float current_storage[N_SHAPE];
+    float output_storage[N_SHAPE];
+    const float *current[N_SHAPE];
+    float *output[N_SHAPE];
+};
+
+static void initialize_generated_sfem_fixture(GeneratedSfemFixture &fixture) {
+    static const float input[N_SHAPE] = {%(u)s};
+    for (unsigned q = 0; q < N_QP; ++q) {
+        fixture.determinant[q] = 1.0f;
+        for (unsigned j = 0; j < 9; ++j) {
+            fixture.adjugate_storage[j][q] = 0.0f;
+        }
+        fixture.adjugate_storage[0][q] = 1.0f;
+        fixture.adjugate_storage[4][q] = 1.0f;
+        fixture.adjugate_storage[8][q] = 1.0f;
+    }
+    for (unsigned j = 0; j < 9; ++j) {
+        fixture.adjugate[j] = fixture.adjugate_storage[j];
+    }
+    for (unsigned i = 0; i < N_SHAPE; ++i) {
+        fixture.current_storage[i] = input[i];
+        fixture.output_storage[i] = 0.0f;
+        fixture.current[i] = &fixture.current_storage[i];
+        fixture.output[i] = &fixture.output_storage[i];
+    }
+}
+
+static int run_generated_sfem_kernel(GeneratedSfemFixture &fixture, float *out) {
+    for (unsigned i = 0; i < N_SHAPE; ++i) {
+        fixture.output_storage[i] = 0.0f;
+    }
+    const int status = %(generated_kernel)s(
+            1,
+            1,
+            fixture.determinant,
+            fixture.adjugate,
+            fixture.current,
+            %(kappa)sf,
+            fixture.output);
+    if (status != 0) {
+        return status;
+    }
+    for (unsigned i = 0; i < N_SHAPE; ++i) {
+        out[i] = fixture.output_storage[i];
+    }
+    return 0;
+}
+
+static int run_metal_kernel(float *out, double *total_gpu_us, double *avg_gpu_us) {
+    @autoreleasepool {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        if (!device) {
+            return 77;
+        }
+
+        NSString *source = %(source)s;
+        NSError *error = nil;
+        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+        id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
+        if (!library) {
+            std::fprintf(stderr, "Metal library compilation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 78;
+        }
+
+        id<MTLFunction> function = [library newFunctionWithName:@"%(metal_kernel_name)s"];
+        if (!function) {
+            std::fprintf(stderr, "Metal function lookup failed\n");
+            return 79;
+        }
+
+        id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
+        if (!pipeline) {
+            std::fprintf(stderr, "Metal pipeline creation failed: %%s\n", [[error localizedDescription] UTF8String]);
+            return 80;
+        }
+
+        static const float input[N_SHAPE] = {%(u)s};
+        const float kappa = %(kappa)sf;
+        id<MTLBuffer> u_buffer = [device newBufferWithBytes:input length:sizeof(input) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> out_buffer = [device newBufferWithLength:N_SHAPE * sizeof(float) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> kappa_buffer = [device newBufferWithBytes:&kappa length:sizeof(kappa) options:MTLResourceStorageModeShared];
+        id<MTLCommandQueue> queue = [device newCommandQueue];
+
+        id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+        id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+        [encoder setComputePipelineState:pipeline];
+        [encoder setBuffer:u_buffer offset:0 atIndex:0];
+        [encoder setBuffer:out_buffer offset:0 atIndex:1];
+        [encoder setBuffer:kappa_buffer offset:0 atIndex:2];
+        [encoder dispatchThreads:MTLSizeMake(N_SHAPE, 1, 1)
+            threadsPerThreadgroup:MTLSizeMake(N_SHAPE, 1, 1)];
+        [encoder endEncoding];
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+        if ([command_buffer status] != MTLCommandBufferStatusCompleted) {
+            std::fprintf(stderr, "Metal command failed\n");
+            return 81;
+        }
+        const float *result = static_cast<const float *>([out_buffer contents]);
+        for (unsigned i = 0; i < N_SHAPE; ++i) {
+            out[i] = result[i];
+        }
+
+        double total_gpu_seconds = 0.0;
+        for (unsigned iter = 0; iter < METAL_TIMING_ITERATIONS; ++iter) {
+            id<MTLCommandBuffer> timing_command_buffer = [queue commandBuffer];
+            id<MTLComputeCommandEncoder> timing_encoder = [timing_command_buffer computeCommandEncoder];
+            [timing_encoder setComputePipelineState:pipeline];
+            [timing_encoder setBuffer:u_buffer offset:0 atIndex:0];
+            [timing_encoder setBuffer:out_buffer offset:0 atIndex:1];
+            [timing_encoder setBuffer:kappa_buffer offset:0 atIndex:2];
+            [timing_encoder dispatchThreads:MTLSizeMake(N_SHAPE, 1, 1)
+                threadsPerThreadgroup:MTLSizeMake(N_SHAPE, 1, 1)];
+            [timing_encoder endEncoding];
+            [timing_command_buffer commit];
+            [timing_command_buffer waitUntilCompleted];
+            if ([timing_command_buffer status] != MTLCommandBufferStatusCompleted) {
+                std::fprintf(stderr, "Metal timing command failed\n");
+                return 82;
+            }
+            const double gpu_seconds = [timing_command_buffer GPUEndTime] - [timing_command_buffer GPUStartTime];
+            if (gpu_seconds > 0.0) {
+                total_gpu_seconds += gpu_seconds;
+            }
+        }
+        *total_gpu_us = total_gpu_seconds * 1.0e6;
+        *avg_gpu_us = *total_gpu_us / static_cast<double>(METAL_TIMING_ITERATIONS);
+        return 0;
+    }
+}
+
+int main() {
+    GeneratedSfemFixture fixture;
+    initialize_generated_sfem_fixture(fixture);
+
+    float generated_out[N_SHAPE];
+    float metal_out[N_SHAPE];
+    double total_gpu_us = 0.0;
+    double avg_gpu_us = 0.0;
+
+    const int generated_status = run_generated_sfem_kernel(fixture, generated_out);
+    if (generated_status != 0) {
+        std::fprintf(stderr, "generated SFEM kernel failed: %%d\n", generated_status);
+        return 90;
+    }
+
+    const int metal_status = run_metal_kernel(metal_out, &total_gpu_us, &avg_gpu_us);
+    if (metal_status != 0) {
+        return metal_status;
+    }
+
+    float max_abs_diff = 0.0f;
+    for (unsigned i = 0; i < N_SHAPE; ++i) {
+        const float diff = std::fabs(metal_out[i] - generated_out[i]);
+        if (diff > max_abs_diff) {
+            max_abs_diff = diff;
+        }
+    }
+    const bool outputs_match = max_abs_diff <= COMPARISON_TOLERANCE;
+    std::printf("generated_sfem_compare target=%(generated_kernel)s output_max_abs_diff=%%.9g tolerance=%%.9g ok=%%d\n",
+                static_cast<double>(max_abs_diff),
+                static_cast<double>(COMPARISON_TOLERANCE),
+                outputs_match ? 1 : 0);
+    std::printf("metal_timing name=%(metal_kernel_name)s iterations=%%u total_gpu_us=%%.6f avg_gpu_us=%%.6f\n",
+                METAL_TIMING_ITERATIONS, total_gpu_us, avg_gpu_us);
+
+    volatile float sink = 0.0f;
+    const auto cpu_start = std::chrono::steady_clock::now();
+    for (unsigned iter = 0; iter < GENERATED_SFEM_TIMING_ITERATIONS; ++iter) {
+        const int status = run_generated_sfem_kernel(fixture, generated_out);
+        if (status != 0) {
+            return 91;
+        }
+        sink += generated_out[iter %% N_SHAPE];
+    }
+    const auto cpu_end = std::chrono::steady_clock::now();
+    const double total_cpu_us =
+            std::chrono::duration<double, std::micro>(cpu_end - cpu_start).count();
+    const double avg_cpu_us = total_cpu_us / static_cast<double>(GENERATED_SFEM_TIMING_ITERATIONS);
+    std::printf("generated_sfem_timing name=%(generated_kernel)s iterations=%%u total_cpu_us=%%.6f avg_cpu_us=%%.6f\n",
+                GENERATED_SFEM_TIMING_ITERATIONS, total_cpu_us, avg_cpu_us);
+    return outputs_match ? 0 : 92;
+}
+'''
 
 
 if __name__ == "__main__":
