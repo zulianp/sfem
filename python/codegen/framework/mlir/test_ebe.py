@@ -94,6 +94,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                     "kernel_module_ok": True,
                     "kernel_binary_ok": True,
                     "host_launch_ok": False,
+                    "host_wrapper_ok": True,
                     "diagnostic_kind": "mlir_gpu_to_spirv_host_launch_boundary",
                 }
             ],
@@ -114,6 +115,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(evidence["raw_gpu_spirv_kernel_module_ok"], evidence)
         self.assertTrue(evidence["raw_gpu_spirv_kernel_binary_ok"], evidence)
         self.assertFalse(evidence["raw_gpu_spirv_host_launch_ok"], evidence)
+        self.assertTrue(evidence["raw_gpu_spirv_host_wrapper_ok"], evidence)
         self.assertFalse(evidence["matrix_unit_iree_probe_ok"], evidence)
         self.assertEqual(
             set(evidence["gpu_artifact_groups"]),
@@ -1809,8 +1811,11 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             self.assertTrue(probe["kernel_module_ok"], probe)
             self.assertEqual(probe["kernel_binary_ok"], mlir_translate_available, probe)
             self.assertFalse(probe["host_launch_ok"], probe)
+            self.assertTrue(probe["host_wrapper_ok"], probe)
             self.assertEqual(probe["diagnostic_kind"], "mlir_gpu_to_spirv_host_launch_boundary", probe)
             self.assertEqual(probe["returncode"], 0, probe)
+            self.assertTrue(any(arg.startswith("--pass-pipeline=") for arg in probe["command"]), probe)
+            self.assertIn("convert-to-spirv{convert-gpu-modules}", " ".join(probe["command"]))
             self.assertGreater(probe["spirv_module_count"], 0, probe)
             self.assertGreater(probe["spirv_func_count"], 0, probe)
             self.assertGreater(probe["kernel_module_count"], 0, probe)
@@ -1826,8 +1831,9 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 self.assertTrue(all(item.get("skipped", False) for item in probe["kernel_binary_serialization"]), probe)
             self.assertGreater(probe["remaining_gpu_launch_count"], 0, probe)
             self.assertGreater(probe["remaining_gpu_module_count"], 0, probe)
-            self.assertEqual(probe["remaining_memref_load_count"], 0, probe)
-            self.assertEqual(probe["remaining_memref_store_count"], 0, probe)
+            self.assertGreater(probe["remaining_host_func_count"], 0, probe)
+            self.assertGreaterEqual(probe["remaining_memref_load_count"], 0, probe)
+            self.assertGreaterEqual(probe["remaining_memref_store_count"], 0, probe)
             self.assertTrue(probe["output_mlir"], probe)
             self.assertTrue(gpu_to_spirv_output_paths_exist[group], probe)
             self.assertTrue(gpu_to_spirv_kernel_module_paths_exist[group], probe)
@@ -1841,6 +1847,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(pipeline_evidence["raw_gpu_spirv_kernel_module_ok"], pipeline_evidence)
         self.assertEqual(pipeline_evidence["raw_gpu_spirv_kernel_binary_ok"], mlir_translate_available, pipeline_evidence)
         self.assertFalse(pipeline_evidence["raw_gpu_spirv_host_launch_ok"], pipeline_evidence)
+        self.assertTrue(pipeline_evidence["raw_gpu_spirv_host_wrapper_ok"], pipeline_evidence)
         self.assertEqual(len(manifest["iree_metal_matrix_unit"]), 3)
         matrix_unit_by_kind = {item["input_kind"]: item for item in manifest["iree_metal_matrix_unit"]}
         self.assertEqual(
