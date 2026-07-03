@@ -3108,8 +3108,8 @@ class GenApiTest(unittest.TestCase):
                 mesh_contents = input_file.read()
             self.assertGreater(_assert_lane_loops_request_simd(self, mesh), 0)
             self.assertIn(
-                "#pragma omp simd\n        for (int lane = 0; lane < nelems; ++lane) {\n"
-                "            block_current[0][lane] =",
+                "const idx_t node = element_shape[evbegin + lane];\n"
+                "                block_current[stream][lane] =",
                 mesh_contents,
             )
 
@@ -3444,7 +3444,10 @@ class GenApiTest(unittest.TestCase):
             )
             with open(source, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
-            self.assertIn("ev[0 * VECTOR_SIZE + lane]", operator_source)
+            self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];", operator_source)
+            self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
+            self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
+            self.assertNotIn("idx_t ev[VECTOR_SIZE * CELL_N_SHAPE]", operator_source)
             self.assertNotIn("ev[lane * CELL_N_SHAPE", operator_source)
             self.assertNotIn("ev[scatter * CELL_N_SHAPE", operator_source)
             subprocess.run(
@@ -3605,7 +3608,10 @@ class GenApiTest(unittest.TestCase):
             )
             with open(operator) as source:
                 operator_source = source.read()
-            self.assertIn("ev[0 * VECTOR_SIZE + lane]", operator_source)
+            self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[shape];", operator_source)
+            self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
+            self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
+            self.assertNotIn("idx_t ev[VECTOR_SIZE * N_SHAPE]", operator_source)
             self.assertNotIn("ev[lane * N_SHAPE", operator_source)
             self.assertNotIn("ev[scatter * N_SHAPE", operator_source)
             affine_begin = operator_source.index(

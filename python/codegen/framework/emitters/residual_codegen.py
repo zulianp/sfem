@@ -660,11 +660,201 @@ def _affine_mesh_public_wrapper_lines(
 
 
 def _zero_block_output_lines(name, n_streams, indent):
-    lines = [*_work_item_loop_lines(indent)]
-    for stream in range(n_streams):
-        lines.append("%s    %s[%d][lane] = scalar_t(0);" % (indent, name, stream))
+    return [
+        "%sfor (int stream = 0; stream < %d; ++stream) {" % (indent, n_streams),
+        *_work_item_loop_lines("%s    " % indent),
+        "%s        %s[stream][lane] = scalar_t(0);" % (indent, name),
+        "%s    }" % indent,
+        "%s}" % indent,
+    ]
+
+
+def _stream_pointer_array_lines(pointer_type, array_name, storage_name, n_streams, stream_order, indent):
+    if tuple(stream_order) == tuple(range(n_streams)):
+        return [
+            "%s%s %s[N_FIELDS * N_SHAPE];" % (indent, pointer_type, array_name),
+            "%sfor (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {" % indent,
+            "%s    %s[stream] = %s[stream];" % (indent, array_name, storage_name),
+            "%s}" % indent,
+        ]
+
+    return [
+        "%s%sconst %s[N_FIELDS * N_SHAPE] = {%s};"
+        % (
+            indent,
+            pointer_type,
+            array_name,
+            ", ".join("%s[%d]" % (storage_name, i) for i in stream_order),
+        )
+    ]
+
+
+@dataclass(frozen=True)
+class MeshBlockGatherLoop:
+    shape_var: str
+    shape_count: str
+    lane_indent: str
+    setup_lines: tuple = ()
+    close_lines: tuple = ()
+    element_index: str = None
+
+
+@dataclass(frozen=True)
+class MeshBlockScatterLoop:
+    shape_var: str
+    shape_count: str
+    scatter_indent: str
+    setup_lines: tuple = ()
+    close_lines: tuple = ()
+    element_index: str = None
+
+
+def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
+    element_index = loop.shape_var if loop.element_index is None else loop.element_index
+    lines = [
+        "%sfor (int %s = 0; %s < %s; ++%s) {"
+        % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
+        "%s    const idx_t *const SFEM_RESTRICT element_shape = elements[%s];"
+        % (indent, element_index),
+    ]
+    lines.extend(loop.setup_lines)
+    lines.extend(_work_item_loop_lines(loop.lane_indent))
+    lines.append(
+        "%s    const idx_t node = element_shape[evbegin + lane];"
+        % loop.lane_indent
+    )
+    lines.extend(assignment_lines)
+    lines.append("%s}" % loop.lane_indent)
+    lines.extend(loop.close_lines)
     lines.append("%s}" % indent)
     return lines
+
+
+def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
+    element_index = loop.shape_var if loop.element_index is None else loop.element_index
+    lines = [
+        "%sfor (int %s = 0; %s < %s; ++%s) {"
+        % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
+        "%s    const idx_t *const SFEM_RESTRICT element_shape = elements[%s];"
+        % (indent, element_index),
+    ]
+    lines.extend(loop.setup_lines)
+    lines.extend(
+        [
+            "%sfor (int scatter = 0; scatter < nelems; ++scatter) {"
+            % loop.scatter_indent,
+            "%s    %s" % (loop.scatter_indent, _atomic_update_pragma()),
+            accumulation_line,
+            "%s}" % loop.scatter_indent,
+        ]
+    )
+    lines.extend(loop.close_lines)
+    lines.append("%s}" % indent)
+    return lines
+
+
+def _field_gather_lines(system, dependencies, indent):
+    lines = []
+    if dependencies.current:
+        lines.append(
+            "%sconst scalar_t *const current_components[N_FIELDS] = {%s};"
+            % (indent, ", ".join(field.name for field in system.fields))
+        )
+    if dependencies.previous:
+        lines.append(
+            "%sconst scalar_t *const previous_components[N_FIELDS] = {%s};"
+            % (indent, ", ".join("%s_old" % field.name for field in system.fields))
+        )
+    if dependencies.direction:
+        lines.append(
+            "%sconst scalar_t *const direction_components[N_FIELDS] = {%s};"
+            % (indent, ", ".join("%s_direction" % field.name for field in system.fields))
+        )
+
+    if not lines:
+        return lines
+
+    assignment_lines = []
+    if dependencies.current:
+        assignment_lines.append(
+            "%s            block_current[stream][lane] = current_components[field][node * current_stride];"
+            % indent
+        )
+    if dependencies.previous:
+        assignment_lines.append(
+            "%s            block_previous[stream][lane] = previous_components[field][node * previous_stride];"
+            % indent
+        )
+    if dependencies.direction:
+        assignment_lines.append(
+            "%s            block_direction[stream][lane] = direction_components[field][node * direction_stride];"
+            % indent
+        )
+    lines.extend(
+        [
+            "",
+            *_mesh_block_gather_loop_lines(
+                indent,
+                MeshBlockGatherLoop(
+                    shape_var="shape",
+                    shape_count="N_SHAPE",
+                    setup_lines=(
+                        "%s    for (int field = 0; field < N_FIELDS; ++field)" % indent
+                        + " {",
+                        "%s        const int stream = shape * N_FIELDS + field;" % indent,
+                    ),
+                    close_lines=("%s    }" % indent,),
+                    lane_indent="%s        " % indent,
+                ),
+                assignment_lines,
+            ),
+        ]
+    )
+    return lines
+
+
+def _coordinate_gather_lines(dim, indent):
+    return [
+        "%sconst geom_t *const coordinate_components[DIM] = {%s};"
+        % (indent, ", ".join("points[%d]" % d for d in range(dim))),
+        *_mesh_block_gather_loop_lines(
+            indent,
+            MeshBlockGatherLoop(
+                shape_var="shape",
+                shape_count="N_SHAPE",
+                setup_lines=("%s    for (int d = 0; d < DIM; ++d) {" % indent,),
+                close_lines=("%s    }" % indent,),
+                lane_indent="%s        " % indent,
+            ),
+            [
+                "%s            block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];"
+                % indent
+            ],
+        ),
+    ]
+
+
+def _field_atomic_scatter_lines(system, indent):
+    return [
+        "%sscalar_t *const output_components[N_FIELDS] = {%s};"
+        % (indent, ", ".join("%s_out" % field.name for field in system.fields)),
+        *_mesh_block_scatter_loop_lines(
+            indent,
+            MeshBlockScatterLoop(
+                shape_var="shape",
+                shape_count="N_SHAPE",
+                setup_lines=(
+                    "%s    for (int field = 0; field < N_FIELDS; ++field) {" % indent,
+                    "%s        const int stream = shape * N_FIELDS + field;" % indent,
+                    "%s        scalar_t *const SFEM_RESTRICT out = output_components[field];" % indent,
+                ),
+                close_lines=("%s    }" % indent,),
+                scatter_indent="%s        " % indent,
+            ),
+            "%s            out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];"
+            % indent,
+        ),
+    ]
 
 
 @dataclass(frozen=True)
@@ -1103,28 +1293,117 @@ def _mixed_block_stream_pointer_lines(
         basis_family,
     )
     lines = []
+    identity_order = field_stream_order == tuple(range(layout.total_streams))
     for group in _dependency_stream_groups(dependencies):
+        if identity_order:
+            lines.extend(
+                [
+                    "%sconst scalar_t *block_%s_streams[N_FIELD_STREAMS];"
+                    % (indent, group.name),
+                    "%sfor (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {" % indent,
+                    "%s    block_%s_streams[stream] = block_%s[stream];"
+                    % (indent, group.name, group.name),
+                    "%s}" % indent,
+                ]
+            )
+        else:
+            lines.append(
+                "%sconst scalar_t *const block_%s_streams[N_FIELD_STREAMS] = {%s};"
+                % (
+                    indent,
+                    group.name,
+                    ", ".join(
+                        "block_%s[%d]" % (group.name, stream)
+                        for stream in field_stream_order
+                    ),
+                )
+            )
+    if identity_order:
+        lines.extend(
+            [
+                "%sscalar_t *block_output_streams[N_FIELD_STREAMS];" % indent,
+                "%sfor (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {" % indent,
+                "%s    block_output_streams[stream] = block_output[stream];" % indent,
+                "%s}" % indent,
+            ]
+        )
+    else:
         lines.append(
-            "%sconst scalar_t *const block_%s_streams[N_FIELD_STREAMS] = {%s};"
+            "%sscalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
             % (
                 indent,
-                group.name,
                 ", ".join(
-                    "block_%s[%d]" % (group.name, stream)
+                    "block_output[%d]" % stream
                     for stream in field_stream_order
                 ),
             )
         )
-    lines.append(
-        "%sscalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
-        % (
-            indent,
-            ", ".join(
-                "block_output[%d]" % stream
-                for stream in field_stream_order
-            ),
+    return lines
+
+
+def _mixed_field_gather_lines(system, layout, dependencies, indent):
+    lines = []
+    dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
+    for field_index, field in enumerate(system.fields):
+        n_shape = layout.n_shape(field_index)
+        offset = layout.offset(field_index)
+        field_lines = []
+        for group in dependency_groups:
+            field_lines.append(
+                "%sblock_%s[stream][lane] = %s[node * %s];"
+                % (
+                    indent + "        ",
+                    group.name,
+                    _mixed_mesh_field_pointer(field, group),
+                    group.stride,
+                )
+            )
+        if not field_lines:
+            continue
+        lines.extend(
+            _mesh_block_gather_loop_lines(
+                indent,
+                MeshBlockGatherLoop(
+                    shape_var="local_shape",
+                    shape_count=str(n_shape),
+                    setup_lines=(
+                        "%s    const int stream = %d + local_shape;" % (indent, offset),
+                    ),
+                    lane_indent="%s    " % indent,
+                ),
+                field_lines,
+            )
         )
-    )
+    return lines
+
+
+def _mixed_field_atomic_scatter_lines(system, layout, indent):
+    lines = []
+    for field_index, field in enumerate(system.fields):
+        n_shape = layout.n_shape(field_index)
+        offset = layout.offset(field_index)
+        lines.extend(
+            [
+                "%s{" % indent,
+                "%s    scalar_t *const SFEM_RESTRICT out = %s;"
+                % (indent, _mixed_mesh_output_pointer(field)),
+                *_mesh_block_scatter_loop_lines(
+                    "%s    " % indent,
+                    MeshBlockScatterLoop(
+                        shape_var="local_shape",
+                        shape_count=str(n_shape),
+                        setup_lines=(
+                            "%s        const int stream = %d + local_shape;"
+                            % (indent, offset),
+                        ),
+                        scatter_indent="%s        " % indent,
+                    ),
+                    "%s            out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];"
+                    % indent,
+                ),
+                "%s}" % indent,
+            ]
+        )
     return lines
 
 
@@ -3512,7 +3791,6 @@ def _mixed_affine_function(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
-            "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
         ]
     )
     if dependencies.current:
@@ -3524,36 +3802,11 @@ def _mixed_affine_function(
     lines.extend(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
-            "",
-            *_work_item_loop_lines("        "),
         ]
     )
-    for shape in range(cell_rule.n_shape):
-        lines.append(
-            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
-            % (shape, shape)
-        )
-    lines.append("        }")
-    dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
-    if dependency_groups:
-        lines.extend(["", *_work_item_loop_lines("        ")])
-    for field_index, field in enumerate(system.fields):
-        for local_shape in range(layout.n_shape(field_index)):
-            stream = layout.stream_index(field_index, local_shape)
-            node = "ev[%d * VECTOR_SIZE + lane]" % local_shape
-            for group in dependency_groups:
-                lines.append(
-                    "            block_%s[%d][lane] = %s[%s * %s];"
-                    % (
-                        group.name,
-                        stream,
-                        _mixed_mesh_field_pointer(field, group),
-                        node,
-                        group.stride,
-                    )
-                )
-    if dependency_groups:
-        lines.append("        }")
+    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ")
+    if field_gather:
+        lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     lines.extend(
         _affine_geometry_stream_conversion_lines(
@@ -3603,17 +3856,7 @@ def _mixed_affine_function(
             "",
         ]
     )
-    for field_index, field in enumerate(system.fields):
-        for local_shape in range(layout.n_shape(field_index)):
-            stream = layout.stream_index(field_index, local_shape)
-            lines.extend(
-                _direct_atomic_scatter_lines(
-                    _mixed_mesh_output_pointer(field),
-                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % local_shape,
-                    "block_output[%d][%%s]" % stream,
-                    "        ",
-                )
-            )
+    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        "))
     lines.extend(
         [
             "    }",
@@ -3737,7 +3980,6 @@ def _mixed_isoparametric_function(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
-            "        idx_t ev[VECTOR_SIZE * CELL_N_SHAPE];",
             "        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];",
             "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
@@ -3752,41 +3994,12 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
-            "",
-            *_work_item_loop_lines("        "),
         ]
     )
-    for shape in range(cell_rule.n_shape):
-        lines.append(
-            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
-            % (shape, shape)
-        )
-    lines.append("        }")
-    dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
-    lines.extend(["", *_work_item_loop_lines("        ")])
-    for shape in range(cell_rule.n_shape):
-        node = "ev[%d * VECTOR_SIZE + lane]" % shape
-        for d in range(dim):
-            lines.append(
-                "            block_coordinates[%d][lane] = points[%d][%s];"
-                % (shape * dim + d, d, node)
-            )
-    for field_index, field in enumerate(system.fields):
-        for local_shape in range(layout.n_shape(field_index)):
-            stream = layout.stream_index(field_index, local_shape)
-            node = "ev[%d * VECTOR_SIZE + lane]" % local_shape
-            for group in dependency_groups:
-                lines.append(
-                    "            block_%s[%d][lane] = %s[%s * %s];"
-                    % (
-                        group.name,
-                        stream,
-                        _mixed_mesh_field_pointer(field, group),
-                        node,
-                        group.stride,
-                    )
-                )
-    lines.append("        }")
+    lines.extend(["", *_coordinate_gather_lines(dim, "        ")])
+    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ")
+    if field_gather:
+        lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     if tensor_product_geometry:
         lines.append("")
@@ -3899,17 +4112,7 @@ def _mixed_isoparametric_function(
             "",
         ]
     )
-    for field_index, field in enumerate(system.fields):
-        for local_shape in range(layout.n_shape(field_index)):
-            stream = layout.stream_index(field_index, local_shape)
-            lines.extend(
-                _direct_atomic_scatter_lines(
-                    _mixed_mesh_output_pointer(field),
-                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % local_shape,
-                    "block_output[%d][%%s]" % stream,
-                    "        ",
-                )
-            )
+    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        "))
     lines.extend(
         [
             "    }",
@@ -4413,7 +4616,6 @@ def _mesh_operator_source(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
-            "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
         ]
     )
     if dependencies.current:
@@ -4436,60 +4638,52 @@ def _mesh_operator_source(
     lines.extend(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
-            "",
-            *_work_item_loop_lines("        "),
         ]
     )
-    for shape in range(n_shape):
-        lines.append(
-            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
-            % (shape, shape)
-        )
-    lines.append("        }")
-    if dependencies.current or dependencies.previous or dependencies.direction:
-        lines.extend(["", *_work_item_loop_lines("        ")])
-        for shape in range(n_shape):
-            for field_index, field in enumerate(system.fields):
-                stream = shape * n_fields + field_index
-                node = "ev[%d * VECTOR_SIZE + lane]" % shape
-                if dependencies.current:
-                    lines.append(
-                        "            block_current[%d][lane] = %s[%s * current_stride];"
-                        % (stream, field.name, node)
-                    )
-                if dependencies.previous:
-                    lines.append(
-                        "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
-                        % (stream, field.name, node)
-                    )
-                if dependencies.direction:
-                    lines.append(
-                        "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
-                        % (stream, field.name, node)
-                    )
-        lines.append("        }")
+    lines.extend(_field_gather_lines(system, dependencies, "        "))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
     if dependencies.current:
-        lines.append(
-            "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join("block_current[%d]" % i for i in field_stream_order)
-        )
-    if dependencies.previous:
-        lines.append(
-            "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join("block_previous[%d]" % i for i in field_stream_order)
-        )
-    if dependencies.direction:
-        lines.append(
-            "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_direction[%d]" % i
-                for i in field_stream_order
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_current_streams",
+                "block_current",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
             )
         )
-    lines.append(
-        "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
-        % ", ".join("block_output[%d]" % i for i in field_stream_order)
+    if dependencies.previous:
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_previous_streams",
+                "block_previous",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
+            )
+        )
+    if dependencies.direction:
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_direction_streams",
+                "block_direction",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
+            )
+        )
+    lines.extend(
+        _stream_pointer_array_lines(
+            "scalar_t *",
+            "block_output_streams",
+            "block_output",
+            n_fields * n_shape,
+            field_stream_order,
+            "        ",
+        )
     )
     lines.extend(
         _affine_geometry_stream_conversion_lines(
@@ -4607,17 +4801,7 @@ def _mesh_operator_source(
             "",
         ]
     )
-    for shape in range(n_shape):
-        for field_index, field in enumerate(system.fields):
-            stream = shape * n_fields + field_index
-            lines.extend(
-                _direct_atomic_scatter_lines(
-                    "%s_out" % field.name,
-                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
-                    "block_output[%d][%%s]" % stream,
-                    "        ",
-                )
-            )
+    lines.extend(_field_atomic_scatter_lines(system, "        "))
     lines.extend(
         [
             "    }",
@@ -4856,7 +5040,6 @@ def _isoparametric_mesh_operator_source(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
-            "        idx_t ev[VECTOR_SIZE * N_SHAPE];",
             "        scalar_t block_coordinates[%d * N_SHAPE][VECTOR_SIZE];"
             % dim,
             "        scalar_t block_adjugate_data[%d][N_QP * VECTOR_SIZE];"
@@ -4884,45 +5067,10 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
-            "",
-            *_work_item_loop_lines("        "),
         ]
     )
-    for shape in range(n_shape):
-        lines.append(
-            "            ev[%d * VECTOR_SIZE + lane] = elements[%d][evbegin + lane];"
-            % (shape, shape)
-        )
-    lines.extend(["        }", "", *_work_item_loop_lines("        ")])
-    for shape in range(n_shape):
-        node = "ev[%d * VECTOR_SIZE + lane]" % shape
-        for d in range(dim):
-            lines.append(
-                "            block_coordinates[%d][lane] = points[%d][%s];"
-                % (shape * dim + d, d, node)
-            )
-        for field_index, field in enumerate(system.fields):
-            stream = shape * n_fields + field_index
-            if dependencies.current:
-                lines.append(
-                    "            block_current[%d][lane] = %s[%s * current_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.previous:
-                lines.append(
-                    "            block_previous[%d][lane] = %s_old[%s * previous_stride];"
-                    % (stream, field.name, node)
-                )
-            if dependencies.direction:
-                lines.append(
-                    "            block_direction[%d][lane] = %s_direction[%s * direction_stride];"
-                    % (stream, field.name, node)
-                )
-    lines.extend(
-        [
-            "        }",
-        ]
-    )
+    lines.extend(["", *_coordinate_gather_lines(dim, "        ")])
+    lines.extend(_field_gather_lines(system, dependencies, "        "))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        ")])
     if tensor_product_geometry:
         lines.append("")
@@ -5011,26 +5159,47 @@ def _isoparametric_mesh_operator_source(
         lines.extend(["            }", "        }"])
     lines.append("")
     if dependencies.current:
-        lines.append(
-            "        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join("block_current[%d]" % i for i in field_stream_order)
-        )
-    if dependencies.previous:
-        lines.append(
-            "        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join("block_previous[%d]" % i for i in field_stream_order)
-        )
-    if dependencies.direction:
-        lines.append(
-            "        const scalar_t *const block_direction_streams[N_FIELDS * N_SHAPE] = {%s};"
-            % ", ".join(
-                "block_direction[%d]" % i
-                for i in field_stream_order
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_current_streams",
+                "block_current",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
             )
         )
-    lines.append(
-        "        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {%s};"
-        % ", ".join("block_output[%d]" % i for i in field_stream_order)
+    if dependencies.previous:
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_previous_streams",
+                "block_previous",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
+            )
+        )
+    if dependencies.direction:
+        lines.extend(
+            _stream_pointer_array_lines(
+                "const scalar_t *",
+                "block_direction_streams",
+                "block_direction",
+                n_fields * n_shape,
+                field_stream_order,
+                "        ",
+            )
+        )
+    lines.extend(
+        _stream_pointer_array_lines(
+            "scalar_t *",
+            "block_output_streams",
+            "block_output",
+            n_fields * n_shape,
+            field_stream_order,
+            "        ",
+        )
     )
     if dependencies.uses_adjugate:
         lines.append(
@@ -5095,17 +5264,7 @@ def _isoparametric_mesh_operator_source(
             "",
         ]
     )
-    for shape in range(n_shape):
-        for field_index, field in enumerate(system.fields):
-            stream = shape * n_fields + field_index
-            lines.extend(
-                _direct_atomic_scatter_lines(
-                    "%s_out" % field.name,
-                    "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
-                    "block_output[%d][%%s]" % stream,
-                    "        ",
-                )
-            )
+    lines.extend(_field_atomic_scatter_lines(system, "        "))
     lines.extend(
         [
             "    }",
