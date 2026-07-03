@@ -85,6 +85,11 @@ def main():
         action="store_true",
         help="return nonzero when offline xcrun metal compilation is unavailable or fails",
     )
+    parser.add_argument(
+        "--require-pipeline-evidence",
+        action="store_true",
+        help="return nonzero when the summarized SFEM IR to IREE/Metal pipeline evidence is incomplete",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -161,6 +166,7 @@ def main():
         "max_node_degree": args.max_node_degree,
         "artifacts": artifact_groups,
         "iree_metal": [],
+        "iree_metal_executable_files": [],
         "iree_metal_executable_sources": [],
         "iree_metal_gpu": [],
         "iree_metal_matrix_unit": [],
@@ -169,6 +175,7 @@ def main():
         "metal_smoke": [],
         "metal_toolchain": [],
         "performance_shape": [],
+        "pipeline_evidence": {},
         "reference_verification": [],
         "spirv_binary_validation": [],
     }
@@ -196,6 +203,10 @@ def main():
         manifest["iree_metal"] = _probe_iree_metal(output_dir / "iree_metal", linalg_iree_probes)
         manifest["iree_metal_executable_sources"] = _probe_iree_metal_executable_sources(
             output_dir / "iree_metal_executable_sources",
+            linalg_iree_probes,
+        )
+        manifest["iree_metal_executable_files"] = _probe_iree_metal_executable_files(
+            output_dir / "iree_metal_executable_files",
             linalg_iree_probes,
         )
 
@@ -248,6 +259,8 @@ def main():
             ebe_metal,
         )
 
+    manifest["pipeline_evidence"] = _write_pipeline_evidence(output_dir, manifest)
+
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(str(manifest_path))
@@ -271,6 +284,9 @@ def main():
     if args.require_metal_toolchain:
         if not manifest["metal_toolchain"] or any(not item.get("ok", False) for item in manifest["metal_toolchain"]):
             return 8
+    if args.require_pipeline_evidence:
+        if not manifest["pipeline_evidence"].get("metal_pipeline_ok", False):
+            return 13
     if any(not item.get("ok", False) for item in manifest["mlir_validation"]):
         return 2
     if any(not item.get("ok", False) and not item.get("skipped", False) for item in manifest["spirv_binary_validation"]):
@@ -306,6 +322,107 @@ def _write_ir_artifacts(output_dir, sum_factor_ir, form_ir):
     sum_factor_path.write_text(json.dumps(sum_factor_ir.to_dict(), indent=2, sort_keys=True) + "\n")
     form_path.write_text(json.dumps(form_ir.to_dict(), indent=2, sort_keys=True) + "\n")
     return [str(sum_factor_path), str(form_path)]
+
+
+def _write_pipeline_evidence(output_dir, manifest):
+    evidence = _build_pipeline_evidence(manifest)
+    path = Path(output_dir) / "pipeline_evidence.json"
+    evidence["path"] = str(path)
+    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+    return evidence
+
+
+def _build_pipeline_evidence(manifest):
+    artifacts = manifest.get("artifacts", {})
+    metal_toolchain = manifest.get("metal_toolchain", [])
+    iree_backend_files = manifest.get("iree_metal_executable_files", [])
+    iree_backend_source_counts = {}
+    for item in metal_toolchain:
+        source_kind = item.get("source_kind", "")
+        if source_kind:
+            iree_backend_source_counts[source_kind] = iree_backend_source_counts.get(source_kind, 0) + 1
+
+    raw_gpu_diagnostics = sorted(
+        {
+            item.get("diagnostic_kind", "")
+            for item in manifest.get("iree_metal_gpu", [])
+            if item.get("diagnostic_kind")
+        }
+    )
+    matrix_unit_diagnostics = sorted(
+        {
+            item.get("diagnostic_kind", "")
+            for item in manifest.get("iree_metal_matrix_unit", [])
+            if item.get("diagnostic_kind")
+        }
+    )
+
+    evidence = {
+        "name": "tensor_product_laplace_pipeline_evidence",
+        "material": manifest.get("material"),
+        "element": manifest.get("element"),
+        "quadrature_order": manifest.get("quadrature_order"),
+        "n_shape": manifest.get("n_shape"),
+        "n_qp": manifest.get("n_qp"),
+        "sfem_ir_files": len(artifacts.get("sfem_ir", [])),
+        "sum_factor_artifacts": len(artifacts.get("sum_factor", [])),
+        "form_linalg_artifacts": len(artifacts.get("form_linalg", [])),
+        "gpu_artifact_groups": sorted(
+            group
+            for group in ("sum_factor", "form", "ebe_map", "ebe_full")
+            if any(str(path).endswith(".gpu.mlir") for path in artifacts.get(group, []))
+        ),
+        "reference_ok": _all_required_ok(manifest.get("reference_verification", [])),
+        "performance_shape_ok": _all_required_ok(manifest.get("performance_shape", [])),
+        "mlir_validation_ok": _all_required_ok(manifest.get("mlir_validation", [])),
+        "direct_spirv_validation_ok": _all_required_ok(manifest.get("spirv_binary_validation", [])),
+        "iree_metal_vmfb_ok": _all_required_ok(manifest.get("iree_metal", [])),
+        "iree_hal_executable_sources_ok": _all_required_ok(manifest.get("iree_metal_executable_sources", [])),
+        "iree_backend_files_ok": _all_required_ok(iree_backend_files),
+        "iree_backend_metal_source_count": sum(item.get("metal_source_count", 0) for item in iree_backend_files),
+        "iree_backend_spirv_binary_count": sum(item.get("spirv_binary_count", 0) for item in iree_backend_files),
+        "iree_backend_spirv_bytes": sum(item.get("spirv_binary_total_bytes", 0) for item in iree_backend_files),
+        "iree_backend_spirv_deserialization_ok": all(
+            all(spv.get("ok", False) or spv.get("skipped", False) for spv in item.get("spirv_deserialization", []))
+            for item in iree_backend_files
+        ),
+        "metal_toolchain_ok": _all_required_ok(metal_toolchain),
+        "metal_toolchain_source_counts": iree_backend_source_counts,
+        "metal_smoke_ok": _all_required_ok(manifest.get("metal_smoke", []), allowed_skip_key="no_default_device"),
+        "iree_metal_runtime_ok": _all_required_ok(manifest.get("iree_metal_runtime", [])),
+        "raw_gpu_iree_probe_ok": _all_required_ok(manifest.get("iree_metal_gpu", [])),
+        "raw_gpu_iree_diagnostics": raw_gpu_diagnostics,
+        "matrix_unit_iree_probe_ok": _all_required_ok(manifest.get("iree_metal_matrix_unit", [])),
+        "matrix_unit_iree_diagnostics": matrix_unit_diagnostics,
+    }
+    required_keys = (
+        "reference_ok",
+        "performance_shape_ok",
+        "mlir_validation_ok",
+        "direct_spirv_validation_ok",
+        "iree_metal_vmfb_ok",
+        "iree_hal_executable_sources_ok",
+        "iree_backend_files_ok",
+        "metal_toolchain_ok",
+        "metal_smoke_ok",
+        "iree_metal_runtime_ok",
+    )
+    evidence["metal_pipeline_ok"] = all(evidence[key] for key in required_keys)
+    return evidence
+
+
+def _all_required_ok(items, allowed_skip_key=None):
+    if not items:
+        return False
+    for item in items:
+        if item.get("ok", False):
+            continue
+        if item.get("skipped", False):
+            return False
+        if allowed_skip_key is not None and item.get(allowed_skip_key, False):
+            return False
+        return False
+    return True
 
 
 def _verify_reference(form_ir, max_elements, max_nodes, max_node_degree):
@@ -1003,8 +1120,75 @@ def _probe_iree_metal_executable_sources(output_dir, lowerings):
     return results
 
 
+def _probe_iree_metal_executable_files(output_dir, lowerings):
+    iree_compile = shutil.which("iree-compile")
+    if iree_compile is None:
+        return [
+            {
+                "name": _iree_executable_file_probe_name(config),
+                "ok": False,
+                "skipped": True,
+                "reason": "iree-compile is not available",
+            }
+            for config in lowerings
+        ]
+    output_dir = Path(output_dir)
+    results = []
+    for lowering_config in lowerings:
+        name = _iree_executable_file_probe_name(lowering_config)
+        lowering = lowering_config[1]
+        probe_dir = output_dir / name
+        dump_dir = probe_dir / "executable_files"
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        input_mlir = probe_dir / ("%s.linalg_pipeline.mlir" % lowering.ir.function_prefix)
+        output_vmfb = probe_dir / ("%s.executable_files.metal.vmfb" % lowering.ir.function_prefix)
+        input_mlir.write_text(lowering.render_linalg_pipeline_module())
+        command = [
+            iree_compile,
+            str(input_mlir),
+            "--iree-hal-target-backends=metal-spirv",
+            "--iree-metal-compile-to-metallib=false",
+            "--iree-hal-dump-executable-files-to=%s" % dump_dir,
+            "-o",
+            str(output_vmfb),
+        ]
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout_info = _write_probe_stream(probe_dir, "stdout", result.stdout or "")
+        stderr_info = _write_probe_stream(probe_dir, "stderr", result.stderr or "")
+        diagnostic = _classify_iree_probe_diagnostic(result.stderr or "")
+        file_info = _verify_iree_metal_executable_files(dump_dir)
+        ok = result.returncode == 0 and output_vmfb.exists() and file_info["executable_files_ok"]
+        results.append(
+            {
+                "name": name,
+                "ok": ok,
+                "skipped": False,
+                "input_path": str(input_mlir),
+                "output_vmfb": str(output_vmfb) if output_vmfb.exists() else "",
+                "dump_dir": str(dump_dir),
+                "command": command,
+                "returncode": result.returncode,
+                **diagnostic,
+                **file_info,
+                **stdout_info,
+                **stderr_info,
+            }
+        )
+    return results
+
+
 def _iree_executable_source_probe_name(config):
     return _iree_probe_name(config).replace("_to_metal_vmfb", "_to_metal_executable_sources")
+
+
+def _iree_executable_file_probe_name(config):
+    return _iree_probe_name(config).replace("_to_metal_vmfb", "_to_metal_executable_files")
 
 
 def _verify_iree_metal_executable_source(path):
@@ -1035,6 +1219,142 @@ def _verify_iree_metal_executable_source(path):
         "stream_dispatch_count": text.count("stream.cmd.dispatch"),
         "flow_tensor_load_count": text.count("flow.dispatch.tensor.load"),
         "flow_tensor_store_count": text.count("flow.dispatch.tensor.store"),
+    }
+
+
+def _verify_iree_metal_executable_files(dump_dir):
+    dump_dir = Path(dump_dir)
+    files = sorted(path for path in dump_dir.rglob("*") if path.is_file())
+    metal_files = [path for path in files if path.suffix == ".metal"]
+    spv_files = [path for path in files if path.suffix == ".spv"]
+    mlir_files = [path for path in files if path.suffix == ".mlir"]
+    configured_files = [path for path in mlir_files if path.name.startswith("configured_module_")]
+    benchmark_files = [path for path in mlir_files if path.stem.endswith("_benchmark")]
+    target_mlir_files = [
+        path for path in mlir_files if "_metal_msl_fb" in path.stem and path not in benchmark_files
+    ]
+    missing = []
+    if not configured_files:
+        missing.append("configured_module_mlir")
+    if not target_mlir_files:
+        missing.append("metal_target_mlir")
+    if not metal_files:
+        missing.append("metal_source")
+    if not spv_files:
+        missing.append("spirv_binary")
+    empty_spv_files = [path for path in spv_files if path.stat().st_size == 0]
+    if empty_spv_files:
+        missing.append("empty_spirv_binary")
+    spirv_deserialization = _validate_iree_metal_spirv_binaries(spv_files)
+    if any(not item.get("ok", False) and not item.get("skipped", False) for item in spirv_deserialization):
+        missing.append("spirv_deserialization")
+    metal_source_checks = _verify_iree_metal_source_files(metal_files)
+    if not metal_source_checks["ok"]:
+        missing.append("metal_source_tokens")
+    spv_total_bytes = sum(path.stat().st_size for path in spv_files)
+    return {
+        "executable_files_ok": not missing,
+        "missing_outputs": missing,
+        "file_count": len(files),
+        "configured_mlir_count": len(configured_files),
+        "target_mlir_count": len(target_mlir_files),
+        "benchmark_mlir_count": len(benchmark_files),
+        "metal_source_count": len(metal_files),
+        "spirv_binary_count": len(spv_files),
+        "spirv_binary_total_bytes": spv_total_bytes,
+        "empty_spirv_binary_paths": [str(path) for path in empty_spv_files],
+        "spirv_deserialization": spirv_deserialization,
+        "metal_source_paths": [str(path) for path in metal_files],
+        "spirv_binary_paths": [str(path) for path in spv_files],
+        "configured_mlir_paths": [str(path) for path in configured_files],
+        "target_mlir_paths": [str(path) for path in target_mlir_files],
+        "metal_source_checks": metal_source_checks,
+    }
+
+
+def _validate_iree_metal_spirv_binaries(spv_files):
+    mlir_translate = shutil.which("mlir-translate") or "/opt/homebrew/opt/llvm/bin/mlir-translate"
+    if not mlir_translate or not Path(mlir_translate).exists():
+        return [
+            {
+                "path": str(path),
+                "ok": False,
+                "skipped": True,
+                "reason": "mlir-translate is not available",
+            }
+            for path in spv_files
+        ]
+    expected_tokens = (
+        "spirv.module Logical GLSL450",
+        "spirv.GlobalVariable",
+        "StorageBuffer",
+        "spirv.func",
+    )
+    results = []
+    for path in spv_files:
+        result = subprocess.run(
+            [mlir_translate, str(path), "--deserialize-spirv"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        text = result.stdout
+        missing = [token for token in expected_tokens if token not in text]
+        results.append(
+            {
+                "path": str(path),
+                "ok": result.returncode == 0 and not missing,
+                "skipped": False,
+                "returncode": result.returncode,
+                "missing_tokens": missing,
+                "size": path.stat().st_size if path.exists() else 0,
+                "stdout_preview": text[:1000],
+                "stderr": result.stderr,
+            }
+        )
+    return results
+
+
+def _verify_iree_metal_source_files(metal_files):
+    required_tokens = (
+        "#include <metal_stdlib>",
+        "using namespace metal",
+        "kernel void",
+        "device",
+        "[[buffer(",
+        "thread_position",
+    )
+    if not metal_files:
+        return {
+            "ok": False,
+            "checked_files": 0,
+            "missing_tokens": list(required_tokens),
+            "missing_by_file": [],
+            "kernel_count": 0,
+            "fma_count": 0,
+        }
+    missing_by_file = []
+    kernel_count = 0
+    fma_count = 0
+    for path in metal_files:
+        text = path.read_text()
+        kernel_count += text.count("kernel void")
+        fma_count += text.count("fma(")
+        missing_tokens = [token for token in required_tokens if token not in text]
+        if missing_tokens:
+            missing_by_file.append(
+                {
+                    "path": str(path),
+                    "missing_tokens": missing_tokens,
+                }
+            )
+    return {
+        "ok": not missing_by_file,
+        "checked_files": len(metal_files),
+        "missing_tokens": sorted({token for item in missing_by_file for token in item["missing_tokens"]}),
+        "missing_by_file": missing_by_file,
+        "kernel_count": kernel_count,
+        "fma_count": fma_count,
     }
 
 
@@ -1457,12 +1777,14 @@ def _run_iree_metal_runtime_smoke(output_dir, form_ir, form_linalg_lowering):
 
 def _probe_metal_toolchain(output_dir):
     xcrun = shutil.which("xcrun")
-    metal_files = sorted(Path(output_dir).rglob("*.metal"))
+    output_dir = Path(output_dir)
+    metal_files = sorted(output_dir.rglob("*.metal"))
     if xcrun is None:
         return [
             {
                 "name": "metal_toolchain_compile",
                 "path": str(path),
+                **_metal_toolchain_source_info(output_dir, path),
                 "ok": False,
                 "skipped": True,
                 "reason": "xcrun is not available",
@@ -1470,10 +1792,11 @@ def _probe_metal_toolchain(output_dir):
             for path in metal_files
         ]
     results = []
-    air_dir = Path(output_dir) / "metal_toolchain"
+    air_dir = output_dir / "metal_toolchain"
     air_dir.mkdir(parents=True, exist_ok=True)
     for path in metal_files:
-        air_path = air_dir / (path.stem + ".air")
+        air_path = _metal_toolchain_air_path(output_dir, air_dir, path)
+        air_path.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
             [xcrun, "metal", "-c", str(path), "-o", str(air_path)],
             text=True,
@@ -1484,6 +1807,7 @@ def _probe_metal_toolchain(output_dir):
             {
                 "name": "metal_toolchain_compile",
                 "path": str(path),
+                **_metal_toolchain_source_info(output_dir, path),
                 "ok": result.returncode == 0 and air_path.exists(),
                 "skipped": False,
                 "returncode": result.returncode,
@@ -1493,6 +1817,34 @@ def _probe_metal_toolchain(output_dir):
             }
         )
     return results
+
+
+def _metal_toolchain_air_path(output_dir, air_dir, path):
+    try:
+        relative = Path(path).relative_to(output_dir)
+    except ValueError:
+        relative = Path(path.name)
+    return Path(air_dir) / relative.with_suffix(".air")
+
+
+def _metal_toolchain_source_info(output_dir, path):
+    try:
+        relative = Path(path).relative_to(output_dir)
+    except ValueError:
+        return {
+            "source_kind": "external_metal_source",
+            "source_group": "",
+        }
+    parts = relative.parts
+    if parts and parts[0] == "iree_metal_executable_files":
+        return {
+            "source_kind": "iree_metal_executable_file",
+            "source_group": parts[1] if len(parts) > 1 else "",
+        }
+    return {
+        "source_kind": "sfem_generated_metal",
+        "source_group": parts[0] if parts else "",
+    }
 
 
 def _run_metal_smoke_tests(output_dir, sum_factor_metal, local_metal, ebe_metal):
