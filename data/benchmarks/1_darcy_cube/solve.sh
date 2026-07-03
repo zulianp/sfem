@@ -21,5 +21,6 @@ export DYLD_LIBRARY_PATH=$CODE_DIR/external/petsc/lib/:$CODE_DIR/utopia/utopia/b
 export ISOLVER_LSOLVE_PLUGIN=$INSTALL_DIR/utopia/lib/libutopia.dylib
 export UTOPIA_LINEAR_SOLVER_CONFIG=$PWD/utopia.yaml
 
-ssolve config.yaml
-raw_to_db.py mesh output/db.vtk --point_data="./output/*.raw"
+echo "ssolve driver removed (ISolver dependency dropped from SFEM)." >&2
+echo "Use utopia or another SFEM solver workflow for this benchmark." >&2
+exit 1

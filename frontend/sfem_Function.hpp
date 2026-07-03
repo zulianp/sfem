@@ -14,8 +14,6 @@
 
 #include "sfem_mask.hpp"
 
-// #include "isolver_function.h"
-
 #include "sfem_Operator.hpp"
 #include "sfem_aliases.hpp"
 
@@ -53,7 +51,7 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    class Function final /* : public isolver::Function */ {
+    class Function final {
     public:
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();

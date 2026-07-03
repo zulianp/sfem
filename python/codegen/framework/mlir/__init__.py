@@ -38,7 +38,9 @@ from .sum_factorization import (
     TensorProductLaplaceReferenceEvaluator,
     TensorProductSumFactorReferenceEvaluator,
     tensor_product_laplace_form_ir_from_material,
+    tensor_product_laplace_form_ir_from_user_input_stage,
     tensor_product_sum_factor_ir_from_material,
+    tensor_product_sum_factor_ir_from_user_input_stage,
 )
 from .tools import (
     _find_mlir_opt,
@@ -87,7 +89,9 @@ __all__ = [
     "pad_to_vector_width",
     "reference_ebe_residual",
     "tensor_product_laplace_form_ir_from_material",
+    "tensor_product_laplace_form_ir_from_user_input_stage",
     "tensor_product_sum_factor_ir_from_material",
+    "tensor_product_sum_factor_ir_from_user_input_stage",
     "_find_mlir_opt",
     "_find_mlir_runner",
     "_find_mlir_translate",

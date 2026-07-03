@@ -17,9 +17,10 @@ from codegen.framework.mlir import (
     TensorProductLaplaceReferenceEvaluator,
     TensorProductSumFactorReferenceEvaluator,
     TensorProductSumFactorMLIRLowering,
-    tensor_product_laplace_form_ir_from_material,
-    tensor_product_sum_factor_ir_from_material,
+    tensor_product_laplace_form_ir_from_user_input_stage,
+    tensor_product_sum_factor_ir_from_user_input_stage,
 )
+from sfem import gen
 
 
 def main():
@@ -63,18 +64,14 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    sum_factor_ir = tensor_product_sum_factor_ir_from_material(
+    user_input = gen.UserInputStage.create(
         material,
-        element=args.element,
-        vector_size=args.vector_size,
-        quadrature_order=args.quadrature_order,
+        (args.element,),
+        args.vector_size,
+        args.quadrature_order,
     )
-    form_ir = tensor_product_laplace_form_ir_from_material(
-        material,
-        element=args.element,
-        vector_size=args.vector_size,
-        quadrature_order=args.quadrature_order,
-    )
+    sum_factor_ir = tensor_product_sum_factor_ir_from_user_input_stage(user_input)
+    form_ir = tensor_product_laplace_form_ir_from_user_input_stage(user_input)
 
     artifact_groups = {}
     artifact_groups["sfem_ir"] = _write_ir_artifacts(output_dir / "sfem_ir", sum_factor_ir, form_ir)

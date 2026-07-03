@@ -34,10 +34,6 @@ endif()
 
 find_package(MatrixIO REQUIRED)
 
-if(SFEM_ENABLE_ISOLVER)
-    find_package(ISolver REQUIRED)
-endif()
-
 set(SFEM_MODULES
     algebra base matrix 
     algebra/coo
@@ -323,15 +319,9 @@ endforeach()
 
 set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
-list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
-
 if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     # FIXME these executables need to be fixed when compiling with real_t=float32
-    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
-endif()
-
-if(NOT ${SFEM_ENABLE_ISOLVER})
-     list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
 endif()
 
 if(SFEM_ENABLE_RESAMPLING)

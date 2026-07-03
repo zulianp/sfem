@@ -14,7 +14,6 @@ option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels
 option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
 option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
 option(SFEM_ENABLE_HXTSORT "Enable HXTSort library for unsigned indices" OFF)
-option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
 option(SFEM_ENABLE_LAPACK "Enable Lapck support" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
