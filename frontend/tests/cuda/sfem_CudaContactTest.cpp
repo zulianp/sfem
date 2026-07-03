@@ -2,7 +2,6 @@
 
 #include "sfem_test.hpp"
 
-#include "matrixio_array.h"
 #include "sfem_base.hpp"
 #include "smesh_grid.hpp"
 #include "smesh_ssquad4_prolongation.hpp"

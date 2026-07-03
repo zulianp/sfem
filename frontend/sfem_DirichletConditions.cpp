@@ -5,7 +5,6 @@
 #include <stddef.h>
 
 #include "boundary_condition.hpp"
-#include "matrixio_array.h"
 #include "operators/boundary_conditions/dirichlet.hpp"
 #include "sfem_Function.hpp"
 #include "smesh_prolongation.hpp"
@@ -285,14 +284,11 @@ namespace sfem {
                 cdc.component = 0;
 
                 if (SFEM_DIRICHLET_NODESET) {
-                    idx_t    *this_set{nullptr};
-                    ptrdiff_t lsize{0}, gsize{0};
-                    if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
+                    cdc.nodeset = Buffer<idx_t>::from_file(smesh::Path(pch));
+                    if (!cdc.nodeset) {
                         SFEM_ERROR("Failed to read file %s\n", pch);
                         break;
                     }
-
-                    cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
                     cdc.sidesets.push_back(Sideset::create_from_file(comm, smesh::Path(pch)));
                     auto mesh_for_sidesets = space->mesh_ptr();
@@ -330,12 +326,11 @@ namespace sfem {
                 if (strncmp(pch, path_key, path_key_len) == 0) {
                     conds[i].value = 0;
 
-                    real_t   *values{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(
-                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    auto values = Buffer<real_t>::from_file(smesh::Path(pch + path_key_len));
+                    if (!values) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
+                    const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
                     if (conds[i].nodeset->size() != lsize) {
                         if (!rank) {
@@ -364,8 +359,7 @@ namespace sfem {
                                                                                const ryml::NodeRef                  &node) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
 
-        MPI_Comm comm = space->mesh_ptr()->comm()->get();
-        auto     dc   = std::make_unique<DirichletConditions>(space);
+        auto dc = std::make_unique<DirichletConditions>(space);
 
         for (auto c : node.children()) {
             std::shared_ptr<Sideset>       sideset;
@@ -409,13 +403,10 @@ namespace sfem {
                 if (is_file) {
                     std::string path;
                     c["path"] >> path;
-                    idx_t    *arr{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                    nodeset = Buffer<idx_t>::from_file(smesh::Path(path));
+                    if (!nodeset) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
                     }
-
-                    nodeset = manage_host_buffer<idx_t>(lsize, arr);
                 } else {
                     ptrdiff_t size  = c["nodes"].num_children();
                     nodeset         = create_host_buffer<idx_t>(size);

@@ -9,8 +9,6 @@
 #include "sfem_base.hpp"
 
 
-#include "matrixio_array.h"
-
 #include "sfem_API.hpp"
 
 #include <vector>

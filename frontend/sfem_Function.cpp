@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 
-#include "matrixio_array.h"
 #include "utils.h"
 
 #include "sfem_defs.hpp"
@@ -106,7 +105,6 @@ namespace sfem {
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
-        MPI_Comm comm = impl_->space->mesh_ptr()->comm()->get();
         smesh::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
@@ -148,7 +146,6 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
         auto      space      = impl_->space;
-        auto      mesh       = space->mesh_ptr();
         const int block_size = space->block_size();
 
         smesh::create_directory(impl_->output_dir.c_str());
@@ -176,8 +173,7 @@ namespace sfem {
                          impl_->export_counter++,
                          smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
-                //  TODO
-                if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (buff->to_file(smesh::Path(path))) {
                     return SFEM_FAILURE;
                 }
             }
@@ -191,7 +187,8 @@ namespace sfem {
                      impl_->export_counter++,
                      smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
-            if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
+            auto out = Buffer<real_t>::wrap(space->n_dofs(), const_cast<real_t *>(x));
+            if (out->to_file(smesh::Path(path))) {
                 return SFEM_FAILURE;
             }
         }
@@ -660,6 +657,8 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(const std::shared_ptr<Communicator> &comm, const char *folder) {
+        (void)comm;
+
         char pattern[1024 * 10];
         snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
@@ -671,7 +670,6 @@ namespace sfem {
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
         ptrdiff_t local_size = SFEM_PTRDIFF_INVALID;
-        ptrdiff_t size       = SFEM_PTRDIFF_INVALID;
 
         printf("n_files (%d):\n", n_files);
         int err = 0;
@@ -682,7 +680,7 @@ namespace sfem {
             snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm->get(), path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
 
             data[np] = idx;
         }
