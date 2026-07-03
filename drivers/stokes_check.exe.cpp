@@ -10,9 +10,6 @@
 #include <sys/types.h>
 // #include <unistd.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
 
@@ -219,60 +216,48 @@ void stokes_ref_sol(const int tp_num,
 //     printf("err = (%g, %g, %g)\n", err_ux, err_uy, err_p);
 // }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_stokes_check(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
 
     if (argc != 5) {
-        // fprintf(stderr, "usage: %s <mesh> <ux.raw> <uy.raw> <uz.raw> <p.raw>\n", argv[0]);
         fprintf(stderr, "usage: %s <mesh> <ux.raw> <uy.raw> <p.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char *path_ux = argv[2];
     const char *path_uy = argv[3];
-    // const char *path_uz = argv[4];
-    // const char *path_p = argv[5];
+    const char *path_p  = argv[4];
 
-    const char *path_p = argv[4];
-
-    double tick = MPI_Wtime();
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    const double tick = smesh::time_seconds();
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh    = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements = mesh->n_elements();
+    const ptrdiff_t nnodes    = mesh->n_nodes();
 
     if (mesh->element_type(0) != smesh::TRI3) {
         fprintf(stderr, "element_type must be smesh::TRI3\n");
         return EXIT_FAILURE;
     }
 
-    real_t *ux = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
-    real_t *uy = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
-    real_t *p = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
+    auto ux_buf = sfem::create_host_buffer<real_t>(nnodes);
+    auto uy_buf = sfem::create_host_buffer<real_t>(nnodes);
+    auto p_buf  = sfem::create_host_buffer<real_t>(nnodes);
+    real_t *ux  = ux_buf->data();
+    real_t *uy  = uy_buf->data();
+    real_t *p   = p_buf->data();
 
-    // Optional params
     real_t SFEM_MU = 1;
-    int SFEM_PROBLEM_TYPE = 1;
+    int    SFEM_PROBLEM_TYPE = 1;
 
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
     SFEM_READ_ENV(SFEM_MU, atof);
 
-    if (rank == 0) {
+    if (!comm->rank()) {
         printf(
             "----------------------------------------\n"
             "Options:\n"
@@ -284,31 +269,23 @@ int main(int argc, char *argv[]) {
             SFEM_MU);
     }
 
-    stokes_ref_sol(SFEM_PROBLEM_TYPE, SFEM_MU, mesh->n_nodes(), mesh->points()->data(), ux, uy, p);
+    stokes_ref_sol(SFEM_PROBLEM_TYPE, SFEM_MU, nnodes, mesh->points()->data(), ux, uy, p);
 
-    array_write(comm, path_ux, SFEM_MPI_REAL_T, ux, mesh->n_nodes(), mesh->n_nodes());
-    array_write(comm, path_uy, SFEM_MPI_REAL_T, uy, mesh->n_nodes(), mesh->n_nodes());
-    array_write(comm, path_p, SFEM_MPI_REAL_T, p, mesh->n_nodes(), mesh->n_nodes());
+    ux_buf->to_file(smesh::Path(path_ux));
+    uy_buf->to_file(smesh::Path(path_uy));
+    p_buf->to_file(smesh::Path(path_p));
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    ///////////////////////////////////////////////////////////////////////////////
-
-    ptrdiff_t nelements = mesh->n_elements();
-    ptrdiff_t nnodes = mesh->n_nodes();
-
-
-
-    free(ux);
-    free(uy);
-    free(p);
-
-    double tock = MPI_Wtime();
-    if (!rank) {
+    const double tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_stokes_check(ctx->communicator(), argc, argv);
 }

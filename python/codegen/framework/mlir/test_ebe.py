@@ -531,6 +531,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("gpu.module @sfem_laplace_quad4_sum_factor_gpu_kernels", module)
         self.assertEqual(module.count("gpu.launch_func"), 8)
         self.assertEqual(module.count("gpu.func @"), 8)
+        self.assertEqual(module.count("spirv.entry_point_abi ="), 8)
+        self.assertEqual(module.count("spirv.interface_var_abi ="), 24)
         self.assertIn("threads in (%threads_x, %threads_y, %c1)", module)
         self.assertIn("scf.for %k = %c0 to %contract_extent", module)
         self.assertNotIn("scf.if", module)
@@ -551,6 +553,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
 
         self.assertEqual(module.count("gpu.launch_func"), 18)
         self.assertEqual(module.count("gpu.func @"), 18)
+        self.assertEqual(module.count("spirv.entry_point_abi ="), 18)
+        self.assertEqual(module.count("spirv.interface_var_abi ="), 54)
         self.assertIn("@sfem_laplace_hex8_sum_factor_field_gradient_d2_axis2_kernel", module)
         self.assertIn("@sfem_laplace_hex8_sum_factor_test_gradient_d2_axis0_kernel", module)
         self.assertIn("memref<2x4xf32>", module)
@@ -669,6 +673,58 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("basis[row * 3 + k] * operand[k * 9 + col]", metal_source)
         self.assertNotIn("if (", metal_source)
 
+        harness = lowering.render_metal_smoke_test_harness()
+        self.assertEqual(harness.count("static const float basis_"), 18)
+        self.assertIn("sum_factor_stage_count=%d", harness)
+        self.assertIn('std::printf("sum_factor_stage_count=%d\\n", 18);', harness)
+        self.assertIn("sfem_laplace_hex27_sum_factor_field_gradient_d2_axis2_metal", harness)
+        self.assertIn("sfem_laplace_hex27_sum_factor_test_gradient_d2_axis0_metal", harness)
+
+    def test_laplace_proteus_hex64_sum_factor_exposes_order4_gpu_and_spirv_artifacts(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="PROTEUS_HEX64",
+            vector_size=8,
+        )
+        self.assertEqual(ir.n_shape_1d, 4)
+        self.assertEqual(ir.n_qp_1d, 4)
+        self.assertEqual(ir.n_shape, 64)
+        self.assertEqual(ir.n_qp, 64)
+        self.assertEqual(len(ir.field_gradient_stages), 9)
+        self.assertEqual(len(ir.test_gradient_stages), 9)
+
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        gpu_module = lowering.render_gpu_module()
+        self.assertEqual(gpu_module.count("gpu.launch_func"), 18)
+        self.assertEqual(gpu_module.count("gpu.func @"), 18)
+        self.assertEqual(gpu_module.count("spirv.entry_point_abi ="), 18)
+        self.assertEqual(gpu_module.count("spirv.interface_var_abi ="), 54)
+        self.assertIn("%threads_x = arith.constant 16 : index", gpu_module)
+        self.assertIn("%threads_y = arith.constant 4 : index", gpu_module)
+        self.assertIn("@sfem_laplace_proteus_hex64_sum_factor_field_gradient_d2_axis2_kernel", gpu_module)
+        self.assertIn("@sfem_laplace_proteus_hex64_sum_factor_test_gradient_d2_axis0_kernel", gpu_module)
+        self._run_mlir_opt(gpu_module)
+
+        matrix_unit_module = lowering.render_matrix_unit_module()
+        self.assertEqual(matrix_unit_module.count("= vector.matrix_multiply"), 18)
+        self.assertIn("sfem.matrix_unit.raw_lhs_rows = 4 : i64", matrix_unit_module)
+        self.assertIn("sfem.matrix_unit.raw_lhs_columns = 4 : i64", matrix_unit_module)
+        self.assertIn("sfem.matrix_unit.raw_rhs_columns = 16 : i64", matrix_unit_module)
+        self.assertIn("vector<128xf32>", matrix_unit_module)
+        self._run_mlir_opt(matrix_unit_module)
+
+        dispatch = lowering.spirv_opencl_dispatch_manifest()
+        self.assertEqual(dispatch["n_stages"], 18)
+        self.assertEqual(dispatch["stages"][0]["global_work_items"], 64)
+        self.assertEqual(dispatch["stages"][-1]["global_work_items"], 64)
+        spirv_module = lowering.render_spirv_opencl_module()
+        self.assertEqual(spirv_module.count('spirv.EntryPoint "Kernel"'), 18)
+        self.assertIn("spirv.FMul", spirv_module)
+        self.assertIn("spirv.FAdd", spirv_module)
+        self._run_mlir_opt(spirv_module)
+
     def test_laplace_quad4_sum_factor_metal_source_is_branch_free(self):
         from codegen.framework.materials.laplace import material
 
@@ -687,6 +743,43 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("#pragma unroll", source)
         self.assertIn("for (uint k = 0; k < 2; ++k)", source)
         self.assertNotIn("if (", source)
+
+    def test_laplace_quad4_sum_factor_emits_spirv_opencl_stage_kernels(self):
+        from codegen.framework.materials.laplace import material
+
+        ir = tensor_product_sum_factor_ir_from_material(
+            material,
+            element="QUAD4",
+            vector_size=8,
+        )
+        lowering = TensorProductSumFactorMLIRLowering(ir)
+        module = lowering.render_spirv_opencl_module()
+        module_op = lowering.render_spirv_opencl_module_op()
+        dispatch = lowering.spirv_opencl_dispatch_manifest()
+
+        self.assertIn("spirv.module Logical OpenCL", module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_spirv_opencl"', module)
+        self.assertTrue(module_op.startswith("spirv.module Logical OpenCL"))
+        self.assertEqual(dispatch["lowering"], "tensor_product_sum_factor_spirv_opencl")
+        self.assertEqual(dispatch["n_stages"], 8)
+        self.assertEqual(dispatch["stages"][0]["kernel"], "sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_spirv_opencl")
+        self.assertEqual(dispatch["stages"][0]["global_work_items"], 4)
+        self.assertEqual(dispatch["stages"][0]["global_work_items"], dispatch["stages"][0]["result_elements"])
+        self.assertIn(
+            'spirv.EntryPoint "Kernel" @sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_spirv_opencl',
+            module,
+        )
+        self.assertEqual(module.count('spirv.EntryPoint "Kernel"'), 8)
+        self.assertIn("spirv.GlobalVariable @sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_basis", module)
+        self.assertIn("spirv.AccessChain", module)
+        self.assertIn("spirv.FMul", module)
+        self.assertIn("spirv.FAdd", module)
+        self.assertIn('spirv.Store "CrossWorkgroup"', module)
+        self.assertNotIn("scf.if", module)
+        self.assertNotIn("arith.cmpi", module)
+        self.assertNotIn("atomic", module)
+        self._run_mlir_opt(module)
+        self._run_mlir_opt(module_op)
 
     def test_laplace_sum_factor_inspection_artifacts_are_written(self):
         from codegen.framework.materials.laplace import material
@@ -707,6 +800,12 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             matrix_unit_memref_module = artifacts.file_for_suffix(".matrix_unit_memref.mlir").read_text()
             matrix_unit_pipeline_module = artifacts.file_for_suffix(".matrix_unit_pipeline.mlir").read_text()
             gpu_module = artifacts.file_for_suffix(".gpu.mlir").read_text()
+            spirv_opencl_module = artifacts.file_for_suffix(".spirv.opencl.mlir").read_text()
+            spirv_opencl_op = artifacts.file_for_suffix(".spirv.opencl.op.mlir").read_text()
+            spirv_opencl_binary_size = artifacts.file_for_suffix(".spirv.opencl.spv").stat().st_size
+            spirv_opencl_dispatch = json.loads(
+                artifacts.file_for_suffix(".spirv.opencl.dispatch.json").read_text()
+            )
             metal_source = artifacts.file_for_suffix(".metal").read_text()
             harness = artifacts.file_for_suffix(".metal_smoke.mm").read_text()
 
@@ -729,10 +828,26 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("gpu.launch_func", gpu_module)
         self.assertIn("spirv.entry_point_abi", gpu_module)
         self.assertIn("spirv.interface_var_abi", gpu_module)
+        self.assertIn('sfem.lowering = "tensor_product_sum_factor_spirv_opencl"', spirv_opencl_module)
+        self.assertIn("spirv.module Logical OpenCL", spirv_opencl_module)
+        self.assertIn('spirv.EntryPoint "Kernel"', spirv_opencl_module)
+        self.assertIn("spirv.FMul", spirv_opencl_module)
+        self.assertIn("spirv.FAdd", spirv_opencl_module)
+        self.assertTrue(spirv_opencl_op.startswith("spirv.module Logical OpenCL"))
+        self.assertGreater(spirv_opencl_binary_size, 0)
+        self.assertEqual(spirv_opencl_dispatch["n_stages"], 8)
+        self.assertEqual(spirv_opencl_dispatch["stages"][0]["global_work_items"], 4)
         self.assertIn("kernel void sfem_laplace_quad4_sum_factor_field_gradient_d0_axis0_metal", metal_source)
         self.assertIn("newLibraryWithSource", harness)
+        self.assertIn("sum_factor_stage_count=%d", harness)
+        self.assertIn('std::printf("sum_factor_stage_count=%d\\n", 8);', harness)
+        self.assertEqual(harness.count("static const float basis_"), 8)
         self.assertNotIn("scf.if", gpu_module)
         self.assertNotIn("arith.cmpi", gpu_module)
+        self.assertNotIn("scf.if", spirv_opencl_module)
+        self.assertNotIn("arith.cmpi", spirv_opencl_module)
+        self.assertNotIn("scf.if", spirv_opencl_op)
+        self.assertNotIn("arith.cmpi", spirv_opencl_op)
         self.assertNotIn("if (", metal_source)
 
         self._run_mlir_opt(linalg_module)
@@ -742,6 +857,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self._run_mlir_opt(matrix_unit_memref_module)
         self._run_mlir_opt(matrix_unit_pipeline_module)
         self._run_mlir_opt(gpu_module)
+        self._run_mlir_opt(spirv_opencl_module)
+        self._run_mlir_opt(spirv_opencl_op)
 
     def test_laplace_quad4_sum_factor_runs_on_metal_when_device_is_available(self):
         from codegen.framework.materials.laplace import material
@@ -765,6 +882,7 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         if result.no_default_device:
             self.skipTest("Metal runtime has no default MTLDevice")
         self.assertTrue(result.success, result.run_stderr)
+        self.assertIn("sum_factor_stage_count=8", result.run_stdout)
 
     def test_laplace_quad4_form_ir_emits_fused_tensor_product_metal_apply(self):
         from codegen.framework.materials.laplace import material
@@ -814,6 +932,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(module.count("gpu.func @"), 1)
         self.assertIn("memref<4xf32>", module)
         self.assertIn("memref<1xf32>", module)
+        self.assertEqual(module.count("spirv.entry_point_abi ="), 1)
+        self.assertEqual(module.count("spirv.interface_var_abi ="), 6)
         self.assertIn("spirv.entry_point_abi = #spirv.entry_point_abi<workgroup_size = [4, 1, 1]>", module)
         self.assertIn("spirv.interface_var_abi = #spirv.interface_var_abi<(0, 0)>", module)
         self.assertIn("scf.for %qy", module)
@@ -838,7 +958,13 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn('sfem.form = "laplace"', module)
         self.assertIn("@sfem_laplace_quad4_sum_factor_laplace_apply_linalg_pipeline", module)
         self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d0_linalg_pipeline", module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_field_gradient_d1_linalg_pipeline", module)
+        self.assertIn("@sfem_laplace_quad4_sum_factor_test_gradient_d0_linalg_pipeline", module)
         self.assertIn("@sfem_laplace_quad4_sum_factor_test_gradient_d1_linalg_pipeline", module)
+        self.assertIn("%weighted_d0", module)
+        self.assertIn("%weighted_d1", module)
+        self.assertIn("%test_d0", module)
+        self.assertIn("%test_d1", module)
         self.assertEqual(module.count("linalg.matmul"), 8)
         self.assertEqual(module.count("func.call @"), 12)
         self.assertEqual(module.count("linalg.generic"), 7)
@@ -928,6 +1054,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn("%elem = gpu.block_id x", module)
         self.assertIn("blocks in (%blocks, %c1, %c1)", module)
         self.assertIn("threads in (%threads, %c1, %c1)", module)
+        self.assertEqual(module.count("spirv.entry_point_abi ="), 1)
+        self.assertEqual(module.count("spirv.interface_var_abi ="), 7)
         self.assertIn("%node = memref.load %connectivity[%elem, %trial]", module)
         self.assertIn("%coeff = memref.load %u[%node]", module)
         self.assertIn("memref.store %sum_y, %element_out[%elem, %row]", module)
@@ -985,6 +1113,9 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertIn('sfem.lowering = "tensor_product_laplace_ebe_gpu"', module)
         self.assertIn('sfem.mesh_phases = "ebe_map,ebe_reduce"', module)
         self.assertEqual(module.count("gpu.launch_func"), 2)
+        self.assertEqual(module.count("gpu.func @"), 2)
+        self.assertEqual(module.count("spirv.entry_point_abi ="), 2)
+        self.assertEqual(module.count("spirv.interface_var_abi ="), 12)
         self.assertIn("@sfem_laplace_quad4_sum_factor_laplace_apply_ebe_map_kernel", module)
         self.assertIn("@sfem_laplace_quad4_sum_factor_laplace_apply_ebe_reduce_kernel", module)
         self.assertIn("memref<8x4xindex>", module)
@@ -1203,6 +1334,8 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
                 "--verify-performance-shape",
                 "--validate-mlir",
                 "--probe-iree-metal",
+                "--probe-iree-metal-gpu",
+                "--probe-iree-metal-matrix-unit",
                 "--run-iree-metal-runtime",
                 "--probe-metal-toolchain",
             ]
@@ -1224,6 +1357,14 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             )
             sum_factor_ir = json.loads(sum_factor_ir_path.read_text())
             form_ir = json.loads(form_ir_path.read_text())
+            matrix_unit_stderr_paths_exist = {
+                item["input_kind"]: bool(item.get("stderr_path")) and Path(item["stderr_path"]).is_file()
+                for item in manifest.get("iree_metal_matrix_unit", [])
+            }
+            gpu_probe_stderr_paths_exist = {
+                item["artifact_group"]: bool(item.get("stderr_path")) and Path(item["stderr_path"]).is_file()
+                for item in manifest.get("iree_metal_gpu", [])
+            }
 
         self.assertEqual(manifest["material"], "laplace")
         self.assertEqual(manifest["element"], "QUAD4")
@@ -1241,6 +1382,10 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(any(path.endswith(".matrix_unit.mlir") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".matrix_unit_memref.mlir") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".matrix_unit_pipeline.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".spirv.opencl.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".spirv.opencl.op.mlir") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".spirv.opencl.spv") for path in manifest["artifacts"]["sum_factor"]))
+        self.assertTrue(any(path.endswith(".spirv.opencl.dispatch.json") for path in manifest["artifacts"]["sum_factor"]))
         self.assertTrue(any(path.endswith(".ebe.full.gpu.mlir") for path in manifest["artifacts"]["ebe_full"]))
         self.assertTrue(any(path.endswith(".ebe.metal") for path in manifest["artifacts"]["ebe_metal"]))
         self.assertTrue(any(path.endswith(".ebe_metal_smoke.mm") for path in manifest["artifacts"]["ebe_metal"]))
@@ -1270,6 +1415,13 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(any(item["name"] == "linalg_fill_accumulators" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "linalg_pipeline_calls" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "linalg_pipeline_bridges" for item in manifest["performance_shape"]))
+        derivative_coverage = [
+            item for item in manifest["performance_shape"]
+            if item["name"] == "laplace_form_derivative_coverage" and not item.get("skipped")
+        ]
+        self.assertEqual(len(derivative_coverage), 1)
+        self.assertTrue(derivative_coverage[0]["ok"], derivative_coverage)
+        self.assertEqual(derivative_coverage[0]["derivatives"], [0, 1])
         self.assertTrue(any(item["name"] == "vector_matrix_multiply" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_vector_matrix_multiply" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "matrix_unit_memref_transfer_read" for item in manifest["performance_shape"]))
@@ -1279,6 +1431,51 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(any(item["name"] == "matrix_unit_alignment" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "gpu_spirv_entry_point_abi" for item in manifest["performance_shape"]))
         self.assertTrue(any(item["name"] == "gpu_spirv_interface_var_abi" for item in manifest["performance_shape"]))
+        gpu_dispatch = [
+            item for item in manifest["performance_shape"]
+            if item["name"] == "sum_factor_gpu_dispatch_coverage" and not item.get("skipped")
+        ]
+        self.assertEqual(len(gpu_dispatch), 1)
+        self.assertTrue(gpu_dispatch[0]["ok"], gpu_dispatch)
+        self.assertEqual(gpu_dispatch[0]["kernel_count"], 8)
+        self.assertEqual(gpu_dispatch[0]["launch_count"], 8)
+        self.assertEqual(gpu_dispatch[0]["derivatives"], [0, 1])
+        laplace_gpu_dispatch = [
+            item for item in manifest["performance_shape"]
+            if item["name"] == "laplace_gpu_dispatch_coverage" and not item.get("skipped")
+        ]
+        self.assertEqual(
+            {item["lowering"] for item in laplace_gpu_dispatch},
+            {
+                "tensor_product_laplace_form_gpu",
+                "tensor_product_laplace_ebe_gpu_map",
+                "tensor_product_laplace_ebe_gpu",
+            },
+        )
+        laplace_gpu_by_lowering = {item["lowering"]: item for item in laplace_gpu_dispatch}
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_form_gpu"]["kernel_count"], 1)
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_form_gpu"]["interface_var_abi_count"], 6)
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_ebe_gpu_map"]["kernel_count"], 1)
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_ebe_gpu_map"]["interface_var_abi_count"], 7)
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_ebe_gpu"]["kernel_count"], 2)
+        self.assertEqual(laplace_gpu_by_lowering["tensor_product_laplace_ebe_gpu"]["interface_var_abi_count"], 12)
+        self.assertTrue(any(item["name"] == "spirv_opencl_module" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_entry_points" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_cross_workgroup_access" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_unrolled_contractions" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_accumulators" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_module_op" for item in manifest["performance_shape"]))
+        self.assertTrue(any(item["name"] == "spirv_opencl_serialized_binary" for item in manifest["performance_shape"]))
+        dispatch_shape = next(
+            item for item in manifest["performance_shape"] if item["name"] == "spirv_opencl_dispatch_metadata"
+        )
+        self.assertTrue(dispatch_shape["ok"], dispatch_shape)
+        self.assertEqual(dispatch_shape["n_stages"], 8)
+        self.assertEqual(len(manifest["spirv_binary_validation"]), 1)
+        spirv_binary = manifest["spirv_binary_validation"][0]
+        self.assertTrue(spirv_binary["ok"], spirv_binary)
+        self.assertGreater(spirv_binary["size"], 0)
+        self.assertEqual(spirv_binary["missing_tokens"], [])
         ebe_topology = next(
             item for item in manifest["performance_shape"] if item["name"] == "ebe_gpu_topology"
         )
@@ -1295,15 +1492,74 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         else:
             self.assertTrue(all(item["ok"] for item in manifest["iree_metal"]), manifest["iree_metal"])
             self.assertTrue(all(item["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb") for item in manifest["iree_metal"]))
-        self.assertEqual(len(manifest["iree_metal_runtime"]), 1)
-        runtime = manifest["iree_metal_runtime"][0]
-        if runtime.get("skipped"):
-            self.assertIn("reason", runtime)
+        self.assertEqual(len(manifest["iree_metal_gpu"]), 4)
+        gpu_probe_by_group = {item["artifact_group"]: item for item in manifest["iree_metal_gpu"]}
+        self.assertEqual(set(gpu_probe_by_group), {"sum_factor", "form", "ebe_map", "ebe_full"})
+        if shutil.which("iree-compile") is None:
+            self.assertTrue(all(item["skipped"] for item in gpu_probe_by_group.values()), manifest["iree_metal_gpu"])
+            self.assertTrue(all("iree-compile is not available" in item["reason"] for item in gpu_probe_by_group.values()))
         else:
-            self.assertTrue(runtime["ok"], runtime)
-            self.assertEqual(runtime["driver"], "metal")
-            self.assertLessEqual(runtime["max_abs_diff"], 1.0e-5)
-            self.assertTrue(runtime["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb"))
+            for group, gpu_probe in gpu_probe_by_group.items():
+                if gpu_probe["ok"]:
+                    self.assertTrue(gpu_probe["output_vmfb"].endswith(".metal.vmfb"))
+                    continue
+                self.assertFalse(gpu_probe["skipped"], gpu_probe)
+                self.assertNotEqual(gpu_probe["returncode"], 0)
+                self.assertEqual(
+                    gpu_probe["diagnostic_kind"],
+                    "iree_vm_generic_gpu_index_conversion",
+                    gpu_probe,
+                )
+                self.assertGreater(gpu_probe["stderr_bytes"], 0)
+                self.assertTrue(gpu_probe["stderr_preview"], gpu_probe)
+                self.assertTrue(gpu_probe_stderr_paths_exist[group], gpu_probe)
+        self.assertEqual(len(manifest["iree_metal_matrix_unit"]), 3)
+        matrix_unit_by_kind = {item["input_kind"]: item for item in manifest["iree_metal_matrix_unit"]}
+        self.assertEqual(
+            set(matrix_unit_by_kind),
+            {"matrix_unit", "matrix_unit_memref", "matrix_unit_pipeline"},
+        )
+        if shutil.which("iree-compile") is None:
+            self.assertTrue(all(item["skipped"] for item in matrix_unit_by_kind.values()), manifest["iree_metal_matrix_unit"])
+            self.assertTrue(
+                all("iree-compile is not available" in item["reason"] for item in matrix_unit_by_kind.values())
+            )
+        else:
+            for input_kind, matrix_unit_probe in matrix_unit_by_kind.items():
+                if matrix_unit_probe["ok"]:
+                    self.assertTrue(matrix_unit_probe["output_vmfb"].endswith(".%s.metal.vmfb" % input_kind))
+                    continue
+                self.assertFalse(matrix_unit_probe["skipped"], matrix_unit_probe)
+                self.assertNotEqual(matrix_unit_probe["returncode"], 0)
+                self.assertEqual(
+                    matrix_unit_probe["diagnostic_kind"],
+                    "iree_vm_matrix_unit_abi_conversion",
+                    matrix_unit_probe,
+                )
+                self.assertGreater(matrix_unit_probe["stderr_bytes"], 0)
+                self.assertTrue(matrix_unit_probe["stderr_preview"], matrix_unit_probe)
+                self.assertTrue(matrix_unit_stderr_paths_exist[input_kind], matrix_unit_probe)
+        self.assertEqual(len(manifest["iree_metal_runtime"]), 2)
+        runtime_by_name = {item["name"]: item for item in manifest["iree_metal_runtime"]}
+        self.assertIn("sum_factor_linalg_pipeline_metal_runtime", runtime_by_name)
+        self.assertIn("laplace_form_linalg_pipeline_metal_runtime", runtime_by_name)
+        sum_factor_runtime = runtime_by_name["sum_factor_linalg_pipeline_metal_runtime"]
+        form_runtime = runtime_by_name["laplace_form_linalg_pipeline_metal_runtime"]
+        if sum_factor_runtime.get("skipped"):
+            self.assertIn("reason", sum_factor_runtime)
+        else:
+            self.assertTrue(sum_factor_runtime["ok"], sum_factor_runtime)
+            self.assertEqual(sum_factor_runtime["driver"], "metal")
+            self.assertEqual(sum_factor_runtime["function_count"], 4)
+            self.assertLessEqual(sum_factor_runtime["max_abs_diff"], 1.0e-5)
+            self.assertTrue(sum_factor_runtime["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb"))
+        if form_runtime.get("skipped"):
+            self.assertIn("reason", form_runtime)
+        else:
+            self.assertTrue(form_runtime["ok"], form_runtime)
+            self.assertEqual(form_runtime["driver"], "metal")
+            self.assertLessEqual(form_runtime["max_abs_diff"], 1.0e-5)
+            self.assertTrue(form_runtime["output_vmfb"].endswith(".linalg_pipeline.metal.vmfb"))
         self.assertTrue(manifest["metal_toolchain"])
         if shutil.which("xcrun") is None:
             self.assertTrue(all(item["skipped"] for item in manifest["metal_toolchain"]))
@@ -1372,6 +1628,90 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertTrue(all(item["ok"] for item in manifest["reference_verification"]), manifest["reference_verification"])
         self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
         self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
+
+    def test_tensor_product_laplace_artifact_driver_handles_proteus_hex64_high_order(self):
+        script = Path("python/codegen/framework/mlir/scripts/tensor_product_laplace_artifacts.py")
+        env = dict(os.environ)
+        pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = "python" if not pythonpath else "python:" + pythonpath
+
+        with tempfile.TemporaryDirectory() as tmp:
+            command = [
+                sys.executable,
+                str(script),
+                "--output-dir",
+                tmp,
+                "--element",
+                "PROTEUS_HEX64",
+                "--max-elements",
+                "1",
+                "--max-nodes",
+                "65",
+                "--max-node-degree",
+                "1",
+                "--verify-reference",
+                "--verify-performance-shape",
+                "--validate-mlir",
+            ]
+            result = subprocess.run(
+                command,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            manifest_path = Path(result.stdout.strip().splitlines()[-1])
+            manifest = json.loads(manifest_path.read_text())
+            spirv_path = next(
+                Path(path)
+                for path in manifest["artifacts"]["sum_factor"]
+                if path.endswith(".spirv.opencl.spv")
+            )
+            spirv_binary_size = spirv_path.stat().st_size
+
+        self.assertEqual(manifest["element"], "PROTEUS_HEX64")
+        self.assertEqual(manifest["quadrature_order"], 4)
+        self.assertEqual(manifest["n_shape"], 64)
+        self.assertEqual(manifest["n_qp"], 64)
+        self.assertEqual(manifest["n_shape_1d"], 4)
+        self.assertEqual(manifest["n_qp_1d"], 4)
+        self.assertGreater(spirv_binary_size, 0)
+        gpu_dispatch = next(
+            item for item in manifest["performance_shape"]
+            if item["name"] == "sum_factor_gpu_dispatch_coverage" and not item.get("skipped")
+        )
+        self.assertTrue(gpu_dispatch["ok"], gpu_dispatch)
+        self.assertEqual(gpu_dispatch["kernel_count"], 18)
+        self.assertEqual(gpu_dispatch["derivatives"], [0, 1, 2])
+        self.assertEqual(gpu_dispatch["thread_geometries"][0], [16, 4])
+        laplace_gpu_dispatch = [
+            item for item in manifest["performance_shape"]
+            if item["name"] == "laplace_gpu_dispatch_coverage" and not item.get("skipped")
+        ]
+        self.assertEqual(
+            {item["lowering"] for item in laplace_gpu_dispatch},
+            {
+                "tensor_product_laplace_form_gpu",
+                "tensor_product_laplace_ebe_gpu_map",
+                "tensor_product_laplace_ebe_gpu",
+            },
+        )
+        self.assertTrue(all(item["ok"] for item in laplace_gpu_dispatch), laplace_gpu_dispatch)
+        derivative_coverage = next(
+            item for item in manifest["performance_shape"]
+            if item["name"] == "laplace_form_derivative_coverage" and not item.get("skipped")
+        )
+        self.assertTrue(derivative_coverage["ok"], derivative_coverage)
+        self.assertEqual(derivative_coverage["derivatives"], [0, 1, 2])
+        sum_factor_reference = next(
+            item for item in manifest["reference_verification"] if item["name"] == "tensor_product_sum_factor_pipeline_reference"
+        )
+        self.assertLessEqual(sum_factor_reference["max_laplace_residual_diff"], 1.0e-6)
+        self.assertTrue(all(item["ok"] for item in manifest["reference_verification"]), manifest["reference_verification"])
+        self.assertTrue(all(item["ok"] for item in manifest["performance_shape"]), manifest["performance_shape"])
+        self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
+        self.assertTrue(all(item["ok"] for item in manifest["spirv_binary_validation"]), manifest["spirv_binary_validation"])
 
     def test_laplace_hex27_form_ir_emits_high_order_fused_metal_apply(self):
         from codegen.framework.materials.laplace import material

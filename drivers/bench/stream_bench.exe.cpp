@@ -1,4 +1,5 @@
 #include "sfem_aliases.hpp"
+#include "smesh_base.hpp"
 
 // Sloppily adapted from stream bench
 
@@ -8,7 +9,7 @@
 #define MB(nn) (nn * 1000 * 1000)
 typedef double array_element_t;
 
-static double mysecond() { return MPI_Wtime(); }
+
 #define REPEAT 5
 
 static void bench(const size_t n, array_element_t *a, array_element_t *b, array_element_t *c) {
@@ -29,30 +30,30 @@ static void bench(const size_t n, array_element_t *a, array_element_t *b, array_
     bytes[3] = 3 * sizeof(array_element_t) * n;
 
     for (k = 0; k < REPEAT; k++) {
-        times[0][k] = mysecond();
+        times[0][k] = smesh::time_seconds();
 
 #pragma omp parallel for
         for (j = 0; j < n; j++) c[j] = a[j];
 
-        times[0][k] = mysecond() - times[0][k];
-        times[1][k] = mysecond();
+        times[0][k] = smesh::time_seconds() - times[0][k];
+        times[1][k] = smesh::time_seconds();
 
 #pragma omp parallel for
         for (j = 0; j < n; j++) b[j] = scalar * c[j];
 
-        times[1][k] = mysecond() - times[1][k];
-        times[2][k] = mysecond();
+        times[1][k] = smesh::time_seconds() - times[1][k];
+        times[2][k] = smesh::time_seconds();
 
 #pragma omp parallel for
         for (j = 0; j < n; j++) c[j] = a[j] + b[j];
 
-        times[2][k] = mysecond() - times[2][k];
-        times[3][k] = mysecond();
+        times[2][k] = smesh::time_seconds() - times[2][k];
+        times[3][k] = smesh::time_seconds();
 
 #pragma omp parallel for
         for (j = 0; j < n; j++) a[j] = b[j] + scalar * c[j];
 
-        times[3][k] = mysecond() - times[3][k];
+        times[3][k] = smesh::time_seconds() - times[3][k];
     }
 
     /*  --- SUMMARY --- */
@@ -80,13 +81,7 @@ static void bench(const size_t n, array_element_t *a, array_element_t *b, array_
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    auto ctx = sfem::initialize(argc, argv);
 
     size_t n = MB(500);
     if (argc > 1) {
@@ -108,10 +103,9 @@ int main(int argc, char *argv[]) {
 
     // TODO add proper test
     int err = 0;
-    for (ptrdiff_t i = 0; i < n; i++) {
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)n; i++) {
         err += a[i] != b[i];
     }
 
-    MPI_Finalize();
     return err > 0;
 }

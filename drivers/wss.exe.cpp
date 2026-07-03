@@ -3,9 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
 
@@ -71,7 +68,7 @@ void wss_mag_3(const ptrdiff_t nelements,
                real_t *const values) {
     SFEM_UNUSED(nnodes);
     
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     
@@ -118,20 +115,12 @@ void wss_mag_3(const ptrdiff_t nelements,
             &values[i]);
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("wss.c: wss_mag\t%g seconds\n", tock - tick);
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int compute_wss(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -141,37 +130,37 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
+    const char *folder       = argv[1];
     const char *shear_prefix = argv[2];
-    const char *path_output = argv[3];
+    const char *path_output  = argv[3];
 
     printf("%s %s %s %s\n", argv[0], folder, shear_prefix, path_output);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements  = mesh->n_elements();
+    const ptrdiff_t nnodes     = mesh->n_nodes();
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
-
-    real_t *shear_6[6];
-    ptrdiff_t shear_size_local, shear_size_global;
+    std::shared_ptr<sfem::Buffer<real_t>> shear_bufs[6];
+    real_t                               *shear_6[6];
 
     char path[2048];
 
-    // P0
     for (int d = 0; d < 6; ++d) {
         snprintf(path, sizeof(path), "%s.%d.raw", shear_prefix, d);
-        array_create_from_file(comm, path, SFEM_MPI_REAL_T, (void **)&shear_6[d], &shear_size_local, &shear_size_global);
+        shear_bufs[d] = sfem::Buffer<real_t>::from_file(smesh::Path(path));
+        if (!shear_bufs[d]) {
+            SFEM_ERROR("Failed to read file %s\n", path);
+        }
+        shear_6[d] = shear_bufs[d]->data();
     }
 
-    // P0
-    real_t *wss_mag = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
-    memset(wss_mag, 0, mesh->n_elements() * sizeof(real_t));
+    auto wss_mag_buf = sfem::create_host_buffer<real_t>(nelements);
+    real_t *wss_mag  = wss_mag_buf->data();
 
-    wss_mag_3(mesh->n_elements(),
-              mesh->n_nodes(),
+    wss_mag_3(nelements,
+              nnodes,
               mesh->elements(0)->data(),
               mesh->points()->data(),
               shear_6[0],
@@ -182,21 +171,20 @@ int main(int argc, char *argv[]) {
               shear_6[5],
               wss_mag);
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, wss_mag, mesh->n_elements(), mesh->n_elements());
+    wss_mag_buf->to_file(smesh::Path(path_output));
 
-    for (int d = 0; d < 6; ++d) {
-        free(shear_6[d]);
-    }
+    const double tock = smesh::time_seconds();
 
-    free(wss_mag);
-
-    double tock = MPI_Wtime();
-
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return compute_wss(ctx->communicator(), argc, argv);
 }

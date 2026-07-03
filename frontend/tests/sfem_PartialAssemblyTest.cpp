@@ -23,7 +23,7 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     const int dim = 3;
     const int N   = 4;
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, 0, 0, 0, 1, 1, 1);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), N, N, N, 0, 0, 0, 1, 1, 1);
     auto fs   = sfem::FunctionSpace::create(mesh, dim);
     fs->initialize_packed_mesh();
 
@@ -97,7 +97,7 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
     const int dim = 3;
     const int N   = 10;
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, 0, 0, 0, 1, 1, 1);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), N, N, N, 0, 0, 0, 1, 1, 1);
     auto fs   = sfem::FunctionSpace::create(mesh, dim);
     fs->initialize_packed_mesh();
 

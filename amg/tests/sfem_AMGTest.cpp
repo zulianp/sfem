@@ -34,7 +34,7 @@ int test_amg_poisson() {
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
@@ -101,7 +101,7 @@ int test_amg_sqp() {
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,

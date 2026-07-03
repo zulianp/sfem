@@ -198,7 +198,7 @@ int test_poisson() {
     int      SFEM_BASE_RESOLUTION      = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 1);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
@@ -218,8 +218,8 @@ int test_poisson() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), right_parent, right_lfi);
 
     sfem::DirichletConditions::Condition left{.sidesets = {left_sideset}, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right{.sidesets = {right_sideset}, .value = 1, .component = 0};
@@ -331,7 +331,7 @@ int test_poisson_and_boundary_selector() {
 
     int x_dim = 1;
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * x_dim,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -364,7 +364,7 @@ int test_poisson_and_boundary_selector_checkerboard() {
 
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_checkerboard_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
     return test_poisson_and_boundary_selector_aux(
             "test_poisson_and_boundary_selector_checkerboard", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
@@ -389,7 +389,7 @@ int test_poisson_and_boundary_selector_bidomain() {
 
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
     return test_poisson_and_boundary_selector_aux(
             "test_poisson_and_boundary_selector_bidomain", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es, {"left"});
@@ -422,7 +422,7 @@ int test_linear_elasticity() {
     auto     es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     int      SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world());
 
     // Create sidesets for boundary conditions
     auto left_parent  = sfem::create_host_buffer<element_idx_t>(1);
@@ -435,8 +435,8 @@ int test_linear_elasticity() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), right_parent, right_lfi);
 
     // Define boundary conditions
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
@@ -459,7 +459,7 @@ int test_poisson_simple() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world());
 
     // Create sidesets for boundary conditions
     auto left_parent  = sfem::create_host_buffer<element_idx_t>(1);
@@ -472,8 +472,8 @@ int test_poisson_simple() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::world(), right_parent, right_lfi);
 
     // Define boundary conditions for Poisson
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
@@ -512,7 +512,7 @@ int test_bidomain_elasticity() {
 
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
     auto fs = sfem::FunctionSpace::create(m, 3);
 
@@ -566,7 +566,7 @@ int test_boundary_layer_elasticity() {
 
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
     real_t margin_min = 0.5;
     real_t margin_max = 1.5;
@@ -638,7 +638,7 @@ int test_poisson_yaml() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
+    auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world());
     m       = smesh::to_semistructured(16, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, 1);
     auto f  = sfem::Function::create(fs);

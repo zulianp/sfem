@@ -3,11 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
@@ -205,16 +201,8 @@ void grad_and_project_coeffs(const smesh::ElemType element_type,
     }
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_grad_and_project(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -224,33 +212,30 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
-    const char *path_u = argv[2];
-    const char *path_output[3] = {argv[3], argv[4], argv[5]};
+    const char *folder           = argv[1];
+    const char *path_u           = argv[2];
+    const char *path_output[3]   = {argv[3], argv[4], argv[5]};
 
     printf("%s %s %s %s %s %s\n", argv[0], folder, path_u, path_output[0], path_output[1], path_output[2]);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
-
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
-    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
-    real_t *u;
+    auto u = sfem::Buffer<real_t>::from_file(smesh::Path(path_u));
+    if (!u) {
+        SFEM_ERROR("Failed to read file %s\n", path_u);
+    }
 
-    ptrdiff_t u_n_local, u_n_global;
-    array_create_from_file(comm, path_u, SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
+    assert((ptrdiff_t)u->size() == n_nodes);
 
-    assert(u_n_local == n_nodes);
-
-    real_t *grad_u[3];
+    std::shared_ptr<sfem::Buffer<real_t>> grad_bufs[3];
+    real_t                               *grad_u[3];
     for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        grad_u[d] = (real_t *)malloc(u_n_local * sizeof(real_t));
-        memset(grad_u[d], 0, u_n_local * sizeof(real_t));
+        grad_bufs[d] = sfem::create_host_buffer<real_t>(n_nodes);
+        grad_u[d]    = grad_bufs[d]->data();
     }
 
     int SFEM_COMPUTE_COEFFICIENTS = 1;
@@ -263,7 +248,7 @@ int main(int argc, char *argv[]) {
                                 n_nodes,
                                 mesh->elements(0)->data(),
                                 mesh->points()->data(),
-                                u,
+                                u->data(),
                                 grad_u[0],
                                 grad_u[1],
                                 grad_u[2]);
@@ -274,7 +259,7 @@ int main(int argc, char *argv[]) {
                          n_nodes,
                          mesh->elements(0)->data(),
                          mesh->points()->data(),
-                         u,
+                         u->data(),
                          grad_u[0],
                          grad_u[1],
                          grad_u[2]);
@@ -285,26 +270,28 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_SCALE != 1) {
         for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-            for (ptrdiff_t i = 0; i < u_n_local; ++i) {
+            for (ptrdiff_t i = 0; i < n_nodes; ++i) {
                 grad_u[d][i] *= SFEM_SCALE;
             }
         }
     }
 
-    free(u);
-
     for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        array_write(comm, path_output[d], SFEM_MPI_REAL_T, grad_u[d], u_n_local, u_n_global);
-        free(grad_u[d]);
+        grad_bufs[d]->to_file(smesh::Path(path_output[d]));
     }
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_grad_and_project(ctx->communicator(), argc, argv);
 }

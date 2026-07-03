@@ -7,7 +7,7 @@ int test_packed_laplacian() {
 
     enum smesh::ElemType SFEM_ELEM_TYPE = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
     constexpr int        N              = 40;
-    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::wrap(comm), SFEM_ELEM_TYPE, N, N, N, -1, -1, -1, 1, 1, 1);
+    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::world(), SFEM_ELEM_TYPE, N, N, N, -1, -1, -1, 1, 1, 1);
     auto fs   = sfem::FunctionSpace::create(mesh, 1);
 
     SFEM_TEST_ASSERT(fs->initialize_packed_mesh() == SFEM_SUCCESS);

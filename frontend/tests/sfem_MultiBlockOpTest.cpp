@@ -9,7 +9,7 @@
 
 int test_multi_block_op() {
     MPI_Comm comm  = MPI_COMM_WORLD;
-    auto     mesh  = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::wrap(comm), 4, 4, 4);
+    auto     mesh  = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::world(), 4, 4, 4);
     auto     space = sfem::FunctionSpace::create(mesh, 1);
 
     auto f  = sfem::Function::create(space);

@@ -24,12 +24,12 @@
             op->apply(x, y);                                   \
         }                                                      \
         sfem::device_synchronize();                            \
-        double start = MPI_Wtime();                            \
+        double start = smesh::time_seconds();                            \
         for (int r = 0; r < SFEM_REPEAT; r++) {                \
             op->apply(x, y);                                   \
             sfem::device_synchronize();                        \
         }                                                      \
-        double stop    = MPI_Wtime();                          \
+        double stop    = smesh::time_seconds();                          \
         double elapsed = (stop - start) / SFEM_REPEAT;         \
         printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
                #op,                                            \
@@ -42,8 +42,8 @@
     } while (0)
 
 int test_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
+    auto comm = sfem::Communicator::world();
+    auto es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
     SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
@@ -85,7 +85,7 @@ int test_cube() {
     int SFEM_BLOCK_SIZE = 1;
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(comm,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,

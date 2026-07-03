@@ -3,30 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
-
 #include "sfem_base.hpp"
-
-
 
 #include "surface_l2_projection.hpp"
 
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_surface_projection(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -36,66 +22,53 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
+    const char *folder  = argv[1];
     const char *path_p0 = argv[2];
     const char *path_p1 = argv[3];
 
     printf("%s %s %s %s\n", argv[0], folder, path_p0, path_p1);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements  = mesh->n_elements();
+    const ptrdiff_t nnodes     = mesh->n_nodes();
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto p0_buf = sfem::Buffer<real_t>::from_file(smesh::Path(path_p0));
+    if (!p0_buf) {
+        SFEM_ERROR("Failed to read file %s\n", path_p0);
+    }
 
-    real_t *p0;
-    ptrdiff_t p0_n_local, p0_n_global;
-    array_create_from_file(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
+    assert((ptrdiff_t)p0_buf->size() == nelements);
 
-    ptrdiff_t nelements = mesh->n_elements();
-    ptrdiff_t nnodes = mesh->n_nodes();
-
-    assert(p0_n_local == nelements);
-
-    real_t *p1 = (real_t *)malloc(nnodes * sizeof(real_t));
-    memset(p1, 0, nnodes * sizeof(real_t));
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Compute surface_projection
-    ///////////////////////////////////////////////////////////////////////////////
+    auto p1_buf = sfem::create_host_buffer<real_t>(nnodes);
+    real_t *p1  = p1_buf->data();
 
     int SFEM_COMPUTE_COEFFICIENTS = 1;
-
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        surface_e_projection_coeffs(mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
+        surface_e_projection_coeffs(
+                mesh->element_type(0), nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), p0_buf->data(), p1);
     } else {
-        surface_e_projection_apply(mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
+        surface_e_projection_apply(
+                mesh->element_type(0), nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), p0_buf->data(), p1);
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Write cell data
-    ///////////////////////////////////////////////////////////////////////////////
+    p1_buf->to_file(smesh::Path(path_p1));
 
-    array_write(comm, path_p1, SFEM_MPI_REAL_T, p1, nnodes, nnodes);
+    const double tock = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    ///////////////////////////////////////////////////////////////////////////////
-
-    free(p0);
-    free(p1);
-
-    double tock = MPI_Wtime();
-
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_surface_projection(ctx->communicator(), argc, argv);
 }

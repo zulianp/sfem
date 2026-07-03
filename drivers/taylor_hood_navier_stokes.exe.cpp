@@ -5,9 +5,6 @@
 #include <unistd.h>
 #include <limits>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
 #include "sfem_base.hpp"
@@ -18,7 +15,6 @@
 #include "mass.hpp"
 
 #include "boundary_condition.hpp"
-#include "boundary_condition_io.hpp"
 #include "dirichlet.hpp"
 #include "neumann.hpp"
 
@@ -184,8 +180,107 @@ static void mesh_minmax_edge_length(const std::shared_ptr<sfem::Mesh> &mesh, rea
         }
     }
 
-    MPI_Allreduce(&local_min, emin, 1, SFEM_MPI_REAL_T, MPI_MIN, mesh->comm()->get());
-    MPI_Allreduce(&local_max, emax, 1, SFEM_MPI_REAL_T, MPI_MAX, mesh->comm()->get());
+    *emin = local_min;
+    *emax = local_max;
+}
+
+static void read_boundary_conditions_serial(const char *sets,
+                                            const char *values,
+                                            const char *components,
+                                            boundary_condition_t **bcs,
+                                            int *nbc) {
+    if (!sets) {
+        *bcs = nullptr;
+        *nbc = 0;
+        return;
+    }
+
+    const char *splitter = ",";
+    int         count    = 1;
+    {
+        int i = 0;
+        while (sets[i]) {
+            count += (sets[i++] == splitter[0]);
+            assert(i <= (int)strlen(sets));
+        }
+    }
+
+    boundary_condition_t *conds = (boundary_condition_t *)malloc((size_t)count * sizeof(boundary_condition_t));
+
+    {
+        char *sets_copy = strdup(sets);
+        char *pch       = strtok(sets_copy, splitter);
+        int   i         = 0;
+        while (pch != nullptr) {
+            auto buf = sfem::Buffer<idx_t>::from_file(smesh::Path(pch));
+            if (!buf) {
+                fprintf(stderr, "Failed to read file %s\n", pch);
+                free(sets_copy);
+                return;
+            }
+
+            conds[i].idx = (idx_t *)malloc((size_t)buf->size() * sizeof(idx_t));
+            memcpy(conds[i].idx, buf->data(), (size_t)buf->size() * sizeof(idx_t));
+            conds[i].local_size  = buf->size();
+            conds[i].global_size = buf->size();
+            conds[i].value       = 0;
+            conds[i].component   = 0;
+            conds[i].values      = nullptr;
+            i++;
+            pch = strtok(nullptr, splitter);
+        }
+        free(sets_copy);
+    }
+
+    if (values) {
+        static const char *path_key     = "path:";
+        const int          path_key_len = (int)strlen(path_key);
+
+        char *values_copy = strdup(values);
+        char *pch         = strtok(values_copy, splitter);
+        int   i           = 0;
+        while (pch != nullptr) {
+            if (strncmp(pch, path_key, (size_t)path_key_len) == 0) {
+                conds[i].value = 0;
+                auto val_buf   = sfem::Buffer<real_t>::from_file(smesh::Path(pch + path_key_len));
+                if (!val_buf) {
+                    fprintf(stderr, "Failed to read file %s\n", pch + path_key_len);
+                    free(values_copy);
+                    return;
+                }
+                if ((ptrdiff_t)val_buf->size() != conds[i].local_size) {
+                    fprintf(stderr,
+                            "read_boundary_conditions: len(idx) != len(values) (%ld != %ld)\nfile:%s\n",
+                            (long)conds[i].local_size,
+                            (long)val_buf->size(),
+                            pch + path_key_len);
+                }
+                conds[i].values = (real_t *)malloc((size_t)val_buf->size() * sizeof(real_t));
+                memcpy(conds[i].values, val_buf->data(), (size_t)val_buf->size() * sizeof(real_t));
+            } else {
+                conds[i].value  = atof(pch);
+                conds[i].values = nullptr;
+            }
+            i++;
+            pch = strtok(nullptr, splitter);
+        }
+        free(values_copy);
+    }
+
+    if (components) {
+        char *components_copy = strdup(components);
+        char *pch             = strtok(components_copy, splitter);
+        int   i               = 0;
+        while (pch != nullptr) {
+            conds[i].component = atoi(pch);
+            i++;
+            pch = strtok(nullptr, splitter);
+        }
+        free(components_copy);
+    }
+
+    *bcs = conds;
+    *nbc = count;
 }
 
 static int write_output_step(const std::shared_ptr<smesh::Output> &output,
@@ -197,16 +292,10 @@ static int write_output_step(const std::shared_ptr<smesh::Output> &output,
     return output->write_nodal(buffer, smesh::TypeToEnum<real_t>::value(), data);
 }
 
-int main(int argc, char *argv[]) {
-    auto ctx = sfem::initialize_serial(argc, argv);
-
-    MPI_Comm                                comm = ctx->communicator()->get();
+int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     std::shared_ptr<sfem::BiCGStab<real_t>> solver[N_SYSTEMS];
 
-    const int rank = ctx->communicator()->rank();
-    const int size = ctx->communicator()->size();
-
-    if (size != 1) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -218,8 +307,8 @@ int main(int argc, char *argv[]) {
 
     const char *output_folder = argv[2];
 
-    char   path[SFEM_MAX_PATH_LENGTH];
-    double tick = MPI_Wtime();
+    char         path[SFEM_MAX_PATH_LENGTH];
+    const double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -227,7 +316,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     if (mesh->n_blocks() != 1) {
         fprintf(stderr, "%s requires a single mesh block\n", argv[0]);
         return EXIT_FAILURE;
@@ -283,7 +372,7 @@ int main(int argc, char *argv[]) {
     const char       *SFEM_RESTART_FOLDER     = SFEM_RESTART_FOLDER_str.empty() ? nullptr : SFEM_RESTART_FOLDER_str.c_str();
     const int         SFEM_RESTART_ID         = smesh::Env::read("SFEM_RESTART_ID", 0);
 
-    if (rank == 0) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n"
                "Options:\n"
                "----------------------------------------\n"
@@ -326,19 +415,17 @@ int main(int argc, char *argv[]) {
     int                   n_pressure_dirichlet_conditions;
     boundary_condition_t *pressure_dirichlet_conditions;
 
-    read_boundary_conditions(comm,
-                             SFEM_VELOCITY_DIRICHLET_NODESET,
-                             SFEM_VELOCITY_DIRICHLET_VALUE,
-                             SFEM_VELOCITY_DIRICHLET_COMPONENT,
-                             &velocity_dirichlet_conditions,
-                             &n_velocity_dirichlet_conditions);
+    read_boundary_conditions_serial(SFEM_VELOCITY_DIRICHLET_NODESET,
+                                    SFEM_VELOCITY_DIRICHLET_VALUE,
+                                    SFEM_VELOCITY_DIRICHLET_COMPONENT,
+                                    &velocity_dirichlet_conditions,
+                                    &n_velocity_dirichlet_conditions);
 
-    read_boundary_conditions(comm,
-                             SFEM_PRESSURE_DIRICHLET_NODESET,
-                             SFEM_PRESSURE_DIRICHLET_VALUE,
-                             SFEM_PRESSURE_DIRICHLET_COMPONENT,
-                             &pressure_dirichlet_conditions,
-                             &n_pressure_dirichlet_conditions);
+    read_boundary_conditions_serial(SFEM_PRESSURE_DIRICHLET_NODESET,
+                                    SFEM_PRESSURE_DIRICHLET_VALUE,
+                                    SFEM_PRESSURE_DIRICHLET_COMPONENT,
+                                    &pressure_dirichlet_conditions,
+                                    &n_pressure_dirichlet_conditions);
 
     smesh::ElemType p1_type   = elem_lower_order(mesh_element_type);
     const int       p1_nxe    = elem_num_nodes(p1_type);
@@ -537,10 +624,12 @@ int main(int argc, char *argv[]) {
         for (int d = 0; d < sdim; d++) {
             snprintf(path, sizeof(path), "%s/u%d.%09d.raw", SFEM_RESTART_FOLDER, d, SFEM_RESTART_ID);
 
-            if (array_read(comm, path, SFEM_MPI_REAL_T, (void *)vel[d], mesh_nnodes, mesh_nnodes)) {
-                fprintf(stderr, "Error reading restart file: %s\n", SFEM_RESTART_FOLDER);
+            auto vel_buf = sfem::Buffer<real_t>::from_file(smesh::Path(path));
+            if (!vel_buf || (ptrdiff_t)vel_buf->size() != mesh_nnodes) {
+                fprintf(stderr, "Error reading restart file: %s\n", path);
                 return EXIT_FAILURE;
             }
+            memcpy(vel[d], vel_buf->data(), (size_t)mesh_nnodes * sizeof(real_t));
         }
 
         // Read current time file and start from offset
@@ -824,13 +913,18 @@ int main(int argc, char *argv[]) {
 
     log_destroy(&time_logger);
 
-    double tock = MPI_Wtime();
-    if (!rank) {
+    const double tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #nz %ld #steps %ld\n", (long)nelements, (long)nnodes, (long)p2_nnz, step_count);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
     return EXIT_SUCCESS;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_taylor_hood_navier_stokes(ctx->communicator(), argc, argv);
 }
 

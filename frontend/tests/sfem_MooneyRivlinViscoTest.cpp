@@ -60,9 +60,9 @@ int test_mooney_rivlin_visco_relaxation() {
     const char                 *mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
-        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path(mesh_path));
     } else {
-        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,  // Grid

@@ -184,7 +184,7 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     
     // Create 1x1x1 hex8 mesh
     auto mesh = sfem::Mesh::create_hex8_cube(
-        sfem::Communicator::wrap(comm),
+        sfem::Communicator::world(),
         1, 1, 1,
         0.0, 0.0, 0.0,
         1.0, 1.0, 1.0

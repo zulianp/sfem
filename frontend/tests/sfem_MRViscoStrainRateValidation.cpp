@@ -189,7 +189,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     
     // Create mesh (1x1x1 cube)
     auto mesh = sfem::Mesh::create_hex8_cube(
-        sfem::Communicator::wrap(comm),
+        sfem::Communicator::world(),
         1, 1, 1,
         0.0, 0.0, 0.0,
         1.0, 1.0, 1.0
