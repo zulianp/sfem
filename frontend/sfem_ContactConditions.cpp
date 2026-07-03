@@ -5,9 +5,6 @@
 #include "dirichlet.hpp"
 #include "neumann.hpp"
 
-#include "matrixio_array.h"
-#include "matrixio_ndarray.h"
-
 #include "sfem_Input.hpp"
 
 #include "sfem_API.hpp"
