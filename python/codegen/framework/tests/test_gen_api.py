@@ -3310,6 +3310,21 @@ class GenApiTest(unittest.TestCase):
                 "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
                 contents,
             )
+            self.assertIn(
+                "const scalar_t *const block_current_streams[N_FIELD_STREAMS] = {"
+                "block_current[0], block_current[8], block_current[1]",
+                contents,
+            )
+            self.assertIn(
+                "block_current[81], block_current[82], block_current[84], block_current[83], "
+                "block_current[85], block_current[86], block_current[88], block_current[87]}",
+                contents,
+            )
+            self.assertIn(
+                "scalar_t *const block_output_streams[N_FIELD_STREAMS] = {"
+                "block_output[0], block_output[8], block_output[1]",
+                contents,
+            )
             self.assertIn("static constexpr int N_FIELDS = 2;", contents)
             self.assertIn("scalar_t *const SFEM_RESTRICT u_out[3]", contents)
             self.assertNotIn("u0_out", contents)

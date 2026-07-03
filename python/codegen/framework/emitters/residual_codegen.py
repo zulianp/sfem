@@ -1061,7 +1061,47 @@ def _mixed_mesh_output_pointer(field):
     return "%s_out[%d]" % (name, int(getattr(field, "component", 0)))
 
 
-def _mixed_block_stream_pointer_lines(layout, dependencies, indent):
+def _mixed_tensor_product_field_stream_order(
+    layout,
+    cell_rule,
+    field_element_types,
+    basis_family,
+):
+    if not _is_tensor_product_family(cell_rule, basis_family):
+        return tuple(range(layout.total_streams))
+
+    field_element_types = {} if field_element_types is None else field_element_types
+    order = []
+    for field_index, field in enumerate(layout.fields):
+        n_shape = layout.n_shape(field_index)
+        element_type = _field_element_type(
+            _residual_parent_field_name(field),
+            cell_rule,
+            field_element_types,
+        )
+        shape_order = (
+            tuple(range(n_shape))
+            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
+        )
+        order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
+    return tuple(order)
+
+
+def _mixed_block_stream_pointer_lines(
+    layout,
+    dependencies,
+    indent,
+    cell_rule,
+    field_element_types,
+    basis_family,
+):
+    field_stream_order = _mixed_tensor_product_field_stream_order(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+    )
     lines = []
     for group in _dependency_stream_groups(dependencies):
         lines.append(
@@ -1069,14 +1109,21 @@ def _mixed_block_stream_pointer_lines(layout, dependencies, indent):
             % (
                 indent,
                 group.name,
-                _indexed_stream_initializer(
-                    "block_%s" % group.name, layout.total_streams
+                ", ".join(
+                    "block_%s[%d]" % (group.name, stream)
+                    for stream in field_stream_order
                 ),
             )
         )
     lines.append(
         "%sscalar_t *const block_output_streams[N_FIELD_STREAMS] = {%s};"
-        % (indent, _indexed_stream_initializer("block_output", layout.total_streams))
+        % (
+            indent,
+            ", ".join(
+                "block_output[%d]" % stream
+                for stream in field_stream_order
+            ),
+        )
     )
     return lines
 
@@ -3524,7 +3571,16 @@ def _mixed_affine_function(
             "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
             % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim))
         )
-    lines.extend(_mixed_block_stream_pointer_lines(layout, dependencies, "        "))
+    lines.extend(
+        _mixed_block_stream_pointer_lines(
+            layout,
+            dependencies,
+            "        ",
+            cell_rule,
+            field_element_types,
+            basis_family,
+        )
+    )
     call_args = [
         "nelems",
         "0",
@@ -3811,7 +3867,16 @@ def _mixed_isoparametric_function(
         "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
         % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
     )
-    lines.extend(_mixed_block_stream_pointer_lines(layout, dependencies, "        "))
+    lines.extend(
+        _mixed_block_stream_pointer_lines(
+            layout,
+            dependencies,
+            "        ",
+            cell_rule,
+            field_element_types,
+            basis_family,
+        )
+    )
     call_args = [
         "nelems",
         "VECTOR_SIZE",
