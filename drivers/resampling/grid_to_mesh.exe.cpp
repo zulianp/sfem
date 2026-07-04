@@ -23,6 +23,17 @@
 
 #include "sfem_API.hpp"
 
+using sfem::normalize_field_and_find_min_max;
+using sfem::apply_fun_to_mesh;
+using sfem::field_view;
+using sfem::interpolate_field;
+using sfem::resample_field_adjoint_tet4;
+using sfem::resample_field_mesh_adjoint_tet10;
+using sfem::resample_field_mesh_tet10;
+using sfem::resample_field_mesh_tet4;
+using sfem::resample_field_TEST_adjoint_tet4;
+using sfem::sfem_resample_field_info;
+
 #define RED_TEXT "\x1b[31m"
 #define GREEN_TEXT "\x1b[32m"
 #define RESET_TEXT "\x1b[0m"
@@ -513,10 +524,28 @@ int main(int argc, char* argv[]) {
     mesh_deprecated.nnodes                = mesh->n_nodes();
     mesh_deprecated.elements              = mesh->elements(0)->data();
     mesh_deprecated.points                = mesh->points()->data();
-    mesh_deprecated.n_owned_nodes         = mesh->n_nodes();
-    mesh_deprecated.n_owned_nodes_with_ghosts = mesh->n_nodes();
-    mesh_deprecated.n_owned_elements      = mesh->n_elements();
-    mesh_deprecated.n_owned_elements_with_ghosts = mesh->n_elements();
+
+    auto dist = mesh->distributed();
+    if (dist) {
+        mesh_deprecated.n_owned_nodes                = dist->n_nodes_owned();
+        mesh_deprecated.n_owned_nodes_with_ghosts    = mesh->n_nodes();
+        mesh_deprecated.n_global_nodes               = dist->n_nodes_global();
+        mesh_deprecated.n_owned_elements             = dist->n_elements_owned();
+        mesh_deprecated.n_owned_elements_with_ghosts = mesh->n_elements();
+        mesh_deprecated.n_global_elements            = dist->n_elements_global();
+        mesh_deprecated.node_mapping                 = dist->node_mapping()->data();
+        mesh_deprecated.node_owner                   = dist->node_owner()->data();
+        mesh_deprecated.element_mapping              = dist->element_mapping()->data();
+        mesh_deprecated.node_offsets                 = dist->node_offsets()->data();
+        mesh_deprecated.ghosts                       = dist->ghosts()->data();
+    } else {
+        mesh_deprecated.n_owned_nodes                = mesh->n_nodes();
+        mesh_deprecated.n_owned_nodes_with_ghosts    = mesh->n_nodes();
+        mesh_deprecated.n_global_nodes               = mesh->n_nodes();
+        mesh_deprecated.n_owned_elements             = mesh->n_elements();
+        mesh_deprecated.n_owned_elements_with_ghosts = mesh->n_elements();
+        mesh_deprecated.n_global_elements            = mesh->n_elements();
+    }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     real_t*       field        = NULL;
@@ -619,7 +648,7 @@ int main(int argc, char* argv[]) {
     // 1: assemble the dual mass vector in the kernel
     int assemble_dual_mass_vector_cuda = 0;
 
-    if (info.element_type == smesh::TET10 && SFEM_TET10_CUDA == ON) {
+    if (info.element_type == smesh::TET10 && SFEM_TET10_CUDA) {
         if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY && mpi_size > 1) {
             assemble_dual_mass_vector_cuda = 0;
         } else {

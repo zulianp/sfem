@@ -17,6 +17,8 @@
 #define SFEM_RESAMPLE_GAP_DUAL
 // #define real_type real_t
 
+namespace sfem {
+
 static SFEM_INLINE vec_indices floor_V(const vec_real x) {
     const vec_indices res = __builtin_convertvector(x, vec_indices);
     return res;
@@ -627,3 +629,5 @@ int tet4_resample_field_local_V(const ptrdiff_t                      nelements, 
 
     RETURN_FROM_FUNCTION(ret);
 }
+
+}  // namespace sfem

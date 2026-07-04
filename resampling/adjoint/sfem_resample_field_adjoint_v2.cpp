@@ -21,6 +21,8 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+namespace sfem {
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_field_local_adjoint /////////////////////
@@ -682,7 +684,7 @@ push_tet_vertices(struct sfem_stack*         stack,     //
 
     // Push the tetrahedron on the stack
     for (int i = 0; i < n_tets; i++) {
-        struct tet_vertices* tet = malloc(sizeof(struct tet_vertices));
+        struct tet_vertices* tet = (struct tet_vertices*)malloc(sizeof(struct tet_vertices));
         if (tet == NULL) {
             fprintf(stderr, "ERROR: malloc failed: %s:%d\n", __FILE__, __LINE__);
             exit(1);
@@ -731,7 +733,7 @@ add_tetrahedron_to_array(const struct tet_vertices* tet_head,       //
     if (tets_size >= *tets_capacity) {
         *tets_capacity += tet_delta_capacity;
 
-        struct tet_vertices* new_tets = realloc(*tets_out, sizeof(struct tet_vertices) * (*tets_capacity));
+        struct tet_vertices* new_tets = (struct tet_vertices*)realloc(*tets_out, sizeof(struct tet_vertices) * (*tets_capacity));
 
         // Check if realloc failed
         if (new_tets == NULL) {
@@ -793,18 +795,18 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
     int tets_capacity      = 8;
     int tet_delta_capacity = 8;
 
-    *tets_out = malloc(sizeof(struct tet_vertices) * tets_capacity);
+    *tets_out = (struct tet_vertices*)malloc(sizeof(struct tet_vertices) * tets_capacity);
 
     int flag_loop          = 1;
     int n_tets             = 0;
     int total_refined_tets = 0;
 
-    struct tet_vertices* tets_ref                   = malloc(sizeof(struct tet_vertices) * 8);
+    struct tet_vertices* tets_ref                   = (struct tet_vertices*)malloc(sizeof(struct tet_vertices) * 8);
     int                  degenerated_tetrahedra_cnt = 0;
 
     struct sfem_stack* stack = sfem_stack_create(max_refined_tets);
 
-    struct tet_vertices* first_tet = malloc(sizeof(struct tet_vertices));
+    struct tet_vertices* first_tet = (struct tet_vertices*)malloc(sizeof(struct tet_vertices));
     first_tet->x0                  = x0;
     first_tet->x1                  = x1;
     first_tet->x2                  = x2;
@@ -2351,3 +2353,5 @@ field_analytic_destroy(struct field_analytic* field) {
     field->alpha  = NULL;
     field->volume = NULL;
 }
+
+}  // namespace sfem

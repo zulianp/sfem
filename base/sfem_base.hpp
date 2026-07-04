@@ -84,10 +84,6 @@
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
 
-
-// #define ON 1
-// #define OFF 0
-
 #ifdef __cplusplus
 extern "C" {
 #endif

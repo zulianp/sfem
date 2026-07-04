@@ -16,6 +16,8 @@
 #define POW2(x) ((x) * (x))
 #define POW3(x) ((x) * (x) * (x))
 
+namespace sfem {
+
 ptrdiff_t nSizes_global = 0;
 
 /**
@@ -1984,7 +1986,7 @@ int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nele
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#if SFEM_TET10_WENO == ON
+#if SFEM_TET10_WENO
 #define CUBE1 1
 #else
 #define CUBE1 0
@@ -2038,3 +2040,5 @@ int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nele
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
     }
 }
+
+}  // namespace sfem

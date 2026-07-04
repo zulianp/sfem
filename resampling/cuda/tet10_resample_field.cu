@@ -22,7 +22,7 @@
 // #define __TET10_TILE_SIZE__ 32
 // #define WENO_CUDA 1
 
-#if SFEM_TET10_WENO == ON
+#if SFEM_TET10_WENO
 #define CUBE1 1
 #else
 #define CUBE1 0
