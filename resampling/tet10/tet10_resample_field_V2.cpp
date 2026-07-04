@@ -15,6 +15,8 @@
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
 
+namespace sfem {
+
 //////////////////////////////////////////////////////////
 // Casting from int64 to double SIMD vector
 vec_real vec_indices_to_real(const vec_indices a) {
@@ -1311,7 +1313,7 @@ SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
     // const int stride_z = stride[2];
 
     // real_t* out = NULL;
-    real_t* first_ptrs_array[_VL_];
+    const real_t* first_ptrs_array[_VL_];
     hex_aa_8_collect_coeffs_O3_ptr_vec(stride, i, j, k, data, first_ptrs_array);
 
     // ////// Compute the local indices
@@ -1683,7 +1685,7 @@ int hex8_to_tet10_resample_field_local_V2(
     if (SFEM_ENABLE_ISOPARAMETRIC) {
         int a = 0;
 
-#if SFEM_TET10_WENO == OFF
+#if !SFEM_TET10_WENO
         a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
                                                                nnodes,
                                                                elems,
@@ -1721,3 +1723,5 @@ int hex8_to_tet10_resample_field_local_V2(
         //                                                         weighted_field);
     }
 }
+
+}  // namespace sfem

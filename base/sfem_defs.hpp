@@ -67,4 +67,18 @@ namespace sfem {
     using smesh::type_to_string;
 }  // namespace sfem
 
+#ifdef __cplusplus
+using sfem::ADJOINT_BASE;
+using sfem::ADJOINT_REFINE_HYTEG_REFINEMENT;
+using sfem::ADJOINT_REFINE_ITERATIVE;
+using sfem::ADJOINT_REFINE_ONE_STEP;
+using sfem::AdjointRefineType;
+using sfem::AcceleratorsType;
+using sfem::SFEM_ACCELERATOR_TYPE_CPU;
+using sfem::SFEM_ACCELERATOR_TYPE_CUDA;
+using sfem::SFEM_ACCELERATOR_TYPE_HIP;
+using sfem::SFEM_ACCELERATOR_TYPE_OPENACC;
+using sfem::SFEM_ACCELERATOR_TYPE_OPENCL;
+#endif
+
 #endif  // SFEM_DEFS_H

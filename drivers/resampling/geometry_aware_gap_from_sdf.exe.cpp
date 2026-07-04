@@ -16,7 +16,7 @@
 #include "mass.hpp"
 
 
-#include "extract_sharp_features.hpp"
+#include "smesh_extract_shape_features.hpp"
 
 #include "mesh_utils.hpp"
 #include "sfem_API.hpp"
@@ -66,17 +66,17 @@ int main(int argc, char* argv[]) {
     const ptrdiff_t n_owned_nodes = dist ? dist->n_nodes_owned() : mesh->n_nodes();
     auto node_owner = dist ? dist->node_owner() : sfem::create_host_buffer<int>(mesh->n_nodes());
     auto ghosts = dist ? dist->ghosts() : sfem::create_host_buffer<idx_t>(0);
-    auto node_offsets = sfem::create_host_buffer<idx_t>(size + 1);
+    auto node_offsets = sfem::create_host_buffer<ptrdiff_t>(size + 1);
     if (dist) {
         auto d_dist_node_offsets = dist->node_offsets()->data();
         auto d_node_offsets = node_offsets->data();
         for (int i = 0; i < size + 1; ++i) {
-            d_node_offsets[i] = static_cast<idx_t>(d_dist_node_offsets[i]);
+            d_node_offsets[i] = d_dist_node_offsets[i];
         }
     } else {
         auto d_node_offsets = node_offsets->data();
         d_node_offsets[0] = 0;
-        d_node_offsets[1] = static_cast<idx_t>(mesh->n_nodes());
+        d_node_offsets[1] = mesh->n_nodes();
     }
 
     auto node_mapping = sfem::create_host_buffer<idx_t>(n_owned_nodes);
@@ -152,37 +152,37 @@ int main(int argc, char* argv[]) {
         {
             count_t* rowptr = 0;
             idx_t* colidx = 0;
-            build_crs_graph_for_elem_type(
+            smesh::create_crs_graph_for_elem_type(
                 mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), &rowptr, &colidx);
 
-            extract_sharp_edges(mesh->element_type(0),
-                                mesh->n_elements(),
-                                mesh->n_nodes(),
-                                mesh->elements(0)->data(),
-                                mesh->points()->data(),
-                                // CRS-graph (node to node)
-                                rowptr,
-                                colidx,
-                                SFEM_ANGLE_THRESHOLD,
-                                &n_sharp_edges,
-                                &e0,
-                                &e1);
+            smesh::extract_sharp_edges(mesh->element_type(0),
+                                       mesh->n_elements(),
+                                       mesh->elements(0)->data(),
+                                       mesh->n_nodes(),
+                                       mesh->points()->data(),
+                                       // CRS-graph (node to node)
+                                       rowptr,
+                                       colidx,
+                                       SFEM_ANGLE_THRESHOLD,
+                                       &n_sharp_edges,
+                                       &e0,
+                                       &e1);
 
             free(rowptr);
             free(colidx);
         }
 
-        extract_disconnected_faces(mesh->element_type(0),
-                                   mesh->n_elements(),
-                                   mesh->n_nodes(),
-                                   mesh->elements(0)->data(),
-                                   n_sharp_edges,
-                                   e0,
-                                   e1,
-                                   &n_disconnected_elements,
-                                   &disconnected_elements);
+        smesh::extract_disconnected_faces(mesh->element_type(0),
+                                          mesh->n_elements(),
+                                          mesh->n_nodes(),
+                                          mesh->elements(0)->data(),
+                                          n_sharp_edges,
+                                          e0,
+                                          e1,
+                                          &n_disconnected_elements,
+                                          &disconnected_elements);
 
-        n_sharp_edges = extract_sharp_corners(
+        n_sharp_edges = smesh::extract_sharp_corners(
             mesh->n_nodes(), n_sharp_edges, e0, e1, &n_corners, &corners, !SFEM_SUPERIMPOSE);
     }
 

@@ -1,5 +1,7 @@
 #include "tet10_weno_V.hpp"
 
+namespace sfem {
+
 /**
  * @brief Compute the square of a vector
  *
@@ -266,7 +268,7 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
                                         const vec_indices j,            //
                                         const vec_indices k,            //
                                         const real_t *const data,
-                                        real_t *first_ptrs_array[]) {  //
+                                        const real_t *first_ptrs_array[]) {  //
 
     const vec_indices first_indices = hex_aa_8_indices_O3_first_index_vec(stride, i, j, k);
 
@@ -519,3 +521,5 @@ vec_real weno4_3D_HOne_V(const ptrdiff_t *const stride,                         
 
     return wz;
 }
+
+}  // namespace sfem
