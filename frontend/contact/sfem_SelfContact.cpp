@@ -1585,7 +1585,7 @@ namespace sfem {
 
     }  // namespace
 
-    // Select the contact strategy at runtime. SFEM_CONTACT = "nts" (default) | "mortar".
+    // Select the contact strategy at runtime. SFEM_CONTACT = "nts" | "mortar" (default).
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
                                             const std::shared_ptr<smesh::Mesh>&   surface,
                                             const real_t                          margin,
@@ -1597,10 +1597,30 @@ namespace sfem {
         if (method == "nts") {
             printf("[Contact] strategy: nts (SFEM_CONTACT=nts)\n");
             return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
-        } else {
-            printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
+        } else if (method == "mortar") {
+            const smesh::ElemType surface_element_type = surface->block(0)->element_type();
+            if (surface_element_type == smesh::QUADSHELL4) {
+                printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
+                return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
+            }
+
+            printf("[Contact] strategy: nts (SFEM_CONTACT=mortar requested, mortar requires QUADSHELL4 but got %s/%d)\n",
+                   smesh::type_to_string(surface_element_type),
+                   surface_element_type);
+            return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
+        }
+
+        const smesh::ElemType surface_element_type = surface->block(0)->element_type();
+        if (surface_element_type == smesh::QUADSHELL4) {
+            printf("[Contact] strategy: mortar (unknown SFEM_CONTACT=%s, using default)\n", method.c_str());
             return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
         }
+
+        printf("[Contact] strategy: nts (unknown SFEM_CONTACT=%s, default mortar requires QUADSHELL4 but got %s/%d)\n",
+               method.c_str(),
+               smesh::type_to_string(surface_element_type),
+               surface_element_type);
+        return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
     }
 
 #ifdef SFEM_ENABLE_YAML
