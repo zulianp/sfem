@@ -168,6 +168,20 @@ int linear_elasticity_bcrs_sym(const smesh::ElemType              element_type,
                                real_t **const SFEM_RESTRICT       diag_values,
                                real_t **const SFEM_RESTRICT       off_diag_values);
 
+int linear_elasticity_objective_steps_aos(const smesh::ElemType             element_type,
+                                          const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const real_t *const SFEM_RESTRICT u,
+                                          const real_t *const SFEM_RESTRICT inc,
+                                          const int                         nsteps,
+                                          const real_t *const               steps,
+                                          real_t *const SFEM_RESTRICT       out);
+
 #ifdef __cplusplus
 }
 #endif

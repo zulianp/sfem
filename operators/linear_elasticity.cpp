@@ -492,3 +492,66 @@ int linear_elasticity_block_diag_sym_soa(const smesh::ElemType        element_ty
         }
     }
 }
+
+int linear_elasticity_objective_steps_aos(const smesh::ElemType             element_type,
+                                          const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const real_t *const SFEM_RESTRICT u,
+                                          const real_t *const SFEM_RESTRICT inc,
+                                          const int                         nsteps,
+                                          const real_t *const               steps,
+                                          real_t *const SFEM_RESTRICT       out) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_linear_elasticity_objective_steps(level,
+                                                        nelements,
+                                                        stride,
+                                                        nnodes,
+                                                        elements,
+                                                        points,
+                                                        mu,
+                                                        lambda,
+                                                        3,
+                                                        &u[0],
+                                                        &u[1],
+                                                        &u[2],
+                                                        3,
+                                                        &inc[0],
+                                                        &inc[1],
+                                                        &inc[2],
+                                                        nsteps,
+                                                        steps,
+                                                        out);
+    }
+    switch (element_type) {
+        case smesh::HEX8: {
+            return hex8_linear_elasticity_objective_steps(nelements,
+                                                          stride,
+                                                          nnodes,
+                                                          elements,
+                                                          points,
+                                                          mu,
+                                                          lambda,
+                                                          3,
+                                                          &u[0],
+                                                          &u[1],
+                                                          &u[2],
+                                                          3,
+                                                          &inc[0],
+                                                          &inc[1],
+                                                          &inc[2],
+                                                          nsteps,
+                                                          steps,
+                                                          out);
+        }
+        default: {
+            SFEM_ERROR("neohookean_objective_steps_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+    return SFEM_FAILURE;
+}

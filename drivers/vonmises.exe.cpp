@@ -3,29 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
-
 #include "sfem_base.hpp"
-
-
 
 #include "tet4_neohookean.hpp"
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int compute_vonmises(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -41,7 +27,7 @@ int main(int argc, char *argv[]) {
 
     const char *material = argv[1];
 
-    real_t mu = atof(argv[2]);
+    real_t mu     = atof(argv[2]);
     real_t lambda = atof(argv[3]);
 
     const char *folder = argv[4];
@@ -51,8 +37,8 @@ int main(int argc, char *argv[]) {
     int is_AoS = argc == 7;
 
     if (is_AoS) {
-        path_u[0] = argv[5];
-        output_path = argv[6];
+        path_u[0]     = argv[5];
+        output_path   = argv[6];
 
         printf("(AoS) %s %s %g %g %s %s %s\n",
                argv[0],
@@ -64,9 +50,9 @@ int main(int argc, char *argv[]) {
                output_path);
 
     } else {
-        path_u[0] = argv[5];
-        path_u[1] = argv[6];
-        path_u[2] = argv[7];
+        path_u[0]   = argv[5];
+        path_u[1]   = argv[6];
+        path_u[2]   = argv[7];
         output_path = argv[8];
 
         printf("(SoA) %s %s %g %g %s %s %s %s %s\n",
@@ -81,52 +67,47 @@ int main(int argc, char *argv[]) {
                output_path);
     }
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    auto            mesh      = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements = mesh->n_elements();
+    const ptrdiff_t nnodes    = mesh->n_nodes();
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
-
-    real_t *stress = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
-
-    // TODO
-    // if(strcmp(material, "neohookean") == 0) { }
+    auto stress_buf = sfem::create_host_buffer<real_t>(nelements);
+    real_t *stress  = stress_buf->data();
 
     if (is_AoS) {
         SFEM_ERROR("AoS not supported yet!\n");
-        // real_t *u;
-        // ptrdiff_t u_n_local, u_n_global;
-        // array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        // neohookean_vonmisneohookean_vonmises_aos(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
-        // free(u);
     } else {
-        real_t *u[3];
-
-        ptrdiff_t u_n_local, u_n_global;
+        std::shared_ptr<sfem::Buffer<real_t>> u_bufs[3];
+        real_t                               *u[3];
 
         for (int d = 0; d < 3; d++) {
-            array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
+            u_bufs[d] = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[d]));
+            if (!u_bufs[d]) {
+                SFEM_ERROR("Failed to read file %s\n", path_u[d]);
+            }
+            u[d] = u_bufs[d]->data();
         }
 
-        neohookean_vonmises_soa(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
-        
-        for (int d = 0; d < 3; d++) {
-            free(u[d]);
-        }
+        neohookean_vonmises_soa(
+                nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
     }
 
-    array_write(comm, output_path, SFEM_MPI_REAL_T, stress, mesh->n_elements(), mesh->n_elements());
-    free(stress);
+    stress_buf->to_file(smesh::Path(output_path));
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return compute_vonmises(ctx->communicator(), argc, argv);
 }

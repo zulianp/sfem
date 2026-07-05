@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace sfem {
+
 ///////////////////////////////////////////////////////////////////////
 // tet10_uniform_refinement
 ///////////////////////////////////////////////////////////////////////
@@ -599,7 +601,7 @@ insert_tet10_in_output_array(struct tet10_vertices*  tet10_head,    //
     // If not, allocate more space
     if (tets_size >= *tets_capacity) {
         *tets_capacity += tet_delta_capacity;
-        *rTets_out = realloc(*rTets_out, sizeof(struct tet10_vertices) * (*tets_capacity));
+        *rTets_out = (struct tet10_vertices*)realloc(*rTets_out, sizeof(struct tet10_vertices) * (*tets_capacity));
         if (*rTets_out == NULL) {
             fprintf(stderr, "ERROR: realloc failed in insert_tet10_in_output_array: %s:%d\n", __FILE__, __LINE__);
             exit(1);
@@ -637,7 +639,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
         *rTets_out = NULL;
     }
 
-    *rTets_out = malloc(sizeof(struct tet10_vertices) * tets_capacity);
+    *rTets_out = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices) * tets_capacity);
 
     int tets_size                  = 0;
     int flag_loop                  = 1;
@@ -648,7 +650,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
 
     struct sfem_stack* stack = sfem_stack_create(100);
 
-    struct tet10_vertices* first_tet10 = malloc(sizeof(struct tet10_vertices));
+    struct tet10_vertices* first_tet10 = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices));
     struct tet10_vertices  rTets[8];
 
     for (int i = 0; i < 10; i++) {
@@ -661,7 +663,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
     sfem_stack_push(stack, first_tet10);
 
     while (flag_loop == 1 && sfem_stack_size(stack) > 0) {
-        struct tet10_vertices* tet10_head = sfem_stack_pop(stack);
+        struct tet10_vertices* tet10_head = (struct tet10_vertices*)sfem_stack_pop(stack);
 
         if (tet10_head == NULL) {
             fprintf(stderr, "tet10_iterative_refinement: tet10_head == NULL\n");
@@ -710,7 +712,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
 
             if (tets_size >= max_refined_tets) {
                 while (sfem_stack_size(stack) > 0) {
-                    struct tet10_vertices* tet10_head_loc = sfem_stack_pop(stack);
+                    struct tet10_vertices* tet10_head_loc = (struct tet10_vertices*)sfem_stack_pop(stack);
 
                     tets_size = insert_tet10_in_output_array(tet10_head_loc,  //
                                                              rTets_out,
@@ -745,7 +747,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
             refinements_cnt++;
 
             for (int ni = 0; ni < n_tet; ni++) {
-                struct tet10_vertices* tet10_new = malloc(sizeof(struct tet10_vertices));
+                struct tet10_vertices* tet10_new = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices));
                 memcpy(tet10_new, &rTets[ni], sizeof(struct tet10_vertices));
                 sfem_stack_push(stack, tet10_new);
             }
@@ -763,7 +765,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
             refinements_cnt++;
 
             for (int ni = 0; ni < n_tet; ni++) {
-                struct tet10_vertices* tet10_new = malloc(sizeof(struct tet10_vertices));
+                struct tet10_vertices* tet10_new = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices));
                 memcpy(tet10_new, &rTets[ni], sizeof(struct tet10_vertices));
                 sfem_stack_push(stack, tet10_new);
             }
@@ -899,3 +901,5 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
 
     return 0;
 }
+
+}  // namespace sfem

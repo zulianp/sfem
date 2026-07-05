@@ -315,12 +315,12 @@ namespace sfem {
     };
 
     // Boundary conditions should be imposed before by hand... (if any) so cusparse API is valid
-    std::shared_ptr<CooSymSpMV<idx_t, real_t>> d_sym_coo_spmv(
+    std::shared_ptr<CooSym<idx_t, real_t>> d_sym_coo_spmv(
             const ptrdiff_t ndofs, const std::shared_ptr<Buffer<idx_t>>& rowidx,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values,
             const std::shared_ptr<Buffer<real_t>>& diag_values, const real_t scale_output) {
-        auto ret = std::make_shared<CooSymSpMV<idx_t, real_t>>();
+        auto ret = std::make_shared<CooSym<idx_t, real_t>>();
         ret->offdiag_colidx = colidx;
         ret->offdiag_rowidx = rowidx;
         ret->values = values;
@@ -338,7 +338,7 @@ namespace sfem {
     }
 
 #if CUDART_VERSION >= 12000
-    class BSRSpMVImpl {
+    class BSRImpl {
     public:
         cusparseSpMatDescr_t matrix;
         cusparseIndexType_t csrRowOffsetsType{SFEM_CUSPARSE_COMPAT_COUNT_T};
@@ -366,7 +366,7 @@ namespace sfem {
 
         std::shared_ptr<Buffer<cu_compat_count_t>> rowptr_compat;
 
-        BSRSpMVImpl(const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
+        BSRImpl(const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
                     const std::shared_ptr<Buffer<count_t>>& rowptr,
                     const std::shared_ptr<Buffer<idx_t>>& colidx,
                     const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
@@ -425,7 +425,7 @@ namespace sfem {
             CHECK_CUDA(cudaPeekAtLastError());
         }
 
-        ~BSRSpMVImpl() {
+        ~BSRImpl() {
             CHECK_CUDA(cudaFree(dBuffer));
             CHECK_CUSPARSE(cusparseDestroySpMat(matrix));
             CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
@@ -433,7 +433,7 @@ namespace sfem {
         }
 
         void apply(const real_t* const x, real_t* const y) {
-            SFEM_TRACE_SCOPE("BSRSpMV_CUDA::apply");
+            SFEM_TRACE_SCOPE("BSR_CUDA::apply");
 
             if (!initialized) {
                 initialize(x, y);
@@ -456,26 +456,28 @@ namespace sfem {
         }
     };
 
-    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
             const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
-        auto ret = std::make_shared<BSRSpMV<count_t, idx_t, real_t>>();
+        auto ret = std::make_shared<BSR<count_t, idx_t, real_t>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values = values;
         ret->block_cols_ = block_cols;
+        ret->row_block_size_ = block_size;
+        ret->col_block_size_ = block_size;
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
-        auto impl = std::make_shared<BSRSpMVImpl>(
+        auto impl = std::make_shared<BSRImpl>(
                 block_rows, block_cols, block_size, rowptr, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) { impl->apply(x, y); };
         return ret;
     }
 
 #else
-    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
             const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
@@ -496,16 +498,27 @@ namespace sfem {
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
-        assert(false);
+        SFEM_ERROR("Not implemented!\n");
         return nullptr;
     }
 
-    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
+    std::shared_ptr<CooSym<idx_t, real_t>> d_sym_coo_spmv(
+            const ptrdiff_t ndofs,
+            const std::shared_ptr<Buffer<idx_t>>& rowidx,
+            const std::shared_ptr<Buffer<idx_t>>& colidx,
+            const std::shared_ptr<Buffer<real_t>>& values,
+            const std::shared_ptr<Buffer<real_t>>& diag_values,
+            const real_t scale_output) {
+        SFEM_ERROR("Not implemented!\n");
+        return nullptr;
+    }
+
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
             const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
-        assert(false);
+        SFEM_ERROR("Not implemented!\n");
         return nullptr;
     }
 }  // namespace sfem

@@ -58,17 +58,17 @@ int main(int argc, char* argv[]) {
     const ptrdiff_t n_owned_nodes = dist ? dist->n_nodes_owned() : mesh->n_nodes();
     auto node_owner = dist ? dist->node_owner() : sfem::create_host_buffer<int>(mesh->n_nodes());
     auto ghosts = dist ? dist->ghosts() : sfem::create_host_buffer<idx_t>(0);
-    auto node_offsets = sfem::create_host_buffer<idx_t>(size + 1);
+    auto node_offsets = sfem::create_host_buffer<ptrdiff_t>(size + 1);
     if (dist) {
         auto d_dist_node_offsets = dist->node_offsets()->data();
         auto d_node_offsets = node_offsets->data();
         for (int i = 0; i < size + 1; ++i) {
-            d_node_offsets[i] = static_cast<idx_t>(d_dist_node_offsets[i]);
+            d_node_offsets[i] = d_dist_node_offsets[i];
         }
     } else {
         auto d_node_offsets = node_offsets->data();
         d_node_offsets[0] = 0;
-        d_node_offsets[1] = static_cast<idx_t>(mesh->n_nodes());
+        d_node_offsets[1] = mesh->n_nodes();
     }
 
     auto node_mapping = sfem::create_host_buffer<idx_t>(n_owned_nodes);

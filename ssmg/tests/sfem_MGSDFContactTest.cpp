@@ -7,7 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_CRS.hpp"
-#include "spmv.hpp"
+
 
 #include "matrixio_array.h"
 
@@ -263,12 +263,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
 }
 
 int test_contact() {
-    MPI_Comm comm = MPI_COMM_WORLD;
+    auto comm = sfem::Communicator::world();
 
-    int comm_size;
-    MPI_Comm_size(comm, &comm_size);
-
-    if (comm_size > 1) {
+    if (comm->size() > 1) {
         SFEM_ERROR("test_contact() can only be run in serial!\n");
     }
 
@@ -286,7 +283,7 @@ int test_contact() {
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                              SFEM_BASE_RESOLUTION * resolution_ratio,
                                              SFEM_BASE_RESOLUTION * 1,
                                              SFEM_BASE_RESOLUTION * resolution_ratio,

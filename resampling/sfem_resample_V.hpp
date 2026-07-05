@@ -7,9 +7,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 // int tet4_resample_field_local_v2(
 //         // Mesh
 //         const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
@@ -54,8 +52,6 @@ int tet4_resample_field_local_V4(
         // Output
         real_t* const SFEM_RESTRICT weighted_field);
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace sfem
 
 #endif  // SFEM_RESAMPLE_V

@@ -23,23 +23,28 @@ namespace sfem {
         virtual smesh::SharedBuffer<real_t>&                            mass_vector()           = 0;
         virtual smesh::SharedBuffer<real_t*>&                           normals()               = 0;
         virtual smesh::SharedBuffer<real_t>&                            distances()             = 0;
-        virtual smesh::SharedBuffer<real_t>&                            frozen_displacement()   = 0;
         virtual const smesh::SharedBuffer<real_t>&                      distances_whole() const = 0;
         virtual const smesh::SharedBuffer<real_t>&                      directors() const       = 0;
     };
 
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            real_t                                 margin,
-                                            real_t                                 search_radius_sqr,
-                                            ExecutionSpace                         es);
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            real_t                                margin,
+                                            real_t                                search_radius_sqr,
+                                            ExecutionSpace                        es);
 
 #ifdef SFEM_ENABLE_YAML
-    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>&  space,
-                                            const std::shared_ptr<smesh::Mesh>&    surface,
-                                            const ryml::ConstNodeRef&              node,
-                                            ExecutionSpace                         es);
+    std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
+                                            const std::shared_ptr<smesh::Mesh>&   surface,
+                                            const ryml::ConstNodeRef&             node,
+                                            ExecutionSpace                        es);
 #endif
+
+    std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
+                                                      const std::shared_ptr<smesh::Mesh>&   surface,
+                                                      real_t                                margin,
+                                                      real_t                                search_radius_sqr,
+                                                      ExecutionSpace                        es);
 
 }  // namespace sfem
 

@@ -33,7 +33,7 @@ namespace sfem {
 
         // Internally allocates a workspace with same memory requirement as `a`
         // (this could be passed in as arg...)
-        std::shared_ptr<CooSymSpMV<R, T>> coarsen(const std::shared_ptr<CooSymSpMV<R, T>>& a);
+        std::shared_ptr<CooSym<R, T>> coarsen(const std::shared_ptr<CooSym<R, T>>& a);
 
         void pwc_interpolate(const T* const v_coarse, T* const v) {
             R* partition = partition_->data();

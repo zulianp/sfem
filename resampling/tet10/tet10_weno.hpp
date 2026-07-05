@@ -19,6 +19,8 @@
 
 #define Abs(x) fabs(x)
 
+namespace sfem {
+
 void getLinearWeightsConstH(const real_t x, const real_t h, real_t *linear_weights);
 
 void getNonLinearWeightsConstH(const real_t x, const real_t h,    //
@@ -51,5 +53,7 @@ real_t weno4_3D_HOne(const real_t x, const real_t y, const real_t z,  //
                      const int stride_x,                              //
                      const int stride_y,                              //
                      const int stride_z);
+
+}  // namespace sfem
 
 #endif  // __TET10_WENO_H__

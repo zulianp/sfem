@@ -5,7 +5,6 @@
 #include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "spmv.hpp"
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
@@ -121,6 +120,11 @@ void add_matrix_free_vector_ops(const int                       dim,
 
     if (!semi_structured && (element_type == smesh::HEX8 || element_type == smesh::TET10)) {
         ops.push_back({.name = "NeoHookeanOgdenPacked", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+    }
+
+    if (!semi_structured && element_type == smesh::HEX8 || element_type == smesh::TET10 || element_type == smesh::TET4 ||
+        element_type == smesh::QUAD4 || element_type == smesh::TRI3) {
+        ops.push_back({.name = "GeneratedNeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
     }
 }
 

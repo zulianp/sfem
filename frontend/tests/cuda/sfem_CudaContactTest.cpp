@@ -2,7 +2,6 @@
 
 #include "sfem_test.hpp"
 
-#include "matrixio_array.h"
 #include "sfem_base.hpp"
 #include "smesh_grid.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
@@ -21,7 +20,7 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
-#include "spmv.hpp"
+
 
 using namespace sfem;
 
@@ -166,13 +165,12 @@ struct TestOutput {
 };
 
 struct TestOutput gen_test_data(enum ExecutionSpace es) {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
     int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 2);
     if (refine_level > 1) {
@@ -205,7 +203,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     f->hessian_block_diag_sym(nullptr, diag->data());
     f->constraints_mask(mask->data());
 
-    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg(linear_op, es);
     cg->apply(rhs->data(), x->data());
 

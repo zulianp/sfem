@@ -20,21 +20,11 @@
 #include "boundary_condition_io.hpp"
 #include "dirichlet.hpp"
 
-#include "matrixio_array.h"
-
 #include "sfem_SSMultigrid.hpp"
 #include "smesh_glob.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -95,10 +85,10 @@ int main(int argc, char *argv[]) {
 
     smesh::create_directory(output_path);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     const char *folder = argv[1];
-    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto        m      = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
@@ -180,9 +170,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     snprintf(path, sizeof(path), "%s/upper_bound.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
-        return SFEM_FAILURE;
-    }
+    h_upper_bound->to_file(smesh::Path(path));
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (SFEM_USE_SHIFTED_PENALTY) {
@@ -257,29 +245,25 @@ int main(int argc, char *argv[]) {
         solver = mprgp;
     }
 
-    double solve_tick = MPI_Wtime();
+    double solve_tick = smesh::time_seconds();
     solver->apply(rhs->data(), x->data());
-    double solve_tock = MPI_Wtime();
+    double solve_tock = smesh::time_seconds();
 
     auto h_x   = smesh::to_host(x);
     auto h_rhs = smesh::to_host(rhs);
 
     snprintf(path, sizeof(path), "%s/u.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
-        return SFEM_FAILURE;
-    }
+    h_x->to_file(smesh::Path(path));
 
     snprintf(path, sizeof(path), "%s/rhs.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_rhs->data(), ndofs, ndofs)) {
-        return SFEM_FAILURE;
-    }
+    h_rhs->to_file(smesh::Path(path));
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
     ptrdiff_t nnodes    = fs->mesh().n_nodes();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
@@ -288,5 +272,10 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_obstacle(ctx->communicator(), argc, argv);
 }

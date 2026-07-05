@@ -1,0 +1,6 @@
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: rock/sidesets
+    value: [0, 0, 0]
+    component: [0, 1, 2]

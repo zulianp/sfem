@@ -4,16 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
-
 
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
-
 
 #include "sortreduce.hpp"
 
@@ -22,89 +16,68 @@
 
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
+int extract_sharp_edges_driver(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     if (argc != 4) {
-        if (!rank) {
+        if (!comm->rank()) {
             fprintf(stderr, "usage: %s <folder> <angle_threshold> <output_folder>", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    const geom_t angle_threshold = atof(argv[2]);
-    const char *output_folder = argv[3];
+    const geom_t  angle_threshold = atof(argv[2]);
+    const char   *output_folder   = argv[3];
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("%s %s %s %s\n", argv[0], argv[1], argv[2], output_folder);
     }
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
     smesh::create_directory(output_folder);
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
-    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
     if (shell_type(mesh->element_type(0)) != smesh::TRISHELL3) {
         fprintf(stderr, "%s this driver only supports triangle meshes", argv[0]);
         return EXIT_FAILURE;
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Build graphs
-    ///////////////////////////////////////////////////////////////////////////////
+    auto sharp_edges             = smesh::extract_sharp_edges(*mesh, angle_threshold);
+    auto disconnected_elements   = smesh::extract_disconnected_faces(*mesh, sharp_edges);
+    auto corners                 = smesh::extract_sharp_corners(n_nodes, sharp_edges, true);
 
-    auto sharp_edges = smesh::extract_sharp_edges(*mesh, angle_threshold);
-    auto disconnected_elements = smesh::extract_disconnected_faces(*mesh, sharp_edges);
-    auto corners = smesh::extract_sharp_corners(n_nodes, sharp_edges, true);
-
-    const ptrdiff_t n_sharp_edges = sharp_edges->extent(1);
+    const ptrdiff_t n_sharp_edges           = sharp_edges->extent(1);
     const ptrdiff_t n_disconnected_elements = disconnected_elements->size();
-    const ptrdiff_t n_corners = corners->size();
-    auto e0 = sharp_edges->data()[0];
-    auto e1 = sharp_edges->data()[1];
+    const ptrdiff_t n_corners               = corners->size();
+    auto              e0                    = sharp_edges->data()[0];
+    auto              e1                    = sharp_edges->data()[1];
 
     {
         char path[1024 * 10];
         snprintf(path, sizeof(path), "%s/i0.raw", output_folder);
-        array_write(comm, path, SFEM_MPI_COUNT_T, e0, n_sharp_edges, n_sharp_edges);
+        sfem::Buffer<idx_t>::wrap(n_sharp_edges, e0)->to_file(smesh::Path(path));
 
         snprintf(path, sizeof(path), "%s/i1.raw", output_folder);
-        array_write(comm, path, SFEM_MPI_COUNT_T, e1, n_sharp_edges, n_sharp_edges);
+        sfem::Buffer<idx_t>::wrap(n_sharp_edges, e1)->to_file(smesh::Path(path));
 
         snprintf(path, sizeof(path), "%s/corners", output_folder);
 
         smesh::create_directory(path);
 
         snprintf(path, sizeof(path), "%s/corners/i0.raw", output_folder);
-        array_write(comm, path, SFEM_MPI_COUNT_T, corners->data(), n_corners, n_corners);
+        corners->to_file(smesh::Path(path));
 
         snprintf(path, sizeof(path), "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
-        array_write(comm,
-                    path,
-                    SFEM_MPI_ELEMENT_IDX_T,
-                    disconnected_elements->data(),
-                    n_disconnected_elements,
-                    n_disconnected_elements);
+        disconnected_elements->to_file(smesh::Path(path));
 
         {
             const int nxe = elem_num_nodes(mesh->element_type(0));
-            auto delems = sfem::create_host_buffer<idx_t>(nxe, n_disconnected_elements);
-            auto src = mesh->elements(0)->data();
+            auto      delems = sfem::create_host_buffer<idx_t>(nxe, n_disconnected_elements);
+            auto      src    = mesh->elements(0)->data();
 
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < n_disconnected_elements; i++) {
@@ -119,7 +92,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("extract_sharp_edges.c: #elements %ld, #nodes %ld, #n_sharp_edges %ld\n",
                (long)n_elements,
@@ -128,14 +101,15 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free Resources
-    ///////////////////////////////////////////////////////////////////////////////
-
-    double tock = MPI_Wtime();
-    if (!rank) {
+    const double tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return extract_sharp_edges_driver(ctx->communicator(), argc, argv);
 }

@@ -1,33 +1,18 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
-
-#include "smesh_graph.impl.hpp"
 #include "sfem_base.hpp"
+#include "smesh_graph.impl.hpp"
 
 #include "isotropic_phasefield_for_fracture.hpp"
 
-
-
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -44,13 +29,13 @@ int main(int argc, char *argv[]) {
 
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
-    int SFEM_HANDLE_DIRICHLET = 0;
-    int SFEM_EXPORT_FP32 = 0;
-    char *SFEM_INPUT = 0;
+    int   SFEM_HANDLE_DIRICHLET = 0;
+    int   SFEM_EXPORT_FP32      = 0;
+    char *SFEM_INPUT            = 0;
 
-    real_t SFEM_MU = 1.0;
-    real_t SFEM_LAMBDA = 1.0;
-    real_t SFEM_FRACTURE_TOUGHNESS = 1.0;
+    real_t SFEM_MU                     = 1.0;
+    real_t SFEM_LAMBDA                 = 1.0;
+    real_t SFEM_FRACTURE_TOUGHNESS     = 1.0;
     real_t SFEM_LENGTH_SCALE_PARAMETER = 1.0;
 
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
@@ -64,22 +49,21 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_INPUT, );
 
     printf("----------------------------------------\n");
-    printf(
-        "Environment variables:\n"
-        "- SFEM_HANDLE_DIRICHLET=%d\n"
-        "- SFEM_EXPORT_FP32=%d\n"
-        "- SFEM_MU=%g\n"
-        "- SFEM_LAMBDA=%g\n"
-        "- SFEM_FRACTURE_TOUGHNESS=%g\n"
-        "- SFEM_LENGTH_SCALE_PARAMETER=%g\n"
-        "- SFEM_INPUT=%s\n",
-        SFEM_HANDLE_DIRICHLET,
-        SFEM_EXPORT_FP32,
-        SFEM_MU,
-        SFEM_LAMBDA,
-        SFEM_FRACTURE_TOUGHNESS,
-        SFEM_LENGTH_SCALE_PARAMETER,
-        SFEM_INPUT);
+    printf("Environment variables:\n"
+           "- SFEM_HANDLE_DIRICHLET=%d\n"
+           "- SFEM_EXPORT_FP32=%d\n"
+           "- SFEM_MU=%g\n"
+           "- SFEM_LAMBDA=%g\n"
+           "- SFEM_FRACTURE_TOUGHNESS=%g\n"
+           "- SFEM_LENGTH_SCALE_PARAMETER=%g\n"
+           "- SFEM_INPUT=%s\n",
+           SFEM_HANDLE_DIRICHLET,
+           SFEM_EXPORT_FP32,
+           SFEM_MU,
+           SFEM_LAMBDA,
+           SFEM_FRACTURE_TOUGHNESS,
+           SFEM_LENGTH_SCALE_PARAMETER,
+           SFEM_INPUT);
     printf("----------------------------------------\n");
 
     double tick = MPI_Wtime();
@@ -89,32 +73,31 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
-    const ptrdiff_t nnodes = mesh->n_nodes();
+    const ptrdiff_t nnodes    = mesh->n_nodes();
     const ptrdiff_t nelements = mesh->n_elements();
 
-    static const int block_size = 4;
+    static const int block_size     = 4;
     static const int mat_block_size = 4 * 4;
 
-    // TODO read displacement from file
-    real_t *u = (real_t*)malloc(nnodes * block_size * sizeof(real_t));
-
+    std::shared_ptr<sfem::Buffer<real_t>> u_buf;
     if (SFEM_INPUT) {
-        ptrdiff_t nlocal, nglobal;
-        array_create_from_file(comm, SFEM_INPUT, SFEM_MPI_REAL_T, (void **)&u, &nlocal, &nglobal);
-
-        assert(nlocal == nnodes * block_size);
+        u_buf = sfem::Buffer<real_t>::from_file(smesh::Path(SFEM_INPUT));
+        if (!u_buf) {
+            SFEM_ERROR("Failed to read file %s\n", SFEM_INPUT);
+        }
+        assert((ptrdiff_t)u_buf->size() == nnodes * block_size);
     } else {
-        memset(u, 0, nnodes * block_size * sizeof(real_t));
+        u_buf = sfem::create_host_buffer<real_t>(nnodes * block_size);
     }
+    real_t *const u = u_buf->data();
 
-    const real_t mu = SFEM_MU;
+    const real_t mu     = SFEM_MU;
     const real_t lambda = SFEM_LAMBDA;
-    const real_t Gc = SFEM_FRACTURE_TOUGHNESS;
-    const real_t ls = SFEM_LENGTH_SCALE_PARAMETER;
+    const real_t Gc     = SFEM_FRACTURE_TOUGHNESS;
+    const real_t ls     = SFEM_LENGTH_SCALE_PARAMETER;
 
     double tack = MPI_Wtime();
     printf("assemble4.c: read\t\t%g seconds\n", tack - tick);
@@ -123,14 +106,14 @@ int main(int argc, char *argv[]) {
     // Build CRS graph
     ///////////////////////////////////////////////////////////////////////////////
 
-    ptrdiff_t nnz = 0;
-    count_t *rowptr = 0;
-    idx_t *colidx = 0;
-    real_t *values = 0;
+    ptrdiff_t nnz    = 0;
+    count_t  *rowptr = 0;
+    idx_t    *colidx = 0;
+    real_t   *values = 0;
 
     smesh::create_crs_graph(nelements, nnodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
-    nnz = rowptr[nnodes];
+    nnz    = rowptr[nnodes];
     values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
     memset(values, 0, nnz * mat_block_size * sizeof(real_t));
 
@@ -165,19 +148,19 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     count_t *new_rowptr = (count_t *)malloc(((nnodes)*block_size + 1) * sizeof(count_t));
-    idx_t *new_colidx = (idx_t *)malloc(nnz * mat_block_size * sizeof(idx_t));
-    real_t *new_values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
+    idx_t   *new_colidx = (idx_t *)malloc(nnz * mat_block_size * sizeof(idx_t));
+    real_t  *new_values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
 
     smesh::block_crs_to_crs(nnodes,
-                     block_size,
-                     // Block matrix
-                     rowptr,
-                     colidx,
-                     values,
-                     // Scalar matrix
-                     new_rowptr,
-                     new_colidx,
-                     new_values);
+                            block_size,
+                            // Block matrix
+                            rowptr,
+                            colidx,
+                            values,
+                            // Scalar matrix
+                            new_rowptr,
+                            new_colidx,
+                            new_values);
 
     // substitute arrays
     free(rowptr);
@@ -196,11 +179,10 @@ int main(int argc, char *argv[]) {
     // RHS and Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t *rhs = (real_t *)malloc(nnodes * block_size * sizeof(real_t));
-    memset(rhs, 0, nnodes * block_size * sizeof(real_t));
+    auto rhs_buf = sfem::create_host_buffer<real_t>(nnodes * block_size);
 
     isotropic_phasefield_for_fracture_assemble_gradient(
-        nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, rhs);
+            nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, rhs_buf->data());
 
     // {  // Neumann
     //     sprintf(path, "%s/on.raw", folder);
@@ -232,45 +214,48 @@ int main(int argc, char *argv[]) {
 
     real_t energy = 0;
     isotropic_phasefield_for_fracture_assemble_value(
-        nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, &energy);
+            nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, &energy);
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Write CRS matrix and rhs vector
+    // Write CRS matrix, rhs vector, and energy
     ///////////////////////////////////////////////////////////////////////////////
 
-    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : SFEM_MPI_REAL_T;
+    const ptrdiff_t n_dofs     = nnodes * block_size;
+    const ptrdiff_t scalar_nnz = nnz * mat_block_size;
+
+    smesh::create_directory(output_folder);
+
+    auto rowptr_buf = sfem::Buffer<count_t>::wrap(n_dofs + 1, rowptr);
+    auto colidx_buf = sfem::Buffer<idx_t>::wrap(scalar_nnz, colidx);
+    auto values_buf = sfem::Buffer<real_t>::wrap(scalar_nnz, values);
 
     if (SFEM_EXPORT_FP32) {
-        array_dtof(nnz * mat_block_size, (const real_t *)values, (float *)values);
-        array_dtof(nnodes * block_size, (const real_t *)rhs, (float *)rhs);
-        array_dtof(1, (const real_t *)&energy, (float *)&energy);
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, float>(
+                n_dofs, n_dofs, rowptr_buf, colidx_buf, sfem::astype<float>(values_buf), (float)1);
+        crs->to_file(smesh::Path(output_folder));
+    } else {
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, real_t>(n_dofs, n_dofs, rowptr_buf, colidx_buf, values_buf, (real_t)1);
+        crs->to_file(smesh::Path(output_folder));
     }
 
     {
-        crs_t crs_out;
-        crs_out.rowptr = (char *)rowptr;
-        crs_out.colidx = (char *)colidx;
-        crs_out.values = (char *)values;
-        crs_out.grows = (nnodes * block_size);
-        crs_out.lrows = (nnodes * block_size);
-        crs_out.lnnz = nnz * mat_block_size;
-        crs_out.gnnz = nnz * mat_block_size;
-        crs_out.start = 0;
-        crs_out.rowoffset = 0;
-        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-        crs_out.colidx_type = SFEM_MPI_IDX_T;
-        crs_out.values_type = value_type;
-        crs_write_folder(comm, output_folder, &crs_out);
+        const smesh::Path rhs_path = smesh::Path(output_folder) / "rhs.raw";
+        if (SFEM_EXPORT_FP32) {
+            sfem::astype<float>(rhs_buf)->to_file(rhs_path);
+        } else {
+            rhs_buf->to_file(rhs_path);
+        }
     }
 
-    {
-        snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
-        array_write(comm, path, value_type, rhs, nnodes * block_size, nnodes * block_size);
-    }
-
-    snprintf(path, sizeof(path), "%s/value.raw", output_folder);
-    if (!rank) {
-        array_write(MPI_COMM_SELF, path, value_type, &energy, 1, 1);
+    if (!comm->rank()) {
+        auto energy_buf              = sfem::create_host_buffer<real_t>(1);
+        energy_buf->data()[0]        = energy;
+        const smesh::Path value_path = smesh::Path(output_folder) / "value.raw";
+        if (SFEM_EXPORT_FP32) {
+            sfem::astype<float>(energy_buf)->to_file(value_path);
+        } else {
+            energy_buf->to_file(value_path);
+        }
     }
 
     tock = MPI_Wtime();
@@ -284,16 +269,19 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
-    // free(rhs);
 
     tock = MPI_Wtime();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf(
-            "#elements %ld #nodes %ld #nzblocks %ld\n", (long)nelements, (long)nnodes, (long)nnz);
+        printf("#elements %ld #nodes %ld #nzblocks %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return assemble4(ctx->communicator(), argc, argv);
 }

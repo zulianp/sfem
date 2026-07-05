@@ -3,6 +3,8 @@
 #include "tet10_weno.hpp"
 #include "sfem_base.hpp"
 
+namespace sfem {
+
 // real_t Power(const real_t x, const real_t y) { return exp(y * log(x)); }
 static SFEM_INLINE real_t Power(const real_t x, const real_t y) { return pow(x, y); }
 
@@ -516,3 +518,5 @@ real_t weno4_3D_HOne(const real_t x, const real_t y, const real_t z,  //
 
     return wz;
 }
+
+}  // namespace sfem

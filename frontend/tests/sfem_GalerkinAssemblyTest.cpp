@@ -7,9 +7,7 @@
 #include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "spmv.hpp"
 
-#include "matrixio_array.h"
 
 #include "sfem_API.hpp"
 
@@ -26,12 +24,12 @@
             op->apply(x, y);                                   \
         }                                                      \
         sfem::device_synchronize();                            \
-        double start = MPI_Wtime();                            \
+        double start = smesh::time_seconds();                            \
         for (int r = 0; r < SFEM_REPEAT; r++) {                \
             op->apply(x, y);                                   \
             sfem::device_synchronize();                        \
         }                                                      \
-        double stop    = MPI_Wtime();                          \
+        double stop    = smesh::time_seconds();                          \
         double elapsed = (stop - start) / SFEM_REPEAT;         \
         printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
                #op,                                            \
@@ -44,8 +42,8 @@
     } while (0)
 
 int test_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
+    auto comm = sfem::Communicator::world();
+    auto es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
     SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
@@ -87,7 +85,7 @@ int test_cube() {
     int SFEM_BLOCK_SIZE = 1;
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(comm,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -114,7 +112,7 @@ int test_cube() {
 
     auto f  = sfem::Function::create(fs);
     auto x  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto op = sfem::create_op(fs, sfem::op_type::MATRIX_FREE, es);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
 
     op->initialize();
     f->add_operator(op);
@@ -177,7 +175,7 @@ int test_cube() {
     auto restricted  = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
     auto Ax_coarse   = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     OP_HEADERS();
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
@@ -185,7 +183,7 @@ int test_cube() {
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     printf("#elements %ld #ndofs fine %ld coarse %ld\nTTS: %g [s]\n",
            m->n_elements(),

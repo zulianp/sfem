@@ -19,6 +19,8 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+namespace sfem {
+
 /**
  * @brief Transform a quadrature point from reference to physical coordinates.
  *
@@ -617,3 +619,5 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 
     return 0;
 }  // end tet4_resample_field_local_v2
+
+}  // namespace sfem

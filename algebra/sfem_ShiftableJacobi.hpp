@@ -96,6 +96,7 @@ namespace sfem {
             diag                     = d;
             inv_diag                 = create_buffer<T>(n_blocks * block_size * block_size, execution_space());
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
+            impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }

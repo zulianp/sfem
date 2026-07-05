@@ -3,32 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
-
-#include "smesh_graph.impl.hpp"
 #include "sfem_base.hpp"
+#include "smesh_graph.impl.hpp"
 
 // #include "tet4_neohookean.hpp"
 #include "linear_elasticity.hpp"
 
-
-
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_assemble3(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -46,7 +32,7 @@ int main(int argc, char *argv[]) {
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
     int SFEM_HANDLE_DIRICHLET = 0;
-    int SFEM_EXPORT_FP32 = 0;
+    int SFEM_EXPORT_FP32      = 0;
 
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
@@ -61,7 +47,7 @@ int main(int argc, char *argv[]) {
            SFEM_EXPORT_FP32);
     printf("----------------------------------------\n");
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -69,15 +55,14 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     auto element_type = mesh->element_type(0);
-    if(SFEM_USE_MACRO) {
+    if (SFEM_USE_MACRO) {
         element_type = macro_type_variant(element_type);
     }
 
-
-    const ptrdiff_t nnodes = mesh->n_nodes();
+    const ptrdiff_t nnodes    = mesh->n_nodes();
     const ptrdiff_t nelements = mesh->n_elements();
 
     // TODO read displacement from file
@@ -85,29 +70,28 @@ int main(int argc, char *argv[]) {
     memset(displacement, 0, (size_t)nnodes * mesh->spatial_dimension() * sizeof(real_t));
 
     // TODO read params
-    const real_t mu = 1;
+    const real_t mu     = 1;
     const real_t lambda = 1;
 
-    double tack = MPI_Wtime();
+    double tack = smesh::time_seconds();
     printf("assemble3.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
     ///////////////////////////////////////////////////////////////////////////////
 
-    ptrdiff_t nnz = 0;
-    count_t *rowptr = 0;
-    idx_t *colidx = 0;
-    real_t *values = 0;
+    ptrdiff_t nnz    = 0;
+    count_t  *rowptr = 0;
+    idx_t    *colidx = 0;
+    real_t   *values = 0;
 
-    smesh::create_crs_graph_for_elem_type(
-            element_type, nelements, nnodes, mesh->elements(0)->data(), &rowptr, &colidx);
+    smesh::create_crs_graph_for_elem_type(element_type, nelements, nnodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
-    nnz = rowptr[nnodes];
+    nnz    = rowptr[nnodes];
     values = (real_t *)malloc((size_t)nnz * 9 * sizeof(real_t));
     memset(values, 0, (size_t)nnz * 9 * sizeof(real_t));
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("assemble3.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -117,20 +101,20 @@ int main(int argc, char *argv[]) {
 
     // neohookean_assemble_hessian(
     linear_elasticity_crs_aos(element_type,
-                                           // Mesh
-                                           nelements,
-                                           nnodes,
-                                           mesh->elements(0)->data(),
-                                           mesh->points()->data(),
-                                           // Material
-                                           mu,
-                                           lambda,
-                                           // Output
-                                           rowptr,
-                                           colidx,
-                                           values);
+                              // Mesh
+                              nelements,
+                              nnodes,
+                              mesh->elements(0)->data(),
+                              mesh->points()->data(),
+                              // Material
+                              mu,
+                              lambda,
+                              // Output
+                              rowptr,
+                              colidx,
+                              values);
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble3.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -139,20 +123,19 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     count_t *new_rowptr = (count_t *)malloc(((nnodes)*mesh->spatial_dimension() + 1) * sizeof(count_t));
-    idx_t *new_colidx = (idx_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(idx_t));
-    real_t *new_values =
-            (real_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(real_t));
+    idx_t   *new_colidx = (idx_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(idx_t));
+    real_t  *new_values = (real_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(real_t));
 
     smesh::block_crs_to_crs(nnodes,
-                     mesh->spatial_dimension(),
-                     // Block matrix
-                     rowptr,
-                     colidx,
-                     values,
-                     // Scalar matrix
-                     new_rowptr,
-                     new_colidx,
-                     new_values);
+                            mesh->spatial_dimension(),
+                            // Block matrix
+                            rowptr,
+                            colidx,
+                            values,
+                            // Scalar matrix
+                            new_rowptr,
+                            new_colidx,
+                            new_values);
 
     // substitute arrays
     free(rowptr);
@@ -179,7 +162,7 @@ int main(int argc, char *argv[]) {
     // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3],
     // (int)(nnz * 9));
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble3.c: block to scalar\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -210,45 +193,33 @@ int main(int argc, char *argv[]) {
 
     // }
 
-    // tock = MPI_Wtime();
+    // tock = smesh::time_seconds();
     // printf("assemble3.c: boundary\t\t%g seconds\n", tock - tack);
     // tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Write CRS matrix and rhs vector
+    // Write CRS matrix
     ///////////////////////////////////////////////////////////////////////////////
 
-    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : SFEM_MPI_REAL_T;
+    const ptrdiff_t n_dofs     = nnodes * mesh->spatial_dimension();
+    const ptrdiff_t scalar_nnz = nnz * mesh->spatial_dimension() * mesh->spatial_dimension();
+
+    smesh::create_directory(output_folder);
+
+    auto rowptr_buf = sfem::Buffer<count_t>::wrap(n_dofs + 1, rowptr);
+    auto colidx_buf = sfem::Buffer<idx_t>::wrap(scalar_nnz, colidx);
+    auto values_buf = sfem::Buffer<real_t>::wrap(scalar_nnz, values);
 
     if (SFEM_EXPORT_FP32) {
-        array_dtof(
-                nnz * mesh->spatial_dimension() * mesh->spatial_dimension(), (const real_t *)values, (float *)values);
-        // array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, float>(
+                n_dofs, n_dofs, rowptr_buf, colidx_buf, sfem::astype<float>(values_buf), (float)1);
+        crs->to_file(smesh::Path(output_folder));
+    } else {
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, real_t>(n_dofs, n_dofs, rowptr_buf, colidx_buf, values_buf, (real_t)1);
+        crs->to_file(smesh::Path(output_folder));
     }
 
-    {
-        crs_t crs_out;
-        crs_out.rowptr = (char *)rowptr;
-        crs_out.colidx = (char *)colidx;
-        crs_out.values = (char *)values;
-        crs_out.grows = (nnodes * mesh->spatial_dimension());
-        crs_out.lrows = (nnodes * mesh->spatial_dimension());
-        crs_out.lnnz = nnz * mesh->spatial_dimension() * mesh->spatial_dimension();
-        crs_out.gnnz = nnz * mesh->spatial_dimension() * mesh->spatial_dimension();
-        crs_out.start = 0;
-        crs_out.rowoffset = 0;
-        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-        crs_out.colidx_type = SFEM_MPI_IDX_T;
-        crs_out.values_type = value_type;
-        crs_write_folder(comm, output_folder, &crs_out);
-    }
-
-    // {
-    //     sprintf(path, "%s/rhs.raw", output_folder);
-    //     array_write(comm, path, value_type, rhs, nnodes, nnodes);
-    // }
-
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble3.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -260,13 +231,18 @@ int main(int argc, char *argv[]) {
     free(colidx);
     free(values);
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_assemble3(ctx->communicator(), argc, argv);
 }

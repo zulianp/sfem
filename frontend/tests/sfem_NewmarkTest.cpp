@@ -6,7 +6,6 @@
 #include "sfem_Function.hpp"
 
 std::shared_ptr<sfem::Function> create_elasticity_function() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -22,7 +21,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION,
