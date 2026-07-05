@@ -49,7 +49,7 @@ namespace {
         elements->data()[1][1] = 4;
         elements->data()[2][1] = 5;
 
-        return std::make_shared<smesh::Mesh>(smesh::Communicator::self(), smesh::TRI3, elements, points);
+        return std::make_shared<smesh::Mesh>(smesh::Communicator::self(), smesh::TRISHELL3, elements, points);
     }
 
     std::vector<smesh::SharedBuffer<real_t>> make_displacement(const ptrdiff_t n_nodes) {
@@ -84,7 +84,7 @@ int test_self_collisions_find_candidates() {
     auto surface = make_surface_mesh();
     SFEM_TEST_ASSERT(surface != nullptr);
     SFEM_TEST_EQ(surface->spatial_dimension(), 3);
-    SFEM_TEST_EQ(surface->element_type(0), smesh::TRI3);
+    SFEM_TEST_EQ(surface->element_type(0), smesh::TRISHELL3);
 
     auto self_collisions = sfem::SelfCollisions::create(surface);
     SFEM_TEST_ASSERT(self_collisions != nullptr);
@@ -110,8 +110,12 @@ int test_self_collisions_find_candidates() {
     const auto vertex_face_pairs = collect_pairs(self_collisions->vertex_to_face());
     const auto edge_edge_pairs   = collect_pairs(self_collisions->edge_to_edge());
 
-    const std::vector<std::pair<smesh::idx_t, smesh::idx_t>> expected_edge_edge = {
-            {0, 5}, {0, 7}, {5, 11}, {5, 14}, {5, 15}, {5, 16}, {7, 11}, {7, 14}, {7, 15}, {7, 16}, {9, 14}, {9, 16}};
+    // Edges are enumerated from the upper-triangular node-to-node graph:
+    //   edge 0=(0,1), 1=(0,2), 2=(1,2)  [triangle 0]
+    //   edge 3=(3,4), 4=(3,5), 5=(4,5)  [triangle 1]
+    // As triangle 1 sweeps in -x through triangle 0, the swept-AABB broad phase
+    // reports edge (1,2) of triangle 0 against edges (3,5) and (4,5) of triangle 1.
+    const std::vector<std::pair<smesh::idx_t, smesh::idx_t>> expected_edge_edge = {{2, 4}, {2, 5}};
 
     SFEM_TEST_EQ(vertex_face_pairs.size(), (size_t)0);
     SFEM_TEST_EQ(edge_edge_pairs.size(), expected_edge_edge.size());

@@ -9,9 +9,7 @@
 
 #define real_type real_t
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
 /**
  * @brief Transform a quadrature point from reference to physical coordinates.
@@ -626,8 +624,6 @@ normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Fie
                                  real_t*         out_min,   // Output: Minimum value found in the field
                                  real_t*         out_max);
 
-#ifdef __cplusplus
-}  // extern "C"
-#endif
+}  // namespace sfem
 
 #endif  // __SFEM_RESAMPLE_FIELD_TET4_MATH_H__

@@ -6,7 +6,6 @@
 
 #include <mpi.h>
 
-
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
 #include "sortreduce.hpp"
@@ -347,19 +346,34 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
         hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez,1,F, mu, lambda,  S_ikmn);
 
 #else
-        for(int qz = 0; qz < n_qp; qz++) {
-            for(int ky = 0; ky < n_qp; ky++) {
-                for(int kx = 0; kx < n_qp; kx++) {
+        for (int qz = 0; qz < n_qp; qz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
                     hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[qz], jacobian_adjugate, &jacobian_determinant);
                     assert(jacobian_determinant == jacobian_determinant);
                     assert(jacobian_determinant != 0);
 
                     scalar_t F[9] = {0};
-                    hex8_F(jacobian_adjugate, jacobian_determinant, qx[kx], qx[ky], qx[qz], element_ux, element_uy, element_uz, F);
+                    hex8_F(jacobian_adjugate,
+                           jacobian_determinant,
+                           qx[kx],
+                           qx[ky],
+                           qx[qz],
+                           element_ux,
+                           element_uy,
+                           element_uz,
+                           F);
 
-                    hex8_S_ikmn_neohookean_add(
-                        jacobian_adjugate, jacobian_determinant, 
-                        qx[kx], qx[ky], qx[qz], qw[kx] * qw[ky] * qw[qz], F, mu, lambda, S_ikmn);
+                    hex8_S_ikmn_neohookean_add(jacobian_adjugate,
+                                               jacobian_determinant,
+                                               qx[kx],
+                                               qx[ky],
+                                               qx[qz],
+                                               qw[kx] * qw[ky] * qw[qz],
+                                               F,
+                                               mu,
+                                               lambda,
+                                               S_ikmn);
                 }
             }
         }
@@ -875,16 +889,8 @@ int hex8_neohookean_ogden_bcrs_sym(const ptrdiff_t                    nelements,
                         for (int xi = 0; xi < n_qp; xi++) {
                             scalar_t test_grad[3];
                             hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], test_grad);
-                            // linear_elasticity_matrix_sym(mu,
-                            //                              lambda,
-                            //                              jacobian_adjugate,
-                            //                              jacobian_determinant,
-                            //                              test_grad,
-                            //                              test_grad,
-                            //                              qw[xi] * qw[yi] * qw[zi],
-                            //                              element_matrix);
                             SFEM_IMPLEMENT_ME();
-                            // TODO: Implement neohookean_ogden_matrix
+                            // TODO: Implement
                         }
                     }
                 }
@@ -930,16 +936,9 @@ int hex8_neohookean_ogden_bcrs_sym(const ptrdiff_t                    nelements,
                                     scalar_t test_grad[3];
                                     hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], trial_grad);
                                     hex8_ref_shape_grad(edof_j, qx[xi], qx[yi], qx[zi], test_grad);
-                                    // linear_elasticity_matrix_sym(mu,
-                                    //                              lambda,
-                                    //                              jacobian_adjugate,
-                                    //                              jacobian_determinant,
-                                    //                              trial_grad,
-                                    //                              test_grad,
-                                    //                              qw[xi] * qw[yi] * qw[zi],
-                                    //                              element_matrix);
+
                                     SFEM_IMPLEMENT_ME();
-                                    // TODO: Implement neohookean_ogden_matrix
+                                    // TODO: Implement
                                 }
                             }
                         }

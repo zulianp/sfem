@@ -139,6 +139,74 @@ namespace sfem {
             }
         }
 
+        void add_normal_projected_displacement_to_gap(const int                              dim,
+                                                      const smesh::Mesh&                     surface,
+                                                      const smesh::CRSGraph<count_t, idx_t>& graph,
+                                                      const smesh::SharedBuffer<real_t>&     values,
+                                                      const smesh::SharedBuffer<real_t*>&    normals,
+                                                      const std::shared_ptr<Buffer<real_t>>& displacement,
+                                                      const smesh::SharedBuffer<real_t>&     gap) {
+            const count_t* const rowptr = graph.rowptr()->data();
+            const idx_t* const   colidx = graph.colidx()->data();
+            const real_t* const  vals   = values->data();
+            const idx_t* const   nm     = surface.node_mapping()->data();
+            const real_t* const  u      = displacement->data();
+            real_t* const        g      = gap->data();
+            const ptrdiff_t      n      = graph.rowptr()->size() - 1;
+            real_t** const       normal = normals->data();
+
+            if (dim == 3) {
+                const real_t* const nx = normal[0];
+                const real_t* const ny = normal[1];
+                const real_t* const nz = normal[2];
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    const count_t begin = rowptr[i];
+                    const count_t end   = rowptr[i + 1];
+                    if (begin == end) {
+                        continue;
+                    }
+
+                    const ptrdiff_t dof1 = (ptrdiff_t)nm[i] * 3;
+                    real_t          du0  = u[dof1 + 0];
+                    real_t          du1  = u[dof1 + 1];
+                    real_t          du2  = u[dof1 + 2];
+
+                    for (count_t k = begin; k < end; ++k) {
+                        const ptrdiff_t dof2 = (ptrdiff_t)nm[colidx[k]] * 3;
+                        const real_t    w    = vals[k];
+                        du0 -= w * u[dof2 + 0];
+                        du1 -= w * u[dof2 + 1];
+                        du2 -= w * u[dof2 + 2];
+                    }
+
+                    g[i] += nx[i] * du0 + ny[i] * du1 + nz[i] * du2;
+                }
+            } else {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    const count_t begin = rowptr[i];
+                    const count_t end   = rowptr[i + 1];
+                    if (begin == end) {
+                        continue;
+                    }
+
+                    const ptrdiff_t dof1 = (ptrdiff_t)nm[i] * dim;
+                    real_t          proj = 0;
+                    for (int d = 0; d < dim; ++d) {
+                        real_t du = u[dof1 + d];
+                        for (count_t k = begin; k < end; ++k) {
+                            du -= vals[k] * u[(ptrdiff_t)nm[colidx[k]] * dim + d];
+                        }
+
+                        proj += normal[d][i] * du;
+                    }
+
+                    g[i] += proj;
+                }
+            }
+        }
+
         void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
                              const std::shared_ptr<Buffer<real_t>>&  displacement,
                              const std::shared_ptr<Buffer<real_t*>>& inout) {
@@ -183,8 +251,7 @@ namespace sfem {
                   closest_triangles_(sfem::create_buffer<idx_t>(npoints_, es_)),
                   distances_whole_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
                   directors_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)),
-                  normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)),
-                  frozen_displacement_(sfem::create_buffer<real_t>(space_->n_dofs(), es_)) {
+                  normals_(sfem::create_buffer<real_t>(dim_, npoints_, es_)) {
                 assemble_mass_vector();
             }
 
@@ -380,7 +447,7 @@ namespace sfem {
 
                 assemble_coupling_operator(
                         surface_element_type_, surface_elements_, closest_triangles_, closest_s_, closest_t_, *graph_, values_);
-                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
+                add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -388,9 +455,8 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            smesh::SharedBuffer<real_t>&       frozen_displacement() override { return frozen_displacement_; }
-            const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
-            const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
+            const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+            const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
         private:
             void assemble_mass_vector() {
@@ -423,7 +489,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>                      distances_whole_;
             smesh::SharedBuffer<real_t>                      directors_;
             smesh::SharedBuffer<real_t*>                     normals_;
-            smesh::SharedBuffer<real_t>                      frozen_displacement_;
             std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
             smesh::SharedBuffer<real_t>                      values_;
         };
@@ -679,8 +744,8 @@ namespace sfem {
 
                     try {
                         sviz::Client().send(msg);
-                    } catch (const std::exception&) {
-                        // printf("Error sending message to sviz: %s\n", e.what());
+                    } catch (const std::exception& e) {
+                        printf("Error sending message to sviz: %s\n", e.what());
                     }
                 }
                 sviz::Message msg("assemble_mortar_matrices (gaps)");
@@ -745,6 +810,11 @@ namespace sfem {
                     project_to_normal_plane(ax, ay, az, a_projected_x, a_projected_y);
 
                     for (ptrdiff_t j = 0; j < ncandidates; j++) {
+                        const ptrdiff_t pair_idx = ptr[i] + j;
+                        if (!ivd[pair_idx]) {
+                            continue;
+                        }
+
                         const idx_t candidate = candidates[j];
                         const idx_t bv[4]     = {i0[candidate], i1[candidate], i2[candidate], i3[candidate]};
 
@@ -768,7 +838,7 @@ namespace sfem {
 
                         const real_t face_dot = anormal[0] * bnormal[0] + anormal[1] * bnormal[1] + anormal[2] * bnormal[2];
                         if (face_dot > real_t(-0.5)) {
-                            ivd[ptr[i] + j] = 0;
+                            ivd[pair_idx] = 0;
                             continue;
                         }
 
@@ -841,11 +911,9 @@ namespace sfem {
                         }
 
                         if (poly_n < 3) {
-                            ivd[ptr[i] + j] = 0;
+                            ivd[pair_idx] = 0;
                             continue;
                         }
-
-                        ivd[ptr[i] + j] = 1;
 
                         real_t sa[MORTAR_MAX_QP];
                         real_t ta[MORTAR_MAX_QP];
@@ -1002,11 +1070,11 @@ namespace sfem {
                         }
 
                         if (!hit) {
-                            ivd[ptr[i] + j] = false;
+                            ivd[pair_idx] = false;
                             continue;
                         }
 
-                        real_t* const pair_out = &vals[(ptr[i] + j) * MORTAR_PAIR_STRIDE];
+                        real_t* const pair_out = &vals[pair_idx * MORTAR_PAIR_STRIDE];
                         for (int a = 0; a < 16; a++) {
                             pair_out[a] = m_block[a];
                         }
@@ -1016,8 +1084,8 @@ namespace sfem {
 #ifdef VIZ_DEBUG
                 try {
                     sviz::Client().send(msg);
-                } catch (const std::exception&) {
-                    // printf("Error sending message to sviz: %s\n", e.what());
+                } catch (const std::exception& e) {
+                    printf("Error sending message to sviz: %s\n", e.what());
                 }
 #endif  // VIZ_DEBUG
 
@@ -1025,6 +1093,16 @@ namespace sfem {
                 // TODO
             } else {
                 SFEM_ERROR("assemble_mortar_matrices not implemented for element type %d\n", element_type);
+            }
+
+            {
+                auto   m    = mass_vector->data();
+                real_t area = 0;
+                for (ptrdiff_t i = 0; i < mass_vector->size(); i++) {
+                    area += m[i];
+                }
+                // printf("AREA: %g\n", (double)area);
+                assert(area > 0);
             }
         }
 
@@ -1273,8 +1351,7 @@ namespace sfem {
                   normals_(sfem::create_buffer<real_t>(surface->spatial_dimension(), surface->n_nodes(), es)),
                   distances_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
                   distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-                  directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
-                  frozen_displacement_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
+                  directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
 
             void assemble_mass_vector(const smesh::ElemType        element_type,
                                       const SharedBuffer<idx_t*>&  elements,
@@ -1473,8 +1550,7 @@ namespace sfem {
                         dir[dof + c] = director_gap * nrm[c][i];
                     }
                 }
-
-                blas->copy(space_->n_dofs(), displacement->data(), frozen_displacement_->data());
+                add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
             }
 
             const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
@@ -1482,9 +1558,8 @@ namespace sfem {
             smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
             smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
             smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
-            smesh::SharedBuffer<real_t>&       frozen_displacement() override { return frozen_displacement_; }
-            const smesh::SharedBuffer<real_t>& distances_whole() const override { return distances_whole_; }
-            const smesh::SharedBuffer<real_t>& directors() const override { return directors_; }
+            const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+            const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
 
         private:
             std::shared_ptr<FunctionSpace> space_;
@@ -1506,7 +1581,6 @@ namespace sfem {
             smesh::SharedBuffer<real_t>                      distances_;
             smesh::SharedBuffer<real_t>                      distances_whole_;
             smesh::SharedBuffer<real_t>                      directors_;
-            smesh::SharedBuffer<real_t>                      frozen_displacement_;
         };
 
     }  // namespace
@@ -1518,19 +1592,15 @@ namespace sfem {
                                             const real_t                          search_radius_sqr,
                                             const ExecutionSpace                  es) {
         const char* const sel    = std::getenv("SFEM_CONTACT");
-        const std::string method = sel ? sel : "nts";
+        const std::string method = sel ? sel : "mortar";
 
-        if (method == "mortar") {
+        if (method == "nts") {
+            printf("[Contact] strategy: nts (SFEM_CONTACT=nts)\n");
+            return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
+        } else {
             printf("[Contact] strategy: mortar (SFEM_CONTACT=mortar)\n");
             return std::make_shared<ContactMortar>(space, surface, margin, search_radius_sqr, es);
         }
-
-        if (method != "nts") {
-            printf("[Contact] unknown SFEM_CONTACT='%s', falling back to node-to-segment\n", method.c_str());
-        } else {
-            printf("[Contact] strategy: node-to-segment (SFEM_CONTACT=nts)\n");
-        }
-        return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
     }
 
 #ifdef SFEM_ENABLE_YAML
@@ -1551,5 +1621,281 @@ namespace sfem {
         return create_contact(space, surface, margin, search_radius * search_radius, es);
     }
 #endif
+
+    using domain_t = smesh::u32;
+
+    class MultiBodyContact final : public Contact {
+    public:
+        MultiBodyContact(const std::shared_ptr<FunctionSpace>& space,
+                         const std::shared_ptr<smesh::Mesh>&   surface,
+                         std::vector<SharedBuffer<domain_t>>   tags,
+                         real_t                                margin,
+                         real_t                                search_radius_sqr,
+                         ExecutionSpace                        es)
+            : space_(space),
+              surface_(surface),
+              tags_(std::move(tags)),
+              margin_(margin),
+              search_radius_sqr_(search_radius_sqr),
+              es_(es),
+              dim_(surface->spatial_dimension()),
+              npoints_(surface->n_nodes()),
+              nselements_(surface->n_elements()),
+              surface_elements_(surface->block(0)->elements()),
+              surface_element_type_(surface->block(0)->element_type()),
+              mass_vector_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
+              normals_(sfem::create_buffer<real_t>(surface->spatial_dimension(), surface->n_nodes(), es)),
+              distances_(sfem::create_buffer<real_t>(surface->n_nodes(), es)),
+              distances_whole_(sfem::create_buffer<real_t>(space->n_dofs(), es)),
+              directors_(sfem::create_buffer<real_t>(space->n_dofs(), es)) {}
+
+        void recompute(const std::shared_ptr<Buffer<real_t>>& displacement) override {
+            SFEM_TRACE_SCOPE("MultiBodyContact::recompute");
+
+            if (surface_element_type_ != smesh::QUADSHELL4) {
+                SFEM_ERROR("MultiBodyContact is only implemented for QUADSHELL4 (got %d)\n", surface_element_type_);
+                return;
+            }
+
+            auto blas = sfem::blas<real_t>(es_);
+
+            p1_ = smesh::astype<real_t>(surface_->points());
+            {
+                auto               p = p1_->data();
+                auto               u = displacement->data();
+                const idx_t* const m = surface_->node_mapping()->data();
+
+                for (int d = 0; d < dim_; ++d) {
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < npoints_; ++i) {
+                        p[d][i] += u[m[i] * dim_ + d];
+                    }
+                }
+            }
+
+            auto         pc_ptr      = create_host_buffer<ptrdiff_t>(nselements_ + 1);
+            auto         pc_ptr_data = pc_ptr->data();
+            idx_t*       raw_pc_idx  = nullptr;
+            const real_t extrusion   = std::sqrt(search_radius_sqr_) + margin_;
+
+            const int err = ssdf::potential_contact_quads_bvh<real_t, real_t, idx_t, idx_t>(nselements_,
+                                                                                            surface_elements_->data()[0],
+                                                                                            surface_elements_->data()[1],
+                                                                                            surface_elements_->data()[2],
+                                                                                            surface_elements_->data()[3],
+                                                                                            npoints_,
+                                                                                            p1_->data()[0],
+                                                                                            p1_->data()[1],
+                                                                                            p1_->data()[2],
+                                                                                            extrusion,
+                                                                                            pc_ptr_data,
+                                                                                            &raw_pc_idx);
+
+            if (err != 0) {
+                SFEM_ERROR("potential_contact_quads_bvh failed (%d)\n", err);
+                return;
+            }
+
+            const ptrdiff_t npairs = pc_ptr_data[nselements_];
+            auto            pc_idx = create_host_buffer<idx_t>(std::max<ptrdiff_t>(npairs, 1));
+            if (npairs > 0 && raw_pc_idx) {
+                std::memcpy(pc_idx->data(), raw_pc_idx, static_cast<size_t>(npairs) * sizeof(idx_t));
+            }
+            std::free(raw_pc_idx);
+
+            auto is_valid     = create_host_buffer<mask_t>(std::max<ptrdiff_t>(npairs, 1));
+            auto pair_values  = create_host_buffer<real_t>(std::max<ptrdiff_t>(npairs, 1) * MORTAR_PAIR_STRIDE);
+            auto wnormals     = create_host_buffer<real_t>((ptrdiff_t)npoints_ * 3);
+            auto wdistance    = create_host_buffer<real_t>(npoints_);
+            auto wdist_weight = create_host_buffer<real_t>(npoints_);
+            distances_        = sfem::create_buffer<real_t>(npoints_, es_);
+
+            blas->values((ptrdiff_t)npoints_ * 3, 0, wnormals->data());
+            blas->values(npoints_, 0, wdistance->data());
+            blas->values(npoints_, 0, wdist_weight->data());
+            blas->values(npoints_, 0, distances_->data());
+
+            const domain_t* const tag = (!tags_.empty() && tags_[0]) ? tags_[0]->data() : nullptr;
+            auto                  iv  = is_valid->data();
+            auto                  pi  = pc_idx->data();
+
+#pragma omp parallel for
+            for (ptrdiff_t k = 0; k < npairs; ++k) {
+                iv[k] = 1;
+            }
+
+            if (tag) {
+                bool biased_contact = smesh::Env::read("SFEM_BIASED_CONTACT", false);
+
+                if (biased_contact) {
+#pragma omp parallel for
+                    for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                        const domain_t te = tag[e];
+                        for (ptrdiff_t k = pc_ptr_data[e]; k < pc_ptr_data[e + 1]; ++k) {
+                            const domain_t tm = tag[pi[k]];
+                            // Key difference: te >= tm (makes the contact biased, i.e., standard mortar master-slave approach)
+                            if (te == 0 || tm == 0 || te >= tm) {
+                                iv[k] = 0;
+                            }
+                        }
+                    }
+                } else {
+#pragma omp parallel for
+                    for (ptrdiff_t e = 0; e < nselements_; ++e) {
+                        const domain_t te = tag[e];
+                        for (ptrdiff_t k = pc_ptr_data[e]; k < pc_ptr_data[e + 1]; ++k) {
+                            const domain_t tm = tag[pi[k]];
+                            if (te == 0 || tm == 0 || te == tm) {
+                                iv[k] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            assemble_mortar_matrices(surface_element_type_,
+                                     surface_elements_,
+                                     p1_,
+                                     pc_ptr,
+                                     pc_idx,
+                                     pair_values,
+                                     wnormals,
+                                     distances_,
+                                     wdistance,
+                                     wdist_weight,
+                                     mass_vector_,
+                                     is_valid,
+                                     std::sqrt(search_radius_sqr_));
+
+            mortar_elemental_matrices_to_crs(
+                    surface_element_type_, npoints_, surface_elements_, pc_ptr, pc_idx, pair_values, is_valid, graph_, values_);
+
+            sum_postprocess_weighted_quantities(graph_, values_, wnormals, distances_, mass_vector_);
+
+            auto       nrm                 = normals_->data();
+            const auto wn                  = wnormals->data();
+            const auto d                   = mass_vector_->data();
+            const auto gap                 = distances_->data();
+            const auto physical_gap        = wdistance->data();
+            const auto physical_gap_weight = wdist_weight->data();
+            auto       dw                  = distances_whole_->data();
+            auto       dir                 = directors_->data();
+            const auto nm                  = surface_->node_mapping()->data();
+
+            blas->values(space_->n_dofs(), 0, distances_whole_->data());
+            blas->values(space_->n_dofs(), 0, directors_->data());
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < npoints_; ++i) {
+                for (int c = 0; c < dim_; ++c) {
+                    nrm[c][i] = wn[i * 3 + c];
+                }
+
+                if (d[i] == 0) {
+                    continue;
+                }
+
+                const ptrdiff_t dof          = (ptrdiff_t)nm[i] * dim_;
+                const real_t    director_gap = physical_gap_weight[i] != 0 ? physical_gap[i] / physical_gap_weight[i] : gap[i];
+                dw[dof]                      = director_gap;
+                for (int c = 0; c < dim_; ++c) {
+                    dir[dof + c] = director_gap * nrm[c][i];
+                }
+            }
+
+            add_normal_projected_displacement_to_gap(dim_, *surface_, *graph_, values_, normals_, displacement, distances_);
+        }
+
+        const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph() const override { return graph_; }
+        smesh::SharedBuffer<real_t>&                            values() override { return values_; }
+        smesh::SharedBuffer<real_t>&                            mass_vector() override { return mass_vector_; }
+        smesh::SharedBuffer<real_t*>&                           normals() override { return normals_; }
+        smesh::SharedBuffer<real_t>&                            distances() override { return distances_; }
+        const smesh::SharedBuffer<real_t>&                      distances_whole() const override { return distances_whole_; }
+        const smesh::SharedBuffer<real_t>&                      directors() const override { return directors_; }
+
+    private:
+        std::shared_ptr<FunctionSpace>                   space_;
+        std::shared_ptr<smesh::Mesh>                     surface_;
+        std::vector<SharedBuffer<domain_t>>              tags_;
+        real_t                                           margin_;
+        real_t                                           search_radius_sqr_;
+        ExecutionSpace                                   es_;
+        int                                              dim_;
+        ptrdiff_t                                        npoints_;
+        ptrdiff_t                                        nselements_;
+        smesh::SharedBuffer<idx_t*>                      surface_elements_;
+        smesh::ElemType                                  surface_element_type_;
+        smesh::SharedBuffer<real_t*>                     p1_;
+        std::shared_ptr<smesh::CRSGraph<count_t, idx_t>> graph_;
+        smesh::SharedBuffer<real_t>                      values_;
+        smesh::SharedBuffer<real_t>                      mass_vector_;
+        smesh::SharedBuffer<real_t*>                     normals_;
+        smesh::SharedBuffer<real_t>                      distances_;
+        smesh::SharedBuffer<real_t>                      distances_whole_;
+        smesh::SharedBuffer<real_t>                      directors_;
+    };
+
+    SharedBuffer<domain_t> create_domain_tags(const std::shared_ptr<smesh::Mesh>& surface) {
+        const ptrdiff_t n_elements = surface->n_elements();
+        auto            tags       = create_host_buffer<domain_t>(n_elements);
+        domain_t* const tag        = tags->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t e = 0; e < n_elements; ++e) {
+            tag[e] = 0;
+        }
+
+        if (n_elements == 0) {
+            return tags;
+        }
+
+        auto                       n2e    = surface->node_to_element_graph();
+        const count_t*             rowptr = n2e->rowptr()->data();
+        const element_idx_t*       colidx = n2e->colidx()->data();
+        auto                       elems  = surface->block(0)->elements()->data();
+        const int                  nxe    = surface->block(0)->n_nodes_per_element();
+        std::vector<element_idx_t> queue(n_elements);
+        domain_t                   current = 1;
+
+        for (element_idx_t seed = 0; seed < n_elements; ++seed) {
+            if (tag[seed] != 0) {
+                continue;
+            }
+
+            ptrdiff_t head = 0;
+            ptrdiff_t tail = 0;
+            tag[seed]      = current;
+            queue[tail++]  = seed;
+
+            while (head < tail) {
+                const element_idx_t e = queue[head++];
+                for (int a = 0; a < nxe; ++a) {
+                    const idx_t node = elems[a][e];
+                    for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
+                        const element_idx_t adj = colidx[k];
+                        if (tag[adj] == 0) {
+                            tag[adj]      = current;
+                            queue[tail++] = adj;
+                        }
+                    }
+                }
+            }
+
+            ++current;
+        }
+
+        return tags;
+    }
+
+    std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
+                                                      const std::shared_ptr<smesh::Mesh>&   surface,
+                                                      real_t                                margin,
+                                                      real_t                                search_radius_sqr,
+                                                      ExecutionSpace                        es) {
+        std::vector<SharedBuffer<domain_t>> tags;
+        tags.push_back(create_domain_tags(surface));
+        return std::make_shared<MultiBodyContact>(space, surface, std::move(tags), margin, search_radius_sqr, es);
+    }
 
 }  // namespace sfem

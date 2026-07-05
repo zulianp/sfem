@@ -15,6 +15,8 @@
 // #define AVX2
 // #endif
 
+namespace sfem {
+
 // #ifdef AVX512
 // #define _VL_ 8
 // #define ZEROS_VEC \
@@ -83,7 +85,7 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
                                         const vec_indices j,            //
                                         const vec_indices k,            //
                                         const real_t *const data,       //
-                                        real_t *first_ptrs_array[]);    //
+                                        const real_t *first_ptrs_array[]);    //
 
 /// @brief
 /// @param stride
@@ -95,5 +97,7 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
 vec_real weno4_3D_HOne_V(const ptrdiff_t *const stride,                         //
                          const vec_real x, const vec_real y, const vec_real z,  //
                          const real_t *f[]);                                    //
+
+}  // namespace sfem
 
 #endif  // __TET10_WENO_V_H__

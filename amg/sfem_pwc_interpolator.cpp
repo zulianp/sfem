@@ -17,8 +17,8 @@ Ac vc == pt (A (p vc))
 
 namespace sfem {
     template <typename R, typename T>
-    std::shared_ptr<sfem::CooSymSpMV<R, T>> sfem::PiecewiseConstantInterpolator<R, T>::coarsen(
-            const std::shared_ptr<sfem::CooSymSpMV<R, T>> &a) {
+    std::shared_ptr<sfem::CooSym<R, T>> sfem::PiecewiseConstantInterpolator<R, T>::coarsen(
+            const std::shared_ptr<sfem::CooSym<R, T>> &a) {
         count_t fine_nnz = a->values->size();
         R *partition = partition_->data();
         T *weights = weights_->data();

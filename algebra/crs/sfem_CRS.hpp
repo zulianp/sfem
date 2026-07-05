@@ -442,6 +442,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_;
 
         std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
+            SFEM_TRACE_SCOPE("CRS::transpose");
             if (execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Transpose is not supported for non-host execution space");
@@ -472,6 +473,7 @@ namespace sfem {
         }
 
         std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
+            SFEM_TRACE_SCOPE("CRS::mm");
             if (execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Matrix multiplication is not supported for non-host execution space");
@@ -520,14 +522,6 @@ namespace sfem {
 
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
-        SharedBuffer<R>        row_ptr;
-        SharedBuffer<C>        col_idx;
-        SharedBuffer<TStorage> values;
-        ptrdiff_t              cols_{0};
-        T                      uniform_pre_output_scaling{0};
-
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void print(std::ostream& os = std::cout) const {
@@ -546,6 +540,25 @@ namespace sfem {
                 os << "\n";
             }
         }
+
+        int to_file(const smesh::Path& folder) const {
+            auto h_row_ptr = to_host(row_ptr);
+            auto h_col_idx = to_host(col_idx);
+            auto h_values  = to_host(values);
+
+            int err0 = h_row_ptr->to_file(folder / ("row_ptr." + std::string(smesh::TypeToString<R>::value())));
+            int err1 = h_col_idx->to_file(folder / ("col_idx." + std::string(smesh::TypeToString<C>::value())));
+            int err2 = h_values->to_file(folder / ("values." + std::string(smesh::TypeToString<TStorage>::value())));
+
+            return err0 + err1 + err2;
+        }
+
+        SharedBuffer<R>        row_ptr;
+        SharedBuffer<C>        col_idx;
+        SharedBuffer<TStorage> values;
+        ptrdiff_t              cols_{0};
+        T                      uniform_pre_output_scaling{0};
+        ExecutionSpace         execution_space_{EXECUTION_SPACE_INVALID};
     };
 
     // CRS matrix product here: https://github.com/zhen-xie/IA-SpGEMM/blob/master/IA-SPGEMM-CPU_release/detail/csr/common_csr.h

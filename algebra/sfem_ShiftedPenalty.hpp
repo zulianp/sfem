@@ -39,8 +39,8 @@ namespace sfem {
         int       iterations() const override { return iterations_; }
 
         ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
-        SharedBuffer<T>            upper_bound_;
-        SharedBuffer<T>            lower_bound_;
+        SharedBuffer<T>                       upper_bound_;
+        SharedBuffer<T>                       lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
         std::shared_ptr<Operator<T>>          constraints_op_transpose_;
         std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
@@ -50,7 +50,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
-        SharedBuffer<T> lagr_lb, lagr_ub;
+        SharedBuffer<T>                            lagr_lb, lagr_ub;
 
         ExecutionSpace        execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -228,7 +228,11 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
+                            linear_solver_->set_op_and_diag_shift(
+                                    apply_op +
+                                            sfem::create_sparse_block_vector_mult(apply_op->rows(), constraints_op_x_op_, J_pen),
+                                    constraints_op_x_op_,
+                                    J_pen);
 
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
@@ -242,7 +246,7 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op, J_pen);
+                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, execution_space()), J_pen);
                         }
 
                         blas.zeros(n_dofs, c->data());
@@ -282,7 +286,8 @@ namespace sfem {
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
-                    // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the correction)
+                    // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the
+                    // correction)
                     if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
                     if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 

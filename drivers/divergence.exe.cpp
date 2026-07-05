@@ -3,30 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
 #include "operators/div.hpp"
 
-
-
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_divergence(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -36,32 +22,29 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
-    const char *path_u[3] = {argv[2], argv[3], argv[4]};
+    const char *folder      = argv[1];
+    const char *path_u[3]   = {argv[2], argv[3], argv[4]};
     const char *path_output = argv[5];
 
     printf("%s %s %s %s %s %s\n", argv[0], folder, path_u[0], path_u[1], path_u[2], path_output);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
-
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
-    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
-    real_t *u[3];
-
-    ptrdiff_t u_n_local, u_n_global;
-
-    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
+    auto u0 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[0]));
+    auto u1 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[1]));
+    auto u2 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[2]));
+    if (!u0 || !u1 || !u2) {
+        SFEM_ERROR("Failed to read displacement files\n");
     }
 
-    real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));
-    memset(div_u, 0, u_n_local * sizeof(real_t));
+    real_t *u[3] = {u0->data(), u1->data(), u2->data()};
+
+    auto div_u_buf = sfem::create_host_buffer<real_t>(n_nodes);
+    real_t *div_u  = div_u_buf->data();
 
     div_apply(mesh->element_type(0), n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
 
@@ -69,7 +52,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
     if (SFEM_SCALE != 1) {
-        for (ptrdiff_t i = 0; i < u_n_local; ++i) {
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
             div_u[i] *= SFEM_SCALE;
         }
     }
@@ -79,30 +62,29 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_VERBOSE) {
         real_t integral = 0.;
-        for (ptrdiff_t i = 0; i < u_n_local; ++i) {
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
             integral += div_u[i];
         }
 
-        if (!rank) {
+        if (!comm->rank()) {
             printf("integral div(u) = %g\n", (double)integral);
         }
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
+    div_u_buf->to_file(smesh::Path(path_output));
 
-    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        free(u[d]);
-    }
+    const double tock = smesh::time_seconds();
 
-    free(div_u);
-
-    double tock = MPI_Wtime();
-
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_divergence(ctx->communicator(), argc, argv);
 }

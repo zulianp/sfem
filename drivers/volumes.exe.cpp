@@ -3,17 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
 #include "operators/div.hpp"
-
-
 
 #include "sfem_API.hpp"
 
@@ -30,9 +24,6 @@ static SFEM_INLINE void volume(const real_t px0,
                           const real_t pz2,
                           const real_t pz3,
                           real_t *const element_value) {
-    // FLOATING POINT OPS!
-    //       - Result: ADD + ASSIGNMENT + 6*MUL
-    //       - Subexpressions: 9*SUB
     const real_t x0 = -px0 + px1;
     const real_t x1 = -py0 + py2;
     const real_t x2 = -pz0 + pz3;
@@ -45,16 +36,8 @@ static SFEM_INLINE void volume(const real_t px0,
     element_value[0] = x0 * x1 * x2 - x0 * x4 * x8 - x1 * x5 * x6 - x2 * x3 * x7 + x3 * x4 * x5 + x6 * x7 * x8;
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int compute_volumes(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -64,65 +47,63 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
+    const char *folder      = argv[1];
     const char *path_output = argv[2];
 
     printf("%s %s %s\n", argv[0], folder, path_output);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
+    const ptrdiff_t nelements  = mesh->n_elements();
+    const ptrdiff_t nnodes     = mesh->n_nodes();
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto volumes_buf = sfem::create_host_buffer<real_t>(nelements);
+    real_t *volumes  = volumes_buf->data();
 
-    real_t *volumes = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
-    memset(volumes, 0, mesh->n_elements() * sizeof(real_t));
+    geom_t **xyz      = mesh->points()->data();
+    auto     elements = mesh->elements(0)->data();
 
-    geom_t ** xyz = mesh->points()->data();
-    auto elements = mesh->elements(0)->data();
-
-    for (ptrdiff_t i = 0; i < mesh->n_elements(); ++i) {
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
         const idx_t i0 = elements[0][i];
         const idx_t i1 = elements[1][i];
         const idx_t i2 = elements[2][i];
         const idx_t i3 = elements[3][i];
 
         real_t vol = 0;
-        volume(
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            &vol);
+        volume(xyz[0][i0],
+               xyz[0][i1],
+               xyz[0][i2],
+               xyz[0][i3],
+               xyz[1][i0],
+               xyz[1][i1],
+               xyz[1][i2],
+               xyz[1][i3],
+               xyz[2][i0],
+               xyz[2][i1],
+               xyz[2][i2],
+               xyz[2][i3],
+               &vol);
 
         volumes[i] = vol;
     }
 
     int SFEM_VERBOSE = 1;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
-    array_write(comm, path_output, SFEM_MPI_REAL_T, volumes, mesh->n_elements(), mesh->n_elements());
-    free(volumes);
+    volumes_buf->to_file(smesh::Path(path_output));
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return compute_volumes(ctx->communicator(), argc, argv);
 }

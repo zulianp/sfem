@@ -30,13 +30,13 @@
 #include "smesh_env.hpp"
 
 #include "sell.hpp"
+#include "sfem_BSR.hpp"
+#include "sfem_CRS.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
-#include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_CRS.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 #include "smesh_glob.hpp"
@@ -1220,11 +1220,8 @@ namespace sfem {
                 default:
                     return crs;
             }
-        }
-
-        if (format == op_type::BSR) return sfem::hessian_bsr(f, u, es);
-        if (format != op_type::BSR_SYM) {
-            fprintf(stderr, "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n", format.c_str());
+        } else if (format == op_type::BSR) {
+            return sfem::hessian_bsr(f, u, es);
         }
 
         return sfem::hessian_bcrs_sym(f, u, es);

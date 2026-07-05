@@ -1,25 +1,9 @@
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "array_dtof.h"
-
 #include "sfem_API.hpp"
 
+int assemble(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    const double tick = smesh::time_seconds();
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    double tick = MPI_Wtime();
-
-    if (size != 1) {
+    if (comm->size() != 1) {
         SFEM_ERROR("Parallel execution not supported!\n");
     }
 
@@ -36,15 +20,14 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
 
-    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
-    auto         es         = sfem::EXECUTION_SPACE_HOST;
+    auto es = sfem::EXECUTION_SPACE_HOST;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    auto        m      = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto        m      = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     auto        fs     = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto        f      = sfem::Function::create(fs);
 
@@ -91,48 +74,38 @@ int main(int argc, char *argv[]) {
     smesh::create_directory(output_folder);
 
     if (SFEM_EXPORT_FP32) {
-        array_dtof(nnz, (const real_t *)values->data(), (float *)values->data());
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, float>(
+                m->n_nodes(), m->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), sfem::astype<float>(values), (float)1);
+        crs->to_file(smesh::Path(output_folder));
+    } else {
+        auto crs = sfem::h_crs_spmv<count_t, idx_t, real_t>(
+                m->n_nodes(), m->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), values, (real_t)1);
+        crs->to_file(smesh::Path(output_folder));
     }
 
     {
-        crs_t crs_out;
-        crs_out.rowptr      = (char *)crs_graph->rowptr()->data();
-        crs_out.colidx      = (char *)crs_graph->colidx()->data();
-        crs_out.values      = (char *)values->data();
-        crs_out.grows       = m->n_nodes();
-        crs_out.lrows       = m->n_nodes();
-        crs_out.lnnz        = nnz;
-        crs_out.gnnz        = nnz;
-        crs_out.start       = 0;
-        crs_out.rowoffset   = 0;
-        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-        crs_out.colidx_type = SFEM_MPI_IDX_T;
-        crs_out.values_type = value_type;
-        crs_write_folder(comm, output_folder, &crs_out);
-    }
-
-    {
+        const smesh::Path rhs_path = smesh::Path(output_folder) / "rhs.raw";
         if (SFEM_EXPORT_FP32) {
-            array_dtof(rhs->size(), (const real_t *)rhs->data(), (float *)rhs->data());
-        }
-
-        {
-            char path[1024 * 10];
-            snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
-            array_write(comm, path, value_type, rhs->data(), rhs->size(), rhs->size());
+            sfem::astype<float>(rhs)->to_file(rhs_path);
+        } else {
+            rhs->to_file(rhs_path);
         }
     }
 
     ptrdiff_t nelements = m->n_elements();
     ptrdiff_t nnodes    = m->n_nodes();
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
+    return 0;
+}
 
-    return MPI_Finalize();
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return assemble(ctx->communicator(), argc, argv);
 }

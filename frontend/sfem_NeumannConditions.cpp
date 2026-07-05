@@ -4,7 +4,6 @@
 
 #include <stddef.h>
 
-#include "matrixio_array.h"
 #include "utils.h"
 
 #include "sfem_defs.hpp"
@@ -150,8 +149,9 @@ namespace sfem {
                         int k   = 0;
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
-                            ptrdiff_t lsize{0}, gsize{0};
-                            if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
+                            ptrdiff_t lsize{0};
+                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(pch), &ii, &lsize) !=
+                                SMESH_SUCCESS) {
                                 SFEM_ERROR("Failed to read file %s\n", pch);
                                 break;
                             }
@@ -210,12 +210,11 @@ namespace sfem {
                 if (strncmp(pch, path_key, path_key_len) == 0) {
                     conds[i].value = 0;
 
-                    real_t   *values{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(
-                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    auto values = Buffer<real_t>::from_file(smesh::Path(pch + path_key_len));
+                    if (!values) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
+                    const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
                     if (conds[i].surface->extent(1) != lsize) {
                         if (!rank) {
@@ -480,12 +479,10 @@ namespace sfem {
         return no_op();
     }
 
+#ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
-#ifdef SFEM_ENABLE_CUDA
-        return std::make_shared<GPUNeumannConditions>(nc);
-#else
         return nc;
-#endif
     }
+#endif
 
 }  // namespace sfem

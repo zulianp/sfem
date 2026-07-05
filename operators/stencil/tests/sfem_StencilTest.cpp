@@ -31,7 +31,7 @@ int test_stencil2() {
     auto out = sfem::create_host_buffer<real_t>((xc - 2) * (yc - 2));
     auto o   = out->data();
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     slice_stencil_3x3(xc - 2,
                       yc - 2,
@@ -49,7 +49,7 @@ int test_stencil2() {
                       xc - 2,
                       o);
 
-    double tock    = MPI_Wtime();
+    double tock    = smesh::time_seconds();
     double elapsed = tock - tick;
 
     if (verbose) printf("#nodes %ld, TTS: %g [s] TP: %g [MDOF/s]\n", yc * xc, elapsed, 1e-6 * (xc * yc) / elapsed);
@@ -99,16 +99,16 @@ int test_stencil3_against_original() {
     auto out          = sfem::create_host_buffer<real_t>(xc * yc * zc);
     auto out_original = sfem::create_host_buffer<real_t>(xc * yc * zc);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
     
     sshex8_stencil(xc, yc, zc, stencil, in->data(), out->data());
     sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
     
-    double tack = MPI_Wtime();
+    double tack = smesh::time_seconds();
 
     smesh::sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
     
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     double elapsed_stencil = (tack - tick);
     double elapsed_original = (tock - tack);
@@ -180,7 +180,7 @@ int test_stencil3() {
 
     auto out = sfem::create_host_buffer<real_t>(xc * yc * zc);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     int repeat = MAX(3, 100000 / (xc * yc * zc));
 
@@ -191,7 +191,7 @@ int test_stencil3() {
         sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
     }
 
-    double tock    = MPI_Wtime();
+    double tock    = smesh::time_seconds();
     double elapsed = (tock - tick) / repeat;
 
     if (verbose) {

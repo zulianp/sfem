@@ -3,30 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
-
 #include "sfem_base.hpp"
-
-
 
 #include "tet4_l2_projection_p0_p1.hpp"
 
 #include "sfem_API.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_projection_p0_to_p1(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -36,65 +22,52 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
+    const char *folder  = argv[1];
     const char *path_p0 = argv[2];
     const char *path_p1 = argv[3];
 
     printf("%s %s %s %s\n", argv[0], folder, path_p0, path_p1);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
-
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes    = mesh->n_nodes();
 
-    real_t *p0;
-    ptrdiff_t p0_n_local, p0_n_global;
-    array_create_from_file(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
+    auto p0 = sfem::Buffer<real_t>::from_file(smesh::Path(path_p0));
+    if (!p0) {
+        SFEM_ERROR("Failed to read file %s\n", path_p0);
+    }
 
-    assert(p0_n_local == n_elements);
+    assert((ptrdiff_t)p0->size() == n_elements);
 
-    real_t *p1 = (real_t *)malloc(n_nodes * sizeof(real_t));
-    memset(p1, 0, n_nodes * sizeof(real_t));
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Compute projection
-    ///////////////////////////////////////////////////////////////////////////////
+    auto p1_buf = sfem::create_host_buffer<real_t>(n_nodes);
+    real_t *p1  = p1_buf->data();
 
     int SFEM_COMPUTE_COEFFICIENTS = 1;
 
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        tet4_p0_p1_projection_coeffs(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
+        tet4_p0_p1_projection_coeffs(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), p0->data(), p1);
     } else {
-        tet4_p0_p1_l2_projection_apply(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
+        tet4_p0_p1_l2_projection_apply(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), p0->data(), p1);
     }
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Write cell data
-    ///////////////////////////////////////////////////////////////////////////////
+    p1_buf->to_file(smesh::Path(path_p1));
 
-    array_write(comm, path_p1, SFEM_MPI_REAL_T, p1, n_nodes, n_nodes);
+    const double tock = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    ///////////////////////////////////////////////////////////////////////////////
-
-    free(p0);
-    free(p1);
-
-    double tock = MPI_Wtime();
-
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_projection_p0_to_p1(ctx->communicator(), argc, argv);
 }
