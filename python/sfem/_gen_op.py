@@ -3363,6 +3363,7 @@ def _registration_source(material, wrapper_header):
 namespace sfem {
     void %(function)s() {
         Factory::register_op("%(op)s", %(op)s::create);
+        Factory::register_op("ss:%(op)s", %(op)s::create);
     }
 }  // namespace sfem
 """ % {
