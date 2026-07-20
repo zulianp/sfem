@@ -1066,6 +1066,9 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             fields_by_dim[dim] = tuple(collection.fields)
             block_size_by_dim[dim] = sum(int(field.components) for field in collection.fields)
         residual_dependencies, action_dependencies = dependencies
+        parameter_index = {
+            name: index for index, name in enumerate(parameter_names_by_dim[dim])
+        }
         stem = "%s_%s" % (material.name, _element_name(element).lower())
         performance_cases["gradient"].append(
             _performance_case(
@@ -1165,8 +1168,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         residual_common_args = []
         residual_common_args.extend(
-            "storage[%d]" % index
-            for index, _ in enumerate(parameter_names_by_dim[dim])
+            _dependency_storage_args(residual_dependencies.parameters, parameter_index)
         )
         residual_setup = []
         if residual_dependencies.current:
@@ -1251,8 +1253,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         action_common_args = []
         action_common_args.extend(
-            "storage[%d]" % index
-            for index, _ in enumerate(parameter_names_by_dim[dim])
+            _dependency_storage_args(action_dependencies.parameters, parameter_index)
         )
         action_setup = []
         if action_dependencies.current:
@@ -1367,7 +1368,11 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     residual_affine_uses_jacobian = not all(residual_affine_metric_flags)
     action_affine_uses_jacobian = not all(action_affine_metric_flags)
 
-    max_parameters = max(len(names) for names in parameter_names_by_dim.values())
+    max_parameters = max(
+        1,
+        len(material.parameter_defaults),
+        *(len(names) for names in parameter_names_by_dim.values()),
+    )
     parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
@@ -3097,6 +3102,16 @@ def _dependency_parameter_args(parameters, parameter_index):
         if name in parameter_index and name not in names:
             names.append(name)
     return "".join(", storage[%d]" % parameter_index[name] for name in names)
+
+
+def _dependency_storage_args(parameters, parameter_index):
+    parameters = _dependency_parameters(parameters)
+    names = []
+    for parameter in parameters or ():
+        name = str(parameter)
+        if name in parameter_index and name not in names:
+            names.append(name)
+    return tuple("storage[%d]" % parameter_index[name] for name in names)
 
 
 def _dependency_parameters(dependencies):
