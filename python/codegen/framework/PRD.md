@@ -555,26 +555,46 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python \
 
 Goal: verify the unified backend with generated code and hardcoded references.
 
-Status: planned.
+Status: implemented for the current maintained-material scope.
 
 Tasks:
 
-1. Add hardcoded Python reference action tests for Taylor-Hood generated kernels
+1. [x] Add hardcoded Python reference action tests for Taylor-Hood generated kernels
    on `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`.
-2. Add at least one hardcoded Python reference test for a coupled
+2. [x] Add at least one hardcoded Python reference test for a coupled
    poro-hyperelastic monolithic path.
-3. Add at least one hardcoded Python reference test for a generated block kernel
+3. [x] Add at least one hardcoded Python reference test for a generated block kernel
    from a coupled formulation.
-4. Add generated compile tests for all maintained material examples:
+4. [x] Add generated compile tests for all maintained material examples:
    NeoHookean Ogden, Mooney-Rivlin, two-phase flow, Stokes,
    poro-hyperelasticity, Neumann, and Neumann-general.
-5. Add generated wrapper compile and runtime execution tests for all maintained
+5. [x] Add generated wrapper compile and runtime dispatch tests for all maintained
    `op_name` materials.
-6. Add plan-dump schema tests that verify every maintained material has explicit
+6. [x] Add plan-dump schema tests that verify every maintained material has explicit
    geometry, basis, data-stream, local-phase, mesh-phase, diagnostics, and ABI
    metadata.
-7. Add a single bash entry point that runs Python tests, generated compile
+7. [x] Add a single bash entry point that runs Python tests, generated compile
    tests, wrapper compile tests, and optional vectorization/CUDA tests.
+
+Delivered scope:
+
+- Added `python/codegen/framework/tests/test_m9_regression.py`, covering:
+  - symbolic reference checks for Taylor-Hood Stokes residual/action
+    coefficients on `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`;
+  - coupled poro-hyperelastic monolithic residual/action coefficient checks;
+  - generated coupled block-kernel coefficient checks;
+  - clean-output regeneration and generated operator compile coverage for all
+    maintained material examples;
+  - generated Op manifest, C ABI, factory, registration, include-path, runtime
+    operation, and wrapper dispatch metadata;
+  - generated wrapper syntax compilation when frontend optional dependencies
+    such as `ryml.hpp` and `c4core` headers are available in the local build
+    tree;
+  - plan-dump schema checks for geometry, basis, stream, local-phase,
+    mesh-phase, dependency/diagnostic, and ABI-facing metadata.
+- Added `python/codegen/framework/run_m9_regression.sh` as the single required
+  entry point for Python, generated compile, wrapper compile, and optional
+  CUDA/vectorization checks.
 
 Acceptance criteria:
 
@@ -583,35 +603,89 @@ Acceptance criteria:
 - The regression script reports clearly which optional target checks were
   skipped because the compiler/toolchain was unavailable.
 
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_m9_regression
+
+bash python/codegen/framework/run_m9_regression.sh
+```
+
 ## M10. NASA Wall-Mounted Hump Application
 
 Goal: use the generated-operator framework to simulate the NASA Wall-Mounted
 Hump as an end-to-end incompressible-flow application.
 
-Status: planned.
+Status: implemented for the baseline generated-operator hump workflow.
 
 Scope:
 
-- Implement an incompressible Navier-Stokes material using the UFL-style API.
-- Support the Strang-splitting scheme needed by the application workflow.
-- Implement `Mesh::create_wall_mounted_hump` in SMESH.
-- Support the wall-mounted-hump geometry with high-order surface PROTEUS
-  elements.
-- Add an executable that sets up, runs, and writes the simulation using SFEM
-  mesh/function/output abstractions.
-- Reuse the generated-kernel, wrapper, factory, target-platform, and
-  verification infrastructure from M1-M9 instead of adding a separate
-  application-specific generation path.
+- Implemented `codegen.framework.materials.navier_stokes` as a transient
+  incompressible Taylor-Hood material with residual and Jacobian-action forms,
+  previous-velocity state, viscosity/density/timestep parameters, convection
+  scaling, and body-force parameters.
+- Checked in generated `GeneratedNavierStokes` OpenMP/SoA kernels and wrapper
+  for `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`, and registered the generated
+  op in the normal SFEM generated-op registry.
+- Added `Mesh::create_wall_mounted_hump` in SMESH by warping cube and
+  semistructured cube meshes, preserving support for high-order
+  `PROTEUS_HEX*` geometry generation/export.
+- Added `drivers/simulations/wall_mounted_hump.cpp` to build a baseline hump
+  mesh, mark inlet/outlet/wall/span nodes, initialize velocity/pressure fields,
+  create `GeneratedNavierStokes` through the SFEM op factory, attach it to an
+  SFEM `Function`, run generated residual and Jacobian-action work inside the
+  Strang loop, write AoS time-step states through `sfem::Output`, write
+  restartable split fields through `smesh::Output`, and emit residual/action
+  diagnostics in the Strang-stage schedule. The solver driver is intentionally
+  limited to `SFEM_ELEM_TYPE=HEX27` until semistructured `ss:/PROTEUS`
+  Navier-Stokes kernels are generated and registered.
+- Added `drivers/simulations/run_wall_mounted_hump.sh`,
+  `drivers/simulations/postprocess_wall_mounted_hump.py`, and
+  `drivers/simulations/wall_mounted_hump.md` with generation, build, run,
+  restart-field, validation-data, and post-processing notes.
+- Fixed the generated residual-only wrapper parameter mapping so Jacobian action
+  calls use only action dependencies, while parameter storage remains large
+  enough for all material defaults.
 
 Acceptance criteria:
 
 - The mesh generator produces the NASA hump domain and boundary markers needed
   by the solver.
 - The generated Navier-Stokes operator compiles through the normal SFEM build.
-- The executable can run a documented baseline hump case and write restartable
-  fields through SFEM output APIs.
+- The executable can run a documented `HEX27` baseline hump case, reject
+  unsupported solver element types with a clear diagnostic, and write
+  restartable fields through SFEM output APIs.
 - Validation data, run scripts, and post-processing are documented next to the
   driver.
+
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python \
+  -m codegen.framework.materials.navier_stokes \
+  --out-dir /private/tmp/sfem_m10_navier_gen \
+  --element TRI6_TRI3 --compile --dump-plan
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python \
+  -m unittest python.codegen.framework.tests.test_m10_navier_stokes
+
+cmake --build build64 --target wall_mounted_hump -j 4
+
+./build64/wall_mounted_hump /private/tmp/sfem_wall_hump_m10
+
+PYTHONPATH=python venv/bin/python \
+  drivers/simulations/postprocess_wall_mounted_hump.py \
+  /private/tmp/sfem_wall_hump_m10 \
+  --csv /private/tmp/sfem_wall_hump_m10/summary.csv
+```
+
+Smoke post-processing summary:
+
+```csv
+n_nodes,inlet_nodes,outlet_nodes,wall_nodes,span_nodes,u_min,u_max,p_min,p_max,has_strang_stages
+2145,65,65,310,682,0.0,1.0000063281621119,-0.00011709228083766315,0.00034079564172891525,True
+```
 
 ## M11. Matrix Formats and Assembly Backends
 

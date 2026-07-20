@@ -4,6 +4,7 @@ namespace sfem {
     void register_GeneratedLaplace_generated_op();
     void register_GeneratedLinearElasticity_generated_op();
     void register_GeneratedNeoHookeanOgden_generated_op();
+    void register_GeneratedNavierStokes_generated_op();
     void register_GeneratedNeumann_generated_op();
     void register_GeneratedNeumannGeneral_generated_op();
     void register_GeneratedPoroHyperelasticity_generated_op();
@@ -14,6 +15,7 @@ namespace sfem {
         register_GeneratedLaplace_generated_op();
         register_GeneratedLinearElasticity_generated_op();
         register_GeneratedNeoHookeanOgden_generated_op();
+        register_GeneratedNavierStokes_generated_op();
         register_GeneratedNeumann_generated_op();
         register_GeneratedNeumannGeneral_generated_op();
         register_GeneratedPoroHyperelasticity_generated_op();

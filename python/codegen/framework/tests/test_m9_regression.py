@@ -1,8 +1,10 @@
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 import sympy as sp
 
@@ -128,6 +130,88 @@ def _assert_coefficients(test_case, expression_plan, expected):
             _assert_sympy_equal(test_case, actual, expected_component)
 
 
+def _repo_root():
+    return Path(__file__).resolve().parents[4]
+
+
+def _operator_compiler():
+    requested = os.environ.get("CXX")
+    if requested:
+        return shutil.which(requested) or requested
+    return shutil.which("mpic++") or shutil.which("mpicxx") or shutil.which("c++")
+
+
+def _wrapper_compile_include_dirs(out_dir, manifest):
+    root = _repo_root()
+    include_dirs = [
+        Path(out_dir),
+        root / "frontend",
+        root / "frontend" / "ops",
+        root / "base",
+        root / "external" / "smesh" / "src",
+        root / "external" / "smesh" / "src" / "base",
+        root / "external" / "smesh" / "src" / "frontend",
+        root / "external" / "smesh" / "src" / "io",
+        root / "external" / "smesh" / "src" / "mesh",
+        root / "external" / "smesh" / "src" / "mesh" / "geometry",
+        root / "external" / "smesh" / "src" / "mesh" / "sets",
+        root / "external" / "smesh" / "src" / "mesh" / "semistructured",
+        root / "external" / "smesh" / "src" / "mesh" / "semistructured" / "graph",
+        root / "external" / "smesh" / "src" / "utils",
+        root / "external" / "smesh" / "src" / "graph",
+        root / "external" / "smesh" / "src" / "profile",
+        root / "external" / "smesh" / "src" / "sorting",
+        root / "external" / "smesh" / "src" / "arrays",
+        root / "external" / "smesh" / "src" / "quadrature",
+    ]
+    include_dirs.extend(Path(out_dir) / path for path in manifest["generated_include_paths"])
+    include_dirs.extend(Path(path) for path in gen._compile_config_include_dirs(str(root)))
+    include_dirs.extend(path.parent for path in root.glob("build*/_deps/ryml-src/src/ryml.hpp"))
+    include_dirs.extend(path.parents[1] for path in root.glob("build*/_deps/ryml-src/ext/c4core/src/c4/substr.hpp"))
+    seen = set()
+    unique = []
+    for include_dir in include_dirs:
+        include_dir = Path(include_dir)
+        key = str(include_dir)
+        if key not in seen and include_dir.is_dir():
+            unique.append(include_dir)
+            seen.add(key)
+    return unique
+
+
+def _assert_wrapper_syntax_compiles(test_case, out_dir, manifest):
+    compiler = _operator_compiler()
+    if compiler is None:
+        test_case.skipTest("C++ compiler is not available")
+    source = Path(out_dir) / manifest["wrapper"]["source"]
+    include_flags = []
+    for include_dir in _wrapper_compile_include_dirs(out_dir, manifest):
+        include_flags.extend(("-I", str(include_dir)))
+    command = [
+        compiler,
+        "-std=c++17",
+        "-O0",
+        "-fopenmp-simd",
+        "-Werror",
+        "-Wno-unused-command-line-argument",
+        "-fsyntax-only",
+        str(source),
+        *include_flags,
+    ]
+    result = subprocess.run(
+        command,
+        cwd=str(_repo_root()),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode == 0:
+        return
+    if "ryml.hpp" in result.stderr:
+        test_case.skipTest("wrapper syntax compile requires ryml.hpp")
+    test_case.fail(result.stderr)
+
+
 class M9ReferenceRegressionTest(unittest.TestCase):
     def test_taylor_hood_stokes_residual_and_action_match_hardcoded_reference(self):
         for element in ("TRI6_TRI3", "TET10_TET4", "HEX27_HEX8"):
@@ -227,11 +311,55 @@ class M9GeneratedArtifactRegressionTest(unittest.TestCase):
                 self.assertEqual(manifest["op_name"], material.op_name)
                 self.assertTrue(manifest["c_abi"])
                 self.assertTrue(manifest["generated_include_paths"])
+                self.assertTrue(manifest["wrapper"]["source"].endswith(".cpp"))
+                self.assertTrue(manifest["wrapper"]["header"].endswith(".hpp"))
+                self.assertTrue(manifest["wrapper"]["c_abi_header"].endswith(".hpp"))
+                self.assertTrue(manifest["registration"]["source"].endswith(".cpp"))
+                self.assertEqual(manifest["registration"]["operator_name"], material.op_name)
+                self.assertTrue(manifest["factory"]["class"].endswith(material.op_name))
+                self.assertTrue(manifest["factory"]["create"].endswith("%s::create" % material.op_name))
+                self.assertTrue(
+                    manifest["factory"]["create_from_yaml"].endswith("%s::create_from_yaml" % material.op_name)
+                )
+                c_abi_names = {entry["name"] for entry in manifest["c_abi"]}
                 runtime_operations = {
                     operation["name"] for operation in manifest["runtime_operations"]
                 }
                 for operation in operations:
                     self.assertIn(operation, runtime_operations)
+                wrapper_source = os.path.join(out_dir, manifest["wrapper"]["source"])
+                with open(wrapper_source, encoding="utf-8") as input_file:
+                    wrapper = input_file.read()
+                for operation in manifest["runtime_operations"]:
+                    self.assertTrue(operation["variants"])
+                    real_t_functions = []
+                    for variant in operation["variants"]:
+                        self.assertIn(variant["function"], c_abi_names)
+                        self.assertIn(variant["variant"], ("affine", "affine_aos", "isoparametric", "sideset"))
+                        self.assertIn(variant["scalar_type"], ("real_t", "float"))
+                        self.assertTrue(variant["target"])
+                        if variant["scalar_type"] == "real_t":
+                            real_t_functions.append(variant["function"])
+                    if operation["name"] in operations:
+                        self.assertTrue(any(function in wrapper for function in real_t_functions))
+
+    def test_generated_op_wrappers_syntax_compile_when_frontend_headers_are_available(self):
+        if _operator_compiler() is None:
+            self.skipTest("C++ compiler is not available")
+        for name, material, elements, _ in self.MAINTAINED:
+            with self.subTest(material=name), tempfile.TemporaryDirectory() as out_dir:
+                gen.generate(
+                    material,
+                    out_dir,
+                    elements=elements,
+                    compile=True,
+                    clean=True,
+                    dump_plan=True,
+                )
+                manifest_path = os.path.join(out_dir, "op", "sfem_%s_manifest.json" % material.op_name)
+                with open(manifest_path, encoding="utf-8") as input_file:
+                    manifest = json.load(input_file)
+                _assert_wrapper_syntax_compiles(self, out_dir, manifest)
 
     def test_plan_dump_schema_and_specialized_plan_metadata_for_all_maintained_materials(self):
         for name, material, elements, _ in self.MAINTAINED:

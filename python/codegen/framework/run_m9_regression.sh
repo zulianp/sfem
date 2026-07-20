@@ -21,6 +21,12 @@ else
     echo "Generated OpenMP compile checks: skipped because no C++ compiler is available"
 fi
 
+if find "$ROOT" -name ryml.hpp -print -quit | grep -q .; then
+    echo "Generated wrapper syntax checks: covered by test_m9_regression"
+else
+    echo "Generated wrapper syntax checks: skipped where ryml.hpp is unavailable"
+fi
+
 if command -v nvcc >/dev/null 2>&1; then
     echo "Optional CUDA checks: nvcc available; CUDA unittest gates ran above"
 else
