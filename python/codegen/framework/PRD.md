@@ -634,12 +634,14 @@ Scope:
 - Added `drivers/simulations/wall_mounted_hump.cpp` to build a baseline hump
   mesh, mark inlet/outlet/wall/span nodes, initialize velocity/pressure fields,
   create `GeneratedNavierStokes` through the SFEM op factory, attach it to an
-  SFEM `Function`, run generated residual and Jacobian-action work inside the
-  Strang loop, write AoS time-step states through `sfem::Output`, write
-  restartable split fields through `smesh::Output`, and emit residual/action
-  diagnostics in the Strang-stage schedule. The solver driver is intentionally
-  limited to `SFEM_ELEM_TYPE=HEX27` until semistructured `ss:/PROTEUS`
-  Navier-Stokes kernels are generated and registered.
+  SFEM `Function` with `DirichletConditions`, solve each time step with SFEM's
+  constrained residual, matrix-free linear-operator, and BiCGStab APIs, write
+  AoS time-step states through `sfem::Output`, write restartable split fields
+  through `smesh::Output`, and emit residual/correction diagnostics in the
+  solve-stage schedule. The solver driver supports `SFEM_ELEM_TYPE=HEX27` and
+  accepts `PROTEUS_HEX27` by reordering the level-2 semistructured connectivity
+  to the standard `HEX27` convention used by the checked-in `HEX27_HEX8`
+  Taylor-Hood kernels.
 - Added `drivers/simulations/run_wall_mounted_hump.sh`,
   `drivers/simulations/postprocess_wall_mounted_hump.py`, and
   `drivers/simulations/wall_mounted_hump.md` with generation, build, run,
@@ -653,8 +655,8 @@ Acceptance criteria:
 - The mesh generator produces the NASA hump domain and boundary markers needed
   by the solver.
 - The generated Navier-Stokes operator compiles through the normal SFEM build.
-- The executable can run a documented `HEX27` baseline hump case, reject
-  unsupported solver element types with a clear diagnostic, and write
+- The executable can run documented `HEX27` and `PROTEUS_HEX27` baseline hump
+  cases, reject unsupported solver element types with a clear diagnostic, and write
   restartable fields through SFEM output APIs.
 - Validation data, run scripts, and post-processing are documented next to the
   driver.
@@ -683,8 +685,8 @@ PYTHONPATH=python venv/bin/python \
 Smoke post-processing summary:
 
 ```csv
-n_nodes,inlet_nodes,outlet_nodes,wall_nodes,span_nodes,u_min,u_max,p_min,p_max,has_strang_stages
-2145,65,65,310,682,0.0,1.0000063281621119,-0.00011709228083766315,0.00034079564172891525,True
+n_nodes,inlet_nodes,outlet_nodes,wall_nodes,span_nodes,u_min,u_max,p_min,p_max,has_solve_stages
+2145,65,65,310,682,0.0,1.0103999206328473,-2.895625728792179,4.688691952033825,True
 ```
 
 ## M11. Matrix Formats and Assembly Backends
