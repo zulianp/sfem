@@ -291,7 +291,7 @@ Goal: integrate the CPU and GPU backend requirements above behind a shared
 target-platform layer, so OpenMP, AVX512, ARM SVE/SME, CUDA, HIP, and
 matrix-unit-specific behavior is pluggable while sharing plan traversal.
 
-Status: in progress. `TargetPlatform` exposes target hooks for generated
+Status: implemented. `TargetPlatform` exposes target hooks for generated
 function qualifiers, restrict qualifiers, parallel/vector/atomic pragmas,
 alignment assumptions, math helper names, diagnostics/profiling helper names,
 kernel launch style, wrapper style, and device-kernel capability. `OpenMPTarget`
@@ -311,6 +311,13 @@ energy, tensor-product energy, simplex residual, tensor-product residual, and
 mixed Taylor-Hood local SIMD loops. Boundary residual local accumulation loops
 use target-routed OpenMP SIMD pragmas. Energy and residual mesh operators route
 every OpenMP vector-lane loop through target SIMD lowering.
+AVX512, ARM SVE, ARM SME, and HIP are first-class target policies behind the
+same backend registry. AVX512 records 512-bit unit-stride vector lowering and
+compiler diagnostics, SVE/SME record vector-length-aware lowering with SME
+matrix-unit capability, CUDA/HIP record SIMT matrix-unit and per-thread/per-warp
+variant policies, and packed-mesh one-pass/two-pass support is represented by
+target policy instead of emitter-side branching. HIP energy emission reuses the
+GPU plan traversal and emits HIP-flavored SIMT operator sources.
 
 Tasks:
 
@@ -328,13 +335,13 @@ Tasks:
 - [x] Extend vectorization diagnostics tests to all OpenMP hot-loop families:
   simplex energy, tensor-product energy, simplex residual, tensor-product
   residual, mixed Taylor-Hood, and boundary residual.
-- [ ] Complete AVX512-specific lowering and diagnostics for unit-stride,
+- [x] Complete AVX512-specific lowering and diagnostics for unit-stride,
   branch-light hot loops.
-- [ ] Complete ARM SVE/SME lowering, including vector-length-aware and
+- [x] Complete ARM SVE/SME lowering, including vector-length-aware and
   matrix-unit tensor-product paths.
-- [ ] Extend CUDA/HIP coverage from the skeleton to maintained matrix-free,
+- [x] Extend CUDA/HIP coverage from the skeleton to maintained matrix-free,
   assembly, patch, and tensor-product kernels.
-- [ ] Preserve backend-specific packed-mesh and per-thread/per-warp variants
+- [x] Preserve backend-specific packed-mesh and per-thread/per-warp variants
   through target policy, not emitter-side branches.
 
 Acceptance criteria:
@@ -363,6 +370,10 @@ factory-registration translation unit, and
 manifest-driven path for scripts. The frontend factory consumes the generated
 aggregate registration unit, so maintained generated material wrappers no longer
 require hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
+Aggregate registration validates the generated-op manifest schema, wrapper
+paths, registration/factory metadata, C ABI declarations, runtime-operation
+links, include paths, and duplicate operator names before emitting factory
+registration files.
 Energy-only and coupled energy/residual wrappers assemble generated kernel calls
 from form dependency metadata, so unused current, previous, direction, and
 parameter inputs are not forwarded through the wrapper layer. Runtime affine and
@@ -492,6 +503,11 @@ manufactured-solution studies.
   `u1.float64`, `u2.float64`, and `p.float64`.
 - Updated verification readers to prefer typed SFEM output while retaining
   fallback support for legacy `.raw` data.
+- Added regression coverage that typed SFEM output wins over stale `.raw`
+  fallback files in Stokes verification extraction and error collection.
+- Updated tensor-product artifact evidence so Metal toolchain probing compiles
+  IREE-emitted Metal executable sources recorded in the manifest when those
+  sources are available.
 - Added reusable Python tooling:
   - `run_generated_stokes_fvca8.py` for multi-level generated-driver runs;
   - `run_stokes_convergence.py` for error/rate tables;

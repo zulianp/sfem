@@ -170,14 +170,28 @@ from codegen.framework.fem import (
 )
 from codegen.framework.backends.cuda import CUDASoABackend as _CUDASoABackend
 from codegen.framework.backends.openmp import OpenMPSoABackend as _OpenMPSoABackend
+from codegen.framework.backends.targets import (
+    AVX512Target,
+    ARMSMETarget,
+    ARMSVETarget,
+    HIPTarget,
+)
 
 
 DEFAULT_VECTOR_SIZE = 16
 OPENMP_SOA_BACKEND = _OpenMPSoABackend()
 CUDA_SOA_BACKEND = _CUDASoABackend()
+AVX512_SOA_BACKEND = _OpenMPSoABackend(target=AVX512Target())
+ARM_SVE_SOA_BACKEND = _OpenMPSoABackend(target=ARMSVETarget())
+ARM_SME_SOA_BACKEND = _OpenMPSoABackend(target=ARMSMETarget())
+HIP_SOA_BACKEND = _CUDASoABackend(target=HIPTarget())
 BACKENDS_BY_TARGET = {
     KernelTarget.OPENMP: OPENMP_SOA_BACKEND,
+    KernelTarget.AVX512: AVX512_SOA_BACKEND,
+    KernelTarget.ARM_SVE: ARM_SVE_SOA_BACKEND,
+    KernelTarget.ARM_SME: ARM_SME_SOA_BACKEND,
     KernelTarget.CUDA: CUDA_SOA_BACKEND,
+    KernelTarget.HIP: HIP_SOA_BACKEND,
 }
 
 @dataclass(frozen=True)
@@ -699,7 +713,7 @@ def run(material, default_out_dir, argv=None):
     parser.add_argument("--compile", action="store_true")
     parser.add_argument(
         "--target",
-        choices=("openmp", "cuda"),
+        choices=("openmp", "avx512", "arm_sve", "arm_sme", "cuda", "hip"),
         default="openmp",
         help="Backend target to emit.",
     )
@@ -1098,8 +1112,6 @@ def _block_unit_name(unit_name, block):
 
 
 def _emit_codegen_unit(unit, context, target=KernelTarget.OPENMP):
-    if unit.target is not KernelTarget.OPENMP:
-        raise ValueError("unsupported code generation plan target %s" % unit.target)
     backend = _backend_for_target(target)
     return tuple(backend.emit(unit, context))
 
@@ -1426,11 +1438,13 @@ def _clean_outputs(out_dir, name):
         "generated_%s*.cuh" % name,
         "generated_%s*.cpp" % name,
         "generated_%s*.cu" % name,
+        "generated_%s*.hip" % name,
         "generated_%s*.o" % name,
         "%s*.hpp" % name,
         "%s*.cuh" % name,
         "%s*.cpp" % name,
         "%s*.cu" % name,
+        "%s*.hip" % name,
         "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
@@ -1451,11 +1465,13 @@ def _clean_outputs(out_dir, name):
         "generated_%s*.cuh" % name,
         "generated_%s*.cpp" % name,
         "generated_%s*.cu" % name,
+        "generated_%s*.hip" % name,
         "generated_%s*.o" % name,
         "%s*.hpp" % name,
         "%s*.cuh" % name,
         "%s*.cpp" % name,
         "%s*.cu" % name,
+        "%s*.hip" % name,
         "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
@@ -1480,18 +1496,27 @@ def _clean_outputs(out_dir, name):
 
 
 def _compile_operators(paths):
-    compiler = shutil.which("c++")
+    compiler = _operator_compiler()
     if compiler is None:
-        raise RuntimeError("c++ compiler is not available")
+        raise RuntimeError("C++ compiler is not available")
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    include_dirs = [
+        os.path.join(repo_root, "base"),
+    ]
+    include_dirs.extend(_smesh_source_include_dirs(repo_root))
+    include_dirs.extend(_compile_config_include_dirs(repo_root))
     objects = []
     for source in paths:
         if not source.endswith("_operator.cpp"):
             continue
+        include_flags = []
+        for include_dir in include_dirs:
+            include_flags.extend(("-I", include_dir))
         output = os.path.splitext(source)[0] + ".o"
         subprocess.run(
             [
                 compiler,
-                "-std=c++14",
+                "-std=c++17",
                 "-O3",
                 "-fopenmp-simd",
                 "-Werror",
@@ -1499,6 +1524,7 @@ def _compile_operators(paths):
                 source,
                 "-I",
                 os.path.dirname(source),
+                *include_flags,
                 "-o",
                 output,
             ],
@@ -1506,6 +1532,49 @@ def _compile_operators(paths):
         )
         objects.append(output)
     return tuple(objects)
+
+
+def _operator_compiler():
+    requested = os.environ.get("CXX")
+    if requested:
+        return shutil.which(requested) or requested
+    return shutil.which("mpic++") or shutil.which("mpicxx") or shutil.which("c++")
+
+
+def _compile_config_include_dirs(repo_root):
+    requested = os.environ.get("SFEM_BUILD_DIR")
+    build_dirs = []
+    if requested:
+        build_dirs.append(os.path.abspath(requested))
+    build_dirs.extend(
+        os.path.join(repo_root, name)
+        for name in ("build64", "build", "build_test", "build_serial")
+    )
+    build_dirs.extend(sorted(glob.glob(os.path.join(repo_root, "build*"))))
+
+    include_dirs = []
+    seen = set()
+    for build_dir in build_dirs:
+        config = os.path.join(build_dir, "sfem_config.h")
+        smesh_config_dir = os.path.join(build_dir, "external", "smesh")
+        if not os.path.exists(config):
+            continue
+        for include_dir in (build_dir, smesh_config_dir):
+            if os.path.isdir(include_dir) and include_dir not in seen:
+                include_dirs.append(include_dir)
+                seen.add(include_dir)
+    return include_dirs
+
+
+def _smesh_source_include_dirs(repo_root):
+    smesh_src = os.path.join(repo_root, "external", "smesh", "src")
+    if not os.path.isdir(smesh_src):
+        return []
+    include_dirs = [smesh_src]
+    include_dirs.extend(
+        path for path in sorted(glob.glob(os.path.join(smesh_src, "*"))) if os.path.isdir(path)
+    )
+    return include_dirs
 
 
 def _validate_name(name):

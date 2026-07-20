@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from drivers.verification.extract_stokes_fields import extract_fields
 from drivers.verification.run_stokes_convergence import Level, level_errors
 from drivers.verification.stokes_mms import CASES, case_by_name
 
@@ -47,6 +48,17 @@ class StokesVerificationTest(unittest.TestCase):
             values.astype(np.float64).tofile(solution / ("u%d.float64" % d))
         case.pressure(*real_coords).astype(np.float64).tofile(solution / "p.float64")
         return Level(case_name, 1.0, mesh, solution)
+
+    def _write_exact_typed_with_stale_raw_level(self, root: Path, case_name: str, coords) -> Level:
+        level = self._write_exact_typed_level(root, case_name, coords)
+        case = case_by_name(case_name)
+        nnodes = len(np.asarray(coords[0]))
+        for name in ("x", "y", "z")[: case.dim]:
+            np.full(nnodes, 10.0, dtype=np.float32).tofile(level.mesh_dir / ("%s.raw" % name))
+        for d in range(case.dim):
+            np.full(nnodes, -3.0, dtype=np.float64).tofile(level.solution_dir / ("u%d.raw" % d))
+        np.full(nnodes, 7.0, dtype=np.float64).tofile(level.solution_dir / "p.raw")
+        return level
 
     def test_paper_cases_are_available(self):
         self.assertIn("bercovier_engelman_2d", CASES)
@@ -113,6 +125,31 @@ class StokesVerificationTest(unittest.TestCase):
             errors = level_errors(level.name, level, pressure_mean_free=False)
             self.assertEqual(errors["velocity_l2_abs"], 0.0)
             self.assertEqual(errors["pressure_l2_abs"], 0.0)
+
+    def test_typed_sfem_output_is_preferred_over_stale_raw_fallback(self):
+        coords = (
+            np.array([0.0, 0.25, 0.5, 0.75, 1.0]),
+            np.array([0.0, 0.25, 0.5, 0.75, 1.0]),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            level = self._write_exact_typed_with_stale_raw_level(
+                Path(tmp),
+                "bercovier_engelman_2d",
+                coords,
+            )
+            errors = level_errors(level.name, level, pressure_mean_free=False)
+            self.assertEqual(errors["velocity_l2_abs"], 0.0)
+            self.assertEqual(errors["pressure_l2_abs"], 0.0)
+
+            fields = extract_fields(
+                level.name,
+                level.mesh_dir,
+                level.solution_dir,
+                pressure_mean_free=False,
+            )
+            np.testing.assert_allclose(fields["x"], coords[0].astype(np.float32))
+            np.testing.assert_allclose(fields["u0_error"], 0.0)
+            np.testing.assert_allclose(fields["p_error"], 0.0)
 
 
 if __name__ == "__main__":
