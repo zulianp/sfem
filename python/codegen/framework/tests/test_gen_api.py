@@ -1347,6 +1347,20 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("register_GeneratedNeoHookeanOgden_generated_op();", generated_source)
             self.assertIn("register_GeneratedTwoPhaseFlow_generated_op();", generated_source)
 
+            broken_registration = dict(manifests[0])
+            broken_registration["registration"] = dict(broken_registration["registration"])
+            broken_registration["registration"]["operator_name"] = "WrongGeneratedOp"
+            with self.assertRaisesRegex(ValueError, "operator_name must match op_name"):
+                gen.generate_op_registration_files([broken_registration])
+
+            broken_runtime = json.loads(json.dumps(manifests[0]))
+            broken_runtime["runtime_operations"][0]["variants"][0]["function"] = "missing_c_abi_symbol"
+            with self.assertRaisesRegex(ValueError, "not declared in c_abi"):
+                gen.generate_op_registration_files([broken_runtime])
+
+            with self.assertRaisesRegex(ValueError, "operator 'GeneratedLinearElasticity' is duplicated"):
+                gen.generate_op_registration_files([manifests[0], manifests[0]])
+
     def test_frontend_factory_consumes_generated_op_registration_aggregate(self):
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
         factory_path = os.path.join(repo_root, "frontend", "ops", "sfem_OpFactory.cpp")
@@ -2155,6 +2169,14 @@ class GenApiTest(unittest.TestCase):
         self.assertIsInstance(gen.CUDA_SOA_BACKEND, CUDASoABackend)
         self.assertNotIn("OpenMPSoABackend", CUDASoABackend.__dict__)
         self.assertFalse(hasattr(gen.CUDA_SOA_BACKEND, "openmp_backend"))
+        self.assertIsInstance(gen.AVX512_SOA_BACKEND, OpenMPSoABackend)
+        self.assertIsInstance(gen.ARM_SVE_SOA_BACKEND, OpenMPSoABackend)
+        self.assertIsInstance(gen.ARM_SME_SOA_BACKEND, OpenMPSoABackend)
+        self.assertIsInstance(gen.HIP_SOA_BACKEND, CUDASoABackend)
+        self.assertIs(gen._backend_for_target("avx512"), gen.AVX512_SOA_BACKEND)
+        self.assertIs(gen._backend_for_target("arm_sve"), gen.ARM_SVE_SOA_BACKEND)
+        self.assertIs(gen._backend_for_target("arm_sme"), gen.ARM_SME_SOA_BACKEND)
+        self.assertIs(gen._backend_for_target("hip"), gen.HIP_SOA_BACKEND)
 
     def test_cuda_backend_emits_material_energy_kernels_from_plan(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -2201,6 +2223,34 @@ class GenApiTest(unittest.TestCase):
                     source = input_file.read()
                 self.assertNotIn("const ptrdiff_t thread = 0", source)
                 self.assertNotIn("SFEM_INLINE", source)
+
+    def test_hip_backend_emits_material_energy_kernels_from_plan(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            result = gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("QUAD4",),
+                target="hip",
+            )
+            relative = _relative_sources(result, out_dir)
+            self.assertIn(
+                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.hip"),
+                relative,
+            )
+            operator_path = os.path.join(
+                out_dir,
+                "d2",
+                "quad4",
+                "neohookean_ogden_quad4_operator.hip",
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                operator_source = input_file.read()
+            self.assertIn("#include <hip/hip_runtime.h>", operator_source)
+            self.assertIn("__global__ void neohookean_ogden_quad4_quad4_objective_affine_mesh_soa_impl", operator_source)
+            self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
+            self.assertIn("atomicAdd", operator_source)
+            self.assertNotIn("#pragma omp", operator_source)
+            self.assertNotIn("lane", operator_source)
 
     def test_compiles_generated_cuda_material_energy_kernel_when_nvcc_is_available(self):
         compiler = shutil.which("nvcc")
@@ -2845,22 +2895,21 @@ class GenApiTest(unittest.TestCase):
         self.assertIn("TRI6", mixed_basis_elements)
         self.assertIn("TRI3", mixed_basis_elements)
 
-    def test_generation_plan_validation_rejects_unsupported_combinations(self):
+    def test_generation_plan_validation_accepts_known_targets_and_rejects_bad_phases(self):
         context = gen.ElementGenerationContext.create("test_material", "TRI3", 16, None)
         user_input = gen.UserInputStage.create(neohookean_ogden, ("TRI3",), 16, None)
         form_collection = gen._evaluate_forms(user_input).by_dim[2].units[0].form_evaluation
 
-        with self.assertRaisesRegex(ValueError, "target 'cuda' is not supported"):
-            GenerationPlan((
-                gen.KernelPlan(
-                    "cuda_kernel",
-                    "energy",
-                    form_collection,
-                    2,
-                    (gen.MeshPhase.LOCAL_CALL,),
-                    target=gen.KernelTarget.CUDA,
-                ),
-            )).validate_for_context(context)
+        GenerationPlan((
+            gen.KernelPlan(
+                "cuda_kernel",
+                "energy",
+                form_collection,
+                2,
+                (gen.MeshPhase.LOCAL_CALL,),
+                target=gen.KernelTarget.CUDA,
+            ),
+        )).validate_for_context(context)
 
         with self.assertRaisesRegex(ValueError, "mesh phases are not in canonical order"):
             GenerationPlan((

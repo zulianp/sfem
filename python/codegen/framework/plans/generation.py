@@ -46,7 +46,11 @@ class LocalPhase(Enum):
 
 class KernelTarget(Enum):
     OPENMP = "openmp"
+    AVX512 = "avx512"
+    ARM_SVE = "arm_sve"
+    ARM_SME = "arm_sme"
     CUDA = "cuda"
+    HIP = "hip"
 
 
 class KernelScope(Enum):
@@ -602,8 +606,6 @@ class KernelPlan:
                 "kernel '%s' dimension %d does not match context dimension %d"
                 % (self.name, self.dim, context.specialization.dim)
             )
-        if self.target is not KernelTarget.OPENMP:
-            raise ValueError("kernel '%s' target '%s' is not supported" % (self.name, self.target.value))
         _validate_phase_sequence(
             "mesh",
             tuple(phase.phase for phase in self.mesh_phase_plans),

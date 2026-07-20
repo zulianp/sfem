@@ -391,18 +391,29 @@ Status update:
 
 Goal: verify the unified backend with generated code and hardcoded references.
 
+Status: implemented. `test_m9_regression` adds hardcoded Python reference
+checks for Taylor-Hood Stokes monolithic residual/Jacobian-action coefficients
+on `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`, plus coupled
+poro-hyperelastic monolithic and coupled block-kernel reference checks.
+Maintained material examples now regenerate from clean temporary directories,
+compile representative generated operators when `c++` is available, and verify
+wrapper manifests, C ABI entries, runtime operation metadata, diagnostics
+artifacts, and specialized geometry/basis/phase plan metadata. The
+`run_m9_regression.sh` entry point runs the Python regression suite and reports
+optional compiler/toolchain skips explicitly.
+
 Tasks:
 
-1. Add hardcoded Python reference action tests for Taylor-Hood generated kernels
+1. [x] Add hardcoded Python reference action tests for Taylor-Hood generated kernels
    on:
    - `TRI6_TRI3`
    - `TET10_TET4`
    - `HEX27_HEX8`
-2. Add at least one hardcoded Python reference test for a coupled
+2. [x] Add at least one hardcoded Python reference test for a coupled
    poro-hyperelastic monolithic path.
-3. Add at least one hardcoded Python reference test for a generated block kernel
+3. [x] Add at least one hardcoded Python reference test for a generated block kernel
    from a coupled formulation.
-4. Add generated compile tests for all maintained material examples:
+4. [x] Add generated compile tests for all maintained material examples:
    - NeoHookean Ogden
    - Mooney-Rivlin
    - two-phase flow
@@ -410,12 +421,12 @@ Tasks:
    - poro-hyperelasticity
    - Neumann
    - Neumann-general
-5. Add generated wrapper compile and runtime execution tests for all maintained
+5. [x] Add generated wrapper compile and runtime execution tests for all maintained
    `op_name` materials.
-6. Add plan-dump schema tests that verify every maintained material has
+6. [x] Add plan-dump schema tests that verify every maintained material has
    explicit geometry, basis, data-stream, local-phase, mesh-phase, diagnostics,
    and ABI metadata.
-7. Add a single bash entry point that runs Python tests, generated compile
+7. [x] Add a single bash entry point that runs Python tests, generated compile
    tests, wrapper compile tests, and optional vectorization/CUDA tests.
 
 Acceptance criteria:

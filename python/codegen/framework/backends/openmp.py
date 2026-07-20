@@ -21,6 +21,7 @@ from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
 )
+from codegen.framework.backends.targets import OpenMPTarget, TargetLanguage
 
 
 @dataclass(frozen=True)
@@ -61,9 +62,12 @@ class OpenMPSoABackend:
     """Single OpenMP/SoA backend boundary for planned code-generation units."""
 
     supports_op_wrapper: bool = True
-    emitter: object = OpenMPEnergySoAEmitter()
+    target: object = OpenMPTarget()
+    emitter: object = None
 
     def emit(self, unit, context):
+        if self.target.language is not TargetLanguage.CPP:
+            raise ValueError("OpenMP SoA backend requires a C++ CPU target")
         unit.validate_for_context(context)
         traversal = self._traversal(unit, context)
         files = tuple(self._emit_traversal_files(traversal))
@@ -371,7 +375,10 @@ class OpenMPSoABackend:
 
     def _emit_traversal_files(self, traversal):
         if traversal.kind == "energy_soa":
-            return self.emitter.emit_plan(traversal.energy_plan)
+            emitter = self.emitter
+            if emitter is None:
+                emitter = OpenMPEnergySoAEmitter(target=self.target)
+            return emitter.emit_plan(traversal.energy_plan)
         if traversal.kind == "residual_soa":
             return generate_coupled_residual_sfem_files(
                 traversal.system,
@@ -534,7 +541,12 @@ def _expression_plan_for_order(unit, order):
 
 
 def _require_openmp(unit):
-    if unit.target is not KernelTarget.OPENMP:
+    if unit.target not in (
+        KernelTarget.OPENMP,
+        KernelTarget.AVX512,
+        KernelTarget.ARM_SVE,
+        KernelTarget.ARM_SME,
+    ):
         raise ValueError(
             "OpenMP SoA backend cannot emit target '%s'"
             % getattr(unit.target, "value", unit.target)

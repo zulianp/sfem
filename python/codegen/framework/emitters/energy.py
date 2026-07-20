@@ -407,6 +407,7 @@ class OpenMPEnergySoAEmitter:
     """Opaque OpenMP emitter: consume an energy-SoA emission plan, emit files."""
 
     supports_op_wrapper: bool = True
+    target: object = OpenMPTarget()
 
     def emit_plan(self, plan):
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
@@ -418,7 +419,7 @@ class OpenMPEnergySoAEmitter:
             emission_plan=plan.emission_plan,
             reference_data_plan=plan.reference_data_plan,
             diagnostics_plan=plan.diagnostics_plan,
-            source_builder=OpenMPEnergySoASourceBuilder(),
+            source_builder=OpenMPEnergySoASourceBuilder(target=self.target),
         )
 
 
@@ -427,6 +428,8 @@ class CUDAEnergySoAEmitter:
     """Opaque CUDA emitter: consume an energy-SoA emission plan, emit files."""
 
     supports_op_wrapper: bool = False
+    target: object = CUDATarget()
+    operator_extension: str = "cu"
 
     def emit_plan(self, plan):
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
@@ -438,5 +441,8 @@ class CUDAEnergySoAEmitter:
             emission_plan=plan.emission_plan,
             reference_data_plan=plan.reference_data_plan,
             diagnostics_plan=plan.diagnostics_plan,
-            source_builder=CUDAEnergySoASourceBuilder(),
+            source_builder=CUDAEnergySoASourceBuilder(
+                operator_extension=self.operator_extension,
+                target=self.target,
+            ),
         )

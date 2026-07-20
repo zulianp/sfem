@@ -3,6 +3,7 @@ import math
 import sympy as sp
 
 from codegen.framework.symbolic.core import GeneratedKernelFile, _sfem_ccode, _sfem_math_header_source
+from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_header
 from codegen.framework.fem.reference import (
     sfem_is_proteus_hex_element,
     sfem_tensor_product_hex_order,
@@ -93,6 +94,7 @@ def generate_boundary_residual_sfem_files(
     )
     return (
         GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile("kernel_diagnostics.hpp", "\n".join(_sfem_soa_diagnostics_header())),
         GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
     )
 
@@ -327,7 +329,6 @@ def _boundary_source(function, element_type, surface, components, parameters, co
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
-#include "sfem_defs.hpp"
 #include "sfem_macros.hpp"
 
 #include <math.h>
@@ -758,7 +759,6 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
-#include "sfem_defs.hpp"
 #include "sfem_macros.hpp"
 
 #include <math.h>

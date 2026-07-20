@@ -69,17 +69,148 @@ def generate_op_files(material, elements, kernel_sources=None):
 
 def _registration_entries_from_manifests(manifests):
     entries = []
+    seen_operators = set()
     for manifest in manifests:
         if isinstance(manifest, str):
             manifest = json.loads(manifest)
+        _validate_op_manifest(manifest)
         registration = manifest["registration"]
+        operator_name = registration["operator_name"]
+        if operator_name in seen_operators:
+            raise ValueError(
+                "generated Op manifest registration operator '%s' is duplicated"
+                % operator_name
+            )
+        seen_operators.add(operator_name)
         entries.append(
             (
-                registration["operator_name"],
+                operator_name,
                 registration["function"].replace("sfem::", ""),
             )
         )
-    return tuple(sorted(dict(entries).items()))
+    return tuple(sorted(entries))
+
+
+def _validate_op_manifest(manifest):
+    if not isinstance(manifest, dict):
+        raise TypeError("generated Op manifest must be a JSON object")
+    if manifest.get("schema") != "sfem.generated_op_manifest.v1":
+        raise ValueError("generated Op manifest has unsupported schema")
+
+    material = manifest.get("material")
+    op_name = manifest.get("op_name")
+    if not _nonempty_string(material):
+        raise ValueError("generated Op manifest requires a material name")
+    if not _nonempty_string(op_name):
+        raise ValueError("generated Op manifest requires an op_name")
+
+    wrapper = _required_mapping(manifest, "wrapper")
+    _required_string(wrapper, "header", "generated Op manifest wrapper")
+    _required_string(wrapper, "source", "generated Op manifest wrapper")
+    _required_string(wrapper, "c_abi_header", "generated Op manifest wrapper")
+
+    registration = _required_mapping(manifest, "registration")
+    _required_string(registration, "source", "generated Op manifest registration")
+    function = _required_string(registration, "function", "generated Op manifest registration")
+    operator_name = _required_string(
+        registration,
+        "operator_name",
+        "generated Op manifest registration",
+    )
+    if operator_name != op_name:
+        raise ValueError("generated Op manifest registration operator_name must match op_name")
+    if not function.startswith("sfem::"):
+        raise ValueError("generated Op manifest registration function must be namespace-qualified")
+
+    factory = _required_mapping(manifest, "factory")
+    _required_string(factory, "class", "generated Op manifest factory")
+    _required_string(factory, "create", "generated Op manifest factory")
+    _required_string(factory, "create_from_yaml", "generated Op manifest factory")
+
+    include_paths = manifest.get("generated_include_paths")
+    if not isinstance(include_paths, (list, tuple)) or not include_paths:
+        raise ValueError("generated Op manifest requires generated_include_paths")
+    if not all(_nonempty_string(path) for path in include_paths):
+        raise ValueError("generated Op manifest include paths must be strings")
+
+    c_abi = manifest.get("c_abi")
+    if not isinstance(c_abi, (list, tuple)) or not c_abi:
+        raise ValueError("generated Op manifest requires c_abi declarations")
+    c_abi_names = _validate_manifest_c_abi(c_abi)
+    _validate_manifest_runtime_operations(manifest.get("runtime_operations"), c_abi_names)
+
+
+def _validate_manifest_c_abi(c_abi):
+    names = set()
+    for index, entry in enumerate(c_abi):
+        if not isinstance(entry, dict):
+            raise ValueError("generated Op manifest c_abi entry %d must be an object" % index)
+        name = _required_string(entry, "name", "generated Op manifest c_abi entry")
+        declaration = _required_string(
+            entry,
+            "declaration",
+            "generated Op manifest c_abi entry",
+        )
+        if name in names:
+            raise ValueError("generated Op manifest c_abi function '%s' is duplicated" % name)
+        if 'extern "C"' not in declaration or not declaration.rstrip().endswith(";"):
+            raise ValueError(
+                "generated Op manifest c_abi function '%s' must be an extern C declaration"
+                % name
+            )
+        if _c_abi_function_name(declaration) != name:
+            raise ValueError(
+                "generated Op manifest c_abi function '%s' does not match its declaration"
+                % name
+            )
+        names.add(name)
+    return names
+
+
+def _validate_manifest_runtime_operations(runtime_operations, c_abi_names):
+    if not isinstance(runtime_operations, (list, tuple)) or not runtime_operations:
+        raise ValueError("generated Op manifest requires runtime_operations")
+    for operation in runtime_operations:
+        if not isinstance(operation, dict):
+            raise ValueError("generated Op manifest runtime operation must be an object")
+        _required_string(operation, "name", "generated Op manifest runtime operation")
+        variants = operation.get("variants")
+        if not isinstance(variants, (list, tuple)) or not variants:
+            raise ValueError("generated Op manifest runtime operation requires variants")
+        for variant in variants:
+            if not isinstance(variant, dict):
+                raise ValueError("generated Op manifest runtime variant must be an object")
+            _required_string(variant, "variant", "generated Op manifest runtime variant")
+            _required_string(variant, "scalar_type", "generated Op manifest runtime variant")
+            function = _required_string(
+                variant,
+                "function",
+                "generated Op manifest runtime variant",
+            )
+            _required_string(variant, "target", "generated Op manifest runtime variant")
+            if function not in c_abi_names:
+                raise ValueError(
+                    "generated Op manifest runtime function '%s' is not declared in c_abi"
+                    % function
+                )
+
+
+def _required_mapping(mapping, key):
+    value = mapping.get(key)
+    if not isinstance(value, dict):
+        raise ValueError("generated Op manifest requires %s metadata" % key)
+    return value
+
+
+def _required_string(mapping, key, context):
+    value = mapping.get(key)
+    if not _nonempty_string(value):
+        raise ValueError("%s requires %s" % (context, key))
+    return value
+
+
+def _nonempty_string(value):
+    return isinstance(value, str) and bool(value)
 
 
 def _registration_aggregate_header(function_name):
