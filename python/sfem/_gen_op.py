@@ -335,6 +335,10 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
         void set_option(const std::string &name, bool val) override;
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
@@ -364,6 +368,8 @@ def _hyperelastic_op(
     apply_cases = []
     objective_cases = []
     objective_steps_cases = []
+    hessian_crs_cases = []
+    hessian_bsr_cases = []
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     gradient_affine_aos_flags = []
@@ -589,6 +595,49 @@ def _hyperelastic_op(
                 ),
             )
         )
+        hessian_state_args = ", ".join(
+            _nonempty(
+                common_isoparametric_args,
+                *_energy_field_args(
+                    apply_dependencies,
+                    dim,
+                    components,
+                    current="current",
+                ),
+            )
+        )
+        hessian_crs_function = "%s_hessian_crs_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_crs_function):
+            hessian_crs_cases.append(
+                _case(
+                    element,
+                    hessian_crs_function,
+                    ", ".join(
+                        _nonempty(
+                            hessian_state_args,
+                            "rowptr",
+                            "colidx",
+                            "values",
+                        )
+                    ),
+                )
+            )
+        hessian_bsr_function = "%s_hessian_bsr_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
+            hessian_bsr_cases.append(
+                _case(
+                    element,
+                    hessian_bsr_function,
+                    ", ".join(
+                        _nonempty(
+                            hessian_state_args,
+                            "rowptr",
+                            "colidx",
+                            "values",
+                        )
+                    ),
+                )
+            )
 
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
@@ -913,12 +962,50 @@ namespace sfem {
         });
     }
 
-    int %(op)s::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int %(op)s::hessian_crs(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-        return SFEM_FAILURE;
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("%(op)s::hessian_crs requires a current state\\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(hessian_crs_cases)s
+                default:
+                    SFEM_ERROR("%(op)s hessian_crs does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int %(op)s::hessian_bsr(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("%(op)s::hessian_bsr requires a current state\\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(hessian_bsr_cases)s
+                default:
+                    SFEM_ERROR("%(op)s hessian_bsr does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
     }
 
     void %(op)s::set_option(const std::string &name, const bool val) {
@@ -1011,6 +1098,8 @@ namespace sfem {
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
         "objective_steps_cases": "\n".join(objective_steps_cases),
+        "hessian_crs_cases": "\n".join(hessian_crs_cases),
+        "hessian_bsr_cases": "\n".join(hessian_bsr_cases),
         "performance_methods": _performance_methods(material.op_name, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -3340,6 +3429,7 @@ def _c_abi_header(material, kernel_sources):
 #ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
 typedef ptrdiff_t idx_t;
 typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
 typedef double real_t;
 typedef double geom_t;
 #endif
@@ -3406,6 +3496,7 @@ def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, regis
             "create_from_yaml": "sfem::%s::create_from_yaml" % material.op_name,
         },
         "generated_include_paths": _generated_include_paths(kernel_sources),
+        "matrix_formats": _matrix_format_sources(kernel_sources),
         "runtime_operations": _runtime_operations(c_abi),
         "c_abi": c_abi,
     }
@@ -3422,6 +3513,19 @@ def _generated_include_paths(kernel_sources):
         dirname = os.path.dirname(path)
         paths.add(dirname if dirname else ".")
     return tuple(sorted(paths))
+
+
+def _matrix_format_sources(kernel_sources):
+    entries = []
+    for path in sorted(kernel_sources):
+        if path.endswith("_matrix_format_operator.cpp"):
+            entries.append(
+                {
+                    "source": path,
+                    "header": "matrix_formats.hpp",
+                }
+            )
+    return tuple(entries)
 
 
 def _extract_c_abi_declarations(kernel_sources):

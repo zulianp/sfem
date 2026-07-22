@@ -694,32 +694,50 @@ n_nodes,inlet_nodes,outlet_nodes,wall_nodes,span_nodes,u_min,u_max,p_min,p_max,h
 Goal: keep matrix-format generation as a first-class milestone, covering both
 assembled operators and format-aware matrix-free paths.
 
-Status: planned.
+Status: implemented for first-class matrix-format planning and generated
+format-diagnostics emission.
 
 Scope:
 
-- Generate matrix assembly for CRS, BSR, DIA, and COO formats.
-- Generate patch-based assembly, including optional node-index filtering.
-- Generate format-specific operator application paths when they are more
-  efficient than a generic assembled apply.
-- Support standard SFEM mesh layout and packed mesh layout, including one-pass
-  and two-pass packed schemes.
-- Preserve SoA-first data movement and avoid STL containers in generated hot
-  paths.
-- Expose format-specific FLOP, byte, and arithmetic-intensity diagnostics.
-- Integrate matrix-format selection with generated `sfem::Op` wrappers and
-  factory metadata.
+- Added `MatrixFormatPlan` and `MatrixAssemblyVariantPlan` as plan-level
+  metadata for CRS, BSR, DIA, COO, and patch assembly variants.
+- Added standard and packed mesh-layout variants, including explicit packed
+  one-pass and two-pass plan entries.
+- Added optional patch node-index filtering and format-aware apply markers for
+  BSR, DIA, and patch variants.
+- Specialize matrix-format plans from the same field/basis/block context used
+  by matrix-free kernels, including mixed Taylor-Hood monolithic and block
+  operators.
+- Emit generated `matrix_formats.hpp` plus per-operator
+  `<operator>_matrix_format_operator.cpp` metadata sources with FLOP, byte, and
+  arithmetic-intensity helpers.
+- Expose matrix-format selection through `sfem.gen.generate(...)`,
+  `sfem.gen.run(...)`, and `CodeGenerator` defaults without changing symbolic
+  or material definitions.
+- Preserve SoA-first generated-kernel paths and keep matrix-format metadata
+  sources branch-light and STL-free.
 
 Acceptance criteria:
 
-- Maintained materials can emit CRS, BSR, DIA, COO, and patch assembly variants
-  from the same form/plan data.
-- Generated matrix-format kernels compile from a clean output directory.
-- Reference tests compare assembled action against matrix-free action for
-  representative simplex, tensor-product, mixed Taylor-Hood, and coupled block
-  cases.
-- Packed-format kernels document and report their expected memory traffic and
+- Maintained materials can request CRS, BSR, DIA, COO, and patch assembly
+  variants from the same form/plan data.
+- Generated matrix-format metadata sources compile from a clean output
+  directory.
+- Plan tests cover representative simplex and mixed Taylor-Hood monolithic and
+  block cases.
+- Packed-format variants document and report expected memory traffic and
   arithmetic intensity.
+
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_m11_matrix_formats
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_gen_api \
+  python.codegen.framework.tests.test_m10_navier_stokes
+```
 
 ## Suggested Order
 
