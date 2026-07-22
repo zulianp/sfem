@@ -13,6 +13,7 @@ class EnergySoAKernelEmissionPlan:
     emission_plan: object
     reference_data_plan: object = None
     diagnostics_plan: object = None
+    matrix_format_plan: object = None
     local_signatures: tuple = ()
     mesh_signature: object = None
 
@@ -70,6 +71,7 @@ def energy_soa_kernel_emission_plan(unit, context):
         emission_plan=element_plan,
         reference_data_plan=reference_data_plan,
         diagnostics_plan=diagnostics_plan,
+        matrix_format_plan=unit.matrix_format_plan,
         local_signatures=local_signatures,
         mesh_signature=mesh_signature,
     )

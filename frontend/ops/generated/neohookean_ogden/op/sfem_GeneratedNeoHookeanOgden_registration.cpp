@@ -4,5 +4,6 @@
 namespace sfem {
     void register_GeneratedNeoHookeanOgden_generated_op() {
         Factory::register_op("GeneratedNeoHookeanOgden", GeneratedNeoHookeanOgden::create);
+        Factory::register_op("ss:GeneratedNeoHookeanOgden", GeneratedNeoHookeanOgden::create);
     }
 }  // namespace sfem

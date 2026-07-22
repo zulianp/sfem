@@ -21,6 +21,7 @@ from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
 )
+from codegen.framework.emitters.matrix_formats import emit_matrix_format_metadata_files
 from codegen.framework.backends.targets import OpenMPTarget, TargetLanguage
 
 
@@ -55,6 +56,7 @@ class _OpenMPTraversal:
     reference_data_plan: object = None
     diagnostics_plan: object = None
     energy_plan: object = None
+    matrix_format_plan: object = None
 
 
 @dataclass(frozen=True)
@@ -122,6 +124,7 @@ class OpenMPSoABackend:
             reference_data_plan=energy_plan.reference_data_plan,
             diagnostics_plan=energy_plan.diagnostics_plan,
             energy_plan=energy_plan,
+            matrix_format_plan=unit.matrix_format_plan,
         )
 
     def _residual_traversal(self, unit, context):
@@ -210,6 +213,7 @@ class OpenMPSoABackend:
                 mesh_signature=mesh_signature,
                 reference_data_plan=reference_data_plan,
                 diagnostics_plan=diagnostics_plan,
+                matrix_format_plan=unit.matrix_format_plan,
             )
         mesh_kernel = mesh_kernel_plan_from_context(unit, context, prefix)
         if context.is_mixed_order:
@@ -271,6 +275,7 @@ class OpenMPSoABackend:
                 mesh_signature=mesh_signature,
                 reference_data_plan=reference_data_plan,
                 diagnostics_plan=diagnostics_plan,
+                matrix_format_plan=unit.matrix_format_plan,
             )
         kind = "residual_soa"
         emission_plan = _validated_emission_plan(unit, context)
@@ -323,6 +328,7 @@ class OpenMPSoABackend:
             mesh_signature=mesh_signature,
             reference_data_plan=reference_data_plan,
             diagnostics_plan=diagnostics_plan,
+            matrix_format_plan=unit.matrix_format_plan,
         )
 
     def _boundary_residual_traversal(self, unit, context):
@@ -371,16 +377,18 @@ class OpenMPSoABackend:
             mesh_signature=mesh_signature,
             reference_data_plan=reference_data_plan,
             diagnostics_plan=diagnostics_plan,
+            matrix_format_plan=unit.matrix_format_plan,
         )
 
     def _emit_traversal_files(self, traversal):
+        files = ()
         if traversal.kind == "energy_soa":
             emitter = self.emitter
             if emitter is None:
                 emitter = OpenMPEnergySoAEmitter(target=self.target)
-            return emitter.emit_plan(traversal.energy_plan)
-        if traversal.kind == "residual_soa":
-            return generate_coupled_residual_sfem_files(
+            files = tuple(emitter.emit_plan(traversal.energy_plan))
+        elif traversal.kind == "residual_soa":
+            files = tuple(generate_coupled_residual_sfem_files(
                 traversal.system,
                 prefix=traversal.prefix,
                 emission_plan=traversal.emission_plan,
@@ -392,9 +400,9 @@ class OpenMPSoABackend:
                 operator_name=traversal.operator_name,
                 reference_data_plan=traversal.reference_data_plan,
                 diagnostics_plan=traversal.diagnostics_plan,
-            )
-        if traversal.kind == "mixed_residual_soa":
-            return generate_mixed_residual_sfem_files(
+            ))
+        elif traversal.kind == "mixed_residual_soa":
+            files = tuple(generate_mixed_residual_sfem_files(
                 traversal.system,
                 prefix=traversal.prefix,
                 compatible_element=traversal.compatible_element,
@@ -408,17 +416,24 @@ class OpenMPSoABackend:
                 operator_name=traversal.operator_name,
                 reference_data_plan=traversal.reference_data_plan,
                 diagnostics_plan=traversal.diagnostics_plan,
-            )
-        if traversal.kind == "boundary_residual_soa":
-            return generate_boundary_residual_sfem_files(
+            ))
+        elif traversal.kind == "boundary_residual_soa":
+            files = tuple(generate_boundary_residual_sfem_files(
                 traversal.unit.form_collection,
                 prefix=traversal.operator_prefix,
                 emission_plan=traversal.emission_plan,
                 expression_plan=traversal.boundary_expression_plan,
                 reference_data_plan=traversal.reference_data_plan,
                 diagnostics_plan=traversal.diagnostics_plan,
+            ))
+        else:
+            raise ValueError("unsupported OpenMP SoA traversal kind '%s'" % traversal.kind)
+        return files + tuple(
+            emit_matrix_format_metadata_files(
+                traversal.operator_prefix,
+                traversal.matrix_format_plan,
             )
-        raise ValueError("unsupported OpenMP SoA traversal kind '%s'" % traversal.kind)
+        )
 
     @staticmethod
     def _validate_mesh_source_contract(files):
@@ -452,7 +467,12 @@ class OpenMPSoABackend:
                 % (local_name, local_prefix)
             )
         include = '#include "%s"' % local_name
-        for operator in (file for file in files if file.path.endswith("_operator.cpp")):
+        for operator in (
+            file
+            for file in files
+            if file.path.endswith("_operator.cpp")
+            and not file.path.endswith("_matrix_format_operator.cpp")
+        ):
             if include not in operator.source:
                 raise RuntimeError(
                     "OpenMP SoA operator '%s' does not include '%s'"

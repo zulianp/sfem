@@ -138,6 +138,14 @@ from codegen.framework import (
 )
 from codegen.framework.plans.emission import ElementEmissionPlan as _ElementEmissionPlan
 from codegen.framework.plans.generation import GenerationPlan as _GenerationPlan
+from codegen.framework.plans.matrix_formats import (
+    MatrixAssemblyVariantPlan,
+    MatrixFormat,
+    MatrixFormatPlan,
+    MatrixMeshLayout,
+    PackedAssemblyPass,
+    matrix_format_plan_from_request,
+)
 from codegen.framework.fem import (
     SfemCompatibleElement,
     SfemElementBasisPolicy,
@@ -221,6 +229,10 @@ class CodeGenerator:
     op_name: str = None
     parameter_defaults: tuple = ()
     quadrature_settings: tuple = ()
+    matrix_formats: tuple = ()
+    matrix_mesh_layouts: tuple = ("standard",)
+    matrix_packed_passes: tuple = ("one_pass", "two_pass")
+    matrix_patch_node_index_filter: bool = False
 
     def __post_init__(self):
         _validate_name(self.name)
@@ -237,6 +249,16 @@ class CodeGenerator:
             self,
             "quadrature_settings",
             tuple(_normalize_quadrature_setting(setting) for setting in self.quadrature_settings),
+        )
+        object.__setattr__(
+            self,
+            "matrix_format_plan",
+            matrix_format_plan_from_request(
+                self.matrix_formats,
+                self.matrix_mesh_layouts,
+                self.matrix_packed_passes,
+                self.matrix_patch_node_index_filter,
+            ),
         )
         _validate_op(self.op_name, self.parameter_defaults)
 
@@ -397,13 +419,21 @@ class UserInputStage:
     vector_size: int
     quadrature_order: object
     element_contexts: tuple
+    matrix_format_plan: object = None
 
     @property
     def stage(self):
         return PipelineStage.USER_INPUT
 
     @classmethod
-    def create(cls, material, elements, vector_size, quadrature_order):
+    def create(
+        cls,
+        material,
+        elements,
+        vector_size,
+        quadrature_order,
+        matrix_format_plan=None,
+    ):
         contexts = []
         for element in elements:
             isoparametric_case = _integration_case_for_material_element(
@@ -435,12 +465,15 @@ class UserInputStage:
                     affine_case,
                 )
             )
+        if matrix_format_plan is None:
+            matrix_format_plan = getattr(material, "matrix_format_plan", None)
         return cls(
             material,
             tuple(elements),
             vector_size,
             quadrature_order,
             tuple(contexts),
+            matrix_format_plan,
         )
 
 
@@ -574,6 +607,7 @@ class LoweredEquationEvaluation:
     data_symbols: object = None
     kernels: tuple = ()
     diagnostics: bool = True
+    matrix_format_plan: object = None
 
 
 @dataclass(frozen=True)
@@ -586,6 +620,7 @@ class DimensionFormEvaluation:
 class UnifiedFormEvaluation:
     material: object
     by_dim: dict
+    matrix_format_plan: object = None
 
     @property
     def stage(self):
@@ -658,6 +693,10 @@ def generate(
     dump_plan=False,
     plan_out=None,
     target="openmp",
+    matrix_formats=None,
+    matrix_mesh_layouts=None,
+    matrix_packed_passes=None,
+    matrix_patch_node_index_filter=None,
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
@@ -672,11 +711,19 @@ def generate(
     if clean:
         _clean_outputs(out_dir, material.name)
 
+    matrix_format_plan = _selected_matrix_format_plan(
+        material,
+        matrix_formats,
+        matrix_mesh_layouts,
+        matrix_packed_passes,
+        matrix_patch_node_index_filter,
+    )
     user_input = UserInputStage.create(
         material,
         selected,
         vector_size,
         quadrature_order,
+        matrix_format_plan,
     )
     form_evaluation = _evaluate_forms(user_input)
     codegen_plan = SpecializedFormManipulationStage(
@@ -723,6 +770,29 @@ def run(material, default_out_dir, argv=None):
         help="Write a JSON generation-plan dump next to generated sources.",
     )
     parser.add_argument(
+        "--matrix-format",
+        action="append",
+        dest="matrix_formats",
+        help="Matrix assembly format to emit: crs, bsr, dia, coo, patch, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--matrix-layout",
+        action="append",
+        dest="matrix_mesh_layouts",
+        help="Matrix assembly mesh layout: standard, packed, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--packed-pass",
+        action="append",
+        dest="matrix_packed_passes",
+        help="Packed mesh assembly pass: one_pass, two_pass, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--patch-node-index-filter",
+        action="store_true",
+        help="Emit patch assembly metadata with node-index filtering enabled.",
+    )
+    parser.add_argument(
         "--plan-out",
         help="Path for the JSON generation-plan dump. Implies --dump-plan.",
     )
@@ -744,6 +814,10 @@ def run(material, default_out_dir, argv=None):
             dump_plan=args.dump_plan,
             plan_out=args.plan_out,
             target=args.target,
+            matrix_formats=args.matrix_formats,
+            matrix_mesh_layouts=args.matrix_mesh_layouts,
+            matrix_packed_passes=args.matrix_packed_passes,
+            matrix_patch_node_index_filter=args.patch_node_index_filter,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
@@ -792,13 +866,18 @@ def _evaluate_forms(user_input):
                     equation,
                     orders=_equation_form_orders(equation),
                 ),
+                user_input.matrix_format_plan,
             )
             for equation in material_system.equations
         )
         if not units:
             raise ValueError("material '%s' did not define any equations" % user_input.material.name)
         by_dim[dim] = DimensionFormEvaluation(dim, units)
-    return UnifiedFormEvaluation(user_input.material, by_dim)
+    return UnifiedFormEvaluation(
+        user_input.material,
+        by_dim,
+        user_input.matrix_format_plan,
+    )
 
 
 def _codegen_plan_from_form_evaluation(form_evaluation):
@@ -882,6 +961,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             diagnostic_graph,
             evaluated.form_evaluation,
         ),
+        matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
         coupling=KernelCoupling.SINGLE_FIELD,
         material_name=material_name,
         unit_name=evaluated.name,
@@ -902,6 +982,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             mesh_phase_plans=_residual_mesh_phase_plans(blocks),
             blocks=blocks,
             expression_plans=_form_collection_expression_plans(collection),
+            matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
             target=KernelTarget.OPENMP,
             coupling=coupling,
             material_name=material_name,
@@ -924,6 +1005,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         scope=KernelScope.MONOLITHIC,
         coupling=coupling,
         expression_plans=_form_collection_expression_plans(collection),
+        matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
         target=KernelTarget.OPENMP,
         material_name=material_name,
         unit_name=evaluated.name,
@@ -1092,6 +1174,7 @@ def _block_codegen_units(material_name, dim, evaluated, blocks):
                 evaluated.form_evaluation,
                 block,
             ),
+            matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
             material_name=material_name,
             unit_name=_block_unit_name(evaluated.name, block),
         )
@@ -1128,6 +1211,48 @@ def _normalize_generation_target(target):
     if isinstance(target, KernelTarget):
         return target
     return KernelTarget(str(target).lower())
+
+
+def _selected_matrix_format_plan(
+    material,
+    matrix_formats,
+    matrix_mesh_layouts,
+    matrix_packed_passes,
+    matrix_patch_node_index_filter,
+):
+    material_plan = getattr(material, "matrix_format_plan", None)
+    if matrix_formats is None:
+        return material_plan
+    mesh_layouts = (
+        getattr(material, "matrix_mesh_layouts", ("standard",))
+        if matrix_mesh_layouts is None
+        else matrix_mesh_layouts
+    )
+    packed_passes = (
+        getattr(material, "matrix_packed_passes", ("one_pass", "two_pass"))
+        if matrix_packed_passes is None
+        else matrix_packed_passes
+    )
+    patch_filter = (
+        getattr(material, "matrix_patch_node_index_filter", False)
+        if matrix_patch_node_index_filter is None
+        else matrix_patch_node_index_filter
+    )
+    return matrix_format_plan_from_request(
+        matrix_formats,
+        mesh_layouts,
+        packed_passes,
+        patch_filter,
+    )
+
+
+def _matrix_format_plan_for_evaluation(evaluated):
+    plan = getattr(evaluated, "matrix_format_plan", None)
+    if plan is None or plan.is_empty:
+        return None
+    if not any(form.order is FormOrder.TWO for form in evaluated.form_evaluation.forms):
+        return None
+    return plan
 
 
 def _layout_codegen_files(unit, context, files):
@@ -1208,6 +1333,7 @@ _CODEGEN_COMMON_HEADERS = frozenset(
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
+        "matrix_formats.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1271,7 +1397,7 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
     return generate_op_files(material, selected, kernel_sources)
 
 
-def _evaluate_equation(dim, equation, form_collection):
+def _evaluate_equation(dim, equation, form_collection, matrix_format_plan=None):
     if not isinstance(form_collection, FormCollection):
         raise TypeError("equation evaluation requires a lowered FormCollection")
     if equation.is_energy:
@@ -1287,11 +1413,16 @@ def _evaluate_equation(dim, equation, form_collection):
             data_symbols=data_symbols,
             kernels=equation.kernels,
             diagnostics=equation.diagnostics,
+            matrix_format_plan=matrix_format_plan if "apply" in equation.kernels else None,
         )
     if equation.is_residual:
         if form_collection.kind is not FormKind.RESIDUAL:
             raise TypeError("residual equation requires a residual FormCollection")
-        return LoweredEquationEvaluation(equation.name, form_collection)
+        return LoweredEquationEvaluation(
+            equation.name,
+            form_collection,
+            matrix_format_plan=matrix_format_plan,
+        )
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
@@ -1452,6 +1583,7 @@ def _clean_outputs(out_dir, name):
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
+        "matrix_formats.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1479,6 +1611,7 @@ def _clean_outputs(out_dir, name):
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
+        "matrix_formats.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1631,6 +1764,10 @@ __all__ = [
     "MATERIAL_PARAMETER",
     "MaterialParameter",
     "MaterialParameterQualifier",
+    "MatrixAssemblyVariantPlan",
+    "MatrixFormat",
+    "MatrixFormatPlan",
+    "MatrixMeshLayout",
     "MixedFunctionSpace",
     "PRESSURE",
     "PREVIOUS_ARGUMENT",
@@ -1673,8 +1810,10 @@ __all__ = [
     "inner",
     "inv",
     "material_parameter",
+    "matrix_format_plan_from_request",
     "matrix_inner",
     "old",
+    "PackedAssemblyPass",
     "previous_function",
     "qualifiers",
     "qualify",

@@ -419,6 +419,7 @@ class OpenMPEnergySoAEmitter:
             emission_plan=plan.emission_plan,
             reference_data_plan=plan.reference_data_plan,
             diagnostics_plan=plan.diagnostics_plan,
+            matrix_format_plan=plan.matrix_format_plan,
             source_builder=OpenMPEnergySoASourceBuilder(target=self.target),
         )
 
