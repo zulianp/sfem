@@ -1126,6 +1126,145 @@ namespace sfem {
         });
     }
 
+    int GeneratedNeoHookeanOgden::hessian_dia(const real_t *const x,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_dia");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_dia requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3:
+                    return neohookean_ogden_tri3_tri3_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
+                case smesh::TRI6:
+                    return neohookean_ogden_tri6_tri6_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
+                case smesh::QUAD4:
+                    return neohookean_ogden_quad4_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
+                case smesh::TET4:
+                    return neohookean_ogden_tet4_tet4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::TET10:
+                    return neohookean_ogden_tet10_tet10_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::HEX8:
+                    return neohookean_ogden_hex8_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::HEX27:
+                    return neohookean_ogden_hex27_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX8:
+                    return neohookean_ogden_proteus_hex8_proteus_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX27:
+                    return neohookean_ogden_proteus_hex27_proteus_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX64:
+                    return neohookean_ogden_proteus_hex64_proteus_hex64_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX125:
+                    return neohookean_ogden_proteus_hex125_proteus_hex125_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX729:
+                    return neohookean_ogden_proteus_hex729_proteus_hex729_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
+                default:
+                    SFEM_ERROR("GeneratedNeoHookeanOgden hessian_dia does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedNeoHookeanOgden::hessian_coo(const real_t *const x,
+                            const ptrdiff_t nnz,
+                            const idx_t *const rows,
+                            const idx_t *const cols,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_coo");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_coo requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3:
+                    return neohookean_ogden_tri3_tri3_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
+                case smesh::TRI6:
+                    return neohookean_ogden_tri6_tri6_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
+                case smesh::QUAD4:
+                    return neohookean_ogden_quad4_quad4_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
+                case smesh::TET4:
+                    return neohookean_ogden_tet4_tet4_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::TET10:
+                    return neohookean_ogden_tet10_tet10_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::HEX8:
+                    return neohookean_ogden_hex8_hex8_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::HEX27:
+                    return neohookean_ogden_hex27_hex27_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::PROTEUS_HEX8:
+                    return neohookean_ogden_proteus_hex8_proteus_hex8_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::PROTEUS_HEX27:
+                    return neohookean_ogden_proteus_hex27_proteus_hex27_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::PROTEUS_HEX64:
+                    return neohookean_ogden_proteus_hex64_proteus_hex64_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::PROTEUS_HEX125:
+                    return neohookean_ogden_proteus_hex125_proteus_hex125_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                case smesh::PROTEUS_HEX729:
+                    return neohookean_ogden_proteus_hex729_proteus_hex729_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
+                default:
+                    SFEM_ERROR("GeneratedNeoHookeanOgden hessian_coo does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedNeoHookeanOgden::hessian_patch(const real_t *const x,
+                              const count_t *const rowptr,
+                              const idx_t *const colidx,
+                              real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_patch");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_patch requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+                case smesh::TRI3:
+                    return neohookean_ogden_tri3_tri3_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::TRI6:
+                    return neohookean_ogden_tri6_tri6_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::QUAD4:
+                    return neohookean_ogden_quad4_quad4_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::TET4:
+                    return neohookean_ogden_tet4_tet4_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::TET10:
+                    return neohookean_ogden_tet10_tet10_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::HEX8:
+                    return neohookean_ogden_hex8_hex8_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::HEX27:
+                    return neohookean_ogden_hex27_hex27_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::PROTEUS_HEX8:
+                    return neohookean_ogden_proteus_hex8_proteus_hex8_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::PROTEUS_HEX27:
+                    return neohookean_ogden_proteus_hex27_proteus_hex27_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::PROTEUS_HEX64:
+                    return neohookean_ogden_proteus_hex64_proteus_hex64_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::PROTEUS_HEX125:
+                    return neohookean_ogden_proteus_hex125_proteus_hex125_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                case smesh::PROTEUS_HEX729:
+                    return neohookean_ogden_proteus_hex729_proteus_hex729_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                default:
+                    SFEM_ERROR("GeneratedNeoHookeanOgden hessian_patch does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
     void GeneratedNeoHookeanOgden::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::set_option");
         AffineOption options[] = {

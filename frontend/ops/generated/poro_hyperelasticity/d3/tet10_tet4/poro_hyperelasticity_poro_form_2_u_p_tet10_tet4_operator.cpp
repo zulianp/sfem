@@ -553,47 +553,19 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_
                 block_output[stream][lane] = scalar_t(0);
             }
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        const scalar_t *block_direction_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
+        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[10];
+        for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t *block_output_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[DIM * DIM];
+        for (int component = 0; component < DIM * DIM; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
 
-        poro_hyperelasticity_poro_form_2_u_p_d3_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_affine_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, block_output_streams);
+        poro_hyperelasticity_poro_form_2_u_p_d3_simplex_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_affine_reference_data<scalar_t>::q_weight(), block_direction, alpha, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
@@ -811,16 +783,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_
         const scalar_t *const field_shape[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_shape(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_shape()};
         const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_z()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        const scalar_t *block_direction_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_direction_streams[stream] = block_direction[stream];
-        }
-        scalar_t *block_output_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
 
-        poro_hyperelasticity_poro_form_2_u_p_d3_simplex_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::q_weight(), block_direction_streams, alpha, block_output_streams);
+        poro_hyperelasticity_poro_form_2_u_p_d3_simplex_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::q_weight(), block_direction, alpha, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
@@ -903,4 +867,159 @@ extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_action_i
         float *const SFEM_RESTRICT p_out
 ) {
     return sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, alpha, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE void poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t element,
+        const ptrdiff_t out_stride,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int N_ROW_STREAMS = 30;
+    static constexpr int N_COL_STREAMS = 4;
+    static constexpr int ROW_COMPONENT[N_ROW_STREAMS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
+    static constexpr int ROW_SHAPE[N_ROW_STREAMS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    static constexpr int COL_COMPONENT[N_COL_STREAMS] = {3, 3, 3, 3};
+    static constexpr int COL_SHAPE[N_COL_STREAMS] = {0, 1, 2, 3};
+    const ptrdiff_t element_offset = element * N_ROW_STREAMS * N_COL_STREAMS;
+    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
+        const idx_t row_node = elements[ROW_SHAPE[row_stream]][element];
+        const idx_t global_row = row_node * out_stride + ROW_COMPONENT[row_stream];
+        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
+            const idx_t col_node = elements[COL_SHAPE[col_stream]][element];
+            const ptrdiff_t entry = element_offset + row_stream * N_COL_STREAMS + col_stream;
+            rows[entry] = global_row;
+            cols[entry] = col_node * out_stride + COL_COMPONENT[col_stream];
+            values[entry] = element_matrix[row_stream * N_COL_STREAMS + col_stream];
+        }
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        scalar_t *const SFEM_RESTRICT values
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 11;
+    static constexpr int CELL_N_SHAPE = 10;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 2;
+    static constexpr int N_FIELD_STREAMS = 34;
+    static constexpr int VECTOR_SIZE = 1;
+    (void)nnodes;
+    const scalar_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_x();
+    const scalar_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_y();
+    const scalar_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const ptrdiff_t evbegin = element;
+        const int nelems = 1;
+        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
+        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+        scalar_t block_determinant[N_QP * VECTOR_SIZE];
+        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t element_matrix[120];
+
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                }
+            }
+        }
+
+        scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        for (int q = 0; q < N_QP; ++q) {
+            const int lane = 0;
+            const scalar_t J00 = block_coordinates[0][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 9];
+            const scalar_t J01 = block_coordinates[0][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 9];
+            const scalar_t J02 = block_coordinates[0][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 9];
+            const scalar_t J10 = block_coordinates[1][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 9];
+            const scalar_t J11 = block_coordinates[1][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 9];
+            const scalar_t J12 = block_coordinates[1][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 9];
+            const scalar_t J20 = block_coordinates[2][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_cell_grad_ref_0[q * CELL_N_SHAPE + 9];
+            const scalar_t J21 = block_coordinates[2][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_cell_grad_ref_1[q * CELL_N_SHAPE + 9];
+            const scalar_t J22 = block_coordinates[2][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_cell_grad_ref_2[q * CELL_N_SHAPE + 9];
+            geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                    J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                    block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+        }
+
+        const scalar_t *const field_shape[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_shape(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_shape()};
+        const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::tet4_grad_ref_z()};
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+
+        static constexpr int ROW_STREAMS[30] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29};
+        static constexpr int COL_STREAMS[4] = {30, 31, 32, 33};
+        for (int entry = 0; entry < 120; ++entry) {
+            element_matrix[entry] = scalar_t(0);
+        }
+        for (int trial_local = 0; trial_local < 4; ++trial_local) {
+            const int trial = COL_STREAMS[trial_local];
+            for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+                block_direction[stream][0] = scalar_t(0);
+                block_output[stream][0] = scalar_t(0);
+            }
+            block_direction[trial][0] = scalar_t(1);
+            poro_hyperelasticity_poro_form_2_u_p_d3_simplex_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_isoparametric_reference_data<scalar_t>::q_weight(), block_direction, alpha, block_output);
+            for (int test_local = 0; test_local < 30; ++test_local) {
+                const int test = ROW_STREAMS[test_local];
+                element_matrix[test_local * 4 + trial_local] = block_output[test][0];
+            }
+        }
+
+        poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(elements, element, out_stride, element_matrix, rows, cols, values);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, alpha, out_stride, rows, cols, values);
+}
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, alpha, out_stride, rows, cols, values);
 }

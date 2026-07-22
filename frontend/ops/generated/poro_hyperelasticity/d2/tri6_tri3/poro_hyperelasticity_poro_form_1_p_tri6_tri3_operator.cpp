@@ -479,36 +479,19 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_tri6_tri3_residual_aff
                 block_output[stream][lane] = scalar_t(0);
             }
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
-        const scalar_t *block_current_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_current_streams[stream] = block_current[stream];
+        const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[5];
+        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        const scalar_t *block_previous_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_previous_streams[stream] = block_previous[stream];
-        }
-        scalar_t *block_output_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const scalar_t *block_adjugate[DIM * DIM];
+        for (int component = 0; component < DIM * DIM; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
 
-        poro_hyperelasticity_poro_form_1_p_d2_simplex_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_1_p_affine_reference_data<scalar_t>::q_weight(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
+        poro_hyperelasticity_poro_form_1_p_d2_simplex_mixed_residual_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_1_p_affine_reference_data<scalar_t>::q_weight(), block_current, block_previous, alpha, dt, hydraulic_conductivity, storage, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
@@ -711,20 +694,8 @@ static SFEM_INLINE int poro_hyperelasticity_poro_form_1_p_tri6_tri3_residual_iso
         const scalar_t *const field_shape[N_FIELDS] = {sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri6_shape(), sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri3_shape()};
         const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri6_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri6_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri3_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::tri3_grad_ref_y()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        const scalar_t *block_current_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_current_streams[stream] = block_current[stream];
-        }
-        const scalar_t *block_previous_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_previous_streams[stream] = block_previous[stream];
-        }
-        scalar_t *block_output_streams[N_FIELD_STREAMS];
-        for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
 
-        poro_hyperelasticity_poro_form_1_p_d2_simplex_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::q_weight(), block_current_streams, block_previous_streams, alpha, dt, hydraulic_conductivity, storage, block_output_streams);
+        poro_hyperelasticity_poro_form_1_p_d2_simplex_mixed_residual_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_form_1_p_isoparametric_reference_data<scalar_t>::q_weight(), block_current, block_previous, alpha, dt, hydraulic_conductivity, storage, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];

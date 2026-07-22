@@ -6,12 +6,16 @@
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
 #endif
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
+#endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <cstdio>
 
 namespace sfem {
 namespace codegen {
@@ -860,42 +864,22 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_hex8_residual_affine_mesh_soa_i
             }
         }
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[9] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        const scalar_t *const block_current_streams[16] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
+        const scalar_t *const block_previous_streams[16] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
+        scalar_t *const block_output_streams[16] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
+        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[10];
+        for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+        }
+        const scalar_t *block_adjugate[9];
+        for (int component = 0; component < 9; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
+        }
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current_streams, block_previous_streams, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output_streams);
+        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current_streams, block_previous_streams, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output_streams);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1118,9 +1102,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mes
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
-        const scalar_t *const block_current_streams[N_FIELDS * N_SHAPE] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
-        const scalar_t *const block_previous_streams[N_FIELDS * N_SHAPE] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
+        const scalar_t *const block_current_streams[16] = {block_current[0], block_current[1], block_current[2], block_current[3], block_current[6], block_current[7], block_current[4], block_current[5], block_current[8], block_current[9], block_current[10], block_current[11], block_current[14], block_current[15], block_current[12], block_current[13]};
+        const scalar_t *const block_previous_streams[16] = {block_previous[0], block_previous[1], block_previous[2], block_previous[3], block_previous[6], block_previous[7], block_previous[4], block_previous[5], block_previous[8], block_previous[9], block_previous[10], block_previous[11], block_previous[14], block_previous[15], block_previous[12], block_previous[13]};
+        scalar_t *const block_output_streams[16] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
         two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current_streams, block_previous_streams, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output_streams);
@@ -1304,12 +1288,16 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_hex8_jacobian_action_affine_mes
             }
         }
 
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        scalar_t *const block_output_streams[16] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
+        const jacobian_t *const affine_geometry_sources[1] = {g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[1][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[1];
+        for (int geometry_stream = 0; geometry_stream < 1; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+        }
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, affine_shape_1d, affine_q_weight_1d, block_output_streams);
+        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[0], affine_shape_1d, affine_q_weight_1d, block_output_streams);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1416,7 +1404,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_hex8_jacobian_action_isoparamet
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
-        scalar_t *const block_output_streams[N_FIELDS * N_SHAPE] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
+        scalar_t *const block_output_streams[16] = {block_output[0], block_output[1], block_output[2], block_output[3], block_output[6], block_output[7], block_output[4], block_output[5], block_output[8], block_output[9], block_output[10], block_output[11], block_output[14], block_output[15], block_output[12], block_output[13]};
 
         two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape_1d, isoparametric_q_weight_1d, block_output_streams);
 

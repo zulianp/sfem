@@ -13,6 +13,7 @@
 #ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
 typedef ptrdiff_t idx_t;
 typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
 typedef double real_t;
 typedef double geom_t;
 #endif
@@ -22,6 +23,8 @@ typedef double geom_t;
 #endif
 
 #include "../kernel_diagnostics.hpp"
+#include "../matrix_formats.hpp"
+
 
 extern "C" void poro_hyperelasticity_poro_form_1_p_hex27_hex8_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
@@ -66,6 +69,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_p_hex27_hex8_jacobian_action_is
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" void poro_hyperelasticity_poro_form_1_p_hex27_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_p_hex27_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_p_hex27_hex8_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_poro_form_1_p_hex27_hex8_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -253,6 +262,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_p_tet10_tet4_jacobian_action_is
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_1_p_tet10_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_p_tet10_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_p_tet10_tet4_matrix_assembly_variant_count();
+
 extern "C" int poro_hyperelasticity_poro_form_1_p_tet10_tet4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -439,6 +454,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_p_tri6_tri3_jacobian_action_iso
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_1_p_tri6_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_p_tri6_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_p_tri6_tri3_matrix_assembly_variant_count();
+
 extern "C" int poro_hyperelasticity_poro_form_1_p_tri6_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -615,6 +636,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_u_hex27_hex8_jacobian_action_is
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_1_u_hex27_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_u_hex27_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_u_hex27_hex8_matrix_assembly_variant_count();
+
 extern "C" int poro_hyperelasticity_poro_form_1_u_hex27_hex8_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -776,6 +803,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_u_tet10_tet4_jacobian_action_is
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" void poro_hyperelasticity_poro_form_1_u_tet10_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_u_tet10_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_u_tet10_tet4_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_poro_form_1_u_tet10_tet4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -939,6 +972,12 @@ extern "C" void poro_hyperelasticity_poro_form_1_u_tri6_tri3_jacobian_action_iso
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_1_u_tri6_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_1_u_tri6_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_1_u_tri6_tri3_matrix_assembly_variant_count();
+
 extern "C" int poro_hyperelasticity_poro_form_1_u_tri6_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1046,6 +1085,34 @@ extern "C" void poro_hyperelasticity_poro_form_1_u_tri6_tri3_residual_isoparamet
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1165,6 +1232,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_jacobian_action_isopar
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_p_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_hex8_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -1208,6 +1281,34 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_hex8_residual_isoparametric
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tet4_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tet4_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_p_tet4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1327,6 +1428,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_tet4_jacobian_action_isopar
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_p_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tet4_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_p_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -1370,6 +1477,34 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_tet4_residual_isoparametric
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tri3_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tri3_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1479,6 +1614,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_tri3_jacobian_action_isopar
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_p_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_p_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_p_tri3_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_p_tri3_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -1522,6 +1663,32 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_p_tri3_residual_isoparametric
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1645,6 +1812,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_jacobian_action_
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -1688,6 +1861,32 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_hex27_hex8_residual_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1811,6 +2010,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_jacobian_action_
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -1854,6 +2059,32 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_tet10_tet4_residual_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1967,6 +2198,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_jacobian_action_i
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -2010,6 +2247,30 @@ extern "C" void poro_hyperelasticity_poro_form_2_p_u_tri6_tri3_residual_isoparam
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -2129,6 +2390,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_jacobian_action_
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -2172,6 +2439,30 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_hex27_hex8_residual_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -2291,6 +2582,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_jacobian_action_
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -2334,6 +2631,30 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_tet10_tet4_residual_isopara
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -2443,6 +2764,12 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_jacobian_action_i
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" void poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_matrix_assembly_variant_count();
+
 extern "C" void poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -2486,6 +2813,36 @@ extern "C" void poro_hyperelasticity_poro_form_2_u_p_tri6_tri3_residual_isoparam
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_poro_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_poro_hex27_hex8_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -2616,6 +2973,12 @@ extern "C" void poro_hyperelasticity_poro_hex27_hex8_jacobian_action_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" void poro_hyperelasticity_poro_hex27_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_hex27_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_hex27_hex8_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_poro_hex27_hex8_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -2759,6 +3122,36 @@ extern "C" void poro_hyperelasticity_poro_hex27_hex8_residual_isoparametric_mesh
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" int poro_hyperelasticity_poro_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_tet10_tet4_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
 extern "C" int poro_hyperelasticity_poro_tet10_tet4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2888,6 +3281,12 @@ extern "C" void poro_hyperelasticity_poro_tet10_tet4_jacobian_action_isoparametr
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" void poro_hyperelasticity_poro_tet10_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_tet10_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_tet10_tet4_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_poro_tet10_tet4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -3031,6 +3430,36 @@ extern "C" void poro_hyperelasticity_poro_tet10_tet4_residual_isoparametric_mesh
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" int poro_hyperelasticity_poro_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double alpha,
+        const double dt,
+        const double hydraulic_conductivity,
+        const double storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_poro_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float alpha,
+        const float dt,
+        const float hydraulic_conductivity,
+        const float storage,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
 extern "C" int poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -3150,6 +3579,12 @@ extern "C" void poro_hyperelasticity_poro_tri6_tri3_jacobian_action_isoparametri
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" void poro_hyperelasticity_poro_tri6_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_poro_tri6_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_poro_tri6_tri3_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -3559,6 +3994,200 @@ extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_soa_print_rate(
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_crs_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_crs_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_dia_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_dia_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_patch_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_patch_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        float *const SFEM_RESTRICT values
+);
+
 extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -3774,6 +4403,18 @@ extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_steps_isoparamet
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+
+extern "C" void poro_hyperelasticity_solid_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_solid_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_solid_hex27_matrix_assembly_variant_count();
+
+extern "C" void poro_hyperelasticity_solid_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_solid_tet10_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_solid_tet10_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_solid_tet10_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -4051,6 +4692,200 @@ extern "C" void poro_hyperelasticity_solid_tet10_tet10_gradient_soa_print_rate(
         const ptrdiff_t ndofs,
         const int repeat);
 
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_coo_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_coo_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_crs_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_crs_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_dia_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_dia_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_patch_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tet10_tet10_hessian_patch_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        float *const SFEM_RESTRICT values
+);
+
 extern "C" int poro_hyperelasticity_solid_tet10_tet10_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -4266,6 +5101,12 @@ extern "C" int poro_hyperelasticity_solid_tet10_tet10_objective_steps_isoparamet
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+
+extern "C" void poro_hyperelasticity_solid_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *poro_hyperelasticity_solid_tri6_matrix_assembly_variant(const int variant);
+
+extern "C" int poro_hyperelasticity_solid_tri6_matrix_assembly_variant_count();
 
 extern "C" int poro_hyperelasticity_solid_tri6_tri6_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -4502,6 +5343,188 @@ extern "C" void poro_hyperelasticity_solid_tri6_tri6_gradient_soa_print_rate(
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_coo_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_coo_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t nnz,
+        const idx_t *const SFEM_RESTRICT rows,
+        const idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_crs_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_crs_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_dia_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_dia_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_patch_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double mu,
+        const double lmbda,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int poro_hyperelasticity_solid_tri6_tri6_hessian_patch_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float mu,
+        const float lmbda,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const idx_t *const SFEM_RESTRICT node_to_patch,
+        const ptrdiff_t npatch,
+        float *const SFEM_RESTRICT values
+);
 
 extern "C" int poro_hyperelasticity_solid_tri6_tri6_objective_affine_mesh_soa(
         const ptrdiff_t nelements,

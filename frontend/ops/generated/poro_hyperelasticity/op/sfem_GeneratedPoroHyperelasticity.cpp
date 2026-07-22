@@ -825,4 +825,20 @@ namespace sfem {
         SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::hessian_crs");
         return SFEM_FAILURE;
     }
+
+    int GeneratedPoroHyperelasticity::hessian_bsr(const real_t *const,
+                            const count_t *const,
+                            const idx_t *const,
+                            real_t *const) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::hessian_bsr");
+        return SFEM_FAILURE;
+    }
+
+    int GeneratedPoroHyperelasticity::hessian_dia(const real_t *const,
+                            const int *const,
+                            const ptrdiff_t,
+                            real_t *const) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::hessian_dia");
+        return SFEM_FAILURE;
+    }
 }  // namespace sfem
