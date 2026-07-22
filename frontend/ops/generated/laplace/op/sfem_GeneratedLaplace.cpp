@@ -1069,12 +1069,217 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 
-    int GeneratedLaplace::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedLaplace::hessian_crs(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_crs");
-        return SFEM_FAILURE;
+
+
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tri3_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TRI6: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tri6_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TET4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tet4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TET10: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tet10_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_hex27_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX64: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX125: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX729: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                default:
+                    SFEM_ERROR("GeneratedLaplace hessian_crs does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLaplace::hessian_bsr(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_bsr");
+
+
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tri3_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TRI6: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tri6_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TET4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tet4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::TET10: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_tet10_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_hex27_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX64: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX125: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX729: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
+                default:
+                    SFEM_ERROR("GeneratedLaplace hessian_bsr does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLaplace::hessian_dia(const real_t *const,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_dia");
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+            switch (domain.element_type) {
+                case smesh::TRI3:
+                    return laplace_tri3_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::TRI6:
+                    return laplace_tri6_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::QUAD4:
+                    return laplace_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::TET4:
+                    return laplace_tet4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::TET10:
+                    return laplace_tet10_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::HEX8:
+                    return laplace_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::HEX27:
+                    return laplace_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX8:
+                    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX27:
+                    return laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX64:
+                    return laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX125:
+                    return laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_HEX729:
+                    return laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                default:
+                    SFEM_ERROR("GeneratedLaplace hessian_dia does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
     }
 
     int GeneratedLaplace::value(const real_t *, real_t *const) {

@@ -176,6 +176,7 @@ class OpenMPEnergySoASourceBuilder:
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
         return (
+            "#include <cstdio>",
             "#include <type_traits>",
             '#include "%s"' % local_name,
             '#include "%s"' % geometry_name,

@@ -365,10 +365,91 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     }
 
     template <int N_FIELDS>
+    static SFEM_INLINE void evaluate_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const grad_1d,
+            const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+            scalar_t *const value,
+            scalar_t *const gradient) {
+        static constexpr int Q = integer_root(N_QP, 2);
+        static constexpr int S = integer_root(N_SHAPE, 2);
+        scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
+        scalar_t gx[N_FIELDS * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                scalar_t g = scalar_t(0);
+                for (int sx = 0; sx < S; ++sx) {
+                    const int s = sx + S * sy;
+                    const scalar_t u = streams[s * N_FIELDS + f][lane];
+                    v += u * shape_1d[qx * S + sx];
+                    g += u * grad_1d[qx * S + sx];
+                }
+                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                vx[i] = v;
+                gx[i] = g;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
+            const int q = qx + Q * qy;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                scalar_t g0 = scalar_t(0);
+                scalar_t g1 = scalar_t(0);
+                for (int sy = 0; sy < S; ++sy) {
+                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                    v += vx[i] * shape_1d[qy * S + sy];
+                    g0 += gx[i] * shape_1d[qy * S + sy];
+                    g1 += vx[i] * grad_1d[qy * S + sy];
+                }
+                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+                gradient[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] = g0;
+                gradient[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] = g1;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
     static SFEM_INLINE void evaluate_value(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            scalar_t *const value) {
+        static constexpr int Q = integer_root(N_QP, 2);
+        static constexpr int S = integer_root(N_SHAPE, 2);
+        scalar_t vx[N_FIELDS * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int sx = 0; sx < S; ++sx) {
+                    const int s = sx + S * sy;
+                    v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];
+                }
+                vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = v;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
+            const int q = qx + Q * qy;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int sy = 0; sy < S; ++sy) {
+                    v += vx[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                }
+                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
+    static SFEM_INLINE void evaluate_value_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
             scalar_t *const value) {
         static constexpr int Q = integer_root(N_QP, 2);
         static constexpr int S = integer_root(N_SHAPE, 2);
@@ -440,11 +521,86 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
     }
 
     template <int N_FIELDS>
+    static SFEM_INLINE void integrate_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const grad_1d,
+            const scalar_t *const value_coeff,
+            const scalar_t *const grad_coeff,
+            scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+        static constexpr int Q = integer_root(N_QP, 2);
+        static constexpr int S = integer_root(N_SHAPE, 2);
+        scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
+        scalar_t sg[N_FIELDS * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                scalar_t b = scalar_t(0);
+                for (int qy = 0; qy < Q; ++qy) {
+                    const int q = qx + Q * qy;
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy]
+                       + grad_coeff[((f * N_QP + q) * 2 + 1) * VECTOR_SIZE + lane] * grad_1d[qy * S + sy];
+                    b += grad_coeff[((f * N_QP + q) * 2 + 0) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                }
+                const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                sv[i] = a;
+                sg[i] = b;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
+            const int s = sx + S * sy;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int qx = 0; qx < Q; ++qx) {
+                    const int i = ((f * Q + qx) * S + sy) * VECTOR_SIZE + lane;
+                    v += sv[i] * shape_1d[qx * S + sx] + sg[i] * grad_1d[qx * S + sx];
+                }
+                output[s * N_FIELDS + f][lane] += v;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
     static SFEM_INLINE void integrate_value(
             const int nelems,
             const scalar_t *const shape_1d,
             const scalar_t *const value_coeff,
             scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+        static constexpr int Q = integer_root(N_QP, 2);
+        static constexpr int S = integer_root(N_SHAPE, 2);
+        scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                for (int qy = 0; qy < Q; ++qy) {
+                    const int q = qx + Q * qy;
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                }
+                sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] = a;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
+            const int s = sx + S * sy;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int qx = 0; qx < Q; ++qx) {
+                    v += sv[((f * Q + qx) * S + sy) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];
+                }
+                output[s * N_FIELDS + f][lane] += v;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
+    static SFEM_INLINE void integrate_value_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const value_coeff,
+            scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
         static constexpr int Q = integer_root(N_QP, 2);
         static constexpr int S = integer_root(N_SHAPE, 2);
         scalar_t sv[N_FIELDS * Q * S * VECTOR_SIZE];
@@ -481,6 +637,78 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             const scalar_t *const shape_1d,
             const scalar_t *const grad_1d,
             const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
+            scalar_t *const value,
+            scalar_t *const gradient) {
+        static constexpr int Q = integer_root(N_QP, 3);
+        static constexpr int S = integer_root(N_SHAPE, 3);
+        scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        scalar_t gx[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        scalar_t vxy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t g0xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t g1xy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                scalar_t g = scalar_t(0);
+                for (int sx = 0; sx < S; ++sx) {
+                    const int s = sx + S * (sy + S * sz);
+                    const scalar_t u = streams[s * N_FIELDS + f][lane];
+                    v += u * shape_1d[qx * S + sx];
+                    g += u * grad_1d[qx * S + sx];
+                }
+                const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                vx[i] = v;
+                gx[i] = g;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                scalar_t g0 = scalar_t(0);
+                scalar_t g1 = scalar_t(0);
+                for (int sy = 0; sy < S; ++sy) {
+                    const int i = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                    v += vx[i] * shape_1d[qy * S + sy];
+                    g0 += gx[i] * shape_1d[qy * S + sy];
+                    g1 += vx[i] * grad_1d[qy * S + sy];
+                }
+                const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                vxy[j] = v;
+                g0xy[j] = g0;
+                g1xy[j] = g1;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
+            const int q = qx + Q * (qy + Q * qz);
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                scalar_t g0 = scalar_t(0);
+                scalar_t g1 = scalar_t(0);
+                scalar_t g2 = scalar_t(0);
+                for (int sz = 0; sz < S; ++sz) {
+                    const int j = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                    v += vxy[j] * shape_1d[qz * S + sz];
+                    g0 += g0xy[j] * shape_1d[qz * S + sz];
+                    g1 += g1xy[j] * shape_1d[qz * S + sz];
+                    g2 += vxy[j] * grad_1d[qz * S + sz];
+                }
+                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+                gradient[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane] = g0;
+                gradient[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane] = g1;
+                gradient[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] = g2;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
+    static SFEM_INLINE void evaluate_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const grad_1d,
+            const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
             scalar_t *const value,
             scalar_t *const gradient) {
         static constexpr int Q = integer_root(N_QP, 3);
@@ -592,6 +820,50 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
     }
 
     template <int N_FIELDS>
+    static SFEM_INLINE void evaluate_value_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+            scalar_t *const value) {
+        static constexpr int Q = integer_root(N_QP, 3);
+        static constexpr int S = integer_root(N_SHAPE, 3);
+        scalar_t vx[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        scalar_t vxy[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int sx = 0; sx < S; ++sx) {
+                    const int s = sx + S * (sy + S * sz);
+                    v += streams[s * N_FIELDS + f][lane] * shape_1d[qx * S + sx];
+                }
+                vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = v;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int sy = 0; sy < S; ++sy) {
+                    v += vx[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                }
+                vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = v;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qz = 0; qz < Q; ++qz) for (int qy = 0; qy < Q; ++qy) for (int qx = 0; qx < Q; ++qx) {
+            const int q = qx + Q * (qy + Q * qz);
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int sz = 0; sz < S; ++sz) {
+                    v += vxy[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                }
+                value[(f * N_QP + q) * VECTOR_SIZE + lane] = v;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
     static SFEM_INLINE void integrate(
             const int nelems,
             const scalar_t *const shape_1d,
@@ -599,6 +871,69 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             const scalar_t *const value_coeff,
             const scalar_t *const grad_coeff,
             scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
+        static constexpr int Q = integer_root(N_QP, 3);
+        static constexpr int S = integer_root(N_SHAPE, 3);
+        scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t z1[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t z2[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        scalar_t yz1[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                scalar_t b = scalar_t(0);
+                scalar_t c = scalar_t(0);
+                for (int qz = 0; qz < Q; ++qz) {
+                    const int q = qx + Q * (qy + Q * qz);
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz]
+                       + grad_coeff[((f * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] * grad_1d[qz * S + sz];
+                    b += grad_coeff[((f * N_QP + q) * 3 + 0) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                    c += grad_coeff[((f * N_QP + q) * 3 + 1) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                }
+                const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                z0[i] = a;
+                z1[i] = b;
+                z2[i] = c;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                scalar_t b = scalar_t(0);
+                for (int qy = 0; qy < Q; ++qy) {
+                    const int i = (((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane;
+                    a += z0[i] * shape_1d[qy * S + sy] + z2[i] * grad_1d[qy * S + sy];
+                    b += z1[i] * shape_1d[qy * S + sy];
+                }
+                const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                yz0[j] = a;
+                yz1[j] = b;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
+            const int s = sx + S * (sy + S * sz);
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int qx = 0; qx < Q; ++qx) {
+                    const int j = (((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane;
+                    v += yz0[j] * shape_1d[qx * S + sx] + yz1[j] * grad_1d[qx * S + sx];
+                }
+                output[s * N_FIELDS + f][lane] += v;
+            }
+        }
+    }
+
+    template <int N_FIELDS>
+    static SFEM_INLINE void integrate_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const grad_1d,
+            const scalar_t *const value_coeff,
+            const scalar_t *const grad_coeff,
+            scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
         static constexpr int Q = integer_root(N_QP, 3);
         static constexpr int S = integer_root(N_SHAPE, 3);
         scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
@@ -697,6 +1032,50 @@ struct TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
             }
         }
     }
+
+    template <int N_FIELDS>
+    static SFEM_INLINE void integrate_value_contiguous(
+            const int nelems,
+            const scalar_t *const shape_1d,
+            const scalar_t *const value_coeff,
+            scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+        static constexpr int Q = integer_root(N_QP, 3);
+        static constexpr int S = integer_root(N_SHAPE, 3);
+        scalar_t z0[N_FIELDS * Q * Q * S * VECTOR_SIZE];
+        scalar_t yz0[N_FIELDS * Q * S * S * VECTOR_SIZE];
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int qy = 0; qy < Q; ++qy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                for (int qz = 0; qz < Q; ++qz) {
+                    const int q = qx + Q * (qy + Q * qz);
+                    a += value_coeff[(f * N_QP + q) * VECTOR_SIZE + lane] * shape_1d[qz * S + sz];
+                }
+                z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] = a;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int qx = 0; qx < Q; ++qx) for (int sy = 0; sy < S; ++sy) for (int sz = 0; sz < S; ++sz) {
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t a = scalar_t(0);
+                for (int qy = 0; qy < Q; ++qy) {
+                    a += z0[(((f * Q + qx) * Q + qy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qy * S + sy];
+                }
+                yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] = a;
+            }
+        }
+        for (int f = 0; f < N_FIELDS; ++f) for (int sz = 0; sz < S; ++sz) for (int sy = 0; sy < S; ++sy) for (int sx = 0; sx < S; ++sx) {
+            const int s = sx + S * (sy + S * sz);
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                scalar_t v = scalar_t(0);
+                for (int qx = 0; qx < Q; ++qx) {
+                    v += yz0[(((f * Q + qx) * S + sy) * S + sz) * VECTOR_SIZE + lane] * shape_1d[qx * S + sx];
+                }
+                output[s * N_FIELDS + f][lane] += v;
+            }
+        }
+    }
 };
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
@@ -712,12 +1091,34 @@ static SFEM_INLINE void tensor_evaluate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static SFEM_INLINE void tensor_evaluate_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const grad_1d,
+        const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+        scalar_t *const value,
+        scalar_t *const gradient) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_contiguous<N_FIELDS>(
+            nelems, shape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static SFEM_INLINE void tensor_evaluate_value(
         const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const SFEM_RESTRICT streams[N_FIELDS * N_SHAPE],
         scalar_t *const value) {
     TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_value<N_FIELDS>(
+            nelems, shape_1d, streams, value);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static SFEM_INLINE void tensor_evaluate_value_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t streams[N_FIELDS * N_SHAPE][VECTOR_SIZE],
+        scalar_t *const value) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template evaluate_value_contiguous<N_FIELDS>(
             nelems, shape_1d, streams, value);
 }
 
@@ -734,12 +1135,34 @@ static SFEM_INLINE void tensor_integrate(
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static SFEM_INLINE void tensor_integrate_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const grad_1d,
+        const scalar_t *const value_coeff,
+        const scalar_t *const grad_coeff,
+        scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_contiguous<N_FIELDS>(
+            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
 static SFEM_INLINE void tensor_integrate_value(
         const int nelems,
         const scalar_t *const shape_1d,
         const scalar_t *const value_coeff,
         scalar_t *const SFEM_RESTRICT output[N_FIELDS * N_SHAPE]) {
     TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_value<N_FIELDS>(
+            nelems, shape_1d, value_coeff, output);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM, int N_FIELDS>
+static SFEM_INLINE void tensor_integrate_value_contiguous(
+        const int nelems,
+        const scalar_t *const shape_1d,
+        const scalar_t *const value_coeff,
+        scalar_t output[N_FIELDS * N_SHAPE][VECTOR_SIZE]) {
+    TensorProductResidualOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::template integrate_value_contiguous<N_FIELDS>(
             nelems, shape_1d, value_coeff, output);
 }
 

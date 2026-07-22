@@ -301,6 +301,32 @@ def _header(material, residual):
                         const int nsteps,
                         const real_t *const steps,
                         real_t *const out) override;"""
+    matrix_methods = """
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
+        int hessian_dia(const real_t *const x,
+                        const int *const diag_offsets,
+                        const ptrdiff_t ndiag,
+                        real_t *const values) override;""" if residual else """
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
+        int hessian_dia(const real_t *const x,
+                        const int *const diag_offsets,
+                        const ptrdiff_t ndiag,
+                        real_t *const values) override;
+        int hessian_coo(const real_t *const x,
+                        const ptrdiff_t nnz,
+                        const idx_t *const rows,
+                        const idx_t *const cols,
+                        real_t *const values);
+        int hessian_patch(const real_t *const x,
+                          const count_t *const rowptr,
+                          const idx_t *const colidx,
+                          real_t *const values);"""
     return """#pragma once
 
 #include "sfem_Op.hpp"
@@ -334,11 +360,7 @@ namespace sfem {
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
-                        real_t *const values) override;
-        int hessian_bsr(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;
+                        real_t *const values) override;%(matrix_methods)s
         void set_option(const std::string &name, bool val) override;
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
@@ -353,7 +375,12 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 }  // namespace sfem
-""" % {"op": material.op_name, "extra": extra, "value_steps": value_steps}
+""" % {
+        "op": material.op_name,
+        "extra": extra,
+        "value_steps": value_steps,
+        "matrix_methods": matrix_methods,
+    }
 
 
 def _hyperelastic_op(
@@ -370,6 +397,9 @@ def _hyperelastic_op(
     objective_steps_cases = []
     hessian_crs_cases = []
     hessian_bsr_cases = []
+    hessian_dia_cases = []
+    hessian_coo_cases = []
+    hessian_patch_cases = []
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     gradient_affine_aos_flags = []
@@ -638,7 +668,55 @@ def _hyperelastic_op(
                     ),
                 )
             )
-
+        hessian_dia_function = "%s_hessian_dia_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_dia_function):
+            hessian_dia_cases.append(
+                _case(
+                    element,
+                    hessian_dia_function,
+                    ", ".join(
+                        _nonempty(
+                            hessian_state_args,
+                            "diag_offsets",
+                            "ndiag",
+                            "values",
+                        )
+                    ),
+                )
+            )
+        hessian_coo_function = "%s_hessian_coo_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_coo_function):
+            hessian_coo_cases.append(
+                _case(
+                    element,
+                    hessian_coo_function,
+                    ", ".join(
+                        _nonempty(
+                            hessian_state_args,
+                            "nnz",
+                            "rows",
+                            "cols",
+                            "values",
+                        )
+                    ),
+                )
+            )
+        hessian_patch_function = "%s_hessian_patch_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_patch_function):
+            hessian_patch_cases.append(
+                _case(
+                    element,
+                    hessian_patch_function,
+                    ", ".join(
+                        _nonempty(
+                            hessian_state_args,
+                            "rowptr",
+                            "colidx",
+                            "values",
+                        )
+                    ),
+                )
+            )
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
 
@@ -1008,6 +1086,76 @@ namespace sfem {
         });
     }
 
+    int %(op)s::hessian_dia(const real_t *const x,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("%(op)s::hessian_dia requires a current state\\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(hessian_dia_cases)s
+                default:
+                    SFEM_ERROR("%(op)s hessian_dia does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int %(op)s::hessian_coo(const real_t *const x,
+                            const ptrdiff_t nnz,
+                            const idx_t *const rows,
+                            const idx_t *const cols,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_coo");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("%(op)s::hessian_coo requires a current state\\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(hessian_coo_cases)s
+                default:
+                    SFEM_ERROR("%(op)s hessian_coo does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int %(op)s::hessian_patch(const real_t *const x,
+                              const count_t *const rowptr,
+                              const idx_t *const colidx,
+                              real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_patch");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("%(op)s::hessian_patch requires a current state\\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+%(hessian_patch_cases)s
+                default:
+                    SFEM_ERROR("%(op)s hessian_patch does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
     void %(op)s::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("%(op)s::set_option");
         AffineOption options[] = {
@@ -1100,6 +1248,9 @@ namespace sfem {
         "objective_steps_cases": "\n".join(objective_steps_cases),
         "hessian_crs_cases": "\n".join(hessian_crs_cases),
         "hessian_bsr_cases": "\n".join(hessian_bsr_cases),
+        "hessian_dia_cases": "\n".join(hessian_dia_cases),
+        "hessian_coo_cases": "\n".join(hessian_coo_cases),
+        "hessian_patch_cases": "\n".join(hessian_patch_cases),
         "performance_methods": _performance_methods(material.op_name, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -1129,6 +1280,9 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     declarations = []
     residual_cases = []
     action_cases = []
+    hessian_crs_cases = []
+    hessian_bsr_cases = []
+    hessian_dia_cases = []
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     parameter_names_by_dim = {}
@@ -1438,6 +1592,95 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 ),
             )
         )
+        hessian_common_args = []
+        hessian_common_args.extend(
+            _dependency_storage_args(action_dependencies.parameters, parameter_index)
+        )
+        hessian_setup = []
+        if action_dependencies.current:
+            hessian_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "current",
+                    "data",
+                    "const real_t",
+                )
+            )
+            hessian_common_args.append("FIELD_STRIDE")
+            hessian_common_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+            )
+        if action_dependencies.previous:
+            hessian_setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "previous",
+                    "old_data",
+                    "const real_t",
+                )
+            )
+            hessian_common_args.append("FIELD_STRIDE")
+            hessian_common_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+            )
+        hessian_crs_function = "%s_hessian_crs_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_crs_function):
+            hessian_crs_cases.append(
+                _residual_soa_case(
+                    element,
+                    hessian_crs_function,
+                    ", ".join(
+                        (
+                            common_isoparametric,
+                            *hessian_common_args,
+                            "rowptr",
+                            "colidx",
+                            "values",
+                        )
+                    ),
+                    block_size_by_dim[dim],
+                    hessian_setup,
+                )
+            )
+        hessian_bsr_function = "%s_hessian_bsr_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
+            hessian_bsr_cases.append(
+                _residual_soa_case(
+                    element,
+                    hessian_bsr_function,
+                    ", ".join(
+                        (
+                            common_isoparametric,
+                            *hessian_common_args,
+                            "rowptr",
+                            "colidx",
+                            "values",
+                        )
+                    ),
+                    block_size_by_dim[dim],
+                    hessian_setup,
+                )
+            )
+        hessian_dia_function = "%s_hessian_dia_isoparametric_mesh_soa" % stem
+        if _c_abi_function_exists(kernel_sources, hessian_dia_function):
+            hessian_dia_cases.append(
+                _case(
+                    element,
+                    hessian_dia_function,
+                    ", ".join(
+                        (
+                            common_isoparametric,
+                            *_dependency_storage_args(
+                                action_dependencies.parameters,
+                                parameter_index,
+                            ),
+                            "diag_offsets",
+                            "ndiag",
+                            "values",
+                        )
+                    ),
+                )
+            )
 
     residual_uses_previous = any(
         dependencies[0].previous for dependencies in dependencies_by_dim.values()
@@ -1447,6 +1690,44 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     )
     action_uses_previous = any(
         dependencies[1].previous for dependencies in dependencies_by_dim.values()
+    )
+    hessian_state_alias = (
+        "        const real_t *const current = state ? state : impl_->current;"
+        if action_uses_current
+        else ""
+    )
+    hessian_state_check = (
+        "        if (%s) {\n"
+        '            SFEM_ERROR("%s requires %s\\n");\n'
+        "            return SFEM_FAILURE;\n"
+        "        }"
+        % (
+            " || ".join(
+                condition
+                for condition in (
+                    "!current" if action_uses_current else "",
+                    "!impl_->previous" if action_uses_previous else "",
+                )
+                if condition
+            ),
+            material.op_name,
+            (
+                "current and previous states"
+                if action_uses_current and action_uses_previous
+                else (
+                    "a current state"
+                    if action_uses_current
+                    else "a previous state"
+                )
+            ),
+        )
+        if action_uses_current or action_uses_previous
+        else ""
+    )
+    hessian_previous_alias = (
+        "            const real_t *const previous = impl_->previous;"
+        if action_uses_previous
+        else ""
     )
     residual_affine_uses_metric = any(residual_affine_metric_flags)
     action_affine_uses_metric = any(action_affine_metric_flags)
@@ -1861,12 +2142,28 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 
-    int %(op)s::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int %(op)s::hessian_crs(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-        return SFEM_FAILURE;
+%(hessian_crs_body)s
+    }
+
+    int %(op)s::hessian_bsr(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+%(hessian_bsr_body)s
+    }
+
+    int %(op)s::hessian_dia(const real_t *const,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
+%(hessian_dia_body)s
     }
 
     int %(op)s::value(const real_t *, real_t *const) {
@@ -1891,6 +2188,84 @@ namespace sfem {
         "performance_methods": _performance_methods(material.op_name, performance_cases),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
+        "hessian_crs_body": (
+            "%s\n"
+            "%s\n"
+            "        auto mesh = impl_->space->mesh_ptr();\n"
+            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
+            "            real_t storage[MAX_PARAMETERS];\n"
+            "            parameter_array(*domain.parameters,\n"
+            "                            mesh->spatial_dimension(),\n"
+            "                            storage);\n"
+            "%s\n"
+            "            switch (domain.element_type) {\n"
+            "%s\n"
+            "                default:\n"
+            "                    SFEM_ERROR(\"%s hessian_crs does not support element type %%d\\n\",\n"
+            "                               domain.element_type);\n"
+            "                    return SFEM_FAILURE;\n"
+            "            }\n"
+            "        });"
+            % (
+                hessian_state_alias,
+                hessian_state_check,
+                hessian_previous_alias,
+                "\n".join(hessian_crs_cases),
+                material.op_name,
+            )
+            if hessian_crs_cases
+            else "        return SFEM_FAILURE;"
+        ),
+        "hessian_bsr_body": (
+            "%s\n"
+            "%s\n"
+            "        auto mesh = impl_->space->mesh_ptr();\n"
+            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
+            "            real_t storage[MAX_PARAMETERS];\n"
+            "            parameter_array(*domain.parameters,\n"
+            "                            mesh->spatial_dimension(),\n"
+            "                            storage);\n"
+            "%s\n"
+            "            switch (domain.element_type) {\n"
+            "%s\n"
+            "                default:\n"
+            "                    SFEM_ERROR(\"%s hessian_bsr does not support element type %%d\\n\",\n"
+            "                               domain.element_type);\n"
+            "                    return SFEM_FAILURE;\n"
+            "            }\n"
+            "        });"
+            % (
+                hessian_state_alias,
+                hessian_state_check,
+                hessian_previous_alias,
+                "\n".join(hessian_bsr_cases),
+                material.op_name,
+            )
+            if hessian_bsr_cases
+            else "        return SFEM_FAILURE;"
+        ),
+        "hessian_dia_body": (
+            "        auto mesh = impl_->space->mesh_ptr();\n"
+            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
+            "            real_t storage[MAX_PARAMETERS];\n"
+            "            parameter_array(*domain.parameters,\n"
+            "                            mesh->spatial_dimension(),\n"
+            "                            storage);\n"
+            "            switch (domain.element_type) {\n"
+            "%s\n"
+            "                default:\n"
+            "                    SFEM_ERROR(\"%s hessian_dia does not support element type %%d\\n\",\n"
+            "                               domain.element_type);\n"
+            "                    return SFEM_FAILURE;\n"
+            "            }\n"
+            "        });"
+            % ("\n".join(hessian_dia_cases), material.op_name)
+            if hessian_dia_cases
+            else "        return SFEM_FAILURE;"
+        ),
         "affine_options": _affine_option_entries(
             "residual_uses_affine",
             "jacobian_action_uses_affine",
@@ -2790,6 +3165,22 @@ namespace sfem {
         SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
         return SFEM_FAILURE;
     }
+
+    int %(op)s::hessian_bsr(const real_t *const,
+                            const count_t *const,
+                            const idx_t *const,
+                            real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+        return SFEM_FAILURE;
+    }
+
+    int %(op)s::hessian_dia(const real_t *const,
+                            const int *const,
+                            const ptrdiff_t,
+                            real_t *const) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
+        return SFEM_FAILURE;
+    }
 }  // namespace sfem
 """ % {
         "op": material.op_name,
@@ -3414,6 +3805,11 @@ def _c_abi_header(material, kernel_sources):
     body = "\n\n".join(declarations)
     if body:
         body += "\n"
+    matrix_formats_include = (
+        '#include "../matrix_formats.hpp"\n'
+        if "sfem_MatrixAssemblyDiagnostics" in body
+        else ""
+    )
     return """#pragma once
 
 #include <cstddef>
@@ -3439,9 +3835,11 @@ typedef double geom_t;
 #endif
 
 #include "../kernel_diagnostics.hpp"
+%(matrix_formats_include)s
 
 %(body)s""" % {
         "body": body,
+        "matrix_formats_include": matrix_formats_include,
     }
 
 
@@ -3570,6 +3968,15 @@ def _c_abi_function_exists(kernel_sources, function_name):
 
 _RUNTIME_OPERATION_MARKERS = (
     ("jacobian_action", "_jacobian_action_"),
+    ("hessian_bsr", "_hessian_bsr_"),
+    ("hessian_coo_triplet", "_hessian_coo_triplet_"),
+    ("hessian_coo", "_hessian_coo_"),
+    ("hessian_crs", "_hessian_crs_"),
+    ("hessian_dia", "_hessian_dia_"),
+    ("hessian_patch", "_hessian_patch_"),
+    ("bsr_apply", "_bsr_apply_"),
+    ("dia_apply", "_dia_apply_"),
+    ("patch_apply", "_patch_apply_"),
     ("boundary_residual", "_boundary_residual_"),
     ("objective_steps", "_objective_steps_"),
     ("objective", "_objective_"),

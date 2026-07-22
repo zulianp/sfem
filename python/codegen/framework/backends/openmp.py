@@ -400,6 +400,7 @@ class OpenMPSoABackend:
                 operator_name=traversal.operator_name,
                 reference_data_plan=traversal.reference_data_plan,
                 diagnostics_plan=traversal.diagnostics_plan,
+                matrix_format_plan=traversal.matrix_format_plan,
             ))
         elif traversal.kind == "mixed_residual_soa":
             files = tuple(generate_mixed_residual_sfem_files(

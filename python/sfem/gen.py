@@ -1,6 +1,8 @@
 import argparse
 import glob
+import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, replace
@@ -730,13 +732,14 @@ def generate(
         user_input,
         form_evaluation,
     ).run()
-    plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out) if dump_plan or plan_out else None
+    plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out, user_input) if dump_plan or plan_out else None
     target = _normalize_generation_target(target)
     backend = _backend_for_target(target)
     files = CodeGenerationStage(user_input, codegen_plan, target).run()
 
     if material.op_name and backend.supports_op_wrapper:
         files.update(_generate_op_wrapper_files(material, selected, user_input, files))
+        _replace_legacy_hex27_sources_with_proteus_aliases(files)
 
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
@@ -835,7 +838,7 @@ def run(material, default_out_dir, argv=None):
     return result
 
 
-def _write_plan_dump(plan, out_dir, material_name, plan_out=None):
+def _write_plan_dump(plan, out_dir, material_name, plan_out=None, user_input=None):
     if plan_out is None:
         path = os.path.join(out_dir, "%s_plan.json" % material_name)
     else:
@@ -847,8 +850,51 @@ def _write_plan_dump(plan, out_dir, material_name, plan_out=None):
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
-    plan.write_json(path)
+    if user_input is None:
+        plan.write_json(path)
+    else:
+        with open(path, "w", encoding="utf-8") as output:
+            output.write(
+                json.dumps(
+                    _specialized_plan_dump(plan, user_input),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            output.write("\n")
     return path
+
+
+def _specialized_plan_dump(plan, user_input):
+    kernels = []
+    for context in user_input.element_contexts:
+        kernels.extend(
+            unit.to_dict(include_block_kernels=False)
+            for unit in plan.emission_kernels_for_context(context)
+        )
+    monolithic = [
+        kernel
+        for kernel in kernels
+        if kernel["scope"] == KernelScope.MONOLITHIC.value
+    ]
+    blocks = [
+        kernel
+        for kernel in kernels
+        if kernel["scope"] == KernelScope.BLOCK.value
+    ]
+    complete_system = [
+        kernel
+        for kernel in kernels
+        if kernel["coupling"] == KernelCoupling.COMPLETE_SYSTEM.value
+    ]
+    return {
+        "stage": plan.stage.value,
+        "n_kernels": len(kernels),
+        "n_monolithic_kernels": len(monolithic),
+        "n_block_kernels": len(blocks),
+        "n_complete_system_kernels": len(complete_system),
+        "kernels": kernels,
+    }
 
 
 def _evaluate_forms(user_input):
@@ -1253,6 +1299,155 @@ def _matrix_format_plan_for_evaluation(evaluated):
     if not any(form.order is FormOrder.TWO for form in evaluated.form_evaluation.forms):
         return None
     return plan
+
+
+def _replace_legacy_hex27_sources_with_proteus_aliases(files):
+    c_abi_entries = [
+        (path, source)
+        for path, source in files.items()
+        if path.endswith("_c_abi.hpp") and path.startswith("op/")
+    ]
+    if not c_abi_entries:
+        return
+
+    hex27_to_proteus = tensor_product_cartesian_shape_order(3, 27)
+    for c_abi_path, c_abi_source in c_abi_entries:
+        declarations = _extern_c_declarations(c_abi_source)
+        names = {declaration["name"] for declaration in declarations}
+        hex27_declarations = [
+            declaration
+            for declaration in declarations
+            if _legacy_hex27_target_name(declaration["name"]) in names
+        ]
+        if not hex27_declarations:
+            continue
+
+        for source_path in tuple(files):
+            if not (
+                source_path.startswith("d3/hex27/")
+                and source_path.endswith("_hex27_operator.cpp")
+            ):
+                continue
+            proteus_path = source_path.replace("/hex27/", "/proteus_hex27/").replace(
+                "_hex27_operator.cpp",
+                "_proteus_hex27_operator.cpp",
+            )
+            if proteus_path not in files:
+                continue
+            files[source_path] = _legacy_hex27_proteus_alias_source(
+                source_path,
+                c_abi_path,
+                hex27_declarations,
+                hex27_to_proteus,
+            )
+
+
+def _extern_c_declarations(source):
+    pattern = re.compile(
+        r'extern "C"\s+(?P<head>.*?)\((?P<params>.*?)\);',
+        re.DOTALL,
+    )
+    declarations = []
+    for match in pattern.finditer(source):
+        head = match.group("head").strip()
+        name_match = re.search(r"([A-Za-z_]\w*)\s*$", head)
+        if name_match is None:
+            continue
+        declarations.append(
+            {
+                "return_type": head[: name_match.start()].rstrip(),
+                "name": name_match.group(1),
+                "params": match.group("params").strip(),
+            }
+        )
+    return tuple(declarations)
+
+
+def _legacy_hex27_proteus_alias_source(source_path, c_abi_path, declarations, hex27_to_proteus):
+    include_path = _relative_codegen_include(os.path.dirname(source_path), c_abi_path)
+    lines = [
+        '#include "%s"' % include_path,
+        "",
+    ]
+    for declaration in declarations:
+        lines.extend(
+            _legacy_hex27_proteus_alias_function(
+                declaration,
+                hex27_to_proteus,
+            )
+        )
+    return "\n".join(lines)
+
+
+def _legacy_hex27_proteus_alias_function(declaration, hex27_to_proteus):
+    return_type = declaration["return_type"]
+    name = declaration["name"]
+    target = _legacy_hex27_target_name(name)
+    params = _c_params(declaration["params"])
+    lines = ['extern "C" %s %s(' % (return_type, name)]
+    if params:
+        for idx, param in enumerate(params):
+            comma = "," if idx + 1 < len(params) else ""
+            lines.append("        %s%s" % (param, comma))
+    else:
+        lines.append("        void")
+    lines.append(") {")
+
+    args = [_c_param_name(param) for param in params]
+    element_index = _c_element_pointer_param_index(params)
+    if element_index is not None:
+        pointer_type = _c_element_pointer_type(params[element_index])
+        lines.append("    %s *proteus_elements[27] = {" % pointer_type)
+        for idx, hex27_index in enumerate(hex27_to_proteus):
+            comma = "," if idx + 1 < len(hex27_to_proteus) else ""
+            lines.append("        elements[%d]%s" % (hex27_index, comma))
+        lines.append("    };")
+        args[element_index] = "proteus_elements"
+
+    call = "%s(%s)" % (target, ", ".join(args))
+    if return_type == "void":
+        lines.append("    %s;" % call)
+    else:
+        lines.append("    return %s;" % call)
+    lines.extend(["}", ""])
+    return lines
+
+
+def _legacy_hex27_target_name(name):
+    if "_hex27_hex27_" in name:
+        return name.replace("_hex27_hex27_", "_proteus_hex27_proteus_hex27_")
+    if "_hex27_" in name:
+        return name.replace("_hex27_", "_proteus_hex27_")
+    return ""
+
+
+def _c_params(params):
+    params = params.strip()
+    if not params or params == "void":
+        return ()
+    return tuple(param.strip() for param in params.split(",") if param.strip())
+
+
+def _c_param_name(param):
+    tokens = param.replace("*", " * ").replace("&", " & ").split()
+    if not tokens:
+        raise ValueError("empty C parameter")
+    return tokens[-1].split("[", 1)[0]
+
+
+def _c_element_pointer_param_index(params):
+    for idx, param in enumerate(params):
+        if _c_param_name(param) == "elements" and "**" in param:
+            return idx
+    return None
+
+
+def _c_element_pointer_type(param):
+    if "uint16_t" in param:
+        return "uint16_t"
+    if "idx_t" in param:
+        return "idx_t"
+    raise ValueError("unsupported HEX27 element pointer parameter '%s'" % param)
 
 
 def _layout_codegen_files(unit, context, files):

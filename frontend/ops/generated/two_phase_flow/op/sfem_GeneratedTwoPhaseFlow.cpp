@@ -922,11 +922,113 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 
-    int GeneratedTwoPhaseFlow::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedTwoPhaseFlow::hessian_crs(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_crs");
+        const real_t *const current = state ? state : impl_->current;
+        if (!current) {
+            SFEM_ERROR("GeneratedTwoPhaseFlow requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_tri3_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::TET4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_tet4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                default:
+                    SFEM_ERROR("GeneratedTwoPhaseFlow hessian_crs does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedTwoPhaseFlow::hessian_bsr(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_bsr");
+        const real_t *const current = state ? state : impl_->current;
+        if (!current) {
+            SFEM_ERROR("GeneratedTwoPhaseFlow requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            switch (domain.element_type) {
+                case smesh::TRI3: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_tri3_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::TET4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_tet4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                default:
+                    SFEM_ERROR("GeneratedTwoPhaseFlow hessian_bsr does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedTwoPhaseFlow::hessian_dia(const real_t *const,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_dia");
         return SFEM_FAILURE;
     }
 

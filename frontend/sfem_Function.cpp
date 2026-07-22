@@ -378,6 +378,22 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int Function::hessian_dia(const real_t *const x,
+                              const int *const    diag_offsets,
+                              const ptrdiff_t     ndiag,
+                              real_t *const       values) {
+        SFEM_TRACE_SCOPE("Function::hessian_dia");
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_dia(x, diag_offsets, ndiag, values) != SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_dia in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     int Function::hessian_bcrs_sym(const real_t *const  x,
                                    const count_t *const rowptr,
                                    const idx_t *const   colidx,
