@@ -94,7 +94,11 @@ def validate_m6_4(result):
         if block_kernel.block.name.endswith("_p_p"):
             raise RuntimeError("Stokes generated a zero pressure-pressure block kernel")
 
-    operator_sources = tuple(path for path in result.sources if path.endswith("_operator.cpp"))
+    operator_sources = tuple(
+        path
+        for path in result.sources
+        if path.endswith("_operator.cpp") and not path.endswith("_matrix_format_operator.cpp")
+    )
     local_headers = tuple(path for path in result.sources if path.endswith("_local.hpp"))
     if not operator_sources:
         raise RuntimeError("Stokes generation did not produce mesh-level operator sources")
@@ -153,6 +157,29 @@ def main(argv=None):
     parser.add_argument("--vector-size", type=int, default=gen.DEFAULT_VECTOR_SIZE)
     parser.add_argument("--compile", action="store_true")
     parser.add_argument(
+        "--matrix-format",
+        action="append",
+        dest="matrix_formats",
+        help="Matrix assembly format to emit: crs, bsr, dia, coo, patch, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--matrix-layout",
+        action="append",
+        dest="matrix_mesh_layouts",
+        help="Matrix assembly mesh layout: standard, packed, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--packed-pass",
+        action="append",
+        dest="matrix_packed_passes",
+        help="Packed mesh assembly pass: one_pass, two_pass, or all. May be repeated or comma-separated.",
+    )
+    parser.add_argument(
+        "--patch-node-index-filter",
+        action="store_true",
+        help="Emit patch assembly metadata with node-index filtering enabled.",
+    )
+    parser.add_argument(
         "--keep-existing",
         action="store_true",
         help="Keep stale outputs from previous generator runs.",
@@ -173,6 +200,10 @@ def main(argv=None):
         compile=args.compile,
         clean=not args.keep_existing,
         dump_plan=not args.no_plan_dump,
+        matrix_formats=args.matrix_formats,
+        matrix_mesh_layouts=args.matrix_mesh_layouts,
+        matrix_packed_passes=args.matrix_packed_passes,
+        matrix_patch_node_index_filter=args.patch_node_index_filter,
     )
     validate_m6_4(result)
 

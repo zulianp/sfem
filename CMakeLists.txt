@@ -40,6 +40,7 @@ set(SFEM_MODULES
     algebra/bsr
     algebra/bsr_soa
     algebra/crs
+    algebra/dia
     algebra/crs_x_bsr
     algebra/ell
     algebra/mg

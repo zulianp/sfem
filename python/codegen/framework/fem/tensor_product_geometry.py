@@ -458,12 +458,22 @@ def tensor_product_coordinate_gradient_lines(
     stream_array_name="block_coordinate_streams",
     shape_name="shape_1d",
     grad_name="grad_1d",
+    contiguous_coordinate_streams=False,
 ):
-    lines = coordinate_stream_array_lines(
-        coordinate_streams,
-        stream_array_name=stream_array_name,
-        indent=indent,
-    )
+    if contiguous_coordinate_streams:
+        if not isinstance(coordinate_streams, str):
+            raise ValueError("contiguous coordinate streams require a storage name")
+        lines = []
+        evaluator_streams = coordinate_streams
+        tensor_gradient = "tensor_gradient_contiguous"
+    else:
+        lines = coordinate_stream_array_lines(
+            coordinate_streams,
+            stream_array_name=stream_array_name,
+            indent=indent,
+        )
+        evaluator_streams = stream_array_name
+        tensor_gradient = "tensor_gradient"
     lines.extend([
         "%sscalar_t %s[DIM * N_QP * DIM * VECTOR_SIZE];"
         % (indent, gradient_name),
@@ -471,10 +481,10 @@ def tensor_product_coordinate_gradient_lines(
     for component in range(dim):
         lines.extend(
             [
-                "%stensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>("
-                % (indent, dim),
+                "%s%s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>("
+                % (indent, tensor_gradient, dim),
                 "%s        nelems, %s, %s, %s, %d,"
-                % (indent, shape_name, grad_name, stream_array_name, component),
+                % (indent, shape_name, grad_name, evaluator_streams, component),
                 "%s        %s + %d * N_QP * DIM * VECTOR_SIZE);"
                 % (indent, gradient_name, component),
             ]
@@ -540,6 +550,7 @@ def tensor_product_gradient_isoparametric_geometry_lines(
     determinant_target,
     adjugate_streams=None,
     determinant_stream=None,
+    contiguous_coordinate_streams=False,
 ):
     n_shape_1d = round(n_shape ** (1.0 / dim))
     if n_shape_1d ** dim != n_shape:
@@ -566,6 +577,7 @@ def tensor_product_gradient_isoparametric_geometry_lines(
         stream_array_name=stream_array_name,
         shape_name=shape_name,
         grad_name=grad_name,
+        contiguous_coordinate_streams=contiguous_coordinate_streams,
     )
     lines.extend(
         tensor_product_adjugate_determinant_lines(
