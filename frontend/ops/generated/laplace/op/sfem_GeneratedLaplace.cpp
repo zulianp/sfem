@@ -1,5 +1,6 @@
 #include "sfem_GeneratedLaplace.hpp"
 #include "sfem_GeneratedLaplace_c_abi.hpp"
+#include "sfem_PackedLaplacian.hpp"
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -174,6 +175,16 @@ namespace sfem {
             return 0;
         }
 
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        }
+
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
             std::shared_ptr<smesh::FFF> metric_soa;
@@ -246,6 +257,37 @@ namespace sfem {
                     return 0;
             }
         }
+
+        bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
+            switch (element_type) {
+                case smesh::TET4:
+                case smesh::TET10:
+                case smesh::HEX8:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        bool can_use_packed_laplacian_apply(const FunctionSpace &space,
+                                            MultiDomainOp &domains) {
+            if (!space.has_packed_mesh()) {
+                return false;
+            }
+
+            for (auto &entry : domains.domains()) {
+                const OpDomain &domain = entry.second;
+                if (!packed_laplacian_apply_supported(domain.element_type)) {
+                    return false;
+                }
+                if (domain.parameters->require_real_value("kappa") != real_t(1)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
     }  // namespace
 
     class GeneratedLaplace::Impl {
@@ -254,6 +296,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
+        std::shared_ptr<Op> packed_affine_apply;
         std::shared_ptr<Buffer<real_t>> previous_buffer;
         const real_t *previous{nullptr};
         const real_t *current{nullptr};
@@ -736,102 +779,39 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_data = state + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    if (impl_->residual_uses_affine) {
-                        if (storage[0] == real_t(1)) {
-                            return laplace_tri3_residual_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
-                        }
-                        return laplace_tri3_residual_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                if (impl_->residual_uses_affine) {
+                    if ((domain.element_type == smesh::TRI3) && storage[0] == real_t(1)) {
+                        return laplace_residual_2d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
                     }
-                    return laplace_tri3_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_tri6_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tri6_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    if (impl_->residual_uses_affine) {
-                        if (storage[0] == real_t(1)) {
-                            return laplace_tet4_residual_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
-                        }
-                        return laplace_tet4_residual_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    if (domain.element_type == smesh::TRI3) {
+                        return laplace_residual_2d_affine_mesh_soa_aos(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                     }
-                    return laplace_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    return laplace_residual_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                 }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_tet10_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_tet10_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_hex27_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_hex27_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_hex27_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_hex27_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX64: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_hex64_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_hex64_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX125: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_hex125_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_hex125_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX729: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_data = state + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->residual_uses_affine ? laplace_proteus_hex729_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_hex729_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedLaplace does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return laplace_residual_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                    const real_t *const SFEM_RESTRICT u_data = state + 0;
+                    real_t *const SFEM_RESTRICT u_out = out + 0;
+                if (impl_->residual_uses_affine) {
+                    if ((domain.element_type == smesh::TET4) && storage[0] == real_t(1)) {
+                        return laplace_residual_3d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_data, u_out);
+                    }
+                    if (domain.element_type == smesh::TET4) {
+                        return laplace_residual_3d_affine_mesh_soa_aos(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_residual_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                }
+                return laplace_residual_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+            }
+            SFEM_ERROR("laplace residual does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -843,6 +823,19 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+
+        if (impl_->jacobian_action_uses_affine &&
+            can_use_packed_laplacian_apply(*impl_->space, *impl_->domains)) {
+            if (!impl_->packed_affine_apply) {
+                impl_->packed_affine_apply = std::make_shared<PackedLaplacian>(impl_->space);
+                if (impl_->packed_affine_apply->initialize() != SFEM_SUCCESS) {
+                    SFEM_ERROR("GeneratedLaplace failed to initialize packed affine apply backend\n");
+                    return SFEM_FAILURE;
+                }
+            }
+            return impl_->packed_affine_apply->apply(current, direction, out);
+        }
+
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
@@ -887,102 +880,63 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
-                    if (impl_->jacobian_action_uses_affine) {
-                        if (storage[0] == real_t(1)) {
-                            return laplace_tri3_jacobian_action_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
-                        }
-                        return laplace_tri3_jacobian_action_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                if (impl_->jacobian_action_uses_affine) {
+                    if ((domain.element_type == smesh::TRI3) && storage[0] == real_t(1)) {
+                        return laplace_jacobian_action_2d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
                     }
-                    return laplace_tri3_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_tri6_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tri6_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    if (impl_->jacobian_action_uses_affine) {
-                        if (storage[0] == real_t(1)) {
-                            return laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
-                        }
-                        return laplace_tet4_jacobian_action_affine_mesh_soa_aos(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    if (domain.element_type == smesh::TRI3) {
+                        return laplace_jacobian_action_2d_affine_mesh_soa_aos(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                     }
-                    return laplace_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    return laplace_jacobian_action_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                 }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_tet10_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_tet10_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                if (impl_->space->has_packed_mesh()) {
+                    auto packed = impl_->space->packed_mesh();
+                    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                    if (packed_block >= 0) {
+                        auto packed_elements = packed->elements(packed_block);
+                        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                        auto n_shared_nodes = packed->n_shared(packed_block);
+                        auto ghost_ptr = packed->ghost_ptr(packed_block);
+                        auto ghost_idx = packed->ghost_idx(packed_block);
+                        return laplace_jacobian_action_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    }
                 }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_hex27_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_hex27_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_hex27_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_hex27_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX64: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_hex64_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_hex64_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX125: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_hex125_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_hex125_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                case smesh::PROTEUS_HEX729: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
-                    real_t *const SFEM_RESTRICT u_out = out + 0;
-                    return impl_->jacobian_action_uses_affine ? laplace_proteus_hex729_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_hex729_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedLaplace does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return laplace_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
+                    real_t *const SFEM_RESTRICT u_out = out + 0;
+                if (impl_->jacobian_action_uses_affine) {
+                    if ((domain.element_type == smesh::TET4) && storage[0] == real_t(1)) {
+                        return laplace_jacobian_action_3d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
+                    }
+                    if (domain.element_type == smesh::TET4) {
+                        return laplace_jacobian_action_3d_affine_mesh_soa_aos(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    }
+                    return laplace_jacobian_action_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                }
+                if (impl_->space->has_packed_mesh()) {
+                    auto packed = impl_->space->packed_mesh();
+                    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                    if (packed_block >= 0) {
+                        auto packed_elements = packed->elements(packed_block);
+                        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                        auto n_shared_nodes = packed->n_shared(packed_block);
+                        auto ghost_ptr = packed->ghost_ptr(packed_block);
+                        auto ghost_idx = packed->ghost_idx(packed_block);
+                        return laplace_jacobian_action_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                    }
+                }
+                return laplace_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+            }
+            SFEM_ERROR("laplace jacobian_action does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -1116,77 +1070,17 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tri3_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tri6_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tet4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tet10_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_hex27_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX64: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX125: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX729: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                default:
-                    SFEM_ERROR("GeneratedLaplace hessian_crs does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_crs_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_crs_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            SFEM_ERROR("laplace hessian_crs does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -1205,85 +1099,27 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tri3_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tri6_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tet4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_tet10_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_hex27_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX64: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX125: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                case smesh::PROTEUS_HEX729: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
-
-                    return laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-                }
-                default:
-                    SFEM_ERROR("GeneratedLaplace hessian_bsr does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            SFEM_ERROR("laplace hessian_bsr does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
-    int GeneratedLaplace::hessian_dia(const real_t *const,
+    int GeneratedLaplace::hessian_dia(const real_t *const state,
                             const int *const diag_offsets,
                             const ptrdiff_t ndiag,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_dia");
+
+
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1291,38 +1127,18 @@ namespace sfem {
             parameter_array(*domain.parameters,
                             mesh->spatial_dimension(),
                             storage);
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    return laplace_tri3_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::TRI6:
-                    return laplace_tri6_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::QUAD4:
-                    return laplace_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_QUAD4:
-                    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::TET4:
-                    return laplace_tet4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::TET10:
-                    return laplace_tet10_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::HEX8:
-                    return laplace_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::HEX27:
-                    return laplace_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_HEX8:
-                    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_HEX27:
-                    return laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_HEX64:
-                    return laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_HEX125:
-                    return laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                case smesh::PROTEUS_HEX729:
-                    return laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-                default:
-                    SFEM_ERROR("GeneratedLaplace hessian_dia does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_dia_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_dia_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+            }
+            SFEM_ERROR("laplace hessian_dia does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 

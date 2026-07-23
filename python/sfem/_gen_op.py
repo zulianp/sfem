@@ -15,6 +15,14 @@ def generate_op_registration_files(manifests, function_name="register_generated_
 
 def generate_op_files(material, elements, kernel_sources=None):
     c_abi_header = "sfem_%s_c_abi.hpp" % material.op_name if kernel_sources else None
+    kernel_sources = dict(kernel_sources or {})
+    dispatch_sources = (
+        _dispatch_sources(material, elements, c_abi_header, kernel_sources)
+        if c_abi_header
+        else {}
+    )
+    abi_sources = dict(kernel_sources)
+    abi_sources.update(dispatch_sources)
     systems_by_dim = _systems_by_dim(material, elements)
     equations = _representative_equations(systems_by_dim)
     if len(equations) > 1:
@@ -28,7 +36,7 @@ def generate_op_files(material, elements, kernel_sources=None):
     elif equations[0].is_energy:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         header, source = _hyperelastic_op(
-            material, elements, c_abi_header, form_collections, kernel_sources
+            material, elements, c_abi_header, form_collections, abi_sources
         )
     elif equations[0].is_residual:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
@@ -41,7 +49,7 @@ def generate_op_files(material, elements, kernel_sources=None):
             raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
         else:
             header, source = _residual_op(
-                material, elements, c_abi_header, form_collections, kernel_sources
+                material, elements, c_abi_header, form_collections, abi_sources
             )
     else:
         raise ValueError("unsupported generated Op equation form")
@@ -53,12 +61,13 @@ def generate_op_files(material, elements, kernel_sources=None):
         wrapper_source: source,
         registration_source: _registration_source(material, wrapper_header),
     }
+    files.update(dispatch_sources)
     if c_abi_header:
         c_abi_path = "op/%s" % c_abi_header
-        files[c_abi_path] = _c_abi_header(material, kernel_sources)
+        files[c_abi_path] = _c_abi_header(material, abi_sources)
         files["op/sfem_%s_manifest.json" % material.op_name] = _op_manifest(
             material,
-            kernel_sources,
+            abi_sources,
             wrapper_header,
             wrapper_source,
             registration_source,
@@ -758,6 +767,16 @@ namespace sfem {
             return 0;
         }
 
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        }
+
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
@@ -931,13 +950,7 @@ namespace sfem {
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
             }
-            switch (domain.element_type) {
-%(apply_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(apply_dispatch_body)s
         });
     }
 
@@ -1053,13 +1066,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-%(hessian_crs_cases)s
-                default:
-                    SFEM_ERROR("%(op)s hessian_crs does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(hessian_crs_dispatch_body)s
         });
     }
 
@@ -1076,13 +1083,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-%(hessian_bsr_cases)s
-                default:
-                    SFEM_ERROR("%(op)s hessian_bsr does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(hessian_bsr_dispatch_body)s
         });
     }
 
@@ -1099,13 +1100,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-%(hessian_dia_cases)s
-                default:
-                    SFEM_ERROR("%(op)s hessian_dia does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(hessian_dia_dispatch_body)s
         });
     }
 
@@ -1123,13 +1118,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-%(hessian_coo_cases)s
-                default:
-                    SFEM_ERROR("%(op)s hessian_coo does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(hessian_coo_dispatch_body)s
         });
     }
 
@@ -1146,13 +1135,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-%(hessian_patch_cases)s
-                default:
-                    SFEM_ERROR("%(op)s hessian_patch does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(hessian_patch_dispatch_body)s
         });
     }
 
@@ -1233,9 +1216,9 @@ namespace sfem {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "declaration_block": (
-            ""
-            if c_abi_header
-            else 'extern "C" {\n%s\n}' % "\n".join(declarations)
+            'extern "C" {\n%s\n}' % "\n".join(declarations)
+            if declarations
+            else ""
         ),
         "declarations": "\n".join(declarations),
         "defaults": defaults,
@@ -1251,6 +1234,52 @@ namespace sfem {
         "hessian_dia_cases": "\n".join(hessian_dia_cases),
         "hessian_coo_cases": "\n".join(hessian_coo_cases),
         "hessian_patch_cases": "\n".join(hessian_patch_cases),
+        "apply_dispatch_body": _hyperelastic_apply_dispatch_body(
+            material.name,
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            indent="            ",
+        ),
+        "hessian_crs_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_crs",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("rowptr", "colidx", "values"),
+            indent="            ",
+        ),
+        "hessian_bsr_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_bsr",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("rowptr", "colidx", "values"),
+            indent="            ",
+        ),
+        "hessian_dia_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_dia",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("diag_offsets", "ndiag", "values"),
+            indent="            ",
+        ),
+        "hessian_coo_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_coo",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("nnz", "rows", "cols", "values"),
+            indent="            ",
+        ),
+        "hessian_patch_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_patch",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("rowptr", "colidx", "values"),
+            indent="            ",
+        ),
         "performance_methods": _performance_methods(material.op_name, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -1294,6 +1323,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_affine_metric_soa_flags = []
     residual_affine_metric_aos_flags = []
     action_affine_metric_aos_flags = []
+    residual_affine_metric_aos_elements_by_dim = {}
+    action_affine_metric_aos_elements_by_dim = {}
+    residual_affine_metric_aos_unit_elements_by_dim = {}
+    action_affine_metric_aos_unit_elements_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
@@ -1383,6 +1416,15 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         residual_affine_metric_aos_flags.append(residual_affine_uses_metric_aos)
         action_affine_metric_aos_flags.append(action_affine_uses_metric_aos)
+        mesh_element = _mesh_element_name(element)
+        if residual_affine_uses_metric_aos:
+            residual_affine_metric_aos_elements_by_dim.setdefault(dim, []).append(mesh_element)
+        if action_affine_uses_metric_aos:
+            action_affine_metric_aos_elements_by_dim.setdefault(dim, []).append(mesh_element)
+        if residual_affine_uses_metric_aos_unit:
+            residual_affine_metric_aos_unit_elements_by_dim.setdefault(dim, []).append(mesh_element)
+        if action_affine_uses_metric_aos_unit:
+            action_affine_metric_aos_unit_elements_by_dim.setdefault(dim, []).append(mesh_element)
         common_affine_residual = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), %s"
@@ -1744,8 +1786,69 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         *(len(names) for names in parameter_names_by_dim.values()),
     )
     parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
+    laplace_packed_apply = material.name == "laplace"
+    laplace_packed_include = '#include "sfem_PackedLaplacian.hpp"' if laplace_packed_apply else ""
+    laplace_packed_helpers = (
+        """
+        bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
+            switch (element_type) {
+                case smesh::TET4:
+                case smesh::TET10:
+                case smesh::HEX8:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        bool can_use_packed_laplacian_apply(const FunctionSpace &space,
+                                            MultiDomainOp &domains) {
+            if (!space.has_packed_mesh()) {
+                return false;
+            }
+
+            for (auto &entry : domains.domains()) {
+                const OpDomain &domain = entry.second;
+                if (!packed_laplacian_apply_supported(domain.element_type)) {
+                    return false;
+                }
+                if (domain.parameters->require_real_value("kappa") != real_t(1)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+"""
+        if laplace_packed_apply
+        else ""
+    )
+    laplace_packed_member = (
+        "        std::shared_ptr<Op> packed_affine_apply;"
+        if laplace_packed_apply
+        else ""
+    )
+    laplace_packed_apply_fast_path = (
+        """
+        if (impl_->jacobian_action_uses_affine &&
+            can_use_packed_laplacian_apply(*impl_->space, *impl_->domains)) {
+            if (!impl_->packed_affine_apply) {
+                impl_->packed_affine_apply = std::make_shared<PackedLaplacian>(impl_->space);
+                if (impl_->packed_affine_apply->initialize() != SFEM_SUCCESS) {
+                    SFEM_ERROR("%s failed to initialize packed affine apply backend\\n");
+                    return SFEM_FAILURE;
+                }
+            }
+            return impl_->packed_affine_apply->apply(current, direction, out);
+        }
+"""
+        % material.op_name
+        if laplace_packed_apply
+        else ""
+    )
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
+%(laplace_packed_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -1783,6 +1886,16 @@ namespace sfem {
             }
             SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
             return 0;
+        }
+
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
         }
 
         struct AffineGeometryCache {
@@ -1841,6 +1954,7 @@ namespace sfem {
         ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
         }
+%(laplace_packed_helpers)s
     }  // namespace
 
     class %(op)s::Impl {
@@ -1849,6 +1963,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
+%(laplace_packed_member)s
         std::shared_ptr<Buffer<real_t>> previous_buffer;
         const real_t *previous{nullptr};
         const real_t *current{nullptr};
@@ -1969,13 +2084,7 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 %(gradient_previous_alias)s
-            switch (domain.element_type) {
-%(residual_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(residual_dispatch_body)s
         });
     }
 
@@ -1987,6 +2096,7 @@ namespace sfem {
 %(apply_state_check)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+%(laplace_packed_apply_fast_path)s
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
@@ -2031,13 +2141,7 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 %(apply_previous_alias)s
-            switch (domain.element_type) {
-%(action_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
+%(action_dispatch_body)s
         });
     }
 
@@ -2158,7 +2262,7 @@ namespace sfem {
 %(hessian_bsr_body)s
     }
 
-    int %(op)s::hessian_dia(const real_t *const,
+    int %(op)s::hessian_dia(const real_t *const state,
                             const int *const diag_offsets,
                             const ptrdiff_t ndiag,
                             real_t *const values) {
@@ -2174,6 +2278,7 @@ namespace sfem {
 """ % {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        "laplace_packed_include": laplace_packed_include,
         "declaration_block": (
             ""
             if c_abi_header
@@ -2185,9 +2290,40 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
+        "laplace_packed_helpers": laplace_packed_helpers,
+        "laplace_packed_member": laplace_packed_member,
+        "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "performance_methods": _performance_methods(material.op_name, performance_cases),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
+        "residual_dispatch_body": _residual_apply_dispatch_body(
+            material.name,
+            "residual",
+            "residual_uses_affine",
+            "state",
+            kernel_sources,
+            {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
+            parameter_names_by_dim,
+            fields_by_dim,
+            block_size_by_dim,
+            residual_affine_metric_aos_elements_by_dim,
+            residual_affine_metric_aos_unit_elements_by_dim,
+            "            ",
+        ),
+        "action_dispatch_body": _residual_apply_dispatch_body(
+            material.name,
+            "jacobian_action",
+            "jacobian_action_uses_affine",
+            "current",
+            kernel_sources,
+            {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+            parameter_names_by_dim,
+            fields_by_dim,
+            block_size_by_dim,
+            action_affine_metric_aos_elements_by_dim,
+            action_affine_metric_aos_unit_elements_by_dim,
+            "            ",
+        ),
         "hessian_crs_body": (
             "%s\n"
             "%s\n"
@@ -2199,20 +2335,23 @@ namespace sfem {
             "                            mesh->spatial_dimension(),\n"
             "                            storage);\n"
             "%s\n"
-            "            switch (domain.element_type) {\n"
             "%s\n"
-            "                default:\n"
-            "                    SFEM_ERROR(\"%s hessian_crs does not support element type %%d\\n\",\n"
-            "                               domain.element_type);\n"
-            "                    return SFEM_FAILURE;\n"
-            "            }\n"
             "        });"
             % (
                 hessian_state_alias,
                 hessian_state_check,
                 hessian_previous_alias,
-                "\n".join(hessian_crs_cases),
-                material.op_name,
+                _residual_hessian_dispatch_body(
+                    material.name,
+                    "hessian_crs",
+                    kernel_sources,
+                    {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+                    parameter_names_by_dim,
+                    fields_by_dim,
+                    block_size_by_dim,
+                    ("rowptr", "colidx", "values"),
+                    "            ",
+                ),
             )
             if hessian_crs_cases
             else "        return SFEM_FAILURE;"
@@ -2228,25 +2367,30 @@ namespace sfem {
             "                            mesh->spatial_dimension(),\n"
             "                            storage);\n"
             "%s\n"
-            "            switch (domain.element_type) {\n"
             "%s\n"
-            "                default:\n"
-            "                    SFEM_ERROR(\"%s hessian_bsr does not support element type %%d\\n\",\n"
-            "                               domain.element_type);\n"
-            "                    return SFEM_FAILURE;\n"
-            "            }\n"
             "        });"
             % (
                 hessian_state_alias,
                 hessian_state_check,
                 hessian_previous_alias,
-                "\n".join(hessian_bsr_cases),
-                material.op_name,
+                _residual_hessian_dispatch_body(
+                    material.name,
+                    "hessian_bsr",
+                    kernel_sources,
+                    {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+                    parameter_names_by_dim,
+                    fields_by_dim,
+                    block_size_by_dim,
+                    ("rowptr", "colidx", "values"),
+                    "            ",
+                ),
             )
             if hessian_bsr_cases
             else "        return SFEM_FAILURE;"
         ),
         "hessian_dia_body": (
+            "%s\n"
+            "%s\n"
             "        auto mesh = impl_->space->mesh_ptr();\n"
             "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
             "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
@@ -2254,15 +2398,25 @@ namespace sfem {
             "            parameter_array(*domain.parameters,\n"
             "                            mesh->spatial_dimension(),\n"
             "                            storage);\n"
-            "            switch (domain.element_type) {\n"
             "%s\n"
-            "                default:\n"
-            "                    SFEM_ERROR(\"%s hessian_dia does not support element type %%d\\n\",\n"
-            "                               domain.element_type);\n"
-            "                    return SFEM_FAILURE;\n"
-            "            }\n"
+            "%s\n"
             "        });"
-            % ("\n".join(hessian_dia_cases), material.op_name)
+            % (
+                hessian_state_alias,
+                hessian_state_check,
+                hessian_previous_alias,
+                _residual_hessian_dispatch_body(
+                    material.name,
+                    "hessian_dia",
+                    kernel_sources,
+                    {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+                    parameter_names_by_dim,
+                    fields_by_dim,
+                    block_size_by_dim,
+                    ("diag_offsets", "ndiag", "values"),
+                    "            ",
+                ),
+            )
             if hessian_dia_cases
             else "        return SFEM_FAILURE;"
         ),
@@ -3800,8 +3954,218 @@ def _safe_identifier(name):
     return re.sub(r"[^0-9A-Za-z_]", "_", str(name))
 
 
+def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
+    declarations = _extract_c_abi_declarations(kernel_sources, public_only=False)
+    groups = _dispatch_groups(material, elements, declarations)
+    if not groups:
+        return {}
+
+    lines = [
+        '#include "%s"' % c_abi_header,
+        "#include <cstdio>",
+        "",
+        "#ifndef SFEM_SUCCESS",
+        "#define SFEM_SUCCESS 0",
+        "#endif",
+        "#ifndef SFEM_FAILURE",
+        "#define SFEM_FAILURE 1",
+        "#endif",
+        "#ifndef SFEM_CODEGEN_PUBLIC_C_ABI",
+        "#define SFEM_CODEGEN_PUBLIC_C_ABI",
+        "#endif",
+        "",
+    ]
+    private_declarations = []
+    for group in groups:
+        for variant in group["variants"]:
+            private_declarations.append(variant["declaration"])
+    lines.extend(_unique(private_declarations))
+    if private_declarations:
+        lines.append("")
+
+    for group in groups:
+        lines.extend(_dispatch_function_lines(group))
+
+    return {"op/sfem_%s_dispatch.cpp" % material.op_name: "\n".join(lines) + "\n"}
+
+
+def _dispatch_groups(material, elements, declarations):
+    element_names = {
+        _element_name(element).lower(): (_mesh_element_name(element), _element_dim(element))
+        for element in elements
+    }
+    groups = {}
+    for declaration in declarations:
+        name = _c_abi_function_name(declaration)
+        if not name or not declaration.startswith('extern "C" int '):
+            continue
+        mapped = _dispatch_mapping(material.name, name, element_names)
+        if mapped is None:
+            continue
+        dispatch_name, mesh_element, dim = mapped
+        params = _c_abi_parameters(declaration)
+        if not params:
+            continue
+        key = (dispatch_name, tuple(params))
+        groups.setdefault(
+            key,
+            {
+                "name": dispatch_name,
+                "params": tuple(params),
+                "dim": dim,
+                "variants": [],
+            },
+        )["variants"].append(
+            {
+                "mesh_element": mesh_element,
+                "function": name,
+                "declaration": declaration,
+            }
+        )
+
+    ordered = []
+    emitted_names = set()
+    for _, group in sorted(groups.items(), key=lambda item: item[0][0]):
+        if group["name"] in emitted_names:
+            continue
+        emitted_names.add(group["name"])
+        group["variants"] = tuple(
+            sorted(group["variants"], key=lambda item: item["mesh_element"])
+        )
+        ordered.append(group)
+    return tuple(ordered)
+
+
+def _dispatch_mapping(material_name, function_name, element_names):
+    prefix = "%s_" % material_name
+    if not function_name.startswith(prefix):
+        return None
+    suffix = function_name[len(prefix) :]
+    for element_name, (mesh_element, dim) in sorted(
+        element_names.items(),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        element_prefix = "%s_" % element_name
+        dispatch_prefix = ""
+        if suffix.startswith(element_prefix):
+            op_suffix = suffix[len(element_prefix) :]
+        else:
+            element_marker = "_%s_" % element_name
+            marker_index = suffix.find(element_marker)
+            if marker_index < 0:
+                continue
+            dispatch_prefix = suffix[:marker_index]
+            op_suffix = suffix[marker_index + len(element_marker) :]
+        repeated_prefix = "%s_" % element_name
+        if op_suffix.startswith(repeated_prefix):
+            op_suffix = op_suffix[len(repeated_prefix) :]
+        dispatch_suffix = _insert_dispatch_dimension(op_suffix, dim)
+        if dispatch_suffix is None:
+            return None
+        if dispatch_prefix:
+            dispatch_suffix = "%s_%s" % (dispatch_prefix, dispatch_suffix)
+        return "%s_%s" % (material_name, dispatch_suffix), mesh_element, dim
+    return None
+
+
+def _insert_dispatch_dimension(op_suffix, dim):
+    for marker in ("_affine_", "_isoparametric_", "_sideset_"):
+        index = op_suffix.find(marker)
+        if index >= 0:
+            return "%s_%dd%s" % (op_suffix[:index], dim, op_suffix[index:])
+    return None
+
+
+def _c_abi_parameters(declaration):
+    begin = declaration.find("(")
+    end = declaration.rfind(")")
+    if begin < 0 or end < begin:
+        return ()
+    body = declaration[begin + 1 : end].strip()
+    if not body or body == "void":
+        return ()
+    return tuple(_split_c_parameters(body))
+
+
+def _split_c_parameters(body):
+    params = []
+    current = []
+    depth = 0
+    for char in body:
+        if char == "," and depth == 0:
+            params.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+    if current:
+        params.append("".join(current).strip())
+    return params
+
+
+def _dispatch_function_lines(group):
+    params = ("const smesh::ElemType element_type",) + tuple(group["params"])
+    arg_names = tuple(_c_parameter_name(param) for param in group["params"])
+    lines = [
+        'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"],
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    switch (element_type) {",
+        ]
+    )
+    for variant in group["variants"]:
+        lines.extend(
+            [
+                "        case smesh::%s:" % variant["mesh_element"],
+                "            return %s(%s);" % (variant["function"], ", ".join(arg_names)),
+            ]
+        )
+    lines.extend(
+        [
+            "        default:",
+            '            std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
+            % group["name"],
+            "            return SFEM_FAILURE;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def _c_parameter_name(param):
+    cleaned = param.strip()
+    cleaned = cleaned.replace(" SFEM_RESTRICT", "")
+    cleaned = cleaned.replace("SFEM_RESTRICT ", "")
+    cleaned = cleaned.rstrip()
+    match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?$", cleaned)
+    if not match:
+        raise ValueError("could not extract C parameter name from '%s'" % param)
+    return match.group(1)
+
+
+def _unique(values):
+    seen = set()
+    ret = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ret.append(value)
+    return ret
+
+
 def _c_abi_header(material, kernel_sources):
-    declarations = _extract_c_abi_declarations(kernel_sources)
+    declarations = _extract_c_abi_declarations(kernel_sources, public_only=True)
     body = "\n\n".join(declarations)
     if body:
         body += "\n"
@@ -3836,10 +4200,16 @@ typedef double geom_t;
 
 #include "../kernel_diagnostics.hpp"
 %(matrix_formats_include)s
+%(smesh_include)s
+
+#ifndef SFEM_CODEGEN_PUBLIC_C_ABI
+#define SFEM_CODEGEN_PUBLIC_C_ABI
+#endif
 
 %(body)s""" % {
         "body": body,
         "matrix_formats_include": matrix_formats_include,
+        "smesh_include": '#include "smesh_mesh.hpp"' if "smesh::ElemType" in body else "",
     }
 
 
@@ -3866,7 +4236,7 @@ def _registration_function(material):
 
 
 def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, registration_source, c_abi_header):
-    declarations = _extract_c_abi_declarations(kernel_sources)
+    declarations = _extract_c_abi_declarations(kernel_sources, public_only=True)
     c_abi = [
         {
             "name": _c_abi_function_name(declaration),
@@ -3926,11 +4296,12 @@ def _matrix_format_sources(kernel_sources):
     return tuple(entries)
 
 
-def _extract_c_abi_declarations(kernel_sources):
+def _extract_c_abi_declarations(kernel_sources, public_only=False):
     declarations = {}
     for path, source in sorted(kernel_sources.items()):
         if not path.endswith((".cpp", ".hpp")) or path.startswith("op/"):
-            continue
+            if not (public_only and path.endswith("_dispatch.cpp")):
+                continue
         offset = 0
         while True:
             start = source.find('extern "C"', offset)
@@ -3947,6 +4318,12 @@ def _extract_c_abi_declarations(kernel_sources):
             else:
                 break
             name = _c_abi_function_name(declaration)
+            declaration_prefix = source[max(0, start - 32) : start]
+            if public_only and "SFEM_CODEGEN_PUBLIC_C_ABI" not in declaration_prefix:
+                is_int_kernel = declaration.startswith('extern "C" int ')
+                is_metadata = name and "_matrix_assembly_" in name
+                if is_int_kernel and not is_metadata:
+                    continue
             if name and name not in declarations:
                 declarations[name] = declaration
     return tuple(declarations[name] for name in sorted(declarations))
@@ -3957,10 +4334,10 @@ def _c_abi_function_name(declaration):
     return match.group(1) if match else None
 
 
-def _c_abi_function_exists(kernel_sources, function_name):
+def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
     if not kernel_sources:
         return False
-    for declaration in _extract_c_abi_declarations(kernel_sources):
+    for declaration in _extract_c_abi_declarations(kernel_sources, public_only=public_only):
         if _c_abi_function_name(declaration) == function_name:
             return True
     return False
@@ -4299,6 +4676,18 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
             ),
             outputs,
         ),
+        "int %s_objective_steps_isoparametric_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        % (
+            stem,
+            isoparametric_common,
+            _energy_declaration_field_args(
+                apply_dependencies,
+                dim,
+                components,
+                current=True,
+                direction=True,
+            ),
+        ),
         "int %s_objective_affine_mesh_soa(%s%s, real_t *);"
         % (
             stem,
@@ -4335,6 +4724,18 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
             ),
             outputs,
         ),
+        "int %s_objective_steps_affine_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        % (
+            stem,
+            affine_common,
+            _energy_declaration_field_args(
+                apply_dependencies,
+                dim,
+                components,
+                current=True,
+                direction=True,
+            ),
+        ),
     )
 
 
@@ -4345,6 +4746,517 @@ def _case(element, function, arguments):
         "function": function,
         "arguments": arguments,
     }
+
+
+def _residual_hessian_dispatch_body(
+    material_name,
+    operation,
+    kernel_sources,
+    action_dependencies_by_dim,
+    parameter_names_by_dim,
+    fields_by_dim,
+    block_size_by_dim,
+    tail_args,
+    indent,
+):
+    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    for dim in (2, 3):
+        dependencies = action_dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        function = "%s_%s_%dd_isoparametric_mesh_soa" % (
+            material_name,
+            operation,
+            dim,
+        )
+        prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
+        lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        lines.append(
+            "%s    static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+            % (indent, block_size_by_dim[dim])
+        )
+        setup = []
+        args = [
+            "domain.element_type",
+            "domain.block->n_elements()",
+            "mesh->n_nodes()",
+            "domain.block->elements()->data()",
+            "points",
+        ]
+        parameter_index = {
+            name: index for index, name in enumerate(parameter_names_by_dim[dim])
+        }
+        args.extend(_dependency_storage_args(dependencies.parameters, parameter_index))
+        fields = fields_by_dim[dim]
+        if dependencies.current:
+            setup.extend(
+                _residual_soa_view_declarations(
+                    fields,
+                    "current",
+                    "data",
+                    "const real_t",
+                )
+            )
+            args.append("FIELD_STRIDE")
+            args.extend(_residual_soa_field_argument_names(fields, "data"))
+        if dependencies.previous:
+            setup.extend(
+                _residual_soa_view_declarations(
+                    fields,
+                    "previous",
+                    "old_data",
+                    "const real_t",
+                )
+            )
+            args.append("FIELD_STRIDE")
+            args.extend(_residual_soa_field_argument_names(fields, "old_data"))
+        args.extend(tail_args)
+        for line in setup:
+            lines.append(line)
+        if _c_abi_function_exists(kernel_sources, function, public_only=True):
+            lines.append("%s    return %s(%s);" % (indent, function, ", ".join(args)))
+        else:
+            lines.append(
+                '%s    SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
+                % (indent, material_name, operation, dim)
+            )
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s %s does not support spatial dimension %%d\\n", dim);'
+            % (indent, material_name, operation),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _element_condition(variable_name, mesh_elements):
+    names = tuple(sorted(set(mesh_elements)))
+    if not names:
+        return "false"
+    return " || ".join("%s == smesh::%s" % (variable_name, name) for name in names)
+
+
+def _residual_apply_dispatch_body(
+    material_name,
+    operation,
+    affine_flag,
+    current_base,
+    kernel_sources,
+    dependencies_by_dim,
+    parameter_names_by_dim,
+    fields_by_dim,
+    block_size_by_dim,
+    affine_aos_elements_by_dim,
+    affine_aos_unit_elements_by_dim,
+    indent,
+):
+    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    for dim in (2, 3):
+        dependencies = dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
+        lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        lines.append(
+            "%s    static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+            % (indent, block_size_by_dim[dim])
+        )
+        setup = []
+        parameter_index = {
+            name: index for index, name in enumerate(parameter_names_by_dim[dim])
+        }
+        common_args = [
+            "domain.element_type",
+            "domain.block->n_elements()",
+            "mesh->n_nodes()",
+            "domain.block->elements()->data()",
+        ]
+        field_args = []
+        unit_field_args = []
+        if dependencies.current:
+            setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    current_base,
+                    "data",
+                    "const real_t",
+                )
+            )
+            field_args.append("FIELD_STRIDE")
+            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data"))
+            unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data"))
+        if dependencies.previous:
+            setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "previous",
+                    "old_data",
+                    "const real_t",
+                )
+            )
+            field_args.append("FIELD_STRIDE")
+            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "old_data"))
+        if dependencies.direction:
+            setup.extend(
+                _residual_soa_view_declarations(
+                    fields_by_dim[dim],
+                    "direction",
+                    "direction_data",
+                    "const real_t",
+                )
+            )
+            field_args.append("FIELD_STRIDE")
+            field_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+            )
+            unit_field_args.extend(
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+            )
+        setup.extend(
+            _residual_soa_view_declarations(
+                fields_by_dim[dim],
+                "out",
+                "out",
+                "real_t",
+            )
+        )
+        field_args.append("FIELD_STRIDE")
+        field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        for line in setup:
+            lines.append(line)
+
+        storage_args = list(
+            _dependency_storage_args(dependencies.parameters, parameter_index)
+        )
+        affine_soa = "%s_%s_%dd_affine_mesh_soa" % (material_name, operation, dim)
+        affine_aos = "%s_%s_%dd_affine_mesh_soa_aos" % (material_name, operation, dim)
+        affine_aos_unit = "%s_%s_%dd_affine_mesh_soa_aos_unit" % (
+            material_name,
+            operation,
+            dim,
+        )
+        isop = "%s_%s_%dd_isoparametric_mesh_soa" % (material_name, operation, dim)
+        packed = "%s_%s_packed_%dd_isoparametric_mesh_soa" % (
+            material_name,
+            operation,
+            dim,
+        )
+        aos_condition = _element_condition(
+            "domain.element_type", affine_aos_elements_by_dim.get(dim, ())
+        )
+        unit_condition = _element_condition(
+            "domain.element_type", affine_aos_unit_elements_by_dim.get(dim, ())
+        )
+
+        lines.append("%s    if (impl_->%s) {" % (indent, affine_flag))
+        if _c_abi_function_exists(kernel_sources, affine_aos_unit, public_only=True):
+            lines.append(
+                "%s        if ((%s) && storage[0] == real_t(1)) {"
+                % (indent, unit_condition)
+            )
+            lines.append(
+                "%s            return %s(%s);"
+                % (
+                    indent,
+                    affine_aos_unit,
+                    ", ".join(
+                        [
+                            *common_args,
+                            "geom_metric_aos",
+                            *unit_field_args,
+                        ]
+                    ),
+                )
+            )
+            lines.append("%s        }" % indent)
+        if _c_abi_function_exists(kernel_sources, affine_aos, public_only=True):
+            lines.append("%s        if (%s) {" % (indent, aos_condition))
+            lines.append(
+                "%s            return %s(%s);"
+                % (
+                    indent,
+                    affine_aos,
+                    ", ".join(
+                        [
+                            *common_args,
+                            "geom_metric_aos",
+                            *storage_args,
+                            *field_args,
+                        ]
+                    ),
+                )
+            )
+            lines.append("%s        }" % indent)
+        if _c_abi_function_exists(kernel_sources, affine_soa, public_only=True):
+            lines.append(
+                "%s        return %s(%s);"
+                % (
+                    indent,
+                    affine_soa,
+                    ", ".join(
+                        [
+                            *common_args,
+                            *_affine_geometry_offsets(dim).split(", "),
+                            "determinant",
+                            *storage_args,
+                            *field_args,
+                        ]
+                    ),
+                )
+            )
+        else:
+            lines.append(
+                '%s        SFEM_ERROR("%s %s affine %dd dispatch was not generated\\n");'
+                % (indent, material_name, operation, dim)
+            )
+            lines.append("%s        return SFEM_FAILURE;" % indent)
+        lines.append("%s    }" % indent)
+        if operation == "jacobian_action" and _c_abi_function_exists(
+            kernel_sources, packed, public_only=True
+        ):
+            lines.extend(
+                [
+                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s        auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s        if (packed_block >= 0) {" % indent,
+                    "%s            auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s            auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s            auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s            auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    "%s            return %s(%s);"
+                    % (
+                        indent,
+                        packed,
+                        ", ".join(
+                            [
+                                "domain.element_type",
+                                "packed->n_packs(packed_block)",
+                                "packed->n_elements_per_pack(packed_block)",
+                                "domain.block->n_elements()",
+                                "mesh->n_nodes()",
+                                "packed->max_nodes_per_pack()",
+                                "packed_elements->data()",
+                                "owned_nodes_ptr->data()",
+                                "n_shared_nodes->data()",
+                                "ghost_ptr->data()",
+                                "ghost_idx->data()",
+                                "points",
+                                *storage_args,
+                                *field_args,
+                            ]
+                        ),
+                    ),
+                    "%s        }" % indent,
+                    "%s    }" % indent,
+                ]
+            )
+        if _c_abi_function_exists(kernel_sources, isop, public_only=True):
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    isop,
+                    ", ".join(
+                        [
+                            *common_args,
+                            "points",
+                            *storage_args,
+                            *field_args,
+                        ]
+                    ),
+                )
+            )
+        else:
+            lines.append(
+                '%s    SFEM_ERROR("%s %s isoparametric %dd dispatch was not generated\\n");'
+                % (indent, material_name, operation, dim)
+            )
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s %s does not support spatial dimension %%d\\n", dim);'
+            % (indent, material_name, operation),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent):
+    lines = [
+        "%sconst int dim = mesh->spatial_dimension();" % indent,
+    ]
+    for dim in (2, 3):
+        prefix = "if" if dim == 2 else "else if"
+        dependencies = apply_dependencies_by_dim.get(dim)
+        uses_current = getattr(dependencies, "current", True)
+        uses_direction = getattr(dependencies, "direction", True)
+        current_args = ([str(dim)] + ["x + %d" % d for d in range(dim)]) if uses_current else []
+        direction_args = ([str(dim)] + ["h + %d" % d for d in range(dim)]) if uses_direction else []
+        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        affine = "%s_apply_%dd_affine_mesh_soa" % (material_name, dim)
+        isop = "%s_apply_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        packed = "%s_apply_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        lines.append("%s    if (impl_->apply_uses_affine) {" % indent)
+        if _c_abi_function_exists(kernel_sources, affine, public_only=True):
+            lines.append(
+                "%s        return %s(%s);"
+                % (
+                    indent,
+                    affine,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "domain.block->elements()->data()",
+                            *("adjugate[%d]" % i for i in range(dim * dim)),
+                            "determinant",
+                            'domain.parameters->require_real_value("mu")',
+                            'domain.parameters->require_real_value("lmbda")',
+                            *current_args,
+                            *direction_args,
+                            *output_args,
+                        ]
+                    ),
+                )
+            )
+        else:
+            lines.append('%s        SFEM_ERROR("%s affine apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s        return SFEM_FAILURE;" % indent)
+        lines.append("%s    }" % indent)
+        if _c_abi_function_exists(kernel_sources, packed, public_only=True):
+            lines.extend(
+                [
+                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s        auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s        if (packed_block >= 0) {" % indent,
+                    "%s            auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s            auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s            auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s            auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    "%s            return %s(%s);" % (
+                        indent,
+                        packed,
+                        ", ".join(
+                            [
+                                "domain.element_type",
+                                "packed->n_packs(packed_block)",
+                                "packed->n_elements_per_pack(packed_block)",
+                                "domain.block->n_elements()",
+                                "mesh->n_nodes()",
+                                "packed->max_nodes_per_pack()",
+                                "packed_elements->data()",
+                                "owned_nodes_ptr->data()",
+                                "n_shared_nodes->data()",
+                                "ghost_ptr->data()",
+                                "ghost_idx->data()",
+                                "points",
+                                'domain.parameters->require_real_value("mu")',
+                                'domain.parameters->require_real_value("lmbda")',
+                                *current_args,
+                                *direction_args,
+                                *output_args,
+                            ]
+                        ),
+                    ),
+                    "%s        }" % indent,
+                    "%s    }" % indent,
+                ]
+            )
+        if _c_abi_function_exists(kernel_sources, isop, public_only=True):
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    isop,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "domain.block->elements()->data()",
+                            "points",
+                            'domain.parameters->require_real_value("mu")',
+                            'domain.parameters->require_real_value("lmbda")',
+                            *current_args,
+                            *direction_args,
+                            *output_args,
+                        ]
+                    ),
+                )
+            )
+        else:
+            lines.append('%s    SFEM_ERROR("%s isoparametric apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s apply does not support spatial dimension %%d\\n", dim);' % (indent, material_name),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent):
+    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    for dim in (2, 3):
+        prefix = "if" if dim == 2 else "else if"
+        function = "%s_%s_%dd_isoparametric_mesh_soa" % (
+            material_name,
+            operation,
+            dim,
+        )
+        dependencies = apply_dependencies_by_dim.get(dim)
+        current_args = (
+            [str(dim)] + ["current + %d" % d for d in range(dim)]
+            if getattr(dependencies, "current", True)
+            else []
+        )
+        lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        if _c_abi_function_exists(kernel_sources, function, public_only=True):
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    function,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "domain.block->elements()->data()",
+                            "points",
+                            'domain.parameters->require_real_value("mu")',
+                            'domain.parameters->require_real_value("lmbda")',
+                            *current_args,
+                            *tail_args,
+                        ]
+                    ),
+                )
+            )
+        else:
+            lines.append('%s    SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s %s does not support spatial dimension %%d\\n", dim);' % (indent, material_name, operation),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _dual_case(element, flag, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):

@@ -4,6 +4,7 @@
 #include "../laplace_d3_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -2517,7 +2518,7 @@ static SFEM_INLINE int laplace_tet4_hessian_crs_isoparametric_mesh_soa_packed_fi
 
 #pragma omp parallel
     {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = (scalar_t *)std::malloc((size_t)DIM * (size_t)max_nodes_per_pack * sizeof(scalar_t));
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2594,7 +2595,6 @@ static SFEM_INLINE int laplace_tet4_hessian_crs_isoparametric_mesh_soa_packed_fi
             laplace_tet4_hessian_crs_isoparametric_mesh_soa_scatter_packed_crs_entries(element_matrix, entries, values);
             }
         }
-        std::free(pack_coordinates);
     }
     return SFEM_SUCCESS;
 }

@@ -4,6 +4,7 @@
 #include "../laplace_d3_tensor_product_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -1068,6 +1069,180 @@ extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float
     return sfem::codegen::laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_impl(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t kappa,
+        const ptrdiff_t direction_stride,
+        const scalar_t *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT u_out
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 8;
+    static constexpr int N_SHAPE = 8;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
+    static constexpr int VECTOR_SIZE = 1;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);
+                }
+            }
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                const idx_t node = owned_nodes_ptr[pack] + k;
+                pack_direction[k] = u_direction[node * direction_stride];
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
+            }
+
+            for (ptrdiff_t element = e_start; element < e_end; ++element) {
+                const int nelems = 1;
+                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
+                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+                scalar_t block_determinant[N_QP * VECTOR_SIZE];
+                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
+                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t packed_node = elements[shape][element];
+                    const uint16_t coordinate_packed_node = elements[shape][element];
+                    const uint16_t field_packed_node = elements[shape][element];
+                    for (int d = 0; d < DIM; ++d) {
+                        block_coordinates[shape * DIM + d][0] = pack_coordinates[d * max_nodes_per_pack + coordinate_packed_node];
+                    }
+                    block_direction[shape][0] = pack_direction[field_packed_node];
+                    block_output[shape][0] = scalar_t(0);
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
+                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
+                const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+
+                laplace_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t field_packed_node = elements[shape][element];
+                    pack_out[field_packed_node] += block_output[shape][0];
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
+                pack_out[k] = scalar_t(0);
+            }
+            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
+                pack_out[k] = scalar_t(0);
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                u_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];
+                pack_out[n_contiguous + k] = scalar_t(0);
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    return sfem::codegen::laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    return sfem::codegen::laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
 extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1355,7 +1530,7 @@ static SFEM_INLINE int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_p
 
 #pragma omp parallel
     {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = (scalar_t *)std::malloc((size_t)DIM * (size_t)max_nodes_per_pack * sizeof(scalar_t));
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1430,7 +1605,6 @@ static SFEM_INLINE int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_p
             laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_scatter_packed_crs_entries(element_matrix, entries, values);
             }
         }
-        std::free(pack_coordinates);
     }
     return SFEM_SUCCESS;
 }

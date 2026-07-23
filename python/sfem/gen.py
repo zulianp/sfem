@@ -1314,6 +1314,10 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
     ]
     if not c_abi_entries:
         return
+    dispatch_declarations = []
+    for path, source in files.items():
+        if path.endswith("_dispatch.cpp") and path.startswith("op/"):
+            dispatch_declarations.extend(_extern_c_declarations(source))
 
     aliases = (
         _tensor_product_proteus_alias(
@@ -1336,7 +1340,9 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
         ),
     )
     for c_abi_path, c_abi_source in c_abi_entries:
-        declarations = _extern_c_declarations(c_abi_source)
+        declarations = _unique_extern_c_declarations(
+            tuple(_extern_c_declarations(c_abi_source)) + tuple(dispatch_declarations)
+        )
         names = {declaration["name"] for declaration in declarations}
         for alias in aliases:
             alias_declarations = [
@@ -1413,10 +1419,29 @@ def _extern_c_declarations(source):
 
 def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, alias):
     include_path = _relative_codegen_include(os.path.dirname(source_path), c_abi_path)
+    declarations = tuple(
+        declaration
+        for declaration in declarations
+        if "_matrix_assembly_" not in declaration["name"]
+    )
     lines = [
         '#include "%s"' % include_path,
         "",
     ]
+    target_declarations = []
+    emitted_targets = set()
+    for declaration in declarations:
+        target_name = _tensor_product_proteus_target_name(declaration["name"], alias)
+        if not target_name or target_name in emitted_targets:
+            continue
+        emitted_targets.add(target_name)
+        target = dict(declaration)
+        target["name"] = target_name
+        target_declarations.append(target)
+    for declaration in target_declarations:
+        lines.extend(_extern_c_prototype_lines(declaration))
+    if target_declarations:
+        lines.append("")
     for declaration in declarations:
         lines.extend(
             _tensor_product_proteus_alias_function(
@@ -1460,6 +1485,33 @@ def _tensor_product_proteus_alias_function(declaration, alias):
         lines.append("    return %s;" % call)
     lines.extend(["}", ""])
     return lines
+
+
+def _extern_c_prototype_lines(declaration):
+    return_type = declaration["return_type"]
+    name = declaration["name"]
+    params = _c_params(declaration["params"])
+    lines = ['extern "C" %s %s(' % (return_type, name)]
+    if params:
+        for idx, param in enumerate(params):
+            comma = "," if idx + 1 < len(params) else ""
+            lines.append("        %s%s" % (param, comma))
+    else:
+        lines.append("        void")
+    lines.append(");")
+    return lines
+
+
+def _unique_extern_c_declarations(declarations):
+    unique = []
+    seen = set()
+    for declaration in declarations:
+        name = declaration["name"]
+        if name in seen:
+            continue
+        seen.add(name)
+        unique.append(declaration)
+    return tuple(unique)
 
 
 def _tensor_product_proteus_target_name(name, alias):
@@ -1583,6 +1635,7 @@ _CODEGEN_COMMON_HEADERS = frozenset(
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
         "matrix_formats.hpp",
+        "packed_thread_scratch.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1596,6 +1649,7 @@ _CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
+        "packed_thread_scratch.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1959,6 +2013,7 @@ def _clean_outputs(out_dir, name):
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
         "matrix_formats.hpp",
+        "packed_thread_scratch.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
@@ -1987,6 +2042,7 @@ def _clean_outputs(out_dir, name):
         "kernel_diagnostics.hpp",
         "kernel_diagnostics.cuh",
         "matrix_formats.hpp",
+        "packed_thread_scratch.hpp",
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
         "geometry_kernels.hpp",
