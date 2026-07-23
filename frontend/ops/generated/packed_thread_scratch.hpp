@@ -37,5 +37,13 @@ SFEM_INLINE T *thread_scratch(const int slot, const size_t size) {
     return buffers[slot].ensure(size);
 }
 
+template <typename T>
+SFEM_INLINE void prealloc_thread_scratch(const int slot, const size_t size) {
+#pragma omp parallel
+    {
+        (void)thread_scratch<T>(slot, size);
+    }
+}
+
 }  // namespace codegen
 }  // namespace sfem

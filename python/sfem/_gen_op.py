@@ -397,6 +397,8 @@ def _hyperelastic_op(
 ):
     if form_collections is None:
         raise ValueError("energy generated Op requires form collections")
+    if kernel_sources is None:
+        kernel_sources = {}
     parameters = tuple(str(name) for name, _ in material.parameter_defaults)
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
@@ -409,6 +411,22 @@ def _hyperelastic_op(
     hessian_dia_cases = []
     hessian_coo_cases = []
     hessian_patch_cases = []
+    generated_packed_apply = any("_packed_" in source for source in kernel_sources.values())
+    packed_scratch_include = '#include "packed_thread_scratch.hpp"' if generated_packed_apply else ""
+    packed_scratch_prealloc = (
+        """        if (impl_->space->has_packed_mesh()) {
+            auto packed = impl_->space->packed_mesh();
+            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
+            sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(2, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(3, scratch_size);
+        }"""
+        if generated_packed_apply
+        else ""
+    )
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     gradient_affine_aos_flags = []
@@ -455,20 +473,42 @@ def _hyperelastic_op(
         declarations.extend(
             _hyperelastic_declarations(stem, dim, parameters, dependencies)
         )
-        args = _parameter_args(parameters)
-        common_isoparametric_args = (
-            "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), points%s" % args
+        objective_args = "".join(
+            ", %s" % arg for arg in _dependency_domain_parameter_args(objective_dependencies)
         )
-        common_affine_args = (
+        gradient_args = "".join(
+            ", %s" % arg for arg in _dependency_domain_parameter_args(gradient_dependencies)
+        )
+        apply_args = "".join(
+            ", %s" % arg for arg in _dependency_domain_parameter_args(apply_dependencies)
+        )
+        gradient_common_isoparametric_args = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), points%s" % gradient_args
+        )
+        gradient_common_affine_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), %s, determinant%s"
-            % (_affine_geometry_offsets(dim), args)
+            % (_affine_geometry_offsets(dim), gradient_args)
         )
-        common_affine_aos_args = (
+        gradient_common_affine_aos_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
             "domain.block->elements()->data(), adjugate_aos, determinant%s"
-            % args
+            % gradient_args
+        )
+        apply_common_isoparametric_args = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), points%s" % apply_args
+        )
+        apply_common_affine_args = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), %s, determinant%s"
+            % (_affine_geometry_offsets(dim), apply_args)
+        )
+        apply_common_affine_aos_args = (
+            "domain.block->n_elements(), mesh->n_nodes(), "
+            "domain.block->elements()->data(), adjugate_aos, determinant%s"
+            % apply_args
         )
         gradient_affine_uses_aos = _c_abi_function_exists(
             kernel_sources, "%s_gradient_affine_mesh_soa_aos_unit" % stem
@@ -480,7 +520,7 @@ def _hyperelastic_op(
         apply_affine_aos_flags.append(apply_affine_uses_aos)
         gradient_affine_args = ", ".join(
             _nonempty(
-                common_affine_args,
+                gradient_common_affine_args,
                 *_energy_field_args(
                     gradient_dependencies, dim, components, current="x"
                 ),
@@ -489,7 +529,7 @@ def _hyperelastic_op(
         )
         gradient_isoparametric_args = ", ".join(
             _nonempty(
-                common_isoparametric_args,
+                gradient_common_isoparametric_args,
                 *_energy_field_args(
                     gradient_dependencies, dim, components, current="x"
                 ),
@@ -504,7 +544,7 @@ def _hyperelastic_op(
                     "%s_gradient_affine_mesh_soa_aos_unit" % stem,
                     ", ".join(
                         _nonempty(
-                            common_affine_aos_args,
+                            gradient_common_affine_aos_args,
                             *_energy_field_args(
                                 gradient_dependencies, dim, components, current="x"
                             ),
@@ -530,7 +570,7 @@ def _hyperelastic_op(
             )
         apply_affine_args = ", ".join(
             _nonempty(
-                common_affine_args,
+                apply_common_affine_args,
                 *_energy_field_args(
                     apply_dependencies,
                     dim,
@@ -543,7 +583,7 @@ def _hyperelastic_op(
         )
         apply_isoparametric_args = ", ".join(
             _nonempty(
-                common_isoparametric_args,
+                apply_common_isoparametric_args,
                 *_energy_field_args(
                     apply_dependencies,
                     dim,
@@ -562,7 +602,7 @@ def _hyperelastic_op(
                     "%s_apply_affine_mesh_soa_aos_unit" % stem,
                     ", ".join(
                         _nonempty(
-                            common_affine_aos_args,
+                            apply_common_affine_aos_args,
                             *_energy_field_args(
                                 apply_dependencies,
                                 dim,
@@ -596,14 +636,14 @@ def _hyperelastic_op(
                 "%s_objective_affine_mesh_soa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
-                    % (_affine_geometry_offsets(dim), args),
+                    % (_affine_geometry_offsets(dim), objective_args),
                     *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     "impl_->element_values.get()",
                 )),
                 "%s_objective_isoparametric_mesh_soa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
-                    % args,
+                    % objective_args,
                     *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     "impl_->element_values.get()",
                 )),
@@ -613,30 +653,32 @@ def _hyperelastic_op(
             _dual_status_case(
                 element,
                 "%s_objective_steps_affine_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s, nsteps, steps, impl_->element_values.get()"
-                % (
+                ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
-                    % (_affine_geometry_offsets(dim), args),
-                    dim,
-                    _offsets("x", components),
+                    % (_affine_geometry_offsets(dim), objective_args),
+                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     dim,
                     _offsets("h", components),
-                ),
+                    "nsteps",
+                    "steps",
+                    "impl_->element_values.get()",
+                )),
                 "%s_objective_steps_isoparametric_mesh_soa" % stem,
-                "%s, %d, %s, %d, %s, nsteps, steps, impl_->element_values.get()"
-                % (
+                ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
-                    % args,
-                    dim,
-                    _offsets("x", components),
+                    % objective_args,
+                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     dim,
                     _offsets("h", components),
-                ),
+                    "nsteps",
+                    "steps",
+                    "impl_->element_values.get()",
+                )),
             )
         )
         hessian_state_args = ", ".join(
             _nonempty(
-                common_isoparametric_args,
+                apply_common_isoparametric_args,
                 *_energy_field_args(
                     apply_dependencies,
                     dim,
@@ -728,6 +770,7 @@ def _hyperelastic_op(
             )
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
+%(packed_scratch_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -875,6 +918,7 @@ namespace sfem {
             }
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
+%(packed_scratch_prealloc)s
         return SFEM_SUCCESS;
     }
 
@@ -908,6 +952,7 @@ namespace sfem {
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
             }
+%(gradient_packed_dispatch_body)s
             switch (domain.element_type) {
 %(gradient_cases)s
                 default:
@@ -1033,12 +1078,15 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
             int status = SFEM_FAILURE;
+%(objective_steps_packed_dispatch_body)s
+            if (status == SFEM_FAILURE) {
             switch (domain.element_type) {
 %(objective_steps_cases)s
                 default:
                     SFEM_ERROR("%(op)s does not support element type %%d\\n",
                                domain.element_type);
                     return SFEM_FAILURE;
+            }
             }
             if (status != SFEM_SUCCESS) return status;
             for (int step = 0; step < nsteps; ++step) {
@@ -1215,6 +1263,8 @@ namespace sfem {
 """ % {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        "packed_scratch_include": packed_scratch_include,
+        "packed_scratch_prealloc": packed_scratch_prealloc,
         "declaration_block": (
             'extern "C" {\n%s\n}' % "\n".join(declarations)
             if declarations
@@ -1238,6 +1288,18 @@ namespace sfem {
             material.name,
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            indent="            ",
+        ),
+        "gradient_packed_dispatch_body": _hyperelastic_gradient_packed_dispatch_body(
+            material.name,
+            kernel_sources,
+            {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+            indent="            ",
+        ),
+        "objective_steps_packed_dispatch_body": _hyperelastic_objective_steps_packed_dispatch_body(
+            material.name,
+            kernel_sources,
+            {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
         ),
         "hessian_crs_dispatch_body": _hyperelastic_hessian_dispatch_body(
@@ -1775,6 +1837,25 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_affine_uses_metric = any(action_affine_metric_flags)
     residual_affine_uses_metric_soa = any(residual_affine_metric_soa_flags)
     action_affine_uses_metric_soa = any(action_affine_metric_soa_flags)
+    action_packed_affine_uses_metric_soa = any(
+        _c_abi_function_uses_cached_metric(
+            kernel_sources,
+            "%s_jacobian_action_packed_%dd_affine_mesh_soa" % (material.name, dim),
+        )
+        for dim in (2, 3)
+    )
+    laplace_tet4_packed_affine_uses_metric_soa = (
+        material.name == "laplace"
+        and _c_abi_function_exists(
+            kernel_sources,
+            "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
+        )
+    )
+    action_affine_uses_metric_soa = (
+        action_affine_uses_metric_soa
+        or action_packed_affine_uses_metric_soa
+        or laplace_tet4_packed_affine_uses_metric_soa
+    )
     residual_affine_uses_metric_aos = any(residual_affine_metric_aos_flags)
     action_affine_uses_metric_aos = any(action_affine_metric_aos_flags)
     residual_affine_uses_jacobian = not all(residual_affine_metric_flags)
@@ -1787,7 +1868,27 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     )
     parameter_lines = _residual_parameter_array_lines(parameter_names_by_dim)
     laplace_packed_apply = material.name == "laplace"
-    laplace_packed_include = '#include "sfem_PackedLaplacian.hpp"' if laplace_packed_apply else ""
+    generated_packed_apply = any("_jacobian_action_packed_" in source for source in kernel_sources.values())
+    use_laplace_packed_fast_path = laplace_packed_apply and not generated_packed_apply
+    laplace_packed_include = '#include "sfem_PackedLaplacian.hpp"' if use_laplace_packed_fast_path else ""
+    packed_scratch_include = '#include "packed_thread_scratch.hpp"' if generated_packed_apply else ""
+    packed_scratch_prealloc = (
+        """        if (impl_->space->has_packed_mesh()) {
+            auto packed = impl_->space->packed_mesh();
+            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    0, (size_t)dim * (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    1, (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    2, (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    3, (size_t)max_nodes_per_pack);
+        }"""
+        if generated_packed_apply
+        else ""
+    )
     laplace_packed_helpers = (
         """
         bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
@@ -1821,11 +1922,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         }
 """
         if laplace_packed_apply
+        and use_laplace_packed_fast_path
         else ""
     )
     laplace_packed_member = (
         "        std::shared_ptr<Op> packed_affine_apply;"
-        if laplace_packed_apply
+        if use_laplace_packed_fast_path
         else ""
     )
     laplace_packed_apply_fast_path = (
@@ -1843,12 +1945,50 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         }
 """
         % material.op_name
-        if laplace_packed_apply
+        if use_laplace_packed_fast_path
         else ""
     )
+    private_declarations = []
+    if laplace_tet4_packed_affine_uses_metric_soa:
+        private_declarations.append(
+            """int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
+        const geom_t *const SFEM_RESTRICT g_geom_metric3,
+        const geom_t *const SFEM_RESTRICT g_geom_metric4,
+        const geom_t *const SFEM_RESTRICT g_geom_metric5,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);"""
+        )
+    if c_abi_header:
+        declaration_block = (
+            'extern "C" {\n%s\n}' % "\n".join(private_declarations)
+            if private_declarations
+            else ""
+        )
+    else:
+        declaration_block = 'extern "C" {\n%s\n}' % "\n".join(
+            [*declarations, *private_declarations]
+        )
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
 %(laplace_packed_include)s
+%(packed_scratch_include)s
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -2010,12 +2150,14 @@ namespace sfem {
                 (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
                 (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
         if (needs_affine_jacobian || needs_affine_metric) {
-            return cache_affine_geometry(impl_->space,
-                                         *impl_->domains,
-                                         needs_affine_jacobian,
-                                         needs_affine_metric_soa,
-                                         needs_affine_metric_aos);
+            const int status = cache_affine_geometry(impl_->space,
+                                                     *impl_->domains,
+                                                     needs_affine_jacobian,
+                                                     needs_affine_metric_soa,
+                                                     needs_affine_metric_aos);
+            if (status != SFEM_SUCCESS) return status;
         }
+%(packed_scratch_prealloc)s
         return SFEM_SUCCESS;
     }
 
@@ -2279,10 +2421,10 @@ namespace sfem {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "laplace_packed_include": laplace_packed_include,
+        "packed_scratch_include": packed_scratch_include,
+        "packed_scratch_prealloc": packed_scratch_prealloc,
         "declaration_block": (
-            ""
-            if c_abi_header
-            else 'extern "C" {\n%s\n}' % "\n".join(declarations)
+            declaration_block
         ),
         "declarations": "\n".join(declarations),
         "max_parameters": max_parameters,
@@ -3752,6 +3894,13 @@ def _dependency_parameters(dependencies):
     return tuple(getattr(dependencies, "parameters", dependencies or ()))
 
 
+def _dependency_domain_parameter_args(dependencies):
+    return tuple(
+        'domain.parameters->require_real_value("%s")' % str(parameter)
+        for parameter in _dependency_parameters(getattr(dependencies, "parameters", ()))
+    )
+
+
 def _compatible_element_for_field(element, field):
     if hasattr(element, "element_for_field"):
         return element.element_for_field(
@@ -4639,6 +4788,24 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
         + ", const geom_t *"
         + parameter_decl
     )
+    affine_aos_unit_common = (
+        "ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *"
+        + parameter_decl
+    )
+    objective_steps_field_decl = (
+        _energy_declaration_field_args(
+            objective_dependencies,
+            dim,
+            components,
+            current=True,
+        )
+        + _energy_declaration_field_args(
+            apply_dependencies,
+            dim,
+            components,
+            direction=True,
+        )
+    )
     return (
         "int %s_objective_isoparametric_mesh_soa(%s%s, real_t *);"
         % (
@@ -4680,13 +4847,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
         % (
             stem,
             isoparametric_common,
-            _energy_declaration_field_args(
-                apply_dependencies,
-                dim,
-                components,
-                current=True,
-                direction=True,
-            ),
+            objective_steps_field_decl,
         ),
         "int %s_objective_affine_mesh_soa(%s%s, real_t *);"
         % (
@@ -4711,6 +4872,18 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
             ),
             outputs,
         ),
+        "int %s_gradient_affine_mesh_soa_aos_unit(%s%s, ptrdiff_t%s);"
+        % (
+            stem,
+            affine_aos_unit_common,
+            _energy_declaration_field_args(
+                gradient_dependencies,
+                dim,
+                components,
+                current=True,
+            ),
+            outputs,
+        ),
         "int %s_apply_affine_mesh_soa(%s%s, ptrdiff_t%s);"
         % (
             stem,
@@ -4724,10 +4897,10 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
             ),
             outputs,
         ),
-        "int %s_objective_steps_affine_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        "int %s_apply_affine_mesh_soa_aos_unit(%s%s, ptrdiff_t%s);"
         % (
             stem,
-            affine_common,
+            affine_aos_unit_common,
             _energy_declaration_field_args(
                 apply_dependencies,
                 dim,
@@ -4735,6 +4908,13 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
                 current=True,
                 direction=True,
             ),
+            outputs,
+        ),
+        "int %s_objective_steps_affine_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        % (
+            stem,
+            affine_common,
+            objective_steps_field_decl,
         ),
     )
 
@@ -4940,6 +5120,11 @@ def _residual_apply_dispatch_body(
             dim,
         )
         isop = "%s_%s_%dd_isoparametric_mesh_soa" % (material_name, operation, dim)
+        packed_affine = "%s_%s_packed_%dd_affine_mesh_soa" % (
+            material_name,
+            operation,
+            dim,
+        )
         packed = "%s_%s_packed_%dd_isoparametric_mesh_soa" % (
             material_name,
             operation,
@@ -4953,6 +5138,92 @@ def _residual_apply_dispatch_body(
         )
 
         lines.append("%s    if (impl_->%s) {" % (indent, affine_flag))
+        if operation == "jacobian_action" and _c_abi_function_exists(
+            kernel_sources, packed_affine, public_only=True
+        ):
+            packed_affine_geometry_args = (
+                _affine_metric_offsets(dim).split(", ")
+                if _c_abi_function_uses_cached_metric(kernel_sources, packed_affine)
+                else [*_affine_geometry_offsets(dim).split(", "), "determinant"]
+            )
+            lines.extend(
+                [
+                    "%s        if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s            auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s            const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s            if (packed_block >= 0) {" % indent,
+                    "%s                auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s                auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s                auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s                auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s                auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    *(
+                        [
+                            "%s                if (domain.element_type == smesh::TET4) {" % indent,
+                            "%s                    return laplace_tet4_jacobian_action_packed_affine_mesh_soa(%s);"
+                            % (
+                                indent,
+                                ", ".join(
+                                    [
+                                        "packed->n_packs(packed_block)",
+                                        "packed->n_elements_per_pack(packed_block)",
+                                        "domain.block->n_elements()",
+                                        "mesh->n_nodes()",
+                                        "packed->max_nodes_per_pack()",
+                                        "packed_elements->data()",
+                                        "owned_nodes_ptr->data()",
+                                        "n_shared_nodes->data()",
+                                        "ghost_ptr->data()",
+                                        "ghost_idx->data()",
+                                        "geom_metric[0]",
+                                        "geom_metric[1]",
+                                        "geom_metric[2]",
+                                        "geom_metric[3]",
+                                        "geom_metric[4]",
+                                        "geom_metric[5]",
+                                        *storage_args,
+                                        *field_args,
+                                    ]
+                                ),
+                            ),
+                            "%s                }" % indent,
+                        ]
+                        if material_name == "laplace"
+                        and operation == "jacobian_action"
+                        and dim == 3
+                        and _c_abi_function_exists(
+                            kernel_sources,
+                            "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
+                        )
+                        else []
+                    ),
+                    "%s                return %s(%s);"
+                    % (
+                        indent,
+                        packed_affine,
+                        ", ".join(
+                            [
+                                "domain.element_type",
+                                "packed->n_packs(packed_block)",
+                                "packed->n_elements_per_pack(packed_block)",
+                                "domain.block->n_elements()",
+                                "mesh->n_nodes()",
+                                "packed->max_nodes_per_pack()",
+                                "packed_elements->data()",
+                                "owned_nodes_ptr->data()",
+                                "n_shared_nodes->data()",
+                                "ghost_ptr->data()",
+                                "ghost_idx->data()",
+                                *packed_affine_geometry_args,
+                                *storage_args,
+                                *field_args,
+                            ]
+                        ),
+                    ),
+                    "%s            }" % indent,
+                    "%s        }" % indent,
+                ]
+            )
         if _c_abi_function_exists(kernel_sources, affine_aos_unit, public_only=True):
             lines.append(
                 "%s        if ((%s) && storage[0] == real_t(1)) {"
@@ -5098,15 +5369,58 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         dependencies = apply_dependencies_by_dim.get(dim)
         uses_current = getattr(dependencies, "current", True)
         uses_direction = getattr(dependencies, "direction", True)
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = ([str(dim)] + ["x + %d" % d for d in range(dim)]) if uses_current else []
         direction_args = ([str(dim)] + ["h + %d" % d for d in range(dim)]) if uses_direction else []
         output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
         affine = "%s_apply_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_apply_%dd_isoparametric_mesh_soa" % (material_name, dim)
         packed = "%s_apply_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        packed_affine = "%s_apply_packed_%dd_affine_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s    if (impl_->apply_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
+            if _c_abi_function_exists(kernel_sources, packed_affine, public_only=True):
+                lines.extend(
+                    [
+                        "%s        if (impl_->space->has_packed_mesh()) {" % indent,
+                        "%s            auto packed = impl_->space->packed_mesh();" % indent,
+                        "%s            const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                        "%s            if (packed_block >= 0) {" % indent,
+                        "%s                auto packed_elements = packed->elements(packed_block);" % indent,
+                        "%s                auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                        "%s                auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                        "%s                auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                        "%s                auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                        "%s                return %s(%s);" % (
+                            indent,
+                            packed_affine,
+                            ", ".join(
+                                [
+                                    "domain.element_type",
+                                    "packed->n_packs(packed_block)",
+                                    "packed->n_elements_per_pack(packed_block)",
+                                    "domain.block->n_elements()",
+                                    "mesh->n_nodes()",
+                                    "packed->max_nodes_per_pack()",
+                                    "packed_elements->data()",
+                                    "owned_nodes_ptr->data()",
+                                    "n_shared_nodes->data()",
+                                    "ghost_ptr->data()",
+                                    "ghost_idx->data()",
+                                    *("adjugate[%d]" % i for i in range(dim * dim)),
+                                    "determinant",
+                                    *parameter_args,
+                                    *current_args,
+                                    *direction_args,
+                                    *output_args,
+                                ]
+                            ),
+                        ),
+                        "%s            }" % indent,
+                        "%s        }" % indent,
+                    ]
+                )
             lines.append(
                 "%s        return %s(%s);"
                 % (
@@ -5120,8 +5434,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "domain.block->elements()->data()",
                             *("adjugate[%d]" % i for i in range(dim * dim)),
                             "determinant",
-                            'domain.parameters->require_real_value("mu")',
-                            'domain.parameters->require_real_value("lmbda")',
+                            *parameter_args,
                             *current_args,
                             *direction_args,
                             *output_args,
@@ -5162,8 +5475,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                                 "ghost_ptr->data()",
                                 "ghost_idx->data()",
                                 "points",
-                                'domain.parameters->require_real_value("mu")',
-                                'domain.parameters->require_real_value("lmbda")',
+                                *parameter_args,
                                 *current_args,
                                 *direction_args,
                                 *output_args,
@@ -5187,8 +5499,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
                             "points",
-                            'domain.parameters->require_real_value("mu")',
-                            'domain.parameters->require_real_value("lmbda")',
+                            *parameter_args,
                             *current_args,
                             *direction_args,
                             *output_args,
@@ -5209,6 +5520,290 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
     return "\n".join(lines)
 
 
+def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent):
+    affine_lines = [
+        "%sif (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%s    auto packed = impl_->space->packed_mesh();" % indent,
+        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s    if (packed_block >= 0) {" % indent,
+        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        const int dim = mesh->spatial_dimension();" % indent,
+    ]
+    emitted_affine = False
+    for dim in (2, 3):
+        dependencies = gradient_dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        function = "%s_gradient_packed_%dd_affine_mesh_soa" % (material_name, dim)
+        if not _c_abi_function_exists(kernel_sources, function, public_only=True):
+            continue
+        prefix = "if" if not emitted_affine else "else if"
+        emitted_affine = True
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
+        current_args = (
+            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            if getattr(dependencies, "current", True)
+            else []
+        )
+        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        affine_lines.extend(
+            [
+                "%s        %s (dim == %d) {" % (indent, prefix, dim),
+                "%s            return %s(%s);" % (
+                    indent,
+                    function,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "packed->n_packs(packed_block)",
+                            "packed->n_elements_per_pack(packed_block)",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "packed->max_nodes_per_pack()",
+                            "packed_elements->data()",
+                            "owned_nodes_ptr->data()",
+                            "n_shared_nodes->data()",
+                            "ghost_ptr->data()",
+                            "ghost_idx->data()",
+                            *("adjugate[%d]" % i for i in range(dim * dim)),
+                            "determinant",
+                            *parameter_args,
+                            *current_args,
+                            *output_args,
+                        ]
+                    ),
+                ),
+                "%s        }" % indent,
+            ]
+        )
+    affine_lines.extend(
+        [
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    lines = [
+        "%sif (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%s    auto packed = impl_->space->packed_mesh();" % indent,
+        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s    if (packed_block >= 0) {" % indent,
+        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        const int dim = mesh->spatial_dimension();" % indent,
+    ]
+    emitted = False
+    for dim in (2, 3):
+        dependencies = gradient_dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        function = "%s_gradient_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        if not _c_abi_function_exists(kernel_sources, function, public_only=True):
+            continue
+        emitted = True
+        prefix = "if" if emitted and not any("if (dim ==" in line for line in lines) else "else if"
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
+        current_args = (
+            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            if getattr(dependencies, "current", True)
+            else []
+        )
+        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        lines.extend(
+            [
+                "%s        %s (dim == %d) {" % (indent, prefix, dim),
+                "%s            return %s(%s);" % (
+                    indent,
+                    function,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "packed->n_packs(packed_block)",
+                            "packed->n_elements_per_pack(packed_block)",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "packed->max_nodes_per_pack()",
+                            "packed_elements->data()",
+                            "owned_nodes_ptr->data()",
+                            "n_shared_nodes->data()",
+                            "ghost_ptr->data()",
+                            "ghost_idx->data()",
+                            "points",
+                            *parameter_args,
+                            *current_args,
+                            *output_args,
+                        ]
+                    ),
+                ),
+                "%s        }" % indent,
+            ]
+        )
+    lines.extend(
+        [
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    packed_blocks = []
+    if emitted_affine:
+        packed_blocks.append("\n".join(affine_lines))
+    if emitted:
+        packed_blocks.append("\n".join(lines))
+    return "\n".join(packed_blocks)
+
+
+def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent):
+    affine_lines = [
+        "%sif (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%s    auto packed = impl_->space->packed_mesh();" % indent,
+        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s    if (packed_block >= 0) {" % indent,
+        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        const int dim = mesh->spatial_dimension();" % indent,
+    ]
+    emitted_affine = False
+    for dim in (2, 3):
+        dependencies = apply_dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        function = "%s_objective_steps_packed_%dd_affine_mesh_soa" % (material_name, dim)
+        if not _c_abi_function_exists(kernel_sources, function, public_only=True):
+            continue
+        prefix = "if" if not emitted_affine else "else if"
+        emitted_affine = True
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
+        current_args = (
+            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            if getattr(dependencies, "current", True)
+            else []
+        )
+        direction_args = [str(dim)] + ["h + %d" % d for d in range(dim)]
+        affine_lines.extend(
+            [
+                "%s        %s (dim == %d) {" % (indent, prefix, dim),
+                "%s            status = %s(%s);" % (
+                    indent,
+                    function,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "packed->n_packs(packed_block)",
+                            "packed->n_elements_per_pack(packed_block)",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "packed->max_nodes_per_pack()",
+                            "packed_elements->data()",
+                            "owned_nodes_ptr->data()",
+                            "n_shared_nodes->data()",
+                            "ghost_ptr->data()",
+                            "ghost_idx->data()",
+                            *("adjugate[%d]" % i for i in range(dim * dim)),
+                            "determinant",
+                            *parameter_args,
+                            *current_args,
+                            *direction_args,
+                            "nsteps",
+                            "steps",
+                            "impl_->element_values.get()",
+                        ]
+                    ),
+                ),
+                "%s        }" % indent,
+            ]
+        )
+    affine_lines.extend(
+        [
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    lines = [
+        "%sif (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%s    auto packed = impl_->space->packed_mesh();" % indent,
+        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s    if (packed_block >= 0) {" % indent,
+        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        const int dim = mesh->spatial_dimension();" % indent,
+    ]
+    emitted = False
+    for dim in (2, 3):
+        dependencies = apply_dependencies_by_dim.get(dim)
+        if dependencies is None:
+            continue
+        function = "%s_objective_steps_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        if not _c_abi_function_exists(kernel_sources, function, public_only=True):
+            continue
+        emitted = True
+        prefix = "if" if emitted and not any("if (dim ==" in line for line in lines) else "else if"
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
+        current_args = (
+            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            if getattr(dependencies, "current", True)
+            else []
+        )
+        direction_args = (
+            [str(dim)] + ["h + %d" % d for d in range(dim)]
+        )
+        lines.extend(
+            [
+                "%s        %s (dim == %d) {" % (indent, prefix, dim),
+                "%s            status = %s(%s);" % (
+                    indent,
+                    function,
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "packed->n_packs(packed_block)",
+                            "packed->n_elements_per_pack(packed_block)",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "packed->max_nodes_per_pack()",
+                            "packed_elements->data()",
+                            "owned_nodes_ptr->data()",
+                            "n_shared_nodes->data()",
+                            "ghost_ptr->data()",
+                            "ghost_idx->data()",
+                            "points",
+                            *parameter_args,
+                            *current_args,
+                            *direction_args,
+                            "nsteps",
+                            "steps",
+                            "impl_->element_values.get()",
+                        ]
+                    ),
+                ),
+                "%s        }" % indent,
+            ]
+        )
+    lines.extend(
+        [
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    packed_blocks = []
+    if emitted_affine:
+        packed_blocks.append("\n".join(affine_lines))
+    if emitted:
+        packed_blocks.append("\n".join(lines))
+    return "\n".join(packed_blocks)
+
+
 def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent):
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     for dim in (2, 3):
@@ -5219,6 +5814,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             dim,
         )
         dependencies = apply_dependencies_by_dim.get(dim)
+        parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = (
             [str(dim)] + ["current + %d" % d for d in range(dim)]
             if getattr(dependencies, "current", True)
@@ -5238,8 +5834,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
                             "points",
-                            'domain.parameters->require_real_value("mu")',
-                            'domain.parameters->require_real_value("lmbda")',
+                            *parameter_args,
                             *current_args,
                             *tail_args,
                         ]

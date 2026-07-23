@@ -66,16 +66,6 @@ extern "C" void laplace_proteus_quad4_jacobian_u_u_print_rate(
         const ptrdiff_t ndofs,
         const int repeat
 );
-extern "C" void laplace_proteus_quad4_matrix_assembly_print_variant(
-        const int variant,
-        const ptrdiff_t nelements
-);
-extern "C" const sfem_MatrixAssemblyDiagnostics * laplace_proteus_quad4_matrix_assembly_variant(
-        const int variant
-);
-extern "C" int laplace_proteus_quad4_matrix_assembly_variant_count(
-        void
-);
 extern "C" void laplace_proteus_quad4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -120,154 +110,6 @@ extern "C" void laplace_proteus_quad4_residual_isoparametric_mesh_soa_print_rate
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
         const int repeat
-);
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_coo_triplet_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_coo_triplet_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT packed_element_entries,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT packed_element_entries,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        count_t *const SFEM_RESTRICT packed_element_entries,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        count_t *const SFEM_RESTRICT packed_element_entries,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
 );
 extern "C" int laplace_proteus_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -333,6 +175,50 @@ extern "C" int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_floa
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+);
+extern "C" int laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);
+extern "C" int laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t direction_stride,
         const float *const SFEM_RESTRICT u_direction,
@@ -548,25 +434,6 @@ extern "C" void laplace_quad4_jacobian_u_u_print_rate(
     laplace_proteus_quad4_jacobian_u_u_print_rate(elapsed, nelements, ndofs, repeat);
 }
 
-extern "C" void laplace_quad4_matrix_assembly_print_variant(
-        const int variant,
-        const ptrdiff_t nelements
-) {
-    laplace_proteus_quad4_matrix_assembly_print_variant(variant, nelements);
-}
-
-extern "C" const sfem_MatrixAssemblyDiagnostics * laplace_quad4_matrix_assembly_variant(
-        const int variant
-) {
-    return laplace_proteus_quad4_matrix_assembly_variant(variant);
-}
-
-extern "C" int laplace_quad4_matrix_assembly_variant_count(
-        void
-) {
-    return laplace_proteus_quad4_matrix_assembly_variant_count();
-}
-
 extern "C" void laplace_quad4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
@@ -634,262 +501,6 @@ extern "C" void laplace_quad4_residual_isoparametric_mesh_soa_print_rate(
         const int repeat
 ) {
     laplace_proteus_quad4_residual_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
-}
-
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_quad4_hessian_coo_triplet_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_coo_triplet_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rows, cols, values);
-}
-
-extern "C" int laplace_quad4_hessian_coo_triplet_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_coo_triplet_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rows, cols, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT packed_element_entries,
-        double *const SFEM_RESTRICT values
-) {
-    uint16_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, packed_element_entries, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT packed_element_entries,
-        float *const SFEM_RESTRICT values
-) {
-    uint16_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_packed_one_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, packed_element_entries, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        count_t *const SFEM_RESTRICT packed_element_entries,
-        double *const SFEM_RESTRICT values
-) {
-    uint16_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, rowptr, colidx, packed_element_entries, values);
-}
-
-extern "C" int laplace_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        count_t *const SFEM_RESTRICT packed_element_entries,
-        float *const SFEM_RESTRICT values
-) {
-    uint16_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_crs_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, rowptr, colidx, packed_element_entries, values);
-}
-
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
-}
-
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
 }
 
 extern "C" int laplace_quad4_jacobian_action_affine_mesh_soa(
@@ -1014,6 +625,68 @@ extern "C" int laplace_quad4_jacobian_action_isoparametric_mesh_soa_float(
         elements[2]
     };
     return laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_quad4_jacobian_action_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    uint16_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_quad4_jacobian_action_packed_affine_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    uint16_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 extern "C" int laplace_quad4_jacobian_action_packed_isoparametric_mesh_soa(

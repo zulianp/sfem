@@ -37,8 +37,8 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT value
 ) {
@@ -94,8 +94,8 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]
 ) {
@@ -173,8 +173,8 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]

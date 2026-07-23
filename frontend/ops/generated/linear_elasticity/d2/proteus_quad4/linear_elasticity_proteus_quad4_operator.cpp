@@ -8,6 +8,7 @@
 #endif
 #include <cstdint>
 #include <cstdlib>
+#include "../../../packed_thread_scratch.hpp"
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
 #endif
@@ -233,8 +234,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_a
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -301,7 +302,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_a
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_value);
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
@@ -324,14 +325,14 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_me
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float(
@@ -343,14 +344,14 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_me
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
 
@@ -367,8 +368,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_s
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -455,7 +456,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_s
                 block_value[lane] = scalar_t(0);
             }
 
-            linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+            linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -479,8 +480,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
@@ -491,7 +492,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_float(
@@ -503,8 +504,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
@@ -515,8 +516,290 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    (void)n_shared_nodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_u_base_component[k] = u_component[node * u_stride];
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_value[VECTOR_SIZE];
+
+                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7]};
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                for (int step = 0; step < nsteps; ++step) {
+                    const scalar_t alpha = steps[step];
+                    for (int shape = 0; shape < N_SHAPE; ++shape) {
+                        for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                            for (int lane = 0; lane < nelems; ++lane) {
+                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
+                            }
+                        }
+                    }
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        block_value[lane] = scalar_t(0);
+                    }
+
+                    linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_value);
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                    }
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    (void)n_shared_nodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_u_base_component[k] = u_component[node * u_stride];
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_value[VECTOR_SIZE];
+
+                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7]};
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                for (int step = 0; step < nsteps; ++step) {
+                    const scalar_t alpha = steps[step];
+                    for (int shape = 0; shape < N_SHAPE; ++shape) {
+                        for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                            for (int lane = 0; lane < nelems; ++lane) {
+                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
+                            }
+                        }
+                    }
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        block_value[lane] = scalar_t(0);
+                    }
+
+                    linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_value);
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                    }
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 
 namespace sfem {
@@ -528,8 +811,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_i
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -611,7 +894,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_i
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
-        linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+        linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_value);
 
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
@@ -630,14 +913,14 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparame
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float(
@@ -645,14 +928,14 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparame
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
 
@@ -665,8 +948,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_s
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -768,7 +1051,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_objective_s
                 block_value[lane] = scalar_t(0);
             }
 
-            linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_value);
+            linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -788,8 +1071,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
@@ -800,7 +1083,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
@@ -808,8 +1091,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
@@ -820,8 +1103,306 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    (void)n_shared_nodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_u_base_component[k] = u_component[node * u_stride];
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_value[VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+
+                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7]};
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                for (int step = 0; step < nsteps; ++step) {
+                    const scalar_t alpha = steps[step];
+                    for (int shape = 0; shape < N_SHAPE; ++shape) {
+                        for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                            for (int lane = 0; lane < nelems; ++lane) {
+                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
+                            }
+                        }
+                    }
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        block_value[lane] = scalar_t(0);
+                    }
+
+                    linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_value);
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                    }
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    (void)n_shared_nodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_u_base_component[k] = u_component[node * u_stride];
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_value[VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+
+                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7]};
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                for (int step = 0; step < nsteps; ++step) {
+                    const scalar_t alpha = steps[step];
+                    for (int shape = 0; shape < N_SHAPE; ++shape) {
+                        for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                            for (int lane = 0; lane < nelems; ++lane) {
+                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
+                            }
+                        }
+                    }
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        block_value[lane] = scalar_t(0);
+                    }
+
+                    linear_elasticity_d2_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_value);
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                    }
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 
 namespace sfem {
@@ -972,8 +1553,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_gradient_af
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -1048,7 +1629,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_gradient_af
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
 
@@ -1079,8 +1660,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
@@ -1088,7 +1669,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float(
@@ -1100,8 +1681,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
@@ -1109,8 +1690,312 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_u_component[k] = u_component[node * u_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                const scalar_t *block_u_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_u_streams[stream] = block_u_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_u_component[k] = u_component[node * u_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                const scalar_t *block_u_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_u_streams[stream] = block_u_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 
 namespace sfem {
@@ -1122,8 +2007,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_gradient_is
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t u_stride,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
@@ -1213,7 +2098,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_gradient_is
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
-        linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
+        linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
 
@@ -1240,8 +2125,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t u_stride,
         const double *const SFEM_RESTRICT ux,
         const double *const SFEM_RESTRICT uy,
@@ -1249,7 +2134,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float(
@@ -1257,8 +2142,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t u_stride,
         const float *const SFEM_RESTRICT ux,
         const float *const SFEM_RESTRICT uy,
@@ -1266,8 +2151,328 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_u_component[k] = u_component[node * u_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+                const scalar_t *block_u_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_u_streams[stream] = block_u_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const u_components[DIM] = {ux, uy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_u_component[k] = u_component[node * u_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+                const scalar_t *block_u_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_u_streams[stream] = block_u_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                linear_elasticity_d2_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_u_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 
 namespace sfem {
@@ -1418,8 +2623,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_apply_affin
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t h_stride,
         const scalar_t *const SFEM_RESTRICT hx,
         const scalar_t *const SFEM_RESTRICT hy,
@@ -1494,7 +2699,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_apply_affin
         const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
                 nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_h_streams, block_out_streams);
+        linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
 
@@ -1525,8 +2730,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t h_stride,
         const double *const SFEM_RESTRICT hx,
         const double *const SFEM_RESTRICT hy,
@@ -1534,7 +2739,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float(
@@ -1546,8 +2751,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t h_stride,
         const float *const SFEM_RESTRICT hx,
         const float *const SFEM_RESTRICT hy,
@@ -1555,8 +2760,312 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                const scalar_t *block_h_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_h_streams[stream] = block_h_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const scalar_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                const scalar_t *block_h_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_h_streams[stream] = block_h_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
+                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
+                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+
+                linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
 
 
 namespace sfem {
@@ -1568,8 +3077,8 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_apply_isopa
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const ptrdiff_t h_stride,
         const scalar_t *const SFEM_RESTRICT hx,
         const scalar_t *const SFEM_RESTRICT hy,
@@ -1659,7 +3168,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_proteus_quad4_apply_isopa
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
 
-        linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_h_streams, block_out_streams);
+        linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
 
@@ -1686,8 +3195,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
         const double lmbda,
+        const double mu,
         const ptrdiff_t h_stride,
         const double *const SFEM_RESTRICT hx,
         const double *const SFEM_RESTRICT hy,
@@ -1695,7 +3204,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, mu, lmbda, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float(
@@ -1703,8 +3212,8 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
         const float lmbda,
+        const float mu,
         const ptrdiff_t h_stride,
         const float *const SFEM_RESTRICT hx,
         const float *const SFEM_RESTRICT hy,
@@ -1712,5 +3221,325 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, mu, lmbda, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
+
+namespace sfem {
+namespace codegen {
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+) {
+    using scalar_t = double;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+                const scalar_t *block_h_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_h_streams[stream] = block_h_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+) {
+    using scalar_t = float;
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 4;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+
+    const geom_t *const SFEM_RESTRICT x = points[0];
+    const geom_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
+    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    static constexpr int N_QP_1D = 2;
+    static constexpr int N_SHAPE_1D = 2;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {x, y};
+            const scalar_t *const h_components[DIM] = {hx, hy};
+            scalar_t *const out_components[DIM] = {outx, outy};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
+                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    const idx_t node = owned_nodes_ptr[pack] + k;
+                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
+                    pack_h_component[k] = h_component[node * h_stride];
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const idx_t node = ghosts[k];
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
+                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
+                }
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+                const scalar_t *block_h_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_h_streams[stream] = block_h_data[stream];
+                }
+                scalar_t *block_out_streams[N_SHAPE * DIM];
+                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+                    block_out_streams[stream] = block_out_data[stream];
+                }
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
+                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
+                        }
+                    }
+                }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+
+                linear_elasticity_d2_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, block_h_streams, block_out_streams);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
+                        }
+                    }
+                }
+            }
+
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
+                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
+                    pack_component_out[k] = scalar_t(0);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
+                    pack_component_out[n_contiguous + k] = scalar_t(0);
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem

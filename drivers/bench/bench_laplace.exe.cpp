@@ -135,6 +135,12 @@ namespace {
         op->set_option("assume_affine", assume_affine);
     }
 
+    void require_success(const int err, const char *const label) {
+        if (err != SFEM_SUCCESS) {
+            SFEM_ERROR("%s failed with code %d\n", label, err);
+        }
+    }
+
     std::shared_ptr<sfem::Mesh> create_benchmark_mesh(const std::shared_ptr<sfem::Communicator> &comm,
                                                       const smesh::ElemType                      element_type,
                                                       const int                                  resolution) {
@@ -142,13 +148,8 @@ namespace {
             case smesh::TRI3:
             case smesh::QUAD4:
                 return sfem::Mesh::create_square(comm, element_type, resolution, resolution, 0, 0, 1, 1);
-            case smesh::PROTEUS_QUAD4: {
-                auto mesh = sfem::Mesh::create_square(comm, smesh::QUAD4, resolution, resolution, 0, 0, 1, 1);
-                if (mesh) {
-                    mesh->block(0)->set_element_type(smesh::PROTEUS_QUAD4);
-                }
-                return mesh;
-            }
+            case smesh::PROTEUS_QUAD4:
+                return sfem::Mesh::create_square(comm, smesh::QUAD4, resolution, resolution, 0, 0, 1, 1);
             case smesh::TRI6: {
                 auto mesh = sfem::Mesh::create_square(comm, smesh::TRI3, resolution, resolution, 0, 0, 1, 1);
                 return smesh::promote_to(smesh::TRI6, mesh);
@@ -178,7 +179,7 @@ namespace {
         sfem::device_synchronize();
         const double t0 = MPI_Wtime();
         for (int i = 0; i < repeat; ++i) {
-            f->gradient(x, out);
+            require_success(f->gradient(x, out), "bench_laplace gradient");
         }
         sfem::device_synchronize();
         return MPI_Wtime() - t0;
@@ -195,7 +196,7 @@ namespace {
         sfem::device_synchronize();
         const double t0 = MPI_Wtime();
         for (int i = 0; i < repeat; ++i) {
-            op->apply(state, direction, out);
+            require_success(op->apply(state, direction, out), "bench_laplace apply");
         }
         sfem::device_synchronize();
         return MPI_Wtime() - t0;
@@ -229,7 +230,8 @@ int main(int argc, char *argv[]) {
             smesh::Env::read_string("SFEM_GENERATED_PACKED_OPERATOR", generated_operator_name.c_str());
     const std::string packed_operator_name      = smesh::Env::read_string("SFEM_PACKED_OPERATOR", "PackedLaplacian");
     const std::string codegen_geometry          = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "affine");
-    const std::string generated_packed_geometry = smesh::Env::read_string("SFEM_GENERATED_PACKED_GEOMETRY", "isoparametric");
+    const std::string generated_packed_geometry =
+            smesh::Env::read_string("SFEM_GENERATED_PACKED_GEOMETRY", codegen_geometry.c_str());
     const bool        run_baseline              = smesh::Env::read("SFEM_RUN_BASELINE", true);
     const bool        run_generated_packed      = smesh::Env::read("SFEM_RUN_GENERATED_PACKED", true);
     const bool        run_packed                = smesh::Env::read("SFEM_RUN_PACKED", true);
@@ -243,14 +245,22 @@ int main(int argc, char *argv[]) {
     const auto element_type =
             static_cast<smesh::ElemType>(smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "TET4").c_str()));
     const bool assume_affine = codegen_geometry == "affine" && generated_laplace_affine_geometry_supported(element_type);
+    const bool generated_packed_supports_isoparametric =
+            generated_laplace_packed_isoparametric_supported(element_type);
     const bool generated_packed_assume_affine =
-            generated_packed_geometry == "affine" && generated_laplace_affine_geometry_supported(element_type);
+            generated_laplace_affine_geometry_supported(element_type) &&
+            (generated_packed_geometry == "affine" ||
+             (generated_packed_geometry == "isoparametric" && !generated_packed_supports_isoparametric));
     auto mesh = create_benchmark_mesh(comm, element_type, resolution);
-    auto sfc  = smesh::SFC::create_from_env();
-    sfc->reorder(*mesh);
 
     if (!mesh) {
         SFEM_ERROR("bench_laplace.exe cannot create mesh for SFEM_ELEM_TYPE=%s\n", type_to_string(element_type));
+    }
+
+    auto sfc = smesh::SFC::create_from_env();
+    sfc->reorder(*mesh);
+    if (element_type == smesh::PROTEUS_QUAD4) {
+        mesh->block(0)->set_element_type(smesh::PROTEUS_QUAD4);
     }
 
     if (!generated_laplace_supported(mesh->element_type(0))) {
@@ -345,53 +355,55 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < warmup; ++i) {
         blas->zeros(ndofs, generated->data());
-        generated_f->gradient(x->data(), generated->data());
+        require_success(generated_f->gradient(x->data(), generated->data()), "generated warmup gradient");
         blas->zeros(ndofs, generated->data());
-        generated_op->apply(x->data(), direction->data(), generated->data());
+        require_success(generated_op->apply(x->data(), direction->data(), generated->data()), "generated warmup apply");
         if (baseline_f) {
             blas->zeros(ndofs, baseline->data());
-            baseline_f->gradient(x->data(), baseline->data());
+            require_success(baseline_f->gradient(x->data(), baseline->data()), "baseline warmup gradient");
             blas->zeros(ndofs, baseline->data());
-            baseline_op->apply(x->data(), direction->data(), baseline->data());
+            require_success(baseline_op->apply(x->data(), direction->data(), baseline->data()), "baseline warmup apply");
         }
         if (generated_packed_op) {
             blas->zeros(ndofs, generated_packed->data());
-            generated_packed_op->apply(x->data(), direction->data(), generated_packed->data());
+            require_success(generated_packed_op->apply(x->data(), direction->data(), generated_packed->data()),
+                            "generated packed warmup apply");
         }
         if (packed_op) {
             blas->zeros(ndofs, packed->data());
-            packed_op->apply(x->data(), direction->data(), packed->data());
+            require_success(packed_op->apply(x->data(), direction->data(), packed->data()), "packed warmup apply");
         }
     }
 
     blas->zeros(ndofs, generated->data());
-    generated_f->gradient(x->data(), generated->data());
+    require_success(generated_f->gradient(x->data(), generated->data()), "generated gradient");
     real_t gradient_max_abs_diff = 0;
     if (baseline_f) {
         blas->zeros(ndofs, baseline->data());
-        baseline_f->gradient(x->data(), baseline->data());
+        require_success(baseline_f->gradient(x->data(), baseline->data()), "baseline gradient");
         gradient_max_abs_diff = max_abs_diff(generated->data(), baseline->data(), ndofs);
     }
 
     blas->zeros(ndofs, generated->data());
-    generated_op->apply(x->data(), direction->data(), generated->data());
+    require_success(generated_op->apply(x->data(), direction->data(), generated->data()), "generated apply");
     real_t apply_max_abs_diff = 0;
     if (baseline_op) {
         blas->zeros(ndofs, baseline->data());
-        baseline_op->apply(x->data(), direction->data(), baseline->data());
+        require_success(baseline_op->apply(x->data(), direction->data(), baseline->data()), "baseline apply");
         apply_max_abs_diff = max_abs_diff(generated->data(), baseline->data(), ndofs);
     }
     real_t generated_packed_apply_max_abs_diff = 0;
     if (generated_packed_op) {
         blas->zeros(ndofs, generated_packed->data());
-        generated_packed_op->apply(x->data(), direction->data(), generated_packed->data());
+        require_success(generated_packed_op->apply(x->data(), direction->data(), generated_packed->data()),
+                        "generated packed apply");
         generated_packed_apply_max_abs_diff =
                 max_abs_diff(generated_packed->data(), baseline_op ? baseline->data() : generated->data(), ndofs);
     }
     real_t packed_apply_max_abs_diff = 0;
     if (packed_op) {
         blas->zeros(ndofs, packed->data());
-        packed_op->apply(x->data(), direction->data(), packed->data());
+        require_success(packed_op->apply(x->data(), direction->data(), packed->data()), "packed apply");
         packed_apply_max_abs_diff = max_abs_diff(packed->data(), baseline_op ? baseline->data() : generated->data(), ndofs);
     }
 
@@ -428,6 +440,11 @@ int main(int argc, char *argv[]) {
     if (generated_packed_geometry == "affine" && !generated_packed_assume_affine) {
         printf("requested_generated_packed_geometry affine\n");
         printf("generated_packed_geometry_fallback unsupported_affine_cache %s\n", type_to_string(mesh->element_type(0)));
+    }
+    if (generated_packed_geometry == "isoparametric" && generated_packed_assume_affine) {
+        printf("requested_generated_packed_geometry isoparametric\n");
+        printf("generated_packed_geometry_fallback unsupported_isoparametric_packed %s\n",
+               type_to_string(mesh->element_type(0)));
     }
     printf("element_type %s\n", type_to_string(mesh->element_type(0)));
     printf("#elements %ld\n", static_cast<long>(nelements));

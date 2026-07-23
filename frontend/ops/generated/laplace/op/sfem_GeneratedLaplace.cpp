@@ -1,6 +1,7 @@
 #include "sfem_GeneratedLaplace.hpp"
 #include "sfem_GeneratedLaplace_c_abi.hpp"
-#include "sfem_PackedLaplacian.hpp"
+
+#include "packed_thread_scratch.hpp"
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -11,7 +12,31 @@
 
 #include <cstring>
 
-
+extern "C" {
+int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_geom_metric0,
+        const geom_t *const SFEM_RESTRICT g_geom_metric1,
+        const geom_t *const SFEM_RESTRICT g_geom_metric2,
+        const geom_t *const SFEM_RESTRICT g_geom_metric3,
+        const geom_t *const SFEM_RESTRICT g_geom_metric4,
+        const geom_t *const SFEM_RESTRICT g_geom_metric5,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);
+}
 
 namespace sfem {
     namespace {
@@ -258,36 +283,6 @@ namespace sfem {
             }
         }
 
-        bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
-            switch (element_type) {
-                case smesh::TET4:
-                case smesh::TET10:
-                case smesh::HEX8:
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        bool can_use_packed_laplacian_apply(const FunctionSpace &space,
-                                            MultiDomainOp &domains) {
-            if (!space.has_packed_mesh()) {
-                return false;
-            }
-
-            for (auto &entry : domains.domains()) {
-                const OpDomain &domain = entry.second;
-                if (!packed_laplacian_apply_supported(domain.element_type)) {
-                    return false;
-                }
-                if (domain.parameters->require_real_value("kappa") != real_t(1)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
     }  // namespace
 
     class GeneratedLaplace::Impl {
@@ -296,7 +291,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
-        std::shared_ptr<Op> packed_affine_apply;
+
         std::shared_ptr<Buffer<real_t>> previous_buffer;
         const real_t *previous{nullptr};
         const real_t *current{nullptr};
@@ -697,19 +692,33 @@ namespace sfem {
                 (impl_->jacobian_action_uses_affine && true);
         const bool needs_affine_metric =
                 (impl_->residual_uses_affine && (false || true)) ||
-                (impl_->jacobian_action_uses_affine && (false || true));
+                (impl_->jacobian_action_uses_affine && (true || true));
         const bool needs_affine_metric_soa =
                 (impl_->residual_uses_affine && false) ||
-                (impl_->jacobian_action_uses_affine && false);
+                (impl_->jacobian_action_uses_affine && true);
         const bool needs_affine_metric_aos =
                 (impl_->residual_uses_affine && true) ||
                 (impl_->jacobian_action_uses_affine && true);
         if (needs_affine_jacobian || needs_affine_metric) {
-            return cache_affine_geometry(impl_->space,
-                                         *impl_->domains,
-                                         needs_affine_jacobian,
-                                         needs_affine_metric_soa,
-                                         needs_affine_metric_aos);
+            const int status = cache_affine_geometry(impl_->space,
+                                                     *impl_->domains,
+                                                     needs_affine_jacobian,
+                                                     needs_affine_metric_soa,
+                                                     needs_affine_metric_aos);
+            if (status != SFEM_SUCCESS) return status;
+        }
+        if (impl_->space->has_packed_mesh()) {
+            auto packed = impl_->space->packed_mesh();
+            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    0, (size_t)dim * (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    1, (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    2, (size_t)max_nodes_per_pack);
+            sfem::codegen::prealloc_thread_scratch<real_t>(
+                    3, (size_t)max_nodes_per_pack);
         }
         return SFEM_SUCCESS;
     }
@@ -824,18 +833,6 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
 
-        if (impl_->jacobian_action_uses_affine &&
-            can_use_packed_laplacian_apply(*impl_->space, *impl_->domains)) {
-            if (!impl_->packed_affine_apply) {
-                impl_->packed_affine_apply = std::make_shared<PackedLaplacian>(impl_->space);
-                if (impl_->packed_affine_apply->initialize() != SFEM_SUCCESS) {
-                    SFEM_ERROR("GeneratedLaplace failed to initialize packed affine apply backend\n");
-                    return SFEM_FAILURE;
-                }
-            }
-            return impl_->packed_affine_apply->apply(current, direction, out);
-        }
-
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
@@ -858,7 +855,7 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian->jacobian_determinant()->data());
                 }
-                if (false) {
+                if (true) {
                     if (!cache->metric_soa) {
                         SFEM_ERROR("GeneratedLaplace affine jacobian action requires cached SoA metric geometry\n");
                         return SFEM_FAILURE;
@@ -886,6 +883,18 @@ namespace sfem {
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
                 if (impl_->jacobian_action_uses_affine) {
+                    if (impl_->space->has_packed_mesh()) {
+                        auto packed = impl_->space->packed_mesh();
+                        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                        if (packed_block >= 0) {
+                            auto packed_elements = packed->elements(packed_block);
+                            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                            auto n_shared_nodes = packed->n_shared(packed_block);
+                            auto ghost_ptr = packed->ghost_ptr(packed_block);
+                            auto ghost_idx = packed->ghost_idx(packed_block);
+                            return laplace_jacobian_action_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                        }
+                    }
                     if ((domain.element_type == smesh::TRI3) && storage[0] == real_t(1)) {
                         return laplace_jacobian_action_2d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
                     }
@@ -913,6 +922,21 @@ namespace sfem {
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
                 if (impl_->jacobian_action_uses_affine) {
+                    if (impl_->space->has_packed_mesh()) {
+                        auto packed = impl_->space->packed_mesh();
+                        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                        if (packed_block >= 0) {
+                            auto packed_elements = packed->elements(packed_block);
+                            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                            auto n_shared_nodes = packed->n_shared(packed_block);
+                            auto ghost_ptr = packed->ghost_ptr(packed_block);
+                            auto ghost_idx = packed->ghost_idx(packed_block);
+                            if (domain.element_type == smesh::TET4) {
+                                return laplace_tet4_jacobian_action_packed_affine_mesh_soa(packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                            }
+                            return laplace_jacobian_action_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                        }
+                    }
                     if ((domain.element_type == smesh::TET4) && storage[0] == real_t(1)) {
                         return laplace_jacobian_action_3d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric_aos, u_direction_data, u_out);
                     }
@@ -978,10 +1002,10 @@ namespace sfem {
                     (impl_->jacobian_action_uses_affine && true);
             const bool needs_affine_metric =
                     (impl_->residual_uses_affine && (false || true)) ||
-                    (impl_->jacobian_action_uses_affine && (false || true));
+                    (impl_->jacobian_action_uses_affine && (true || true));
             const bool needs_affine_metric_soa =
                     (impl_->residual_uses_affine && false) ||
-                    (impl_->jacobian_action_uses_affine && false);
+                    (impl_->jacobian_action_uses_affine && true);
             const bool needs_affine_metric_aos =
                     (impl_->residual_uses_affine && true) ||
                     (impl_->jacobian_action_uses_affine && true);
@@ -1060,28 +1084,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_crs");
-
-
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters,
-                            mesh->spatial_dimension(),
-                            storage);
-
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_crs_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-            }
-            else if (dim == 3) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_crs_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-            }
-            SFEM_ERROR("laplace hessian_crs does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
+        return SFEM_FAILURE;
     }
 
     int GeneratedLaplace::hessian_bsr(const real_t *const state,
@@ -1089,28 +1092,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_bsr");
-
-
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters,
-                            mesh->spatial_dimension(),
-                            storage);
-
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-            }
-            else if (dim == 3) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
-            }
-            SFEM_ERROR("laplace hessian_bsr does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
+        return SFEM_FAILURE;
     }
 
     int GeneratedLaplace::hessian_dia(const real_t *const state,
@@ -1118,28 +1100,7 @@ namespace sfem {
                             const ptrdiff_t ndiag,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_dia");
-
-
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters,
-                            mesh->spatial_dimension(),
-                            storage);
-
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_dia_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-            }
-            else if (dim == 3) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 1;
-                return laplace_hessian_dia_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
-            }
-            SFEM_ERROR("laplace hessian_dia does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
+        return SFEM_FAILURE;
     }
 
     int GeneratedLaplace::value(const real_t *, real_t *const) {
