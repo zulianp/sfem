@@ -233,20 +233,24 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("int hessian_dia", wrapper_header)
         self.assertIn("int hessian_coo", wrapper_header)
         self.assertIn("int hessian_patch", wrapper_header)
-        c_abi_header = (
-            generated_root
-            / "op"
-            / "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
-        ).read_text()
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
-        self.assertIn(
-            "neohookean_ogden_tet4_tet4_hessian_crs_isoparametric_mesh_soa",
-            (
-                generated_root
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("HEX8", "TET4"),
+                clean=True,
+                matrix_formats=("crs", "coo"),
+            )
+            c_abi_header = (
+                Path(out_dir)
                 / "op"
                 / "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
-            ).read_text(),
-        )
+            ).read_text()
+            self.assertIn("neohookean_ogden_hessian_coo_triplet_3d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("neohookean_ogden_hessian_crs_3d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("const smesh::ElemType element_type", c_abi_header)
+            self.assertNotIn("neohookean_ogden_hex8_hex8_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
+            self.assertNotIn("neohookean_ogden_tet4_tet4_hessian_crs_isoparametric_mesh_soa", c_abi_header)
 
     def test_generated_neohookean_hex_hessian_assembly_wraps_proteus(self):
         generated_root = (
@@ -574,12 +578,13 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 (Path(out_dir) / "op/sfem_GeneratedStokes_manifest.json").read_text()
             )
             coo_triplet_variants = _manifest_runtime_variants(manifest, "hessian_coo_triplet")
-            self.assertEqual(len(coo_triplet_variants), 8)
+            self.assertEqual(len(coo_triplet_variants), 6)
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedStokes_c_abi.hpp").read_text()
-            self.assertIn("stokes_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("stokes_form_2_p_u_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("stokes_form_2_u_p_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertNotIn("stokes_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
 
             monolithic = (Path(out_dir) / "d2/tri6_tri3/stokes_tri6_tri3_operator.cpp").read_text()
             pressure_velocity = (
@@ -628,19 +633,19 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
-                "two_phase_flow_tri3_hessian_coo_triplet_isoparametric_mesh_soa",
+                "two_phase_flow_hessian_coo_triplet_2d_isoparametric_mesh_soa",
                 c_abi_header,
             )
             self.assertIn(
-                "two_phase_flow_form_2_p_w_p_w_tri3_hessian_coo_triplet_isoparametric_mesh_soa",
+                "two_phase_flow_form_2_p_w_p_w_hessian_coo_triplet_2d_isoparametric_mesh_soa",
                 c_abi_header,
             )
             self.assertIn(
-                "two_phase_flow_form_2_p_c_p_w_tri3_hessian_coo_triplet_isoparametric_mesh_soa",
+                "two_phase_flow_form_2_p_c_p_w_hessian_coo_triplet_2d_isoparametric_mesh_soa",
                 c_abi_header,
             )
             declaration_begin = c_abi_header.index(
-                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_tri3_hessian_coo_triplet_isoparametric_mesh_soa"
+                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_coo_triplet_2d_isoparametric_mesh_soa"
             )
             declaration_end = c_abi_header.index(");", declaration_begin)
             triplet_declaration = c_abi_header[declaration_begin:declaration_end]
@@ -683,11 +688,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
-                "two_phase_flow_form_2_p_w_p_w_tri3_hessian_bsr_isoparametric_mesh_soa",
+                "two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_isoparametric_mesh_soa",
                 c_abi_header,
             )
             declaration_begin = c_abi_header.index(
-                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_tri3_hessian_bsr_isoparametric_mesh_soa"
+                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_isoparametric_mesh_soa"
             )
             declaration_end = c_abi_header.index(");", declaration_begin)
             bsr_declaration = c_abi_header[declaration_begin:declaration_end]
@@ -816,6 +821,9 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 packed_fill_begin,
             )
             packed_fill = operator_source[packed_fill_begin:packed_fill_end]
+            self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_fill)
+            self.assertNotIn("std::malloc", packed_fill)
+            self.assertNotIn("std::free", packed_fill)
             self.assertIn("laplace_d2_simplex_jacobian_action_block_contiguous", packed_fill)
             self.assertIn("scatter_packed_crs_entries(element_matrix, entries, values);", packed_fill)
             self.assertNotIn("find_col", packed_fill)
@@ -834,13 +842,15 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("int block_size", header)
             self.assertIn('#include "../matrix_formats.hpp"', c_abi_header)
             self.assertIn("laplace_tri3_matrix_assembly_variant_count", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_crs_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_crs_packed_one_pass_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_crs_packed_two_pass_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_crs_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_crs_packed_one_pass_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_crs_packed_two_pass_2d_isoparametric_mesh_soa", c_abi_header)
             self.assertIn("uint16_t **const SFEM_RESTRICT elements", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_bsr_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_dia_isoparametric_mesh_soa", c_abi_header)
-            self.assertIn("laplace_tri3_hessian_coo_triplet_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_bsr_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_dia_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("laplace_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)
+            self.assertIn("const smesh::ElemType element_type", c_abi_header)
+            self.assertNotIn("extern \"C\" int laplace_tri3_hessian_crs_isoparametric_mesh_soa", c_abi_header)
             self.assertIn('"rowptr_colidx"', source)
             self.assertIn('"FunctionSpace::PackedMesh"', source)
             self.assertIn('"diagonal_offsets"', source)
@@ -890,11 +900,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 for variant in _manifest_runtime_variants(manifest, "hessian_crs")
             }
             self.assertIn(
-                "laplace_tri3_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
+                "laplace_hessian_crs_packed_one_pass_2d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
             self.assertIn(
-                "laplace_tri3_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
+                "laplace_hessian_crs_packed_two_pass_2d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
             self.assertTrue(_manifest_runtime_variants(manifest, "hessian_bsr"))
@@ -905,9 +915,24 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("GeneratedLaplace::hessian_crs", wrapper)
             self.assertIn("GeneratedLaplace::hessian_bsr", wrapper)
             self.assertIn("GeneratedLaplace::hessian_dia", wrapper)
-            self.assertIn("laplace_tri3_hessian_crs_isoparametric_mesh_soa", wrapper)
-            self.assertIn("laplace_tri3_hessian_bsr_isoparametric_mesh_soa", wrapper)
-            self.assertIn("laplace_tri3_hessian_dia_isoparametric_mesh_soa", wrapper)
+            self.assertIn("laplace_hessian_crs_2d_isoparametric_mesh_soa", wrapper)
+            self.assertIn("laplace_hessian_bsr_2d_isoparametric_mesh_soa", wrapper)
+            self.assertIn("laplace_hessian_dia_2d_isoparametric_mesh_soa", wrapper)
+            hessian_crs_body = wrapper[
+                wrapper.index("int GeneratedLaplace::hessian_crs") :
+                wrapper.index("int GeneratedLaplace::hessian_bsr")
+            ]
+            hessian_bsr_body = wrapper[
+                wrapper.index("int GeneratedLaplace::hessian_bsr") :
+                wrapper.index("int GeneratedLaplace::hessian_dia")
+            ]
+            hessian_dia_body = wrapper[
+                wrapper.index("int GeneratedLaplace::hessian_dia") :
+                wrapper.index("int GeneratedLaplace::value")
+            ]
+            self.assertNotIn("switch (domain.element_type)", hessian_crs_body)
+            self.assertNotIn("switch (domain.element_type)", hessian_bsr_body)
+            self.assertNotIn("switch (domain.element_type)", hessian_dia_body)
             for removed_query in (
                 "n_matrix_format_variants",
                 "matrix_format_variant",
@@ -977,6 +1002,17 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 "return neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa(",
                 operator_source,
             )
+            packed_apply_begin = operator_source.index(
+                "neohookean_ogden_tri3_tri3_apply_packed_isoparametric_mesh_soa"
+            )
+            packed_apply_end = operator_source.index(
+                'extern "C" int neohookean_ogden_tri3_tri3_apply_packed_isoparametric_mesh_soa_float',
+                packed_apply_begin,
+            )
+            packed_apply = operator_source[packed_apply_begin:packed_apply_end]
+            self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_apply)
+            self.assertNotIn("std::malloc", packed_apply)
+            self.assertNotIn("std::free", packed_apply)
             self.assertIn(
                 "neohookean_ogden_tri3_tri3_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
                 operator_source,
@@ -1001,6 +1037,9 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 packed_fill_begin,
             )
             packed_fill = operator_source[packed_fill_begin:packed_fill_end]
+            self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_fill)
+            self.assertNotIn("std::malloc", packed_fill)
+            self.assertNotIn("std::free", packed_fill)
             self.assertIn("neohookean_ogden_d2_simplex_tri3_apply_block", packed_fill)
             self.assertIn("scatter_packed_crs_entries(element_matrix, entries, values);", packed_fill)
             self.assertNotIn("find_col", packed_fill)
@@ -1009,11 +1048,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 for variant in _manifest_runtime_variants(manifest, "hessian_crs")
             }
             self.assertIn(
-                "neohookean_ogden_tri3_tri3_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_hessian_crs_packed_one_pass_2d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
             self.assertIn(
-                "neohookean_ogden_tri3_tri3_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_hessian_crs_packed_two_pass_2d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
 

@@ -1042,10 +1042,15 @@ class GenApiTest(unittest.TestCase):
             with open(c_abi, encoding="utf-8") as stream:
                 declarations = stream.read()
             self.assertIn(
-                "extern \"C\" int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                "extern \"C\" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
                 declarations,
             )
             self.assertIn(
+                "extern \"C\" int neohookean_ogden_apply_2d_affine_mesh_soa",
+                declarations,
+            )
+            self.assertIn("const smesh::ElemType element_type", declarations)
+            self.assertNotIn(
                 "extern \"C\" int neohookean_ogden_tri3_tri3_apply_affine_mesh_soa",
                 declarations,
             )
@@ -1080,7 +1085,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("d2/tri3", metadata["generated_include_paths"])
             self.assertIn("op", metadata["generated_include_paths"])
             self.assertIn(
-                "neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_soa",
+                "neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(
@@ -1155,7 +1160,7 @@ class GenApiTest(unittest.TestCase):
 
             c_abi = read_generated("sfem_GeneratedLinearElasticity_c_abi.hpp")
             apply_declarations = re.findall(
-                r'extern "C" int linear_elasticity_tet4_tet4_apply_[^;]+;',
+                r'extern "C" int linear_elasticity_apply_[^;]+;',
                 c_abi,
                 flags=re.S,
             )
@@ -1183,7 +1188,7 @@ class GenApiTest(unittest.TestCase):
                 wrapper,
             )
             apply_calls = re.findall(
-                r"linear_elasticity_tet4_tet4_apply_[^(]+\([^;\n]+\)",
+                r"linear_elasticity_apply_[^(]+\([^;\n]+\)",
                 wrapper,
             )
             self.assertTrue(apply_calls)
@@ -1449,8 +1454,8 @@ class GenApiTest(unittest.TestCase):
                 source.index('parameters.require_real_value("C_ka1")'),
                 source.index('parameters.require_real_value("porosity")'),
             )
-            self.assertIn("two_phase_flow_tri3_residual_isoparametric_mesh_soa", source)
-            self.assertIn("two_phase_flow_tri3_jacobian_action_isoparametric_mesh_soa", source)
+            self.assertIn("two_phase_flow_residual_2d_isoparametric_mesh_soa", source)
+            self.assertIn("two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa", source)
             self.assertIn("const geom_t *const *adjugate = nullptr;", source)
             self.assertIn("int cache_affine_geometry(", source)
             self.assertIn("const bool matched = set_affine_option", source)
@@ -1478,6 +1483,10 @@ class GenApiTest(unittest.TestCase):
             with open(c_abi, encoding="utf-8") as stream:
                 declarations = stream.read()
             self.assertIn(
+                "extern \"C\" int two_phase_flow_residual_2d_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertNotIn(
                 "extern \"C\" int two_phase_flow_tri3_residual_isoparametric_mesh_soa",
                 declarations,
             )
@@ -1490,7 +1499,7 @@ class GenApiTest(unittest.TestCase):
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int two_phase_flow_tri3_jacobian_action_isoparametric_mesh_aos",
+                "extern \"C\" int two_phase_flow_jacobian_action_2d_isoparametric_mesh_aos",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow_manifest.json")
@@ -2389,6 +2398,7 @@ class GenApiTest(unittest.TestCase):
             for header in (
                 "kernel_math.hpp",
                 "kernel_diagnostics.hpp",
+                "packed_thread_scratch.hpp",
                 "tensor_product_kernels.hpp",
                 "geometry_kernels.hpp",
             ):
@@ -2418,8 +2428,11 @@ class GenApiTest(unittest.TestCase):
             with open(operator_source, encoding="utf-8") as input_file:
                 operator_contents = input_file.read()
             self.assertIn('#include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"', operator_contents)
+            self.assertIn(
+                "neohookean_ogden_proteus_hex8_proteus_hex8_apply_soa_diagnostics",
+                operator_contents,
+            )
             self.assertIn("idx_t *proteus_elements[8] = {", operator_contents)
-            self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_crs_isoparametric_mesh_soa", operator_contents)
 
             proteus_operator = os.path.join(
                 out_dir,
@@ -3155,11 +3168,11 @@ class GenApiTest(unittest.TestCase):
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
             self.assertIn(
-                "extern \"C\" int poro_hyperelasticity_solid_tri6_tri6_gradient_isoparametric_mesh_soa",
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_tri6_tri6_gradient_soa_diagnostics",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
+                "extern \"C\" int poro_hyperelasticity_poro_residual_2d_affine_mesh_soa",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_manifest.json")
@@ -3172,12 +3185,14 @@ class GenApiTest(unittest.TestCase):
             )
             self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
             self.assertIn(
-                "poro_hyperelasticity_poro_tri6_tri3_residual_affine_mesh_soa",
+                "poro_hyperelasticity_poro_residual_2d_affine_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
-            self.assertEqual(
-                _manifest_runtime_variants(metadata, "gradient"),
-                {"affine", "isoparametric"},
+            self.assertFalse(
+                any(
+                    operation["name"] == "gradient"
+                    for operation in metadata["runtime_operations"]
+                )
             )
             self.assertEqual(
                 _manifest_runtime_variants(metadata, "residual"),
@@ -3284,9 +3299,9 @@ class GenApiTest(unittest.TestCase):
             with open(wrapper, encoding="utf-8") as input_file:
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedStokes::Impl", wrapper_contents)
-            self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", wrapper_contents)
-            self.assertIn("stokes_tri6_tri3_residual_affine_mesh_soa", wrapper_contents)
-            self.assertIn("stokes_tri6_tri3_jacobian_action_affine_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_residual_2d_isoparametric_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_residual_2d_affine_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_jacobian_action_2d_affine_mesh_soa", wrapper_contents)
             self.assertIn("residual_uses_affine", wrapper_contents)
             self.assertIn("jacobian_action_uses_affine", wrapper_contents)
             self.assertIn("int cache_affine_geometry(", wrapper_contents)
@@ -3309,19 +3324,19 @@ class GenApiTest(unittest.TestCase):
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
             self.assertIn(
-                "extern \"C\" int stokes_tri6_tri3_residual_isoparametric_mesh_soa",
+                "extern \"C\" int stokes_residual_2d_isoparametric_mesh_soa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_tri6_tri3_residual_affine_mesh_soa",
+                "extern \"C\" int stokes_residual_2d_affine_mesh_soa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa",
+                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa",
+                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedStokes_manifest.json")
@@ -3334,7 +3349,7 @@ class GenApiTest(unittest.TestCase):
             )
             self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
             self.assertIn(
-                "stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa",
+                "stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertIn(
@@ -3790,7 +3805,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("metric_aos = smesh::FFF::create_AoS", wrapper_source)
             self.assertIn("geom_metric_aos", wrapper_source)
             self.assertIn(
-                "laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit",
+                "laplace_jacobian_action_3d_affine_mesh_soa_aos_unit",
                 wrapper_source,
             )
 
@@ -4070,9 +4085,10 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("jacobian_aos", wrapper_source)
             self.assertIn("jacobian_adjugate_AoS", wrapper_source)
             self.assertIn(
-                "linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit",
+                "linear_elasticity_apply_3d_affine_mesh_soa",
                 wrapper_source,
             )
+            self.assertIn("domain.element_type", wrapper_source)
 
             subprocess.run(
                 [
@@ -4386,10 +4402,10 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as input_file:
                 proteus_source = input_file.read()
-            self.assertIn("neumann_quad4_edgeshell2_boundary_residual_soa", quad_source)
+            self.assertIn("neumann_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
             self.assertNotIn("for (int qy = 0; qy < Q; ++qy)", quad_source)
             self.assertIn("idx_t *proteus_elements[4] = {", quad_source)
-            self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_soa", quad_source)
+            self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
             self.assertIn("#pragma omp simd", proteus_quad_source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
@@ -4455,9 +4471,10 @@ class GenApiTest(unittest.TestCase):
             ) as input_file:
                 c_abi = input_file.read()
             self.assertIn(
-                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
                 c_abi,
             )
+            self.assertIn("const smesh::ElemType element_type", c_abi)
             with open(
                 os.path.join(out_dir, "op", "sfem_GeneratedNeumann_manifest.json"),
                 encoding="utf-8",
@@ -4470,7 +4487,7 @@ class GenApiTest(unittest.TestCase):
             )
             self.assertIn("d3/hex8", metadata["generated_include_paths"])
             self.assertIn(
-                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(
