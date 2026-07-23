@@ -13,6 +13,7 @@
 #ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
 typedef ptrdiff_t idx_t;
 typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
 typedef double real_t;
 typedef double geom_t;
 #endif
@@ -21,7 +22,8 @@ typedef double geom_t;
 #define SFEM_RESTRICT __restrict__
 #endif
 
-#include "../kernel_diagnostics.hpp"
+#include "../../kernel_diagnostics.hpp"
+
 
 extern "C" int neumann_general_hex27_quadshell9_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
@@ -286,6 +288,46 @@ extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual
         float *const SFEM_RESTRICT out0,
         float *const SFEM_RESTRICT out1,
         float *const SFEM_RESTRICT out2);
+
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
+        const ptrdiff_t nsides,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const element_idx_t *const SFEM_RESTRICT parent,
+        const int16_t *const SFEM_RESTRICT side_idx,
+        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
+        const int out_stride,
+        real_t *const SFEM_RESTRICT out0,
+        real_t *const SFEM_RESTRICT out1);
+
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
+        const ptrdiff_t nsides,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const element_idx_t *const SFEM_RESTRICT parent,
+        const int16_t *const SFEM_RESTRICT side_idx,
+        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
+        const int out_stride,
+        float *const SFEM_RESTRICT out0,
+        float *const SFEM_RESTRICT out1);
+
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
+        const int out_stride,
+        real_t *const SFEM_RESTRICT out0,
+        real_t *const SFEM_RESTRICT out1);
+
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
+        const int out_stride,
+        float *const SFEM_RESTRICT out0,
+        float *const SFEM_RESTRICT out1);
 
 extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,

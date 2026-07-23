@@ -440,6 +440,16 @@ namespace sfem {
                     total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_proteus_quad4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_proteus_quad4_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_proteus_hex8_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_proteus_hex8_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
                 default:
                     break;
             }
@@ -475,6 +485,16 @@ namespace sfem {
                 case smesh::HEX8: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_proteus_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_proteus_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_proteus_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_proteus_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 default:
@@ -514,6 +534,16 @@ namespace sfem {
                     total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
                 default:
                     break;
             }
@@ -549,6 +579,16 @@ namespace sfem {
                 case smesh::HEX8: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_HEX8: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 default:
@@ -695,6 +735,26 @@ namespace sfem {
                     real_t *const SFEM_RESTRICT p_c_out = out + 1;
                     return impl_->residual_uses_affine ? two_phase_flow_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
+                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
+                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    return impl_->residual_uses_affine ? two_phase_flow_proteus_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_proteus_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
+                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
+                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    return impl_->residual_uses_affine ? two_phase_flow_proteus_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
                 default:
                     SFEM_ERROR("GeneratedTwoPhaseFlow does not support element type %d\n",
                                domain.element_type);
@@ -798,6 +858,26 @@ namespace sfem {
                     real_t *const SFEM_RESTRICT p_w_out = out + 0;
                     real_t *const SFEM_RESTRICT p_c_out = out + 1;
                     return impl_->jacobian_action_uses_affine ? two_phase_flow_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
+                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    return impl_->jacobian_action_uses_affine ? two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
+                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    return impl_->jacobian_action_uses_affine ? two_phase_flow_proteus_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
                 default:
                     SFEM_ERROR("GeneratedTwoPhaseFlow does not support element type %d\n",
@@ -965,6 +1045,18 @@ namespace sfem {
                     const real_t *const SFEM_RESTRICT p_c_data = current + 1;
                     return two_phase_flow_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_proteus_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
                 default:
                     SFEM_ERROR("GeneratedTwoPhaseFlow hessian_crs does not support element type %d\n",
                                domain.element_type);
@@ -1015,6 +1107,18 @@ namespace sfem {
                     const real_t *const SFEM_RESTRICT p_w_data = current + 0;
                     const real_t *const SFEM_RESTRICT p_c_data = current + 1;
                     return two_phase_flow_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
+                }
+                case smesh::PROTEUS_HEX8: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    return two_phase_flow_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values);
                 }
                 default:
                     SFEM_ERROR("GeneratedTwoPhaseFlow hessian_bsr does not support element type %d\n",

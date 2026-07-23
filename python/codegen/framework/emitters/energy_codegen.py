@@ -34,12 +34,12 @@ from codegen.framework.symbolic.core import (
     sfem_soa_element_specialization,
     sfem_soa_reference_input,
     sfem_tensor_product_hex_uses_cartesian_ordering,
+    sfem_tensor_product_quad_uses_cartesian_ordering,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
     tensor_product_coordinate_gradient_lines,
     tensor_product_current_q_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
-    tensor_product_ordered_coordinate_streams,
     validate_reference_data_plan,
 )
 from codegen.framework.plans.form_transformations import (
@@ -628,11 +628,6 @@ def _sfem_soa_block_function(
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = (
-        "block_coordinate_data"
-        if use_stream_arrays
-        else "block_coordinate_streams"
-    )
     params = ["const int nelems"]
     if form.weak_form is not None:
         params.append("const ptrdiff_t geometry_stride")
@@ -1690,7 +1685,10 @@ def _tensor_product_q_index_lines(dim, indent):
 def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
     if (
         quadrature_rule is not None
-        and sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
+        and (
+            sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(quadrature_rule.element_type)
+        )
     ):
         return tuple(range(n_nodes))
     return tensor_product_cartesian_shape_order(dim, n_nodes)
@@ -1717,7 +1715,8 @@ def _tensor_product_node_coords(quadrature_rule):
         and n_shape_1d == 2
         and sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
     )
-    if n_shape_1d == 2 and dim == 2:
+    cartesian_quad = dim == 2 and n_shape_1d == 2 and sfem_tensor_product_quad_uses_cartesian_ordering(quadrature_rule.element_type)
+    if n_shape_1d == 2 and dim == 2 and not cartesian_quad:
         return ((0, 0), (1, 0), (1, 1), (0, 1))
     if n_shape_1d == 2 and dim == 3 and not cartesian_hex:
         return (
@@ -1749,9 +1748,18 @@ def _tensor_product_node_coords(quadrature_rule):
 def _tensor_product_shape_index_lines(quadrature_rule, indent):
     dim = quadrature_rule.dim
     n_shape_1d = quadrature_rule.tensor_product_n_shape_1d
-    if n_shape_1d == 2 and dim == 2:
+    if (
+        n_shape_1d == 2
+        and dim == 2
+        and not sfem_tensor_product_quad_uses_cartesian_ordering(quadrature_rule.element_type)
+    ):
         return (
             "%sconst int sx = ((shape + 1) >> 1) & 1;" % indent,
+            "%sconst int sy = shape >> 1;" % indent,
+        )
+    if n_shape_1d == 2 and dim == 2:
+        return (
+            "%sconst int sx = shape & 1;" % indent,
             "%sconst int sy = shape >> 1;" % indent,
         )
     if (
@@ -1854,7 +1862,7 @@ def _sfem_soa_isoparametric_geometry_lines(
     q_major=False,
     reference_prefix="",
     source_builder=None,
-    coordinate_streams="block_coordinate_streams",
+    coordinate_streams="block_coordinate_data",
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -2457,6 +2465,7 @@ def _sfem_soa_mesh_operator_function(
         and not use_tensor_product_reference
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
+    compact_coordinate_buffers = geometry_mode == "isoparametric"
     uses_current = _form_uses_current(form, default=True)
     uses_direction = _form_uses_direction(form, default=form.has_direction)
     stream_shape_order = (
@@ -2465,11 +2474,7 @@ def _sfem_soa_mesh_operator_function(
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = (
-        "block_coordinate_data"
-        if use_stream_arrays
-        else "block_coordinate_streams"
-    )
+    coordinate_streams_name = "block_coordinate_data"
 
     base_params = [
         "const ptrdiff_t nelements",
@@ -2544,7 +2549,7 @@ def _sfem_soa_mesh_operator_function(
                 "    const geometry_t *const SFEM_RESTRICT %s = points[%d];"
                 % (_component_name(d), d)
             )
-        if use_stream_arrays:
+        if compact_coordinate_buffers:
             lines.extend(
                 _ordered_element_pointer_array_lines(
                     "idx_t",
@@ -2596,8 +2601,10 @@ def _sfem_soa_mesh_operator_function(
             lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
         else:
             lines.append("        scalar_t block_value[VECTOR_SIZE];")
-        if geometry_mode == "isoparametric":
+        if compact_coordinate_buffers:
             lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+    elif compact_coordinate_buffers:
+        lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
@@ -2629,7 +2636,7 @@ def _sfem_soa_mesh_operator_function(
     )
 
     if geometry_mode == "isoparametric":
-        if compact_stream_buffers:
+        if compact_coordinate_buffers:
             lines.append("        const geometry_t *const coordinate_components[DIM] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
             lines.extend(
                 [
@@ -2801,22 +2808,6 @@ def _sfem_soa_mesh_operator_function(
                     )
                 )
 
-    if geometry_mode == "isoparametric" and not (
-        form.weak_form is not None and use_tensor_product_reference
-    ):
-        lines.append("")
-        if not compact_stream_buffers:
-            lines.append(
-                "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        "block_%s" % stream
-                        for stream in _coordinate_stream_names(dim, n_nodes)
-                    ),
-                )
-            )
-
     if form.weak_form is None:
         lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
         if use_tensor_product_reference:
@@ -2838,22 +2829,8 @@ def _sfem_soa_mesh_operator_function(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=(
-                    "block_coordinate_data"
-                    if compact_stream_buffers
-                    else tensor_product_ordered_coordinate_streams(
-                        dim,
-                        n_nodes,
-                        _coordinate_stream_names(dim, n_nodes),
-                        lambda stream: "block_%s" % stream,
-                        shape_order=_tensor_product_stream_shape_order(
-                            quadrature_rule,
-                            dim,
-                            n_nodes,
-                        ),
-                    )
-                ),
-                contiguous_coordinate_streams=compact_stream_buffers,
+                coordinate_streams="block_coordinate_data",
+                contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
                     "block_jacobian_adjugate%d[%s]" % (component, index)
                 ),
@@ -3166,17 +3143,14 @@ def _sfem_soa_mesh_objective_steps_function(
         specialized_prefix is not None and not use_tensor_product_reference
     )
     use_stream_arrays = use_shared_weak_local
+    compact_coordinate_buffers = geometry_mode == "isoparametric"
     stream_shape_order = (
         _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = (
-        "block_coordinate_data"
-        if use_stream_arrays
-        else "block_coordinate_streams"
-    )
+    coordinate_streams_name = "block_coordinate_data"
 
     base_params = [
         "const ptrdiff_t nelements",
@@ -3253,7 +3227,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 "    const geometry_t *const SFEM_RESTRICT %s = points[%d];"
                 % (_component_name(d), d)
             )
-        if use_stream_arrays:
+        if compact_coordinate_buffers:
             lines.extend(
                 _ordered_element_pointer_array_lines(
                     "idx_t",
@@ -3301,8 +3275,10 @@ def _sfem_soa_mesh_objective_steps_function(
         lines.append("        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];")
         lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
         lines.append("        scalar_t block_value[VECTOR_SIZE];")
-        if geometry_mode == "isoparametric":
+        if compact_coordinate_buffers:
             lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+    elif compact_coordinate_buffers:
+        lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
@@ -3333,7 +3309,7 @@ def _sfem_soa_mesh_objective_steps_function(
     )
 
     if geometry_mode == "isoparametric":
-        if compact_stream_buffers:
+        if compact_coordinate_buffers:
             lines.append("        const geometry_t *const coordinate_components[DIM] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
             lines.extend(
                 [
@@ -3424,20 +3400,6 @@ def _sfem_soa_mesh_objective_steps_function(
                 )
         lines.append("        }")
 
-    if geometry_mode == "isoparametric" and not use_tensor_product_geometry:
-        lines.append("")
-        if not compact_stream_buffers:
-            lines.append(
-                "        const scalar_t *const block_coordinate_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        "block_%s" % stream
-                        for stream in _coordinate_stream_names(dim, n_nodes)
-                    ),
-                )
-            )
-
     if geometry_mode == "isoparametric" and use_tensor_product_geometry:
         lines.append("")
         lines.extend(
@@ -3446,22 +3408,8 @@ def _sfem_soa_mesh_objective_steps_function(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=(
-                    "block_coordinate_data"
-                    if compact_stream_buffers
-                    else tensor_product_ordered_coordinate_streams(
-                        dim,
-                        n_nodes,
-                        _coordinate_stream_names(dim, n_nodes),
-                        lambda stream: "block_%s" % stream,
-                        shape_order=_tensor_product_stream_shape_order(
-                            quadrature_rule,
-                            dim,
-                            n_nodes,
-                        ),
-                    )
-                ),
-                contiguous_coordinate_streams=compact_stream_buffers,
+                coordinate_streams="block_coordinate_data",
+                contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
                     "block_jacobian_adjugate%d[%s]" % (component, index)
                 ),

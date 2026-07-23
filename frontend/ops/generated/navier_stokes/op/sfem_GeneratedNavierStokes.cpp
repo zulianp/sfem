@@ -810,11 +810,27 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 
-    int GeneratedNavierStokes::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedNavierStokes::hessian_crs(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedNavierStokes::hessian_crs");
+        return SFEM_FAILURE;
+    }
+
+    int GeneratedNavierStokes::hessian_bsr(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedNavierStokes::hessian_bsr");
+        return SFEM_FAILURE;
+    }
+
+    int GeneratedNavierStokes::hessian_dia(const real_t *const,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedNavierStokes::hessian_dia");
         return SFEM_FAILURE;
     }
 

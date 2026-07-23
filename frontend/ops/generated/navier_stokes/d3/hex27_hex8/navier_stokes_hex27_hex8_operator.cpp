@@ -1,8 +1,8 @@
 #include <type_traits>
 #include "../navier_stokes_d3_tensor_product_mixed_local.hpp"
-#include "../../kernel_math.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../kernel_math.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -426,6 +426,10 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
     (void)nnodes;
     const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex8_shape_1d()};
     const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex8_grad_1d()};
+    const idx_t *const SFEM_RESTRICT field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -435,7 +439,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -445,7 +449,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
             const int stream = 27 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -455,7 +459,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
             const int stream = 54 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -465,7 +469,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
             const int stream = 81 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -492,16 +496,13 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
         for (int component = 0; component < DIM * DIM; ++component) {
             block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        const scalar_t *const block_current_streams[89] = {block_current[0], block_current[8], block_current[1], block_current[11], block_current[24], block_current[9], block_current[3], block_current[10], block_current[2], block_current[16], block_current[20], block_current[17], block_current[23], block_current[26], block_current[21], block_current[19], block_current[22], block_current[18], block_current[4], block_current[12], block_current[5], block_current[15], block_current[25], block_current[13], block_current[7], block_current[14], block_current[6], block_current[27], block_current[35], block_current[28], block_current[38], block_current[51], block_current[36], block_current[30], block_current[37], block_current[29], block_current[43], block_current[47], block_current[44], block_current[50], block_current[53], block_current[48], block_current[46], block_current[49], block_current[45], block_current[31], block_current[39], block_current[32], block_current[42], block_current[52], block_current[40], block_current[34], block_current[41], block_current[33], block_current[54], block_current[62], block_current[55], block_current[65], block_current[78], block_current[63], block_current[57], block_current[64], block_current[56], block_current[70], block_current[74], block_current[71], block_current[77], block_current[80], block_current[75], block_current[73], block_current[76], block_current[72], block_current[58], block_current[66], block_current[59], block_current[69], block_current[79], block_current[67], block_current[61], block_current[68], block_current[60], block_current[81], block_current[82], block_current[84], block_current[83], block_current[85], block_current[86], block_current[88], block_current[87]};
-        const scalar_t *const block_previous_streams[89] = {block_previous[0], block_previous[8], block_previous[1], block_previous[11], block_previous[24], block_previous[9], block_previous[3], block_previous[10], block_previous[2], block_previous[16], block_previous[20], block_previous[17], block_previous[23], block_previous[26], block_previous[21], block_previous[19], block_previous[22], block_previous[18], block_previous[4], block_previous[12], block_previous[5], block_previous[15], block_previous[25], block_previous[13], block_previous[7], block_previous[14], block_previous[6], block_previous[27], block_previous[35], block_previous[28], block_previous[38], block_previous[51], block_previous[36], block_previous[30], block_previous[37], block_previous[29], block_previous[43], block_previous[47], block_previous[44], block_previous[50], block_previous[53], block_previous[48], block_previous[46], block_previous[49], block_previous[45], block_previous[31], block_previous[39], block_previous[32], block_previous[42], block_previous[52], block_previous[40], block_previous[34], block_previous[41], block_previous[33], block_previous[54], block_previous[62], block_previous[55], block_previous[65], block_previous[78], block_previous[63], block_previous[57], block_previous[64], block_previous[56], block_previous[70], block_previous[74], block_previous[71], block_previous[77], block_previous[80], block_previous[75], block_previous[73], block_previous[76], block_previous[72], block_previous[58], block_previous[66], block_previous[59], block_previous[69], block_previous[79], block_previous[67], block_previous[61], block_previous[68], block_previous[60], block_previous[81], block_previous[82], block_previous[84], block_previous[83], block_previous[85], block_previous[86], block_previous[88], block_previous[87]};
-        scalar_t *const block_output_streams[89] = {block_output[0], block_output[8], block_output[1], block_output[11], block_output[24], block_output[9], block_output[3], block_output[10], block_output[2], block_output[16], block_output[20], block_output[17], block_output[23], block_output[26], block_output[21], block_output[19], block_output[22], block_output[18], block_output[4], block_output[12], block_output[5], block_output[15], block_output[25], block_output[13], block_output[7], block_output[14], block_output[6], block_output[27], block_output[35], block_output[28], block_output[38], block_output[51], block_output[36], block_output[30], block_output[37], block_output[29], block_output[43], block_output[47], block_output[44], block_output[50], block_output[53], block_output[48], block_output[46], block_output[49], block_output[45], block_output[31], block_output[39], block_output[32], block_output[42], block_output[52], block_output[40], block_output[34], block_output[41], block_output[33], block_output[54], block_output[62], block_output[55], block_output[65], block_output[78], block_output[63], block_output[57], block_output[64], block_output[56], block_output[70], block_output[74], block_output[71], block_output[77], block_output[80], block_output[75], block_output[73], block_output[76], block_output[72], block_output[58], block_output[66], block_output[59], block_output[69], block_output[79], block_output[67], block_output[61], block_output[68], block_output[60], block_output[81], block_output[82], block_output[84], block_output[83], block_output[85], block_output[86], block_output[88], block_output[87]};
 
-        navier_stokes_d3_tensor_product_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::q_weight_1d(), block_current_streams, block_previous_streams, convection_scale, dt, f0, f1, f2, nu, rho, block_output_streams);
+        navier_stokes_d3_tensor_product_mixed_residual_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::q_weight_1d(), block_current, block_previous, convection_scale, dt, f0, f1, f2, nu, rho, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -512,7 +513,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
         {
             scalar_t *const SFEM_RESTRICT out = u_out[1];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -523,7 +524,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
         {
             scalar_t *const SFEM_RESTRICT out = u_out[2];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -534,7 +535,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_affine_mesh_mixed_impl(
         {
             scalar_t *const SFEM_RESTRICT out = p_out;
             for (int local_shape = 0; local_shape < 8; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -653,6 +654,11 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
     (void)nnodes;
     const scalar_t *const isoparametric_shape_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d();
     const scalar_t *const isoparametric_grad_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d();
+    const idx_t *const SFEM_RESTRICT field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
+    const idx_t *const SFEM_RESTRICT coordinate_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -665,7 +671,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
 
         const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = coordinate_elements[shape];
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
@@ -676,7 +682,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
         }
 
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -686,7 +692,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
             const int stream = 27 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -696,7 +702,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
             const int stream = 54 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -706,7 +712,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
             const int stream = 81 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -723,12 +729,16 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
             }
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[24], block_coordinates[25], block_coordinates[26], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[33], block_coordinates[34], block_coordinates[35], block_coordinates[72], block_coordinates[73], block_coordinates[74], block_coordinates[27], block_coordinates[28], block_coordinates[29], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[30], block_coordinates[31], block_coordinates[32], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[48], block_coordinates[49], block_coordinates[50], block_coordinates[60], block_coordinates[61], block_coordinates[62], block_coordinates[51], block_coordinates[52], block_coordinates[53], block_coordinates[69], block_coordinates[70], block_coordinates[71], block_coordinates[78], block_coordinates[79], block_coordinates[80], block_coordinates[63], block_coordinates[64], block_coordinates[65], block_coordinates[57], block_coordinates[58], block_coordinates[59], block_coordinates[66], block_coordinates[67], block_coordinates[68], block_coordinates[54], block_coordinates[55], block_coordinates[56], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[36], block_coordinates[37], block_coordinates[38], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[45], block_coordinates[46], block_coordinates[47], block_coordinates[75], block_coordinates[76], block_coordinates[77], block_coordinates[39], block_coordinates[40], block_coordinates[41], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[42], block_coordinates[43], block_coordinates[44], block_coordinates[18], block_coordinates[19], block_coordinates[20]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
-        tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams,
-                coordinate_value, coordinate_grad_ref);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
+                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
@@ -737,16 +747,13 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
         const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()};
         const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_grad_1d()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        const scalar_t *const block_current_streams[89] = {block_current[0], block_current[8], block_current[1], block_current[11], block_current[24], block_current[9], block_current[3], block_current[10], block_current[2], block_current[16], block_current[20], block_current[17], block_current[23], block_current[26], block_current[21], block_current[19], block_current[22], block_current[18], block_current[4], block_current[12], block_current[5], block_current[15], block_current[25], block_current[13], block_current[7], block_current[14], block_current[6], block_current[27], block_current[35], block_current[28], block_current[38], block_current[51], block_current[36], block_current[30], block_current[37], block_current[29], block_current[43], block_current[47], block_current[44], block_current[50], block_current[53], block_current[48], block_current[46], block_current[49], block_current[45], block_current[31], block_current[39], block_current[32], block_current[42], block_current[52], block_current[40], block_current[34], block_current[41], block_current[33], block_current[54], block_current[62], block_current[55], block_current[65], block_current[78], block_current[63], block_current[57], block_current[64], block_current[56], block_current[70], block_current[74], block_current[71], block_current[77], block_current[80], block_current[75], block_current[73], block_current[76], block_current[72], block_current[58], block_current[66], block_current[59], block_current[69], block_current[79], block_current[67], block_current[61], block_current[68], block_current[60], block_current[81], block_current[82], block_current[84], block_current[83], block_current[85], block_current[86], block_current[88], block_current[87]};
-        const scalar_t *const block_previous_streams[89] = {block_previous[0], block_previous[8], block_previous[1], block_previous[11], block_previous[24], block_previous[9], block_previous[3], block_previous[10], block_previous[2], block_previous[16], block_previous[20], block_previous[17], block_previous[23], block_previous[26], block_previous[21], block_previous[19], block_previous[22], block_previous[18], block_previous[4], block_previous[12], block_previous[5], block_previous[15], block_previous[25], block_previous[13], block_previous[7], block_previous[14], block_previous[6], block_previous[27], block_previous[35], block_previous[28], block_previous[38], block_previous[51], block_previous[36], block_previous[30], block_previous[37], block_previous[29], block_previous[43], block_previous[47], block_previous[44], block_previous[50], block_previous[53], block_previous[48], block_previous[46], block_previous[49], block_previous[45], block_previous[31], block_previous[39], block_previous[32], block_previous[42], block_previous[52], block_previous[40], block_previous[34], block_previous[41], block_previous[33], block_previous[54], block_previous[62], block_previous[55], block_previous[65], block_previous[78], block_previous[63], block_previous[57], block_previous[64], block_previous[56], block_previous[70], block_previous[74], block_previous[71], block_previous[77], block_previous[80], block_previous[75], block_previous[73], block_previous[76], block_previous[72], block_previous[58], block_previous[66], block_previous[59], block_previous[69], block_previous[79], block_previous[67], block_previous[61], block_previous[68], block_previous[60], block_previous[81], block_previous[82], block_previous[84], block_previous[83], block_previous[85], block_previous[86], block_previous[88], block_previous[87]};
-        scalar_t *const block_output_streams[89] = {block_output[0], block_output[8], block_output[1], block_output[11], block_output[24], block_output[9], block_output[3], block_output[10], block_output[2], block_output[16], block_output[20], block_output[17], block_output[23], block_output[26], block_output[21], block_output[19], block_output[22], block_output[18], block_output[4], block_output[12], block_output[5], block_output[15], block_output[25], block_output[13], block_output[7], block_output[14], block_output[6], block_output[27], block_output[35], block_output[28], block_output[38], block_output[51], block_output[36], block_output[30], block_output[37], block_output[29], block_output[43], block_output[47], block_output[44], block_output[50], block_output[53], block_output[48], block_output[46], block_output[49], block_output[45], block_output[31], block_output[39], block_output[32], block_output[42], block_output[52], block_output[40], block_output[34], block_output[41], block_output[33], block_output[54], block_output[62], block_output[55], block_output[65], block_output[78], block_output[63], block_output[57], block_output[64], block_output[56], block_output[70], block_output[74], block_output[71], block_output[77], block_output[80], block_output[75], block_output[73], block_output[76], block_output[72], block_output[58], block_output[66], block_output[59], block_output[69], block_output[79], block_output[67], block_output[61], block_output[68], block_output[60], block_output[81], block_output[82], block_output[84], block_output[83], block_output[85], block_output[86], block_output[88], block_output[87]};
 
-        navier_stokes_d3_tensor_product_mixed_residual_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_current_streams, block_previous_streams, convection_scale, dt, f0, f1, f2, nu, rho, block_output_streams);
+        navier_stokes_d3_tensor_product_mixed_residual_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_current, block_previous, convection_scale, dt, f0, f1, f2, nu, rho, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -757,7 +764,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = u_out[1];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -768,7 +775,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = u_out[2];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -779,7 +786,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_residual_isoparametric_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = p_out;
             for (int local_shape = 0; local_shape < 8; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -886,6 +893,10 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
     (void)nnodes;
     const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex8_shape_1d()};
     const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::hex8_grad_1d()};
+    const idx_t *const SFEM_RESTRICT field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -895,7 +906,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
         scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
 
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -905,7 +916,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
             const int stream = 27 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -915,7 +926,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
             const int stream = 54 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -925,7 +936,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
             const int stream = 81 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -952,16 +963,13 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
         for (int component = 0; component < DIM * DIM; ++component) {
             block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        const scalar_t *const block_previous_streams[89] = {block_previous[0], block_previous[8], block_previous[1], block_previous[11], block_previous[24], block_previous[9], block_previous[3], block_previous[10], block_previous[2], block_previous[16], block_previous[20], block_previous[17], block_previous[23], block_previous[26], block_previous[21], block_previous[19], block_previous[22], block_previous[18], block_previous[4], block_previous[12], block_previous[5], block_previous[15], block_previous[25], block_previous[13], block_previous[7], block_previous[14], block_previous[6], block_previous[27], block_previous[35], block_previous[28], block_previous[38], block_previous[51], block_previous[36], block_previous[30], block_previous[37], block_previous[29], block_previous[43], block_previous[47], block_previous[44], block_previous[50], block_previous[53], block_previous[48], block_previous[46], block_previous[49], block_previous[45], block_previous[31], block_previous[39], block_previous[32], block_previous[42], block_previous[52], block_previous[40], block_previous[34], block_previous[41], block_previous[33], block_previous[54], block_previous[62], block_previous[55], block_previous[65], block_previous[78], block_previous[63], block_previous[57], block_previous[64], block_previous[56], block_previous[70], block_previous[74], block_previous[71], block_previous[77], block_previous[80], block_previous[75], block_previous[73], block_previous[76], block_previous[72], block_previous[58], block_previous[66], block_previous[59], block_previous[69], block_previous[79], block_previous[67], block_previous[61], block_previous[68], block_previous[60], block_previous[81], block_previous[82], block_previous[84], block_previous[83], block_previous[85], block_previous[86], block_previous[88], block_previous[87]};
-        const scalar_t *const block_direction_streams[89] = {block_direction[0], block_direction[8], block_direction[1], block_direction[11], block_direction[24], block_direction[9], block_direction[3], block_direction[10], block_direction[2], block_direction[16], block_direction[20], block_direction[17], block_direction[23], block_direction[26], block_direction[21], block_direction[19], block_direction[22], block_direction[18], block_direction[4], block_direction[12], block_direction[5], block_direction[15], block_direction[25], block_direction[13], block_direction[7], block_direction[14], block_direction[6], block_direction[27], block_direction[35], block_direction[28], block_direction[38], block_direction[51], block_direction[36], block_direction[30], block_direction[37], block_direction[29], block_direction[43], block_direction[47], block_direction[44], block_direction[50], block_direction[53], block_direction[48], block_direction[46], block_direction[49], block_direction[45], block_direction[31], block_direction[39], block_direction[32], block_direction[42], block_direction[52], block_direction[40], block_direction[34], block_direction[41], block_direction[33], block_direction[54], block_direction[62], block_direction[55], block_direction[65], block_direction[78], block_direction[63], block_direction[57], block_direction[64], block_direction[56], block_direction[70], block_direction[74], block_direction[71], block_direction[77], block_direction[80], block_direction[75], block_direction[73], block_direction[76], block_direction[72], block_direction[58], block_direction[66], block_direction[59], block_direction[69], block_direction[79], block_direction[67], block_direction[61], block_direction[68], block_direction[60], block_direction[81], block_direction[82], block_direction[84], block_direction[83], block_direction[85], block_direction[86], block_direction[88], block_direction[87]};
-        scalar_t *const block_output_streams[89] = {block_output[0], block_output[8], block_output[1], block_output[11], block_output[24], block_output[9], block_output[3], block_output[10], block_output[2], block_output[16], block_output[20], block_output[17], block_output[23], block_output[26], block_output[21], block_output[19], block_output[22], block_output[18], block_output[4], block_output[12], block_output[5], block_output[15], block_output[25], block_output[13], block_output[7], block_output[14], block_output[6], block_output[27], block_output[35], block_output[28], block_output[38], block_output[51], block_output[36], block_output[30], block_output[37], block_output[29], block_output[43], block_output[47], block_output[44], block_output[50], block_output[53], block_output[48], block_output[46], block_output[49], block_output[45], block_output[31], block_output[39], block_output[32], block_output[42], block_output[52], block_output[40], block_output[34], block_output[41], block_output[33], block_output[54], block_output[62], block_output[55], block_output[65], block_output[78], block_output[63], block_output[57], block_output[64], block_output[56], block_output[70], block_output[74], block_output[71], block_output[77], block_output[80], block_output[75], block_output[73], block_output[76], block_output[72], block_output[58], block_output[66], block_output[59], block_output[69], block_output[79], block_output[67], block_output[61], block_output[68], block_output[60], block_output[81], block_output[82], block_output[84], block_output[83], block_output[85], block_output[86], block_output[88], block_output[87]};
 
-        navier_stokes_d3_tensor_product_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::q_weight_1d(), block_previous_streams, block_direction_streams, convection_scale, dt, nu, rho, block_output_streams);
+        navier_stokes_d3_tensor_product_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_affine_reference_data<scalar_t>::q_weight_1d(), block_previous, block_direction, convection_scale, dt, nu, rho, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -972,7 +980,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = u_out[1];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -983,7 +991,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = u_out[2];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -994,7 +1002,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_mixe
         {
             scalar_t *const SFEM_RESTRICT out = p_out;
             for (int local_shape = 0; local_shape < 8; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -1104,6 +1112,11 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
     (void)nnodes;
     const scalar_t *const isoparametric_shape_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d();
     const scalar_t *const isoparametric_grad_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d();
+    const idx_t *const SFEM_RESTRICT field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
+    const idx_t *const SFEM_RESTRICT coordinate_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -1116,7 +1129,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
 
         const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = coordinate_elements[shape];
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
@@ -1127,7 +1140,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
         }
 
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1137,7 +1150,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
             const int stream = 27 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1147,7 +1160,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
             const int stream = 54 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1157,7 +1170,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
             const int stream = 81 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1174,12 +1187,16 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
             }
         }
 
-        const scalar_t *const block_coordinate_streams[DIM * N_SHAPE] = {block_coordinates[0], block_coordinates[1], block_coordinates[2], block_coordinates[24], block_coordinates[25], block_coordinates[26], block_coordinates[3], block_coordinates[4], block_coordinates[5], block_coordinates[33], block_coordinates[34], block_coordinates[35], block_coordinates[72], block_coordinates[73], block_coordinates[74], block_coordinates[27], block_coordinates[28], block_coordinates[29], block_coordinates[9], block_coordinates[10], block_coordinates[11], block_coordinates[30], block_coordinates[31], block_coordinates[32], block_coordinates[6], block_coordinates[7], block_coordinates[8], block_coordinates[48], block_coordinates[49], block_coordinates[50], block_coordinates[60], block_coordinates[61], block_coordinates[62], block_coordinates[51], block_coordinates[52], block_coordinates[53], block_coordinates[69], block_coordinates[70], block_coordinates[71], block_coordinates[78], block_coordinates[79], block_coordinates[80], block_coordinates[63], block_coordinates[64], block_coordinates[65], block_coordinates[57], block_coordinates[58], block_coordinates[59], block_coordinates[66], block_coordinates[67], block_coordinates[68], block_coordinates[54], block_coordinates[55], block_coordinates[56], block_coordinates[12], block_coordinates[13], block_coordinates[14], block_coordinates[36], block_coordinates[37], block_coordinates[38], block_coordinates[15], block_coordinates[16], block_coordinates[17], block_coordinates[45], block_coordinates[46], block_coordinates[47], block_coordinates[75], block_coordinates[76], block_coordinates[77], block_coordinates[39], block_coordinates[40], block_coordinates[41], block_coordinates[21], block_coordinates[22], block_coordinates[23], block_coordinates[42], block_coordinates[43], block_coordinates[44], block_coordinates[18], block_coordinates[19], block_coordinates[20]};
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];
-        tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams,
-                coordinate_value, coordinate_grad_ref);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
+                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
@@ -1188,16 +1205,13 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
         const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()};
         const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_grad_1d()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        const scalar_t *const block_previous_streams[89] = {block_previous[0], block_previous[8], block_previous[1], block_previous[11], block_previous[24], block_previous[9], block_previous[3], block_previous[10], block_previous[2], block_previous[16], block_previous[20], block_previous[17], block_previous[23], block_previous[26], block_previous[21], block_previous[19], block_previous[22], block_previous[18], block_previous[4], block_previous[12], block_previous[5], block_previous[15], block_previous[25], block_previous[13], block_previous[7], block_previous[14], block_previous[6], block_previous[27], block_previous[35], block_previous[28], block_previous[38], block_previous[51], block_previous[36], block_previous[30], block_previous[37], block_previous[29], block_previous[43], block_previous[47], block_previous[44], block_previous[50], block_previous[53], block_previous[48], block_previous[46], block_previous[49], block_previous[45], block_previous[31], block_previous[39], block_previous[32], block_previous[42], block_previous[52], block_previous[40], block_previous[34], block_previous[41], block_previous[33], block_previous[54], block_previous[62], block_previous[55], block_previous[65], block_previous[78], block_previous[63], block_previous[57], block_previous[64], block_previous[56], block_previous[70], block_previous[74], block_previous[71], block_previous[77], block_previous[80], block_previous[75], block_previous[73], block_previous[76], block_previous[72], block_previous[58], block_previous[66], block_previous[59], block_previous[69], block_previous[79], block_previous[67], block_previous[61], block_previous[68], block_previous[60], block_previous[81], block_previous[82], block_previous[84], block_previous[83], block_previous[85], block_previous[86], block_previous[88], block_previous[87]};
-        const scalar_t *const block_direction_streams[89] = {block_direction[0], block_direction[8], block_direction[1], block_direction[11], block_direction[24], block_direction[9], block_direction[3], block_direction[10], block_direction[2], block_direction[16], block_direction[20], block_direction[17], block_direction[23], block_direction[26], block_direction[21], block_direction[19], block_direction[22], block_direction[18], block_direction[4], block_direction[12], block_direction[5], block_direction[15], block_direction[25], block_direction[13], block_direction[7], block_direction[14], block_direction[6], block_direction[27], block_direction[35], block_direction[28], block_direction[38], block_direction[51], block_direction[36], block_direction[30], block_direction[37], block_direction[29], block_direction[43], block_direction[47], block_direction[44], block_direction[50], block_direction[53], block_direction[48], block_direction[46], block_direction[49], block_direction[45], block_direction[31], block_direction[39], block_direction[32], block_direction[42], block_direction[52], block_direction[40], block_direction[34], block_direction[41], block_direction[33], block_direction[54], block_direction[62], block_direction[55], block_direction[65], block_direction[78], block_direction[63], block_direction[57], block_direction[64], block_direction[56], block_direction[70], block_direction[74], block_direction[71], block_direction[77], block_direction[80], block_direction[75], block_direction[73], block_direction[76], block_direction[72], block_direction[58], block_direction[66], block_direction[59], block_direction[69], block_direction[79], block_direction[67], block_direction[61], block_direction[68], block_direction[60], block_direction[81], block_direction[82], block_direction[84], block_direction[83], block_direction[85], block_direction[86], block_direction[88], block_direction[87]};
-        scalar_t *const block_output_streams[89] = {block_output[0], block_output[8], block_output[1], block_output[11], block_output[24], block_output[9], block_output[3], block_output[10], block_output[2], block_output[16], block_output[20], block_output[17], block_output[23], block_output[26], block_output[21], block_output[19], block_output[22], block_output[18], block_output[4], block_output[12], block_output[5], block_output[15], block_output[25], block_output[13], block_output[7], block_output[14], block_output[6], block_output[27], block_output[35], block_output[28], block_output[38], block_output[51], block_output[36], block_output[30], block_output[37], block_output[29], block_output[43], block_output[47], block_output[44], block_output[50], block_output[53], block_output[48], block_output[46], block_output[49], block_output[45], block_output[31], block_output[39], block_output[32], block_output[42], block_output[52], block_output[40], block_output[34], block_output[41], block_output[33], block_output[54], block_output[62], block_output[55], block_output[65], block_output[78], block_output[63], block_output[57], block_output[64], block_output[56], block_output[70], block_output[74], block_output[71], block_output[77], block_output[80], block_output[75], block_output[73], block_output[76], block_output[72], block_output[58], block_output[66], block_output[59], block_output[69], block_output[79], block_output[67], block_output[61], block_output[68], block_output[60], block_output[81], block_output[82], block_output[84], block_output[83], block_output[85], block_output[86], block_output[88], block_output[87]};
 
-        navier_stokes_d3_tensor_product_mixed_jacobian_action_block<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_previous_streams, block_direction_streams, convection_scale, dt, nu, rho, block_output_streams);
+        navier_stokes_d3_tensor_product_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_previous, block_direction, convection_scale, dt, nu, rho, block_output);
 
         {
             scalar_t *const SFEM_RESTRICT out = u_out[0];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -1208,7 +1222,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
         {
             scalar_t *const SFEM_RESTRICT out = u_out[1];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -1219,7 +1233,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
         {
             scalar_t *const SFEM_RESTRICT out = u_out[2];
             for (int local_shape = 0; local_shape < 27; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -1230,7 +1244,7 @@ static SFEM_INLINE int navier_stokes_hex27_hex8_jacobian_action_isoparametric_me
         {
             scalar_t *const SFEM_RESTRICT out = p_out;
             for (int local_shape = 0; local_shape < 8; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -1287,4 +1301,403 @@ extern "C" int navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa_f
         float *const SFEM_RESTRICT p_out
 ) {
     return sfem::codegen::navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE void navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t element,
+        const ptrdiff_t out_stride,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int N_ROW_STREAMS = 89;
+    static constexpr int N_COL_STREAMS = 89;
+    static constexpr int ROW_COMPONENT[N_ROW_STREAMS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3};
+    static constexpr int ROW_SHAPE[N_ROW_STREAMS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7};
+    static constexpr int COL_COMPONENT[N_COL_STREAMS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3};
+    static constexpr int COL_SHAPE[N_COL_STREAMS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 1, 2, 3, 4, 5, 6, 7};
+    const ptrdiff_t element_offset = element * N_ROW_STREAMS * N_COL_STREAMS;
+    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
+        const idx_t row_node = elements[ROW_SHAPE[row_stream]][element];
+        const idx_t global_row = row_node * out_stride + ROW_COMPONENT[row_stream];
+        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
+            const idx_t col_node = elements[COL_SHAPE[col_stream]][element];
+            const ptrdiff_t entry = element_offset + row_stream * N_COL_STREAMS + col_stream;
+            rows[entry] = global_row;
+            cols[entry] = col_node * out_stride + COL_COMPONENT[col_stream];
+            values[entry] = element_matrix[row_stream * N_COL_STREAMS + col_stream];
+        }
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t convection_scale,
+        const scalar_t dt,
+        const scalar_t nu,
+        const scalar_t rho,
+        const ptrdiff_t previous_stride,
+        const scalar_t *const SFEM_RESTRICT u_old_data[3],
+        const scalar_t *const SFEM_RESTRICT p_old_data,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        scalar_t *const SFEM_RESTRICT values
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 64;
+    static constexpr int CELL_N_SHAPE = 27;
+    static constexpr int N_SHAPE = CELL_N_SHAPE;
+    static constexpr int N_FIELDS = 2;
+    static constexpr int N_FIELD_STREAMS = 89;
+    static constexpr int VECTOR_SIZE = 1;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d();
+    const scalar_t *const isoparametric_grad_1d = sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d();
+    const idx_t *const SFEM_RESTRICT field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+    const idx_t *const SFEM_RESTRICT field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
+    const idx_t *const SFEM_RESTRICT coordinate_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const ptrdiff_t evbegin = element;
+        const int nelems = 1;
+        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];
+        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+        scalar_t block_determinant[N_QP * VECTOR_SIZE];
+        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];
+        scalar_t element_matrix[7921];
+
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = coordinate_elements[shape];
+            for (int d = 0; d < DIM; ++d) {
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    const idx_t node = element_shape[evbegin + lane];
+                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                }
+            }
+        }
+
+        for (int local_shape = 0; local_shape < 27; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
+            const int stream = 0 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_previous[stream][lane] = u_old_data[0][node * previous_stride];
+            }
+        }
+        for (int local_shape = 0; local_shape < 27; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = field_1_elements[local_shape];
+            const int stream = 27 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_previous[stream][lane] = u_old_data[1][node * previous_stride];
+            }
+        }
+        for (int local_shape = 0; local_shape < 27; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = field_2_elements[local_shape];
+            const int stream = 54 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_previous[stream][lane] = u_old_data[2][node * previous_stride];
+            }
+        }
+        for (int local_shape = 0; local_shape < 8; ++local_shape) {
+            const idx_t *const SFEM_RESTRICT element_shape = field_3_elements[local_shape];
+            const int stream = 81 + local_shape;
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const idx_t node = element_shape[evbegin + lane];
+                block_previous[stream][lane] = p_old_data[node * previous_stride];
+            }
+        }
+
+        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
+                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
+                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
+                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+
+        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
+
+        const scalar_t *const field_shape_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()};
+        const scalar_t *const field_grad_1d[N_FIELDS] = {sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::hex8_grad_1d()};
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+
+        const auto row_tensor_stream = [](const int local) -> int {
+            switch (local) {
+                case 0: return 0;
+                case 1: return 2;
+                case 2: return 8;
+                case 3: return 6;
+                case 4: return 18;
+                case 5: return 20;
+                case 6: return 26;
+                case 7: return 24;
+                case 8: return 1;
+                case 9: return 5;
+                case 10: return 7;
+                case 11: return 3;
+                case 12: return 19;
+                case 13: return 23;
+                case 14: return 25;
+                case 15: return 21;
+                case 16: return 9;
+                case 17: return 11;
+                case 18: return 17;
+                case 19: return 15;
+                case 20: return 10;
+                case 21: return 14;
+                case 22: return 16;
+                case 23: return 12;
+                case 24: return 4;
+                case 25: return 22;
+                case 26: return 13;
+                case 27: return 27;
+                case 28: return 29;
+                case 29: return 35;
+                case 30: return 33;
+                case 31: return 45;
+                case 32: return 47;
+                case 33: return 53;
+                case 34: return 51;
+                case 35: return 28;
+                case 36: return 32;
+                case 37: return 34;
+                case 38: return 30;
+                case 39: return 46;
+                case 40: return 50;
+                case 41: return 52;
+                case 42: return 48;
+                case 43: return 36;
+                case 44: return 38;
+                case 45: return 44;
+                case 46: return 42;
+                case 47: return 37;
+                case 48: return 41;
+                case 49: return 43;
+                case 50: return 39;
+                case 51: return 31;
+                case 52: return 49;
+                case 53: return 40;
+                case 54: return 54;
+                case 55: return 56;
+                case 56: return 62;
+                case 57: return 60;
+                case 58: return 72;
+                case 59: return 74;
+                case 60: return 80;
+                case 61: return 78;
+                case 62: return 55;
+                case 63: return 59;
+                case 64: return 61;
+                case 65: return 57;
+                case 66: return 73;
+                case 67: return 77;
+                case 68: return 79;
+                case 69: return 75;
+                case 70: return 63;
+                case 71: return 65;
+                case 72: return 71;
+                case 73: return 69;
+                case 74: return 64;
+                case 75: return 68;
+                case 76: return 70;
+                case 77: return 66;
+                case 78: return 58;
+                case 79: return 76;
+                case 80: return 67;
+                case 81: return 81;
+                case 82: return 82;
+                case 83: return 84;
+                case 84: return 83;
+                case 85: return 85;
+                case 86: return 86;
+                case 87: return 88;
+                case 88: return 87;
+                default: return 0;
+            }
+        };
+        const auto col_tensor_stream = [](const int local) -> int {
+            switch (local) {
+                case 0: return 0;
+                case 1: return 2;
+                case 2: return 8;
+                case 3: return 6;
+                case 4: return 18;
+                case 5: return 20;
+                case 6: return 26;
+                case 7: return 24;
+                case 8: return 1;
+                case 9: return 5;
+                case 10: return 7;
+                case 11: return 3;
+                case 12: return 19;
+                case 13: return 23;
+                case 14: return 25;
+                case 15: return 21;
+                case 16: return 9;
+                case 17: return 11;
+                case 18: return 17;
+                case 19: return 15;
+                case 20: return 10;
+                case 21: return 14;
+                case 22: return 16;
+                case 23: return 12;
+                case 24: return 4;
+                case 25: return 22;
+                case 26: return 13;
+                case 27: return 27;
+                case 28: return 29;
+                case 29: return 35;
+                case 30: return 33;
+                case 31: return 45;
+                case 32: return 47;
+                case 33: return 53;
+                case 34: return 51;
+                case 35: return 28;
+                case 36: return 32;
+                case 37: return 34;
+                case 38: return 30;
+                case 39: return 46;
+                case 40: return 50;
+                case 41: return 52;
+                case 42: return 48;
+                case 43: return 36;
+                case 44: return 38;
+                case 45: return 44;
+                case 46: return 42;
+                case 47: return 37;
+                case 48: return 41;
+                case 49: return 43;
+                case 50: return 39;
+                case 51: return 31;
+                case 52: return 49;
+                case 53: return 40;
+                case 54: return 54;
+                case 55: return 56;
+                case 56: return 62;
+                case 57: return 60;
+                case 58: return 72;
+                case 59: return 74;
+                case 60: return 80;
+                case 61: return 78;
+                case 62: return 55;
+                case 63: return 59;
+                case 64: return 61;
+                case 65: return 57;
+                case 66: return 73;
+                case 67: return 77;
+                case 68: return 79;
+                case 69: return 75;
+                case 70: return 63;
+                case 71: return 65;
+                case 72: return 71;
+                case 73: return 69;
+                case 74: return 64;
+                case 75: return 68;
+                case 76: return 70;
+                case 77: return 66;
+                case 78: return 58;
+                case 79: return 76;
+                case 80: return 67;
+                case 81: return 81;
+                case 82: return 82;
+                case 83: return 84;
+                case 84: return 83;
+                case 85: return 85;
+                case 86: return 86;
+                case 87: return 88;
+                case 88: return 87;
+                default: return 0;
+            }
+        };
+        for (int entry = 0; entry < 7921; ++entry) {
+            element_matrix[entry] = scalar_t(0);
+        }
+        for (int trial_local = 0; trial_local < 89; ++trial_local) {
+            const int trial = col_tensor_stream(trial_local);
+            for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
+                block_direction[stream][0] = scalar_t(0);
+                block_output[stream][0] = scalar_t(0);
+            }
+            block_direction[trial][0] = scalar_t(1);
+            navier_stokes_d3_tensor_product_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_isoparametric_reference_data<scalar_t>::q_weight_1d(), block_previous, block_direction, convection_scale, dt, nu, rho, block_output);
+            for (int test_local = 0; test_local < 89; ++test_local) {
+                const int test = row_tensor_stream(test_local);
+                element_matrix[test_local * 89 + trial_local] = block_output[test][0];
+            }
+        }
+
+        navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(elements, element, out_stride, element_matrix, rows, cols, values);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double convection_scale,
+        const double dt,
+        const double nu,
+        const double rho,
+        const ptrdiff_t previous_stride,
+        const double *const SFEM_RESTRICT u_old_data[3],
+        const double *const SFEM_RESTRICT p_old_data,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, out_stride, rows, cols, values);
+}
+
+extern "C" int navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float convection_scale,
+        const float dt,
+        const float nu,
+        const float rho,
+        const ptrdiff_t previous_stride,
+        const float *const SFEM_RESTRICT u_old_data[3],
+        const float *const SFEM_RESTRICT p_old_data,
+        const ptrdiff_t out_stride,
+        idx_t *const SFEM_RESTRICT rows,
+        idx_t *const SFEM_RESTRICT cols,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::navier_stokes_hex27_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, out_stride, rows, cols, values);
 }

@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include "../laplace_d3_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -1275,9 +1275,10 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_impl(
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const idx_t node = elements[shape][element];
+            const idx_t coordinate_node = elements[shape][element];
             ev[shape] = node;
             for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][node]);
+                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
             }
         }
 
@@ -1299,13 +1300,11 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_impl(
         }
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        static constexpr int ROW_STREAMS[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-        static constexpr int COL_STREAMS[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         for (int entry = 0; entry < 100; ++entry) {
             element_matrix[entry] = scalar_t(0);
         }
         for (int trial_local = 0; trial_local < 10; ++trial_local) {
-            const int trial = COL_STREAMS[trial_local];
+            const int trial = trial_local;
             for (int stream = 0; stream < N_STREAMS; ++stream) {
                 block_direction[stream][0] = scalar_t(0);
                 block_output[stream][0] = scalar_t(0);
@@ -1313,7 +1312,7 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_impl(
             block_direction[trial][0] = scalar_t(1);
             laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
             for (int test_local = 0; test_local < 10; ++test_local) {
-                const int test = ROW_STREAMS[test_local];
+                const int test = test_local;
                 element_matrix[test_local * 10 + trial_local] = block_output[test][0];
             }
         }
@@ -1426,8 +1425,9 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_packed_f
 
                 for (int shape = 0; shape < N_SHAPE; ++shape) {
                     const uint16_t packed_node = elements[shape][element];
+                    const uint16_t coordinate_packed_node = elements[shape][element];
                     for (int d = 0; d < DIM; ++d) {
-                        block_coordinates[shape * DIM + d][0] = pack_coordinates[d * max_nodes_per_pack + packed_node];
+                        block_coordinates[shape * DIM + d][0] = pack_coordinates[d * max_nodes_per_pack + coordinate_packed_node];
                 }
                 }
 
@@ -1449,13 +1449,11 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_packed_f
             }
             const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-            static constexpr int ROW_STREAMS[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-            static constexpr int COL_STREAMS[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
             for (int entry = 0; entry < 100; ++entry) {
                 element_matrix[entry] = scalar_t(0);
             }
             for (int trial_local = 0; trial_local < 10; ++trial_local) {
-                const int trial = COL_STREAMS[trial_local];
+                const int trial = trial_local;
                 for (int stream = 0; stream < N_STREAMS; ++stream) {
                     block_direction[stream][0] = scalar_t(0);
                     block_output[stream][0] = scalar_t(0);
@@ -1463,7 +1461,7 @@ static SFEM_INLINE int laplace_tet10_hessian_crs_isoparametric_mesh_soa_packed_f
                 block_direction[trial][0] = scalar_t(1);
                 laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
                 for (int test_local = 0; test_local < 10; ++test_local) {
-                    const int test = ROW_STREAMS[test_local];
+                    const int test = test_local;
                     element_matrix[test_local * 10 + trial_local] = block_output[test][0];
                 }
             }
@@ -1679,9 +1677,10 @@ static SFEM_INLINE int laplace_tet10_hessian_coo_triplet_isoparametric_mesh_soa_
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const idx_t node = elements[shape][element];
+            const idx_t coordinate_node = elements[shape][element];
             ev[shape] = node;
             for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][node]);
+                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
             }
         }
 
@@ -1706,15 +1705,18 @@ static SFEM_INLINE int laplace_tet10_hessian_coo_triplet_isoparametric_mesh_soa_
         for (int entry = 0; entry < N_STREAMS * N_STREAMS; ++entry) {
             element_matrix[entry] = scalar_t(0);
         }
+        static constexpr int TENSOR_STREAMS[N_STREAMS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         for (int trial = 0; trial < N_STREAMS; ++trial) {
+            const int tensor_trial = TENSOR_STREAMS[trial];
             for (int stream = 0; stream < N_STREAMS; ++stream) {
                 block_direction[stream][0] = scalar_t(0);
                 block_output[stream][0] = scalar_t(0);
             }
-            block_direction[trial][0] = scalar_t(1);
+            block_direction[tensor_trial][0] = scalar_t(1);
             laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
             for (int test = 0; test < N_STREAMS; ++test) {
-                element_matrix[test * N_STREAMS + trial] = block_output[test][0];
+                const int tensor_test = TENSOR_STREAMS[test];
+                element_matrix[test * N_STREAMS + trial] = block_output[tensor_test][0];
             }
         }
 
@@ -1832,9 +1834,10 @@ static SFEM_INLINE int laplace_tet10_hessian_dia_isoparametric_mesh_soa_impl(
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
             const idx_t node = elements[shape][element];
+            const idx_t coordinate_node = elements[shape][element];
             ev[shape] = node;
             for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][node]);
+                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
             }
         }
 
@@ -1859,15 +1862,18 @@ static SFEM_INLINE int laplace_tet10_hessian_dia_isoparametric_mesh_soa_impl(
         for (int entry = 0; entry < N_SHAPE * N_SHAPE; ++entry) {
             element_matrix[entry] = scalar_t(0);
         }
+        static constexpr int TENSOR_STREAMS[N_SHAPE] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         for (int trial = 0; trial < N_SHAPE; ++trial) {
+            const int tensor_trial = TENSOR_STREAMS[trial];
             for (int stream = 0; stream < N_SHAPE; ++stream) {
                 block_direction[stream][0] = scalar_t(0);
                 block_output[stream][0] = scalar_t(0);
             }
-            block_direction[trial][0] = scalar_t(1);
+            block_direction[tensor_trial][0] = scalar_t(1);
             laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
             for (int test = 0; test < N_SHAPE; ++test) {
-                element_matrix[test * N_SHAPE + trial] = block_output[test][0];
+                const int tensor_test = TENSOR_STREAMS[test];
+                element_matrix[test * N_SHAPE + trial] = block_output[tensor_test][0];
             }
         }
 

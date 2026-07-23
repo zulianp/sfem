@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <type_traits>
 #include "../neohookean_ogden_d3_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -688,7 +688,6 @@ static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_isoparametric_mesh
             block_u_streams[stream] = block_u_data[stream];
         }
 
-
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
@@ -932,7 +931,6 @@ static SFEM_INLINE int neohookean_ogden_tet10_tet10_objective_steps_isoparametri
                 }
             }
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -1532,7 +1530,6 @@ static SFEM_INLINE int neohookean_ogden_tet10_tet10_gradient_isoparametric_mesh_
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -2340,7 +2337,6 @@ static SFEM_INLINE int neohookean_ogden_tet10_tet10_apply_isoparametric_mesh_soa
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};

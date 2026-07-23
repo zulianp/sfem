@@ -728,6 +728,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "PROTEUS_HEX64",
             "TET10",
             "QUAD4",
+            "PROTEUS_QUAD4",
             "TRI3",
             "TRI6",
         )
@@ -740,6 +741,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "TRI3": (2, 3, 1),
             "TRI6": (2, 6, 3),
             "QUAD4": (2, 4, 4),
+            "PROTEUS_QUAD4": (2, 4, 4),
             "TET4": (3, 4, 1),
             "TET10": (3, 10, 4),
             "HEX8": (3, 8, 8),
@@ -1200,13 +1202,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             section,
         )
         self.assertIn(
-            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
+            "tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
             section,
         )
-        self.assertNotIn(
-            "for (int shape = 0; shape < N_SHAPE; ++shape)",
-            section,
-        )
+        self.assertNotIn("block_coordinate_streams", section)
+        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", section)
 
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
         compiler = shutil.which("c++")
@@ -1358,15 +1358,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("static_assert(N_SHAPE == 27", shared_local)
         self.assertNotIn("scalar_t block_ux7[VECTOR_SIZE]", operator_by_element["HEX8"])
         self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX8"])
-        self.assertIn("const scalar_t *block_u_streams[N_SHAPE * DIM];", operator_by_element["HEX8"])
-        self.assertIn("static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6};", operator_by_element["HEX8"])
+        self.assertIn("const scalar_t *const block_u_streams[N_SHAPE * DIM]", operator_by_element["HEX8"])
+        self.assertNotIn("block_coordinate_streams", operator_by_element["HEX8"])
+        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_by_element["HEX8"])
         self.assertNotIn("scalar_t block_ux26[VECTOR_SIZE]", operator_by_element["HEX27"])
         self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX27"])
-        self.assertIn("const scalar_t *block_u_streams[N_SHAPE * DIM];", operator_by_element["HEX27"])
-        self.assertIn(
-            "static constexpr int STREAM_SHAPE_ORDER[N_SHAPE] = {0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6};",
-            operator_by_element["HEX27"],
-        )
+        self.assertIn("const scalar_t *const block_u_streams[N_SHAPE * DIM]", operator_by_element["HEX27"])
+        self.assertNotIn("block_coordinate_streams", operator_by_element["HEX27"])
+        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_by_element["HEX27"])
 
     def test_generated_neohookean_action_matches_python_reference(self):
         compiler = shutil.which("c++")
@@ -1488,7 +1487,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
-        self.assertIn("block_coordinate_streams[DIM * N_SHAPE]", operator_source)
+        self.assertNotIn("block_coordinate_streams", operator_source)
+        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_source)
         self.assertIn(
             '#include "geometry_kernels.hpp"',
             operator_source,
@@ -1589,13 +1589,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             isoparametric_mesh_source,
         )
         self.assertIn(
-            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",
+            "tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",
             isoparametric_mesh_source,
         )
-        self.assertNotIn(
-            "for (int shape = 0; shape < N_SHAPE; ++shape)",
-            isoparametric_mesh_source,
-        )
+        self.assertNotIn("block_coordinate_streams", isoparametric_mesh_source)
+        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", isoparametric_mesh_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             library = compile_generated_shared_library(

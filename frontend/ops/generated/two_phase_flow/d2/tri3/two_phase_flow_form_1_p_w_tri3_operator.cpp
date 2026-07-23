@@ -1,7 +1,9 @@
 #include <type_traits>
+#include <cstdint>
+#include <cstdlib>
 #include "../two_phase_flow_form_1_p_w_d2_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0

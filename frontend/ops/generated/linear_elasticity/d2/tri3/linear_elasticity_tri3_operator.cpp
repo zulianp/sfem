@@ -1,12 +1,18 @@
+#include <cstdio>
 #include <type_traits>
 #include "../linear_elasticity_d2_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <cstdint>
+#include <cstdlib>
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
+#endif
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
 #endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -266,11 +272,10 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_affine_mesh_soa_imp
         const scalar_t *const u_components[DIM] = {ux, uy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -410,11 +415,10 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_steps_affine_mesh_s
         }
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -565,22 +569,20 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_isoparametric_mesh_
         const geometry_t *const coordinate_components[DIM] = {x, y};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -593,11 +595,6 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_isoparametric_mesh_
         const scalar_t *block_u_streams[N_SHAPE * DIM];
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_u_streams[stream] = block_u_data[stream];
-        }
-
-        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
 
         for (int q = 0; q < N_QP; ++q) {
@@ -627,19 +624,19 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_isoparametric_mesh_
                 const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g0;
+                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g1;
+                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g0;
+                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g1;
+                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
@@ -755,11 +752,10 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_steps_isoparametric
         const geometry_t *const coordinate_components[DIM] = {x, y};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -772,20 +768,14 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_steps_isoparametric
         }
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
-        }
-
-        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
 
         for (int q = 0; q < N_QP; ++q) {
@@ -815,19 +805,19 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_objective_steps_isoparametric
                 const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g0;
+                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g1;
+                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g0;
+                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g1;
+                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
@@ -1093,11 +1083,10 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_affine_mesh_soa_impl
         const scalar_t *const u_components[DIM] = {ux, uy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1136,13 +1125,13 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_affine_mesh_soa_impl
         linear_elasticity_d2_simplex_tri3_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1250,22 +1239,20 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_s
         const geometry_t *const coordinate_components[DIM] = {x, y};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1284,11 +1271,6 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_s
         scalar_t *block_out_streams[N_SHAPE * DIM];
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
-        }
-
-        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
 
         for (int q = 0; q < N_QP; ++q) {
@@ -1318,19 +1300,19 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_s
                 const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g0;
+                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g1;
+                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g0;
+                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g1;
+                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
@@ -1347,13 +1329,13 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_s
         linear_elasticity_d2_simplex_tri3_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1582,11 +1564,10 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_affine_mesh_soa_impl(
         const scalar_t *const h_components[DIM] = {hx, hy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1625,13 +1606,13 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_affine_mesh_soa_impl(
         linear_elasticity_d2_simplex_tri3_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, mu, lmbda, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1739,22 +1720,20 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa_
         const geometry_t *const coordinate_components[DIM] = {x, y};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const h_components[DIM] = {hx, hy};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1773,11 +1752,6 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa_
         scalar_t *block_out_streams[N_SHAPE * DIM];
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
-        }
-
-        const scalar_t *block_coordinate_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
         }
 
         for (int q = 0; q < N_QP; ++q) {
@@ -1807,19 +1781,19 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa_
                 const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g0;
+                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_streams[shape * 2 + 0][lane] * g1;
+                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g0;
+                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_streams[shape * 2 + 1][lane] * g1;
+                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
@@ -1836,13 +1810,13 @@ static SFEM_INLINE int linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa_
         linear_elasticity_d2_simplex_tri3_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_q_weight, mu, lmbda, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }

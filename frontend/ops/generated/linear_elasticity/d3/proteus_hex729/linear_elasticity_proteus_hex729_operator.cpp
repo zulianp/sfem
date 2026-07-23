@@ -1,12 +1,18 @@
+#include <cstdio>
 #include <type_traits>
 #include "../linear_elasticity_d3_tensor_product_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <cstdint>
+#include <cstdlib>
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
+#endif
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
 #endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -268,11 +274,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -450,11 +455,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
         }
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
@@ -643,22 +647,20 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -673,19 +675,15 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
             block_u_streams[stream] = block_u_data[stream];
         }
 
-        const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
-        for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
-        }
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -806,11 +804,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
@@ -823,30 +820,25 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_objective
         }
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
         }
 
-        const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
-        for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
-        }
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -1120,11 +1112,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_gradient_
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1178,13 +1169,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_gradient_
         linear_elasticity_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1316,22 +1307,20 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_gradient_
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const u_components[DIM] = {ux, uy, uz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
                 }
             }
@@ -1352,19 +1341,15 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_gradient_
             block_out_streams[stream] = block_out_data[stream];
         }
 
-        const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
-        for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
-        }
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -1374,13 +1359,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_gradient_
         linear_elasticity_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_u_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1624,11 +1609,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_apply_aff
         const scalar_t *const h_components[DIM] = {hx, hy, hz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1682,13 +1666,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_apply_aff
         linear_elasticity_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, mu, lmbda, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }
@@ -1820,22 +1804,20 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_apply_iso
         const geometry_t *const coordinate_components[DIM] = {x, y, z};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[stream_shape * VECTOR_SIZE + lane]];
+                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
                 }
             }
         }
         const scalar_t *const h_components[DIM] = {hx, hy, hz};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[stream_shape * VECTOR_SIZE + lane];
+                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
                     block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
                 }
             }
@@ -1856,19 +1838,15 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_apply_iso
             block_out_streams[stream] = block_out_data[stream];
         }
 
-        const scalar_t *block_coordinate_streams[DIM * N_SHAPE];
-        for (int stream = 0; stream < DIM * N_SHAPE; ++stream) {
-            block_coordinate_streams[stream] = block_coordinate_data[stream];
-        }
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 0,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
                 coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 1,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
                 coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_streams, 2,
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
                 coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
 
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
@@ -1878,13 +1856,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_proteus_hex729_apply_iso
         linear_elasticity_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, mu, lmbda, block_h_streams, block_out_streams);
 
         scalar_t *const out_components[DIM] = {outx, outy, outz};
+
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const int stream_shape = shape;
             for (int d = 0; d < DIM; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[stream_shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
+                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
                     }
                 }
             }

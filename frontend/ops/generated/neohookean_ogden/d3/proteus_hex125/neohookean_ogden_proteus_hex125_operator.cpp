@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <type_traits>
 #include "../neohookean_ogden_d3_tensor_product_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif

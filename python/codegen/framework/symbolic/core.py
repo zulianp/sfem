@@ -19,6 +19,7 @@ try:
         sfem_soa_reference_input,
         sfem_supported_element_types,
         sfem_tensor_product_hex_uses_cartesian_ordering,
+        sfem_tensor_product_quad_uses_cartesian_ordering,
     )
     from codegen.framework.plans.reference_data import validate_reference_data_plan
 except ImportError:
@@ -34,6 +35,7 @@ except ImportError:
         sfem_soa_reference_input,
         sfem_supported_element_types,
         sfem_tensor_product_hex_uses_cartesian_ordering,
+        sfem_tensor_product_quad_uses_cartesian_ordering,
     )
     def validate_reference_data_plan(*args, **kwargs):
         return None

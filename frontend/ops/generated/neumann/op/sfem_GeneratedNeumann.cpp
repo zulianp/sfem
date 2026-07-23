@@ -515,6 +515,12 @@ namespace sfem {
                         status |= neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
                         break;
                     }
+                    case smesh::PROTEUS_QUAD4: {
+                        static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
+                        status |= neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(sideset->size(), mesh->n_nodes(), domain.block->elements()->data(), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], FIELD_STRIDE, u_out[0], u_out[1]);
+                        break;
+                    }
                     default:
                         SFEM_ERROR("GeneratedNeumann does not support element type %d\n",
                                    domain.element_type);

@@ -1,8 +1,8 @@
 #include <type_traits>
 #include "../navier_stokes_form_1_p_d3_simplex_mixed_local.hpp"
-#include "../../kernel_math.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../kernel_math.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0

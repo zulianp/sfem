@@ -9,8 +9,8 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../kernel_math.hpp"
-#include "../tensor_product_kernels.hpp"
+#include "../../kernel_math.hpp"
+#include "../../tensor_product_kernels.hpp"
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
@@ -169,9 +169,8 @@ static SFEM_INLINE void poro_hyperelasticity_poro_form_2_p_p_d3_tensor_product_j
     static_assert(ipow(P_N_SHAPE_1D, DIM) == P_N_SHAPE, "P_N_SHAPE must be tensor-product compatible");
     scalar_t direction_p_value[N_QP * VECTOR_SIZE];
     scalar_t direction_p_grad_ref[N_QP * DIM * VECTOR_SIZE];
-    const scalar_t *const direction_p_streams[P_N_SHAPE] = {direction[0], direction[1], direction[2], direction[3], direction[4], direction[5], direction[6], direction[7]};
     tensor_evaluate_contiguous<scalar_t, N_QP, P_N_SHAPE, VECTOR_SIZE, DIM, 1>(
-            nelems, field_shape_1d[0], field_grad_1d[0], direction_p_streams, direction_p_value, direction_p_grad_ref);
+            nelems, field_shape_1d[0], field_grad_1d[0], direction + 0, direction_p_value, direction_p_grad_ref);
     scalar_t p_value_coeff[N_QP * VECTOR_SIZE];
     scalar_t p_grad_coeff_ref[N_QP * DIM * VECTOR_SIZE];
     for (int q = 0; q < N_QP; ++q) {
@@ -209,9 +208,8 @@ static SFEM_INLINE void poro_hyperelasticity_poro_form_2_p_p_d3_tensor_product_j
             p_grad_coeff_ref[(q * DIM + 2) * VECTOR_SIZE + lane] = qw * (adj6 * grad_coeff0_0 + adj7 * grad_coeff0_1 + adj8 * grad_coeff0_2);
         }
     }
-    scalar_t *const p_output_streams[P_N_SHAPE] = {output[0], output[1], output[2], output[3], output[4], output[5], output[6], output[7]};
     tensor_integrate_contiguous<scalar_t, N_QP, P_N_SHAPE, VECTOR_SIZE, DIM, 1>(
-            nelems, field_shape_1d[0], field_grad_1d[0], p_value_coeff, p_grad_coeff_ref, p_output_streams);
+            nelems, field_shape_1d[0], field_grad_1d[0], p_value_coeff, p_grad_coeff_ref, output + 0);
 }
 
 } // namespace codegen

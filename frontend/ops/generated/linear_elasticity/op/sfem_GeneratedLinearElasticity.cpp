@@ -262,6 +262,11 @@ namespace sfem {
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements);
@@ -337,6 +342,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -416,6 +426,11 @@ namespace sfem {
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements);
@@ -491,6 +506,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -570,6 +590,11 @@ namespace sfem {
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements);
@@ -645,6 +670,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -774,6 +804,8 @@ namespace sfem {
                     return impl_->gradient_uses_affine ? linear_elasticity_tri6_tri6_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 case smesh::QUAD4:
                     return impl_->gradient_uses_affine ? linear_elasticity_quad4_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                case smesh::PROTEUS_QUAD4:
+                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
                     if (impl_->gradient_uses_affine) {
                         return adjugate_aos ? linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
@@ -842,6 +874,8 @@ namespace sfem {
                     return impl_->apply_uses_affine ? linear_elasticity_tri6_tri6_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
                 case smesh::QUAD4:
                     return impl_->apply_uses_affine ? linear_elasticity_quad4_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                case smesh::PROTEUS_QUAD4:
+                    return impl_->apply_uses_affine ? linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
                     if (impl_->apply_uses_affine) {
                         return adjugate_aos ? linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
@@ -905,6 +939,9 @@ namespace sfem {
                     break;
                 case smesh::QUAD4:
                     status = impl_->objective_uses_affine ? linear_elasticity_quad4_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
+                    break;
+                case smesh::PROTEUS_QUAD4:
+                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
                     break;
                 case smesh::TET4:
                     status = impl_->objective_uses_affine ? linear_elasticity_tet4_tet4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_tet4_tet4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
@@ -995,6 +1032,9 @@ namespace sfem {
                 case smesh::QUAD4:
                     status = impl_->objective_uses_affine ? linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     break;
+                case smesh::PROTEUS_QUAD4:
+                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    break;
                 case smesh::TET4:
                     status = impl_->objective_uses_affine ? linear_elasticity_tet4_tet4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_tet4_tet4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     break;
@@ -1040,12 +1080,120 @@ namespace sfem {
         });
     }
 
-    int GeneratedLinearElasticity::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedLinearElasticity::hessian_crs(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_crs");
-        return SFEM_FAILURE;
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_crs requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    SFEM_ERROR("GeneratedLinearElasticity hessian_crs does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_bsr(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_bsr");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_bsr requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    SFEM_ERROR("GeneratedLinearElasticity hessian_bsr does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_dia(const real_t *const x,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_dia");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_dia requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    SFEM_ERROR("GeneratedLinearElasticity hessian_dia does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_coo(const real_t *const x,
+                            const ptrdiff_t nnz,
+                            const idx_t *const rows,
+                            const idx_t *const cols,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_coo");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_coo requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    SFEM_ERROR("GeneratedLinearElasticity hessian_coo does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_patch(const real_t *const x,
+                              const count_t *const rowptr,
+                              const idx_t *const colidx,
+                              real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_patch");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_patch requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            switch (domain.element_type) {
+
+                default:
+                    SFEM_ERROR("GeneratedLinearElasticity hessian_patch does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+        });
     }
 
     void GeneratedLinearElasticity::set_option(const std::string &name, const bool val) {

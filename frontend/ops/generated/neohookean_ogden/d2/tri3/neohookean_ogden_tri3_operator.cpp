@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <type_traits>
 #include "../neohookean_ogden_d2_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -597,7 +597,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_isoparametric_mesh_s
             block_u_streams[stream] = block_u_data[stream];
         }
 
-
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
             scalar_t J00_values[VECTOR_SIZE];
@@ -778,7 +777,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_objective_steps_isoparametric_
                 }
             }
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
@@ -1274,7 +1272,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_gradient_isoparametric_mesh_so
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
@@ -1926,7 +1923,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_tri3_apply_isoparametric_mesh_soa_i
         for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-
 
         for (int q = 0; q < N_QP; ++q) {
             scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};

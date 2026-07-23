@@ -38,6 +38,7 @@ def _atomic_update_pragma():
 _CELL_TO_SURFACE = {
     "TRI3": "EDGESHELL2",
     "QUAD4": "EDGESHELL2",
+    "PROTEUS_QUAD4": "EDGESHELL2",
     "TET4": "TRISHELL3",
     "TET10": "TRISHELL6",
     "HEX8": "QUADSHELL4",
@@ -129,6 +130,12 @@ def _cell_side_nodes(element_type):
             (1, 2),
             (2, 3),
             (3, 0),
+        ),
+        "PROTEUS_QUAD4": (
+            (0, 1),
+            (1, 3),
+            (3, 2),
+            (2, 0),
         ),
         "TET4": (
             (0, 1, 3),

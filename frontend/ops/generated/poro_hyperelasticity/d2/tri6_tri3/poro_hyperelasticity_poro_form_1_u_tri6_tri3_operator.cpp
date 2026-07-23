@@ -1,8 +1,8 @@
 #include <type_traits>
 #include "../poro_hyperelasticity_poro_form_1_u_d2_simplex_mixed_local.hpp"
-#include "../../kernel_math.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../kernel_math.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0

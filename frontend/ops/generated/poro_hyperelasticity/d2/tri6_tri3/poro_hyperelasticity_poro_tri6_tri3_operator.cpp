@@ -1,8 +1,8 @@
 #include <type_traits>
 #include "../poro_hyperelasticity_poro_d2_simplex_mixed_local.hpp"
-#include "../../kernel_math.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../kernel_math.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -1234,13 +1234,11 @@ static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_hessian_coo_triplet_i
         const scalar_t *const field_grad_ref[N_FIELDS * DIM] = {sfem::codegen::poro_hyperelasticity_poro_isoparametric_reference_data<scalar_t>::tri6_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_isoparametric_reference_data<scalar_t>::tri6_grad_ref_y(), sfem::codegen::poro_hyperelasticity_poro_isoparametric_reference_data<scalar_t>::tri3_grad_ref_x(), sfem::codegen::poro_hyperelasticity_poro_isoparametric_reference_data<scalar_t>::tri3_grad_ref_y()};
         const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
 
-        static constexpr int ROW_STREAMS[15] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-        static constexpr int COL_STREAMS[15] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
         for (int entry = 0; entry < 225; ++entry) {
             element_matrix[entry] = scalar_t(0);
         }
         for (int trial_local = 0; trial_local < 15; ++trial_local) {
-            const int trial = COL_STREAMS[trial_local];
+            const int trial = trial_local;
             for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {
                 block_direction[stream][0] = scalar_t(0);
                 block_output[stream][0] = scalar_t(0);
@@ -1248,7 +1246,7 @@ static SFEM_INLINE int poro_hyperelasticity_poro_tri6_tri3_hessian_coo_triplet_i
             block_direction[trial][0] = scalar_t(1);
             poro_hyperelasticity_poro_d2_simplex_mixed_jacobian_action_block_contiguous<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(nelems, 0, block_determinant, block_adjugate, field_shape, field_grad_ref, sfem::codegen::poro_hyperelasticity_poro_isoparametric_reference_data<scalar_t>::q_weight(), block_direction, alpha, dt, hydraulic_conductivity, storage, block_output);
             for (int test_local = 0; test_local < 15; ++test_local) {
-                const int test = ROW_STREAMS[test_local];
+                const int test = test_local;
                 element_matrix[test_local * 15 + trial_local] = block_output[test][0];
             }
         }

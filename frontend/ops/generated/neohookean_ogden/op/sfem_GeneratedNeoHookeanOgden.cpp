@@ -262,6 +262,11 @@ namespace sfem {
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_tet4_tet4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_tet4_tet4_objective_soa_diagnostics(), nelements);
@@ -337,6 +342,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -416,6 +426,11 @@ namespace sfem {
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_tet4_tet4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_tet4_tet4_gradient_soa_diagnostics(), nelements);
@@ -491,6 +506,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -570,6 +590,11 @@ namespace sfem {
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_tet4_tet4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_tet4_tet4_apply_soa_diagnostics(), nelements);
@@ -645,6 +670,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_proteus_quad4_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -774,6 +804,8 @@ namespace sfem {
                     return impl_->gradient_uses_affine ? neohookean_ogden_tri6_tri6_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : neohookean_ogden_tri6_tri6_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 case smesh::QUAD4:
                     return impl_->gradient_uses_affine ? neohookean_ogden_quad4_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : neohookean_ogden_quad4_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                case smesh::PROTEUS_QUAD4:
+                    return impl_->gradient_uses_affine ? neohookean_ogden_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : neohookean_ogden_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
                     return impl_->gradient_uses_affine ? neohookean_ogden_tet4_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : neohookean_ogden_tet4_tet4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::TET10:
@@ -839,6 +871,8 @@ namespace sfem {
                     return impl_->apply_uses_affine ? neohookean_ogden_tri6_tri6_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1) : neohookean_ogden_tri6_tri6_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                 case smesh::QUAD4:
                     return impl_->apply_uses_affine ? neohookean_ogden_quad4_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1) : neohookean_ogden_quad4_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                case smesh::PROTEUS_QUAD4:
+                    return impl_->apply_uses_affine ? neohookean_ogden_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1) : neohookean_ogden_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                 case smesh::TET4:
                     return impl_->apply_uses_affine ? neohookean_ogden_tet4_tet4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : neohookean_ogden_tet4_tet4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 case smesh::TET10:
@@ -899,6 +933,9 @@ namespace sfem {
                     break;
                 case smesh::QUAD4:
                     status = impl_->objective_uses_affine ? neohookean_ogden_quad4_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : neohookean_ogden_quad4_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
+                    break;
+                case smesh::PROTEUS_QUAD4:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : neohookean_ogden_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
                     break;
                 case smesh::TET4:
                     status = impl_->objective_uses_affine ? neohookean_ogden_tet4_tet4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : neohookean_ogden_tet4_tet4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
@@ -989,6 +1026,9 @@ namespace sfem {
                 case smesh::QUAD4:
                     status = impl_->objective_uses_affine ? neohookean_ogden_quad4_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_quad4_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     break;
+                case smesh::PROTEUS_QUAD4:
+                    status = impl_->objective_uses_affine ? neohookean_ogden_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    break;
                 case smesh::TET4:
                     status = impl_->objective_uses_affine ? neohookean_ogden_tet4_tet4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : neohookean_ogden_tet4_tet4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     break;
@@ -1054,6 +1094,8 @@ namespace sfem {
                     return neohookean_ogden_tri6_tri6_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::QUAD4:
                     return neohookean_ogden_quad4_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::PROTEUS_QUAD4:
+                    return neohookean_ogden_proteus_quad4_proteus_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::TET4:
                     return neohookean_ogden_tet4_tet4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
                 case smesh::TET10:
@@ -1100,6 +1142,8 @@ namespace sfem {
                     return neohookean_ogden_tri6_tri6_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::QUAD4:
                     return neohookean_ogden_quad4_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::PROTEUS_QUAD4:
+                    return neohookean_ogden_proteus_quad4_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::TET4:
                     return neohookean_ogden_tet4_tet4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
                 case smesh::TET10:
@@ -1146,6 +1190,8 @@ namespace sfem {
                     return neohookean_ogden_tri6_tri6_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
                 case smesh::QUAD4:
                     return neohookean_ogden_quad4_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
+                case smesh::PROTEUS_QUAD4:
+                    return neohookean_ogden_proteus_quad4_proteus_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, diag_offsets, ndiag, values);
                 case smesh::TET4:
                     return neohookean_ogden_tet4_tet4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, diag_offsets, ndiag, values);
                 case smesh::TET10:
@@ -1193,6 +1239,8 @@ namespace sfem {
                     return neohookean_ogden_tri6_tri6_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
                 case smesh::QUAD4:
                     return neohookean_ogden_quad4_quad4_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
+                case smesh::PROTEUS_QUAD4:
+                    return neohookean_ogden_proteus_quad4_proteus_quad4_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, nnz, rows, cols, values);
                 case smesh::TET4:
                     return neohookean_ogden_tet4_tet4_hessian_coo_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, nnz, rows, cols, values);
                 case smesh::TET10:
@@ -1239,6 +1287,8 @@ namespace sfem {
                     return neohookean_ogden_tri6_tri6_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::QUAD4:
                     return neohookean_ogden_quad4_quad4_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
+                case smesh::PROTEUS_QUAD4:
+                    return neohookean_ogden_proteus_quad4_proteus_quad4_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, current + 0, current + 1, rowptr, colidx, values);
                 case smesh::TET4:
                     return neohookean_ogden_tet4_tet4_hessian_patch_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
                 case smesh::TET10:

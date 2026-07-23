@@ -340,6 +340,11 @@ namespace sfem {
                     total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_quad4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_quad4_residual_element_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_proteus_quad4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_proteus_quad4_residual_element_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_tet4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_tet4_residual_element_soa_diagnostics(), nelements);
@@ -415,6 +420,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(laplace_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(laplace_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(laplace_proteus_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(laplace_proteus_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -494,6 +504,11 @@ namespace sfem {
                     total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_quad4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_quad4_jacobian_action_element_soa_diagnostics(), nelements);
                     break;
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements);
+                    break;
+                }
                 case smesh::TET4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(laplace_tet4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(laplace_tet4_jacobian_action_element_soa_diagnostics(), nelements);
@@ -569,6 +584,11 @@ namespace sfem {
                 case smesh::QUAD4: {
                     const ptrdiff_t nelements = domain.block->n_elements();
                     total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(laplace_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(laplace_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    break;
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    const ptrdiff_t nelements = domain.block->n_elements();
+                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(laplace_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(laplace_proteus_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
                     break;
                 }
                 case smesh::TET4: {
@@ -741,6 +761,12 @@ namespace sfem {
                     real_t *const SFEM_RESTRICT u_out = out + 0;
                     return impl_->residual_uses_affine ? laplace_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                    const real_t *const SFEM_RESTRICT u_data = state + 0;
+                    real_t *const SFEM_RESTRICT u_out = out + 0;
+                    return impl_->residual_uses_affine ? laplace_proteus_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out) : laplace_proteus_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_data, FIELD_STRIDE, u_out);
+                }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
                     const real_t *const SFEM_RESTRICT u_data = state + 0;
@@ -885,6 +911,12 @@ namespace sfem {
                     const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
                     real_t *const SFEM_RESTRICT u_out = out + 0;
                     return impl_->jacobian_action_uses_affine ? laplace_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                    const real_t *const SFEM_RESTRICT u_direction_data = direction + 0;
+                    real_t *const SFEM_RESTRICT u_out = out + 0;
+                    return impl_->jacobian_action_uses_affine ? laplace_proteus_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out) : laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                 }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
@@ -1100,6 +1132,11 @@ namespace sfem {
 
                     return laplace_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
 
@@ -1184,6 +1221,11 @@ namespace sfem {
 
                     return laplace_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
                 }
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 1;
+
+                    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+                }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 1;
 
@@ -1256,6 +1298,8 @@ namespace sfem {
                     return laplace_tri6_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
                 case smesh::QUAD4:
                     return laplace_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+                case smesh::PROTEUS_QUAD4:
+                    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
                 case smesh::TET4:
                     return laplace_tet4_hessian_dia_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
                 case smesh::TET10:

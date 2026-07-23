@@ -8,8 +8,8 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../kernel_math.hpp"
-#include "../tensor_product_kernels.hpp"
+#include "../../kernel_math.hpp"
+#include "../../tensor_product_kernels.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
