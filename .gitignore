@@ -105,7 +105,6 @@ workflows/resample/sdf.float32.xdmf
 ./assemble3
 ./assemble4
 ./neohookean_assemble
-./stokes
 ./stokes_check
 ./linear_elasticity_assemble
 ./select_submesh

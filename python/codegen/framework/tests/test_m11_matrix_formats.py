@@ -92,15 +92,15 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         source = (
             generated_root
             / "d3"
-            / "hex8"
-            / "neohookean_ogden_hex8_operator.cpp"
+            / "proteus_hex8"
+            / "neohookean_ogden_proteus_hex8_operator.cpp"
         ).read_text()
         self.assertIn("#include <cstdio>", source)
         hessian_begin = source.index(
-            "neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_assemble_impl"
+            "neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_assemble_impl"
         )
         hessian_end = source.index(
-            'extern "C" int neohookean_ogden_hex8_hex8_hessian_crs_isoparametric_mesh_soa',
+            'extern "C" int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_crs_isoparametric_mesh_soa',
             hessian_begin,
         )
         hessian_source = source[hessian_begin:hessian_end]
@@ -125,18 +125,18 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             hessian_source,
         )
         self.assertIn("isoparametric_grad_1d, block_coordinate_data,", hessian_source)
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_crs_isoparametric_mesh_soa", source)
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_bsr_isoparametric_mesh_soa", source)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_crs_isoparametric_mesh_soa", source)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_bsr_isoparametric_mesh_soa", source)
         bsr_scatter = _static_function_body(
             source,
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_bsr",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr",
         )
         self.assertIn("count_t entries[N_SHAPE * N_SHAPE];", bsr_scatter)
         self.assertIn("bool valid_block_graph = true;", bsr_scatter)
         self.assertIn("missing block graph entry", bsr_scatter)
         self.assertIn("if (!valid_block_graph) return SFEM_FAILURE;", bsr_scatter)
         self.assertIn("return SFEM_SUCCESS;", bsr_scatter)
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
         self.assertIn("entries[i * N_SHAPE + j] = row_begin + ks[j];", bsr_scatter)
         self.assertIn("scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];", bsr_scatter)
         self.assertIn("block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];", bsr_scatter)
@@ -147,7 +147,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("std::vector", bsr_scatter)
         crs_scatter = _static_function_body(
             source,
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_crs",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_crs",
         )
         self.assertIn("count_t row_begin[N_SHAPE];", source)
         self.assertIn("int lenrow[N_SHAPE];", source)
@@ -160,16 +160,16 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("idx_t patch_nodes[N_SHAPE];", source)
         self.assertNotIn("int active_shapes[N_SHAPE];", source)
         self.assertIn(
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_patch",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_patch",
             source,
         )
         patch_scatter = _static_function_body(
             source,
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_patch",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_patch",
         )
         self.assertIn("const count_t *const SFEM_RESTRICT rowptr", patch_scatter)
         self.assertIn("const idx_t *const SFEM_RESTRICT colidx", patch_scatter)
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", patch_scatter)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", patch_scatter)
         self.assertIn("entries[i * N_SHAPE + j] = row_begin + ks[j];", patch_scatter)
         self.assertNotIn("_find_col<", patch_scatter)
         self.assertIn("values[entries[i * N_SHAPE + j] * DIM * DIM]", patch_scatter)
@@ -179,7 +179,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("bool valid_diagonal_offsets = true;", source)
         self.assertIn("missing diagonal offset", source)
         self.assertIn(
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_dia",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_dia",
             source,
         )
         self.assertIn("if (!valid_diagonal_offsets) return SFEM_FAILURE;", source)
@@ -187,20 +187,20 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("bool valid_coo_entries = true;", source)
         self.assertIn("missing graph entry", source)
         self.assertIn(
-            "static SFEM_INLINE int neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_coo",
+            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_coo",
             source,
         )
         self.assertIn("if (!valid_coo_entries) return SFEM_FAILURE;", source)
         self.assertIn("int invalid_matrix_graph = 0;", source)
         self.assertIn("reduction(|:invalid_matrix_graph)", source)
         self.assertIn("return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;", source)
-        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_crs", source)
-        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_bsr", source)
-        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_patch", source)
+        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_crs", source)
+        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr", source)
+        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_patch", source)
         self.assertIn("values[entries[i * N_SHAPE + j] * DIM * DIM]", source)
         coo_triplet_scatter = _static_function_body(
             source,
-            "static SFEM_INLINE void neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_scatter_coo_triplets",
+            "static SFEM_INLINE void neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_coo_triplets",
         )
         self.assertIn("const ptrdiff_t element_offset = element * NDOFS * NDOFS;", coo_triplet_scatter)
         self.assertIn("rows[entry] = global_row;", coo_triplet_scatter)
@@ -208,7 +208,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("values[entry] = element_matrix[row * NDOFS + col];", coo_triplet_scatter)
         self.assertNotIn("#pragma omp atomic", coo_triplet_scatter)
         self.assertNotIn("find_col", coo_triplet_scatter)
-        self.assertIn("neohookean_ogden_hex8_hex8_hessian_coo_triplet_isoparametric_mesh_soa", source)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa", source)
         self.assertIn(
             "GeneratedNeoHookeanOgden::hessian_bsr",
             (
@@ -248,13 +248,45 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             ).read_text(),
         )
 
-    def test_generated_neohookean_hex27_hessian_assembly_wraps_proteus(self):
+    def test_generated_neohookean_hex_hessian_assembly_wraps_proteus(self):
         generated_root = (
             Path(__file__).resolve().parents[4]
             / "frontend"
             / "ops"
             / "generated"
             / "neohookean_ogden"
+        )
+        quad4_source = (
+            generated_root
+            / "d2"
+            / "quad4"
+            / "neohookean_ogden_quad4_operator.cpp"
+        ).read_text()
+        proteus_quad4_source = (
+            generated_root
+            / "d2"
+            / "proteus_quad4"
+            / "neohookean_ogden_proteus_quad4_operator.cpp"
+        ).read_text()
+        proteus_quad4_hessian = _hessian_assembly_body(
+            proteus_quad4_source,
+            "neohookean_ogden_proteus_quad4_proteus_quad4_hessian_isoparametric_mesh_soa_assemble_impl",
+        )
+        hex8_source = (
+            generated_root
+            / "d3"
+            / "hex8"
+            / "neohookean_ogden_hex8_operator.cpp"
+        ).read_text()
+        proteus_hex8_source = (
+            generated_root
+            / "d3"
+            / "proteus_hex8"
+            / "neohookean_ogden_proteus_hex8_operator.cpp"
+        ).read_text()
+        proteus_hex8_hessian = _hessian_assembly_body(
+            proteus_hex8_source,
+            "neohookean_ogden_proteus_hex8_proteus_hex8_hessian_isoparametric_mesh_soa_assemble_impl",
         )
         hex27_source = (
             generated_root
@@ -273,6 +305,35 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             "neohookean_ogden_proteus_hex27_proteus_hex27_hessian_isoparametric_mesh_soa_assemble_impl",
         )
 
+        self.assertNotIn("neohookean_ogden_quad4_quad4_hessian_isoparametric_mesh_soa_assemble_impl", quad4_source)
+        self.assertIn("idx_t *proteus_elements[4] = {", quad4_source)
+        self.assertIn("elements[3],", quad4_source)
+        self.assertIn("neohookean_ogden_proteus_quad4_proteus_quad4_hessian_crs_isoparametric_mesh_soa", quad4_source)
+        self.assertNotIn("block_u_streams_ordered_shape_index", quad4_source)
+        self.assertNotIn("block_h_streams_ordered_shape_index", quad4_source)
+        self.assertNotIn("block_out_streams_ordered_shape_index", quad4_source)
+        self.assertNotIn("for (ptrdiff_t element = 0; element < nelements; ++element)", quad4_source)
+        self.assertNotIn("STREAM_SHAPE_ORDER", proteus_quad4_hessian)
+        self.assertNotIn("TENSOR_SHAPE_INDEX", proteus_quad4_hessian)
+        self.assertNotIn("block_coordinate_streams[N_SHAPE * DIM] = {", proteus_quad4_hessian)
+        self.assertNotIn("block_coordinate_streams_ordered_shape_index", proteus_quad4_hessian)
+        self.assertNotIn("matrix_coordinate_streams", proteus_quad4_hessian)
+        self.assertNotIn("coordinate_value", proteus_quad4_hessian)
+        self.assertNotIn("neohookean_ogden_hex8_hex8_hessian_isoparametric_mesh_soa_assemble_impl", hex8_source)
+        self.assertIn("idx_t *proteus_elements[8] = {", hex8_source)
+        self.assertIn("elements[3],", hex8_source)
+        self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_crs_isoparametric_mesh_soa", hex8_source)
+        self.assertNotIn("block_u_streams_ordered_shape_index", hex8_source)
+        self.assertNotIn("block_h_streams_ordered_shape_index", hex8_source)
+        self.assertNotIn("block_out_streams_ordered_shape_index", hex8_source)
+        self.assertNotIn("for (ptrdiff_t element = 0; element < nelements; ++element)", hex8_source)
+        self.assertNotIn("STREAM_SHAPE_ORDER", proteus_hex8_hessian)
+        self.assertNotIn("TENSOR_SHAPE_INDEX", proteus_hex8_hessian)
+        self.assertNotIn("block_coordinate_streams[N_SHAPE * DIM] = {", proteus_hex8_hessian)
+        self.assertNotIn("block_coordinate_streams_ordered_shape_index", proteus_hex8_hessian)
+        self.assertNotIn("matrix_coordinate_streams[stream] = block_coordinate_streams[stream]", proteus_hex8_hessian)
+        self.assertNotIn("matrix_coordinate_streams", proteus_hex8_hessian)
+        self.assertNotIn("coordinate_value", proteus_hex8_hessian)
         self.assertNotIn("neohookean_ogden_hex27_hex27_hessian_isoparametric_mesh_soa_assemble_impl", hex27_source)
         self.assertIn("idx_t *proteus_elements[27] = {", hex27_source)
         self.assertIn("elements[8],", hex27_source)
@@ -537,6 +598,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("const ptrdiff_t element_offset = element * N_ROW_STREAMS * N_COL_STREAMS;", monolithic)
             self.assertIn("rows[entry] = global_row;", monolithic)
             self.assertIn("cols[entry] = col_node * out_stride + COL_COMPONENT[col_stream];", monolithic)
+            for source in (monolithic, pressure_velocity, velocity_pressure):
+                self.assertNotIn("ROW_STREAMS[", source)
+                self.assertNotIn("COL_STREAMS[", source)
+                self.assertNotIn("ROW_TENSOR_STREAMS[", source)
+                self.assertNotIn("COL_TENSOR_STREAMS[", source)
             self.assertNotIn("#pragma omp atomic", _static_function_body(
                 monolithic,
                 "static SFEM_INLINE void stokes_tri6_tri3_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets",
@@ -592,7 +658,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("const ptrdiff_t current_stride", source)
             self.assertIn("block_current[0 * N_SHAPE + shape][0] = p_w[node * current_stride];", source)
             self.assertIn("block_current[1 * N_SHAPE + shape][0] = p_c[node * current_stride];", source)
-            self.assertIn("block_direction[trial][0] = scalar_t(1);", source)
+            self.assertIn("block_direction[tensor_trial][0] = scalar_t(1);", source)
             self.assertIn("cols[entry] = ev[col_shape] * out_stride + col_field;", source)
             self.assertNotIn("const ptrdiff_t direction_stride", triplet_declaration)
             self.assertNotIn("#pragma omp atomic", triplet_body)
@@ -638,6 +704,10 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("block_current[0 * N_SHAPE + shape][0] = p_w[node * current_stride];", source)
             self.assertIn("block_current[1 * N_SHAPE + shape][0] = p_c[node * current_stride];", source)
             self.assertIn("block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
+            self.assertNotIn("ROW_STREAMS[", source)
+            self.assertNotIn("COL_STREAMS[", source)
+            self.assertNotIn("ROW_TENSOR_STREAMS[", source)
+            self.assertNotIn("COL_TENSOR_STREAMS[", source)
             self.assertIn("const real_t *const current = state ? state : impl_->current;", wrapper)
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 2;", wrapper)
             self.assertIn("FIELD_STRIDE, p_w_data, p_c_data, rowptr, colidx, values", wrapper)

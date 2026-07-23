@@ -704,10 +704,9 @@ def generate(
     if vector_size <= 0:
         raise ValueError("vector_size must be positive")
 
-    selected = _parse_elements(
-        elements,
-        material.elements or sfem_supported_element_types(),
-    )
+    available_elements = _generation_available_elements(material.elements)
+    selected = _parse_elements(elements, available_elements)
+    selected = _with_tensor_product_proteus_alias_dependencies(selected, available_elements)
     out_dir = os.path.abspath(os.fspath(out_dir))
     os.makedirs(out_dir, exist_ok=True)
     if clean:
@@ -720,27 +719,33 @@ def generate(
         matrix_packed_passes,
         matrix_patch_node_index_filter,
     )
-    user_input = UserInputStage.create(
-        material,
-        selected,
-        vector_size,
-        quadrature_order,
-        matrix_format_plan,
-    )
-    form_evaluation = _evaluate_forms(user_input)
-    codegen_plan = SpecializedFormManipulationStage(
-        user_input,
-        form_evaluation,
-    ).run()
-    plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out, user_input) if dump_plan or plan_out else None
     target = _normalize_generation_target(target)
     backend = _backend_for_target(target)
-    files = CodeGenerationStage(user_input, codegen_plan, target).run()
+    while True:
+        user_input = UserInputStage.create(
+            material,
+            selected,
+            vector_size,
+            quadrature_order,
+            matrix_format_plan,
+        )
+        form_evaluation = _evaluate_forms(user_input)
+        codegen_plan = SpecializedFormManipulationStage(
+            user_input,
+            form_evaluation,
+        ).run()
+        files = CodeGenerationStage(user_input, codegen_plan, target).run()
+        dependency = _missing_hex8_proteus_implementation_dependency(files, selected)
+        if dependency is None:
+            break
+        selected = selected + (dependency,)
+    plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out, user_input) if dump_plan or plan_out else None
 
     if material.op_name and backend.supports_op_wrapper:
         files.update(_generate_op_wrapper_files(material, selected, user_input, files))
-        _replace_legacy_hex27_sources_with_proteus_aliases(files)
+        _replace_legacy_tensor_product_sources_with_proteus_aliases(files)
 
+    files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
     return GenerationResult(source_paths, object_paths, codegen_plan, plan_dump)
@@ -1301,7 +1306,7 @@ def _matrix_format_plan_for_evaluation(evaluated):
     return plan
 
 
-def _replace_legacy_hex27_sources_with_proteus_aliases(files):
+def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
     c_abi_entries = [
         (path, source)
         for path, source in files.items()
@@ -1310,36 +1315,79 @@ def _replace_legacy_hex27_sources_with_proteus_aliases(files):
     if not c_abi_entries:
         return
 
-    hex27_to_proteus = tensor_product_cartesian_shape_order(3, 27)
+    aliases = (
+        _tensor_product_proteus_alias(
+            element_name="quad4",
+            proteus_name="proteus_quad4",
+            dim=2,
+            n_shape=4,
+        ),
+        _tensor_product_proteus_alias(
+            element_name="hex8",
+            proteus_name="proteus_hex8",
+            dim=3,
+            n_shape=8,
+        ),
+        _tensor_product_proteus_alias(
+            element_name="hex27",
+            proteus_name="proteus_hex27",
+            dim=3,
+            n_shape=27,
+        ),
+    )
     for c_abi_path, c_abi_source in c_abi_entries:
         declarations = _extern_c_declarations(c_abi_source)
         names = {declaration["name"] for declaration in declarations}
-        hex27_declarations = [
-            declaration
-            for declaration in declarations
-            if _legacy_hex27_target_name(declaration["name"]) in names
-        ]
-        if not hex27_declarations:
-            continue
+        for alias in aliases:
+            alias_declarations = [
+                declaration
+                for declaration in declarations
+                if _tensor_product_proteus_target_name(declaration["name"], alias) in names
+            ]
+            if not alias_declarations:
+                continue
 
-        for source_path in tuple(files):
-            if not (
-                source_path.startswith("d3/hex27/")
-                and source_path.endswith("_hex27_operator.cpp")
-            ):
-                continue
-            proteus_path = source_path.replace("/hex27/", "/proteus_hex27/").replace(
-                "_hex27_operator.cpp",
-                "_proteus_hex27_operator.cpp",
-            )
-            if proteus_path not in files:
-                continue
-            files[source_path] = _legacy_hex27_proteus_alias_source(
-                source_path,
-                c_abi_path,
-                hex27_declarations,
-                hex27_to_proteus,
-            )
+            for source_path in tuple(files):
+                if not (
+                    source_path.startswith(alias["source_prefix"])
+                    and any(source_path.endswith(suffix) for suffix in alias["source_suffixes"])
+                ):
+                    continue
+                proteus_path = source_path.replace(
+                    alias["source_prefix"],
+                    alias["target_prefix"],
+                )
+                for source_suffix, target_suffix in alias["suffix_pairs"]:
+                    if proteus_path.endswith(source_suffix):
+                        proteus_path = proteus_path[: -len(source_suffix)] + target_suffix
+                        break
+                if proteus_path not in files:
+                    continue
+                files[source_path] = _tensor_product_proteus_alias_source(
+                    source_path,
+                    c_abi_path,
+                    alias_declarations,
+                    alias,
+                )
+
+
+def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
+    return {
+        "element_name": element_name,
+        "proteus_name": proteus_name,
+        "n_shape": int(n_shape),
+        "shape_order": tensor_product_cartesian_shape_order(int(dim), int(n_shape)),
+        "source_prefix": "d%d/%s/" % (int(dim), element_name),
+        "target_prefix": "d%d/%s/" % (int(dim), proteus_name),
+        "source_suffixes": (
+            "_%s_operator.cpp" % element_name,
+            "_%s_boundary_operator.cpp" % element_name,
+        ),
+        "suffix_pairs": (
+            ("_%s_operator.cpp" % element_name, "_%s_operator.cpp" % proteus_name),
+            ("_%s_boundary_operator.cpp" % element_name, "_%s_boundary_operator.cpp" % proteus_name),
+        ),
+    }
 
 
 def _extern_c_declarations(source):
@@ -1363,7 +1411,7 @@ def _extern_c_declarations(source):
     return tuple(declarations)
 
 
-def _legacy_hex27_proteus_alias_source(source_path, c_abi_path, declarations, hex27_to_proteus):
+def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, alias):
     include_path = _relative_codegen_include(os.path.dirname(source_path), c_abi_path)
     lines = [
         '#include "%s"' % include_path,
@@ -1371,18 +1419,18 @@ def _legacy_hex27_proteus_alias_source(source_path, c_abi_path, declarations, he
     ]
     for declaration in declarations:
         lines.extend(
-            _legacy_hex27_proteus_alias_function(
+            _tensor_product_proteus_alias_function(
                 declaration,
-                hex27_to_proteus,
+                alias,
             )
         )
     return "\n".join(lines)
 
 
-def _legacy_hex27_proteus_alias_function(declaration, hex27_to_proteus):
+def _tensor_product_proteus_alias_function(declaration, alias):
     return_type = declaration["return_type"]
     name = declaration["name"]
-    target = _legacy_hex27_target_name(name)
+    target = _tensor_product_proteus_target_name(name, alias)
     params = _c_params(declaration["params"])
     lines = ['extern "C" %s %s(' % (return_type, name)]
     if params:
@@ -1397,10 +1445,11 @@ def _legacy_hex27_proteus_alias_function(declaration, hex27_to_proteus):
     element_index = _c_element_pointer_param_index(params)
     if element_index is not None:
         pointer_type = _c_element_pointer_type(params[element_index])
-        lines.append("    %s *proteus_elements[27] = {" % pointer_type)
-        for idx, hex27_index in enumerate(hex27_to_proteus):
-            comma = "," if idx + 1 < len(hex27_to_proteus) else ""
-            lines.append("        elements[%d]%s" % (hex27_index, comma))
+        shape_order = alias["shape_order"]
+        lines.append("    %s *proteus_elements[%d] = {" % (pointer_type, alias["n_shape"]))
+        for idx, source_index in enumerate(shape_order):
+            comma = "," if idx + 1 < len(shape_order) else ""
+            lines.append("        elements[%d]%s" % (source_index, comma))
         lines.append("    };")
         args[element_index] = "proteus_elements"
 
@@ -1413,11 +1462,16 @@ def _legacy_hex27_proteus_alias_function(declaration, hex27_to_proteus):
     return lines
 
 
-def _legacy_hex27_target_name(name):
-    if "_hex27_hex27_" in name:
-        return name.replace("_hex27_hex27_", "_proteus_hex27_proteus_hex27_")
-    if "_hex27_" in name:
-        return name.replace("_hex27_", "_proteus_hex27_")
+def _tensor_product_proteus_target_name(name, alias):
+    element = alias["element_name"]
+    proteus = alias["proteus_name"]
+    if "_%s_%s_" % (element, element) in name:
+        return name.replace(
+            "_%s_%s_" % (element, element),
+            "_%s_%s_" % (proteus, proteus),
+        )
+    if "_%s_" % element in name:
+        return name.replace("_%s_" % element, "_%s_" % proteus)
     return ""
 
 
@@ -1536,11 +1590,73 @@ _CODEGEN_COMMON_HEADERS = frozenset(
     )
 )
 
+_CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
+    (
+        "kernel_math.hpp",
+        "kernel_math.cuh",
+        "kernel_diagnostics.hpp",
+        "kernel_diagnostics.cuh",
+        "tensor_product_kernels.hpp",
+        "tensor_product_kernels.cuh",
+        "geometry_kernels.hpp",
+        "geometry_kernels.cuh",
+    )
+)
+
 
 def _relative_codegen_include(directory, target):
     if not directory:
         return target.replace(os.sep, "/")
     return os.path.relpath(target, start=directory).replace(os.sep, "/")
+
+
+def _relocate_generated_primitive_headers(files, out_dir, material_name):
+    if not _uses_generated_shared_primitive_headers(out_dir, material_name):
+        return files
+
+    relocated = {}
+    header_targets = {}
+    for header in _CODEGEN_SHARED_PRIMITIVE_HEADERS:
+        if header in files:
+            header_targets[header] = os.path.join("..", header)
+
+    if not header_targets:
+        return files
+
+    for filename, source in files.items():
+        target = header_targets.get(filename, filename)
+        rewritten = _rewrite_generated_primitive_includes(filename, source, header_targets)
+        existing = relocated.get(target)
+        if existing is not None and existing != rewritten:
+            raise RuntimeError("conflicting generated source for %s" % target)
+        relocated[target] = rewritten
+    return relocated
+
+
+def _uses_generated_shared_primitive_headers(out_dir, material_name):
+    normalized = os.path.normpath(os.path.abspath(out_dir))
+    output_name = os.path.basename(normalized)
+    generated_root = os.path.basename(os.path.dirname(normalized))
+    return generated_root == "generated" and output_name in (
+        material_name,
+        "%s_cuda" % material_name,
+        "%s_hip" % material_name,
+    )
+
+
+def _rewrite_generated_primitive_includes(filename, source, header_targets):
+    directory = os.path.dirname(filename)
+    rewritten = source
+    for header, target in header_targets.items():
+        local_include = _relative_codegen_include(directory, header)
+        shared_include = _relative_codegen_include(directory, target)
+        if local_include == shared_include:
+            continue
+        rewritten = rewritten.replace(
+            '#include "%s"' % local_include,
+            '#include "%s"' % shared_include,
+        )
+    return rewritten
 
 
 def _codegen_output_element_label(unit, context):
@@ -1712,6 +1828,70 @@ def _default_elements_for_systems(systems):
     if detected:
         return tuple(detected)
     return sfem_supported_element_types()
+
+
+def _generation_available_elements(elements):
+    available = tuple(elements or sfem_supported_element_types())
+    additions = []
+    for element, proteus in (("QUAD4", "PROTEUS_QUAD4"), ("HEX8", "PROTEUS_HEX8"), ("HEX27", "PROTEUS_HEX27")):
+        if element in available and proteus not in available:
+            additions.append(proteus)
+    return available + tuple(additions)
+
+
+def _with_tensor_product_proteus_alias_dependencies(selected, available):
+    selected = tuple(selected)
+    additions = []
+    selected_names = {_element_selection_name(element) for element in selected}
+    available_by_name = {
+        _element_selection_name(element): element
+        for element in available
+    }
+    for element, proteus in (("QUAD4", "PROTEUS_QUAD4"), ("HEX8", "PROTEUS_HEX8"), ("HEX27", "PROTEUS_HEX27")):
+        if element in selected_names and proteus in available_by_name and proteus not in selected_names:
+            additions.append(available_by_name[proteus])
+    return selected + tuple(additions)
+
+
+def _missing_hex8_proteus_implementation_dependency(files, selected):
+    selected_names = {_element_selection_name(element) for element in selected}
+    if "HEX27_HEX8" not in selected_names or "PROTEUS_HEX27_PROTEUS_HEX8" in selected_names:
+        return None
+    alias = _tensor_product_proteus_alias(
+        element_name="hex8",
+        proteus_name="proteus_hex8",
+        dim=3,
+        n_shape=8,
+    )
+    for source_path in files:
+        if not (
+            source_path.startswith(alias["source_prefix"])
+            and any(source_path.endswith(suffix) for suffix in alias["source_suffixes"])
+        ):
+            continue
+        proteus_path = source_path.replace(
+            alias["source_prefix"],
+            alias["target_prefix"],
+        )
+        for source_suffix, target_suffix in alias["suffix_pairs"]:
+            if proteus_path.endswith(source_suffix):
+                proteus_path = proteus_path[: -len(source_suffix)] + target_suffix
+                break
+        if proteus_path not in files:
+            return _proteus_hex27_hex8_element()
+    return None
+
+
+def _proteus_hex27_hex8_element():
+    return SfemCompatibleElement(
+        "PROTEUS_HEX27_PROTEUS_HEX8",
+        "PROTEUS_HEX27",
+        (
+            ("displacement", "PROTEUS_HEX27"),
+            ("velocity", "PROTEUS_HEX27"),
+            ("pressure", "PROTEUS_HEX8"),
+        ),
+    )
 
 
 def _element_selection_map(elements):

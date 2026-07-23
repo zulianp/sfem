@@ -1602,6 +1602,7 @@ class GenApiTest(unittest.TestCase):
                 "TET4",
                 "TET10",
                 "QUAD4",
+                "PROTEUS_QUAD4",
                 "HEX8",
                 "HEX27",
                 "PROTEUS_HEX8",
@@ -1612,6 +1613,7 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(neo["TRI3"], (1, 1))
         self.assertEqual(neo["TET4"], (1, 1))
         self.assertEqual(neo["QUAD4"], (2, 4))
+        self.assertEqual(neo["PROTEUS_QUAD4"], (2, 4))
         self.assertEqual(neo["HEX8"], (2, 8))
         self.assertEqual(neo["TRI6"], (4, 6))
         self.assertEqual(neo["TET10"], (4, 11))
@@ -1628,6 +1630,7 @@ class GenApiTest(unittest.TestCase):
                 "TET4",
                 "TET10",
                 "QUAD4",
+                "PROTEUS_QUAD4",
                 "HEX8",
                 "HEX27",
                 "PROTEUS_HEX8",
@@ -1638,6 +1641,7 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(neo_affine["TRI3"], (1, 1))
         self.assertEqual(neo_affine["TET4"], (1, 1))
         self.assertEqual(neo_affine["QUAD4"], (2, 4))
+        self.assertEqual(neo_affine["PROTEUS_QUAD4"], (2, 4))
         self.assertEqual(neo_affine["HEX8"], (2, 8))
         self.assertEqual(neo_affine["TRI6"], (2, 3))
         self.assertEqual(neo_affine["TET10"], (2, 4))
@@ -2305,7 +2309,7 @@ class GenApiTest(unittest.TestCase):
                 "tensor_product_energy",
                 neohookean_ogden,
                 ("QUAD4",),
-                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.cpp"),
+                os.path.join("d2", "proteus_quad4", "neohookean_ogden_proteus_quad4_operator.cpp"),
                 "neohookean_ogden_d2_tensor_product_local.hpp",
                 3,
             ),
@@ -2321,7 +2325,7 @@ class GenApiTest(unittest.TestCase):
                 "tensor_product_residual",
                 two_phase_flow,
                 ("QUAD4",),
-                os.path.join("d2", "quad4", "two_phase_flow_quad4_operator.cpp"),
+                os.path.join("d2", "proteus_quad4", "two_phase_flow_proteus_quad4_operator.cpp"),
                 "two_phase_flow_d2_tensor_product_local.hpp",
                 2,
             ),
@@ -2357,8 +2361,8 @@ class GenApiTest(unittest.TestCase):
             source = os.path.join(
                 out_dir,
                 "d3",
-                "hex8",
-                "neohookean_ogden_hex8_operator.cpp",
+                "proteus_hex8",
+                "neohookean_ogden_proteus_hex8_operator.cpp",
             )
             with open(source, encoding="utf-8") as input_file:
                 contents = input_file.read()
@@ -2369,6 +2373,65 @@ class GenApiTest(unittest.TestCase):
             "            block_value[lane] = scalar_t(0);",
             contents,
         )
+
+    def test_generated_staging_reuses_primitive_headers(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            generated_root = os.path.join(root_dir, "generated")
+            out_dir = os.path.join(generated_root, "neohookean_ogden")
+            result = gen.generate(
+                neohookean_ogden,
+                out_dir,
+                elements=("HEX8",),
+                matrix_formats=("crs",),
+            )
+
+            source_names = {os.path.relpath(path, out_dir) for path in result.sources}
+            for header in (
+                "kernel_math.hpp",
+                "kernel_diagnostics.hpp",
+                "tensor_product_kernels.hpp",
+                "geometry_kernels.hpp",
+            ):
+                self.assertIn(os.path.join("..", header), source_names)
+                self.assertTrue(os.path.exists(os.path.join(generated_root, header)))
+                self.assertFalse(os.path.exists(os.path.join(out_dir, header)))
+
+            self.assertIn("matrix_formats.hpp", source_names)
+            self.assertTrue(os.path.exists(os.path.join(out_dir, "matrix_formats.hpp")))
+
+            local_header = os.path.join(
+                out_dir,
+                "d3",
+                "neohookean_ogden_d3_tensor_product_local.hpp",
+            )
+            with open(local_header, encoding="utf-8") as input_file:
+                local_source = input_file.read()
+            self.assertIn('#include "../../kernel_math.hpp"', local_source)
+            self.assertIn('#include "../../tensor_product_kernels.hpp"', local_source)
+
+            operator_source = os.path.join(
+                out_dir,
+                "d3",
+                "hex8",
+                "neohookean_ogden_hex8_operator.cpp",
+            )
+            with open(operator_source, encoding="utf-8") as input_file:
+                operator_contents = input_file.read()
+            self.assertIn('#include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"', operator_contents)
+            self.assertIn("idx_t *proteus_elements[8] = {", operator_contents)
+            self.assertIn("neohookean_ogden_proteus_hex8_proteus_hex8_hessian_crs_isoparametric_mesh_soa", operator_contents)
+
+            proteus_operator = os.path.join(
+                out_dir,
+                "d3",
+                "proteus_hex8",
+                "neohookean_ogden_proteus_hex8_operator.cpp",
+            )
+            with open(proteus_operator, encoding="utf-8") as input_file:
+                proteus_contents = input_file.read()
+            self.assertIn('#include "../../../kernel_diagnostics.hpp"', proteus_contents)
+            self.assertIn('#include "../../../geometry_kernels.hpp"', proteus_contents)
+            self.assertIn('#include "../neohookean_ogden_d3_tensor_product_local.hpp"', proteus_contents)
 
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
@@ -3360,20 +3423,17 @@ class GenApiTest(unittest.TestCase):
                 contents,
             )
             self.assertIn(
-                "const scalar_t *const block_current_streams[89] = {"
-                "block_current[0], block_current[8], block_current[1]",
+                "const idx_t *const SFEM_RESTRICT field_0_elements[27] = {"
+                "elements[0], elements[8], elements[1]",
                 contents,
             )
             self.assertIn(
-                "block_current[81], block_current[82], block_current[84], block_current[83], "
-                "block_current[85], block_current[86], block_current[88], block_current[87]}",
+                "stokes_d3_tensor_product_mixed_residual_block_contiguous",
                 contents,
             )
-            self.assertIn(
-                "scalar_t *const block_output_streams[89] = {"
-                "block_output[0], block_output[8], block_output[1]",
-                contents,
-            )
+            self.assertNotIn("block_current_streams[89]", contents)
+            self.assertNotIn("block_direction_streams[89]", contents)
+            self.assertNotIn("block_output_streams[89]", contents)
             self.assertIn("static constexpr int N_FIELDS = 2;", contents)
             self.assertIn("scalar_t *const SFEM_RESTRICT u_out[3]", contents)
             self.assertNotIn("u0_out", contents)
@@ -4261,7 +4321,15 @@ class GenApiTest(unittest.TestCase):
                 names,
             )
             self.assertIn(
+                os.path.join("d2", "proteus_quad4", "neumann_proteus_quad4_boundary_operator.cpp"),
+                names,
+            )
+            self.assertIn(
                 os.path.join("d3", "hex8", "neumann_hex8_boundary_operator.cpp"),
+                names,
+            )
+            self.assertIn(
+                os.path.join("d3", "proteus_hex8", "neumann_proteus_hex8_boundary_operator.cpp"),
                 names,
             )
             self.assertIn(
@@ -4281,6 +4349,16 @@ class GenApiTest(unittest.TestCase):
             with open(
                 os.path.join(
                     out_dir,
+                    "d2",
+                    "proteus_quad4",
+                    "neumann_proteus_quad4_boundary_operator.cpp",
+                ),
+                encoding="utf-8",
+            ) as input_file:
+                proteus_quad_source = input_file.read()
+            with open(
+                os.path.join(
+                    out_dir,
                     "d3",
                     "hex8",
                     "neumann_hex8_boundary_operator.cpp",
@@ -4288,6 +4366,16 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as input_file:
                 source = input_file.read()
+            with open(
+                os.path.join(
+                    out_dir,
+                    "d3",
+                    "proteus_hex8",
+                    "neumann_proteus_hex8_boundary_operator.cpp",
+                ),
+                encoding="utf-8",
+            ) as input_file:
+                proteus_hex8_source = input_file.read()
             with open(
                 os.path.join(
                     out_dir,
@@ -4300,7 +4388,9 @@ class GenApiTest(unittest.TestCase):
                 proteus_source = input_file.read()
             self.assertIn("neumann_quad4_edgeshell2_boundary_residual_soa", quad_source)
             self.assertNotIn("for (int qy = 0; qy < Q; ++qy)", quad_source)
-            self.assertIn("#pragma omp simd", quad_source)
+            self.assertIn("idx_t *proteus_elements[4] = {", quad_source)
+            self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_soa", quad_source)
+            self.assertIn("#pragma omp simd", proteus_quad_source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
             self.assertIn("neumann_proteus_hex27_proteus_quadshell9_boundary_residual_soa", proteus_source)

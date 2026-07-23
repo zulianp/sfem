@@ -4597,6 +4597,7 @@ def _boundary_surface_name(element):
     surface_by_cell = {
         "TRI3": "edgeshell2",
         "QUAD4": "edgeshell2",
+        "PROTEUS_QUAD4": "edgeshell2",
         "TET4": "trishell3",
         "TET10": "trishell6",
         "HEX8": "quadshell4",
@@ -4618,7 +4619,7 @@ def _boundary_surface_name(element):
 
 def _element_dim(element):
     name = _element_name(element)
-    if name in ("TRI3", "TRI6", "QUAD4") or name.startswith(("TRI6_", "QUAD4_")):
+    if name in ("TRI3", "TRI6", "QUAD4", "PROTEUS_QUAD4") or name.startswith(("TRI6_", "QUAD4_", "PROTEUS_QUAD4_")):
         return 2
     if (
         name in ("TET4", "TET10", "HEX8", "HEX27")
