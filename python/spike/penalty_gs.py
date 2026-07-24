@@ -2,6 +2,7 @@
 
 import numpy as np
 from numba import njit
+from scipy.linalg import lu_factor, lu_solve
 
 
 # Nonlinear Gauss-Seidel (penalty method) converges to Projected Gauss-Seidel
@@ -89,6 +90,22 @@ def penalty_jacobi_step(A, I, x, b, ub, penalty, shift):
         x[i] += omega * ri / (A[i, i] + Dmu)
 
 
+@njit(fastmath=True, boundscheck=False, nogil=True)
+def jacobi_step(A, x, b):
+    rows = A.shape[0]
+    x_old = x.copy()
+
+    r = b
+
+    for i in range(0, rows):
+        ri = r[i]
+
+        for j in range(0, rows):
+            ri -= A[i, j] * x_old[j]
+
+        x[i] += omega * ri / A[i, i]
+
+
 def penalty_gradient(A, I, x, b, ub, penalty, shift):
     rows = A.shape[0]
 
@@ -128,10 +145,10 @@ b[n - 1] = 0
 x = np.zeros(n)
 
 # Solve A x = b
-# x = np.linalg.solve(A, b)
+x = np.linalg.solve(A, b)
 ub = np.ones(n) * 0.075
 
-penalty = 1000 / h
+penalty = 1e12 / h
 
 xc = x.copy()
 
@@ -142,24 +159,62 @@ multipliers = [np.zeros(xc.shape)]
 
 print(f'h={h}')
 
+
+I_diag = np.diag(I)
+A_factor = lu_factor(A, check_finite=False)
+delta_old = shift.copy()
+lambda_hat_old = shift.copy()
+
 aug_damping = h 
-njacs = 1
-for i in range(2000):
+njacs = 10
+for i in range(0, 4000):
+
+    if False:
+    # if True:
     # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
 
-    for j in range(njacs):
-        penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
-        # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
-        shift = penalty * np.maximum(0.0, aug_damping * (xc - ub) + shift / penalty)
+        for j in range(njacs):
+            penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
+            # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
+            shift = penalty * np.maximum(0.0, aug_damping * (xc - ub) + shift / penalty)
+
+        norm_g = np.linalg.norm(penalty_gradient(A, I, xc, b, ub, penalty, shift))
 
     # if (i + 1) % 10 == 0:
     # shift = penalty * np.maximum(0.0, (xc - ub) + shift / penalty)
 
+    else: # Crossed secant method
+        xc[:] = lu_solve(A_factor, b - I_diag * shift, check_finite=False)
+
+        # for j in range(njacs):
+        #     jacobi_step(A, xc, b - I_diag * shift)
+
+        # Algorithm 5 from the paper, applied to the unprojected G.
+        lambda_hat = penalty * (xc - ub)
+        delta = lambda_hat - shift
+
+        if i >= 1:
+            diff_delta = delta - delta_old
+            denom = np.dot(diff_delta, diff_delta)
+            if denom > 1e-30:
+                beta = np.dot(lambda_hat - lambda_hat_old, diff_delta) / denom
+                shift = lambda_hat - beta * delta
+            else:
+                shift = lambda_hat
+        else:
+            shift = lambda_hat
+
+        shift = np.maximum(0.0, shift)
+
+        delta_old = delta.copy()
+        lambda_hat_old = lambda_hat.copy()
+
+        norm_g = np.linalg.norm(A @ xc - b + I_diag * shift)
+
     solutions.append(xc.copy())
     multipliers.append(shift.copy())
 
-    g = np.linalg.norm(penalty_gradient(A, I, xc, b, ub, penalty, shift))
-    norm_g = np.linalg.norm(g)
+    
     norm_pen = np.linalg.norm(np.maximum(0.0, xc - ub))
     norm_shift = np.linalg.norm(shift)
     print(

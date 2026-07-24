@@ -1199,6 +1199,10 @@ namespace sfem {
 
     void %(op)s::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("%(op)s::set_option");
+        if (name == "PACKED_TWO_PASS" || name == "two_pass") {
+            impl_->use_packed_two_pass = val;
+            return;
+        }
         AffineOption options[] = {
 %(affine_options)s
         };

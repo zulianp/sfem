@@ -1525,6 +1525,10 @@ namespace sfem {
 
     void GeneratedLinearElasticity::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::set_option");
+        if (name == "PACKED_TWO_PASS" || name == "two_pass") {
+            impl_->use_packed_two_pass = val;
+            return;
+        }
         AffineOption options[] = {
             {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
             {"objective_assume_affine", &impl_->objective_uses_affine},
@@ -1610,3 +1614,4 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
+
