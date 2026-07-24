@@ -3684,6 +3684,7 @@ def _operator_source(
         "#include <type_traits>",
         "#include <cstdint>",
         "#include <cstdlib>",
+        "#include <string.h>",
         '#include "%s"' % local_name,
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
@@ -3704,6 +3705,15 @@ def _operator_source(
         "#include <cstdio>",
         "",
     ]
+    if prefix == "laplace_tet4":
+        lines.append('#include "tet4_laplacian_inline_cpu.hpp"')
+        lines.append("")
+    elif prefix == "laplace_tet10":
+        lines.append('#include "tet10_laplacian_inline_cpu.hpp"')
+        lines.append("")
+    elif prefix == "laplace_proteus_hex8":
+        lines.append('#include "hex8_laplacian_inline_cpu.hpp"')
+        lines.append("")
     lines.extend(_affine_geometry_stream_helper_lines())
     lines.extend(
         [
@@ -8822,6 +8832,584 @@ def _scalar_packed_jacobian_action_source(
     return lines
 
 
+def _laplace_tet4_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    params,
+    kappa_name,
+    field_name,
+):
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = 64;",
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+            "        scalar_t out0[VECTOR_SIZE];",
+            "        scalar_t out1[VECTOR_SIZE];",
+            "        scalar_t out2[VECTOR_SIZE];",
+            "        scalar_t out3[VECTOR_SIZE];",
+            "        scalar_t u0[VECTOR_SIZE];",
+            "        scalar_t u1[VECTOR_SIZE];",
+            "        scalar_t u2[VECTOR_SIZE];",
+            "        scalar_t u3[VECTOR_SIZE];",
+            "        scalar_t fff0[VECTOR_SIZE];",
+            "        scalar_t fff1[VECTOR_SIZE];",
+            "        scalar_t fff2[VECTOR_SIZE];",
+            "        scalar_t fff3[VECTOR_SIZE];",
+            "        scalar_t fff4[VECTOR_SIZE];",
+            "        scalar_t fff5[VECTOR_SIZE];",
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    fff0[lane] = metric_factor * scalar_t(g_geom_metric0[element]);",
+            "                    fff1[lane] = metric_factor * scalar_t(g_geom_metric1[element]);",
+            "                    fff2[lane] = metric_factor * scalar_t(g_geom_metric2[element]);",
+            "                    fff3[lane] = metric_factor * scalar_t(g_geom_metric3[element]);",
+            "                    fff4[lane] = metric_factor * scalar_t(g_geom_metric4[element]);",
+            "                    fff5[lane] = metric_factor * scalar_t(g_geom_metric5[element]);",
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    u0[lane] = pack_direction[elements[0][element]];",
+            "                    u1[lane] = pack_direction[elements[1][element]];",
+            "                    u2[lane] = pack_direction[elements[2][element]];",
+            "                    u3[lane] = pack_direction[elements[3][element]];",
+            "                }",
+            "",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    tet4_laplacian_apply_fff_soa_tpl<scalar_t, scalar_t>(",
+            "                            fff0[lane], fff1[lane], fff2[lane], fff3[lane], fff4[lane], fff5[lane],",
+            "                            u0[lane], u1[lane], u2[lane], u3[lane],",
+            "                            &out0[lane], &out1[lane], &out2[lane], &out3[lane]);",
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    pack_out[elements[0][element]] += out0[lane];",
+            "                    pack_out[elements[1][element]] += out1[lane];",
+            "                    pack_out[elements[2][element]] += out2[lane];",
+            "                    pack_out[elements[3][element]] += out3[lane];",
+            "                }",
+            "            }",
+            "",
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
+            "                pack_out[n_contiguous + k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(" % impl,
+            "                n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+            "                elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+            "                g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "                %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(" % impl,
+            "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+            "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+            "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(" % (impl, scalar_type),
+                "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+                "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+                "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+                "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _laplace_direct_fff_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    params,
+    kappa_name,
+    field_name,
+    n_shape,
+    vector_size,
+    primitive,
+    primitive_template,
+    metric_measure="scalar_t(1)",
+    primitive_shape_order=None,
+):
+    if primitive_shape_order is None:
+        primitive_shape_order = tuple(range(n_shape))
+    if len(primitive_shape_order) != n_shape:
+        raise ValueError("primitive_shape_order length must match n_shape")
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append("        scalar_t out%d[VECTOR_SIZE];" % shape)
+    for shape in range(n_shape):
+        lines.append("        scalar_t u%d[VECTOR_SIZE];" % shape)
+    for component in range(6):
+        lines.append("        scalar_t fff%d[VECTOR_SIZE];" % component)
+    lines.extend(
+        [
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    const scalar_t inv_det = (metric_factor * %s) / scalar_t(g_jacobian_determinant0[element]);" % metric_measure,
+        ]
+    )
+    for component in range(9):
+        lines.append(
+            "                    const scalar_t adj%d = scalar_t(g_jacobian_adjugate%d[element]);"
+            % (component, component)
+        )
+    metric_terms = (
+        (0, "adj0 * adj0 + adj1 * adj1 + adj2 * adj2"),
+        (1, "adj0 * adj3 + adj1 * adj4 + adj2 * adj5"),
+        (2, "adj0 * adj6 + adj1 * adj7 + adj2 * adj8"),
+        (3, "adj3 * adj3 + adj4 * adj4 + adj5 * adj5"),
+        (4, "adj3 * adj6 + adj4 * adj7 + adj5 * adj8"),
+        (5, "adj6 * adj6 + adj7 * adj7 + adj8 * adj8"),
+    )
+    for component, expr in metric_terms:
+        lines.append("                    fff%d[lane] = (%s) * inv_det;" % (component, expr))
+    lines.extend(
+        [
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            % (shape, primitive_shape_order[shape])
+        )
+    lines.extend(["                }", "", "#pragma omp simd", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    primitive_args = (
+        ["fff%d[lane]" % component for component in range(6)]
+        + ["u%d[lane]" % shape for shape in range(n_shape)]
+        + ["&out%d[lane]" % shape for shape in range(n_shape)]
+    )
+    lines.append(
+        "                    %s%s(%s);"
+        % (primitive, primitive_template, ", ".join(primitive_args))
+    )
+    lines.extend(["                }", "", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "                    const ptrdiff_t element = evbegin + lane;"])
+    for shape in range(n_shape):
+        lines.append(
+            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            % (primitive_shape_order[shape], shape)
+        )
+    lines.extend(
+        [
+            "                }",
+            "            }",
+            "",
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
+            "                pack_out[n_contiguous + k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    common_call_prefix = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+        *(("g_jacobian_adjugate%d" % component) for component in range(9)),
+        "g_jacobian_determinant0",
+        kappa_name,
+        "direction_stride",
+        "%s_direction" % field_name,
+        "out_stride",
+        "%s_out" % field_name,
+    ]
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(%s);" % (impl, ", ".join(common_call_prefix)),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(%s);" % (impl, ", ".join(common_call_prefix)),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(common_call_prefix)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _laplace_metric_direct_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    kappa_name,
+    field_name,
+    n_shape,
+    vector_size,
+    primitive,
+    primitive_template,
+    primitive_shape_order=None,
+):
+    if primitive_shape_order is None:
+        primitive_shape_order = tuple(range(n_shape))
+    if len(primitive_shape_order) != n_shape:
+        raise ValueError("primitive_shape_order length must match n_shape")
+
+    params = [
+        "const ptrdiff_t n_packs",
+        "const ptrdiff_t n_elements_per_pack",
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "const ptrdiff_t max_nodes_per_pack",
+        "uint16_t **const SFEM_RESTRICT elements",
+        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+        "const idx_t *const SFEM_RESTRICT ghost_idx",
+        "const jacobian_t *const SFEM_RESTRICT g_geom_metric",
+        "const scalar_t %s" % kappa_name,
+        "const ptrdiff_t direction_stride",
+        "const scalar_t *const SFEM_RESTRICT %s_direction" % field_name,
+        "const ptrdiff_t out_stride",
+        "scalar_t *const SFEM_RESTRICT %s_out" % field_name,
+    ]
+    call_args = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+        "g_geom_metric",
+        kappa_name,
+        "direction_stride",
+        "%s_direction" % field_name,
+        "out_stride",
+        "%s_out" % field_name,
+    ]
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for i, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if i + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "    (void)direction_stride;",
+            "    (void)out_stride;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append("        scalar_t out%d[VECTOR_SIZE];" % shape)
+    for shape in range(n_shape):
+        lines.append("        scalar_t u%d[VECTOR_SIZE];" % shape)
+    for component in range(6):
+        lines.append("        scalar_t fff%d[VECTOR_SIZE];" % component)
+    lines.extend(
+        [
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            scalar_t *const SFEM_RESTRICT ghost_out = &pack_out[n_contiguous];",
+            "            memcpy(pack_direction, &%s_direction[owned_nodes_ptr[pack]], (size_t)n_contiguous * sizeof(scalar_t));" % field_name,
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k]];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    const ptrdiff_t metric_offset = element * 6;",
+        ]
+    )
+    for component in range(6):
+        lines.append(
+            "                    fff%d[lane] = metric_factor * scalar_t(g_geom_metric[metric_offset + %d]);"
+            % (component, component)
+        )
+    lines.extend(
+        [
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            % (shape, primitive_shape_order[shape])
+        )
+    primitive_args = (
+        ["fff%d[lane]" % c for c in range(6)]
+        + ["u%d[lane]" % s for s in range(n_shape)]
+        + ["&out%d[lane]" % s for s in range(n_shape)]
+    )
+    lines.extend(
+        [
+            "                }",
+            "",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    %s%s(%s);" % (primitive, primitive_template, ", ".join(primitive_args)),
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            % (primitive_shape_order[shape], shape)
+        )
+    lines.extend(
+        [
+            "                }",
+            "            }",
+            "",
+            "            scalar_t *const SFEM_RESTRICT acc = &%s_out[owned_nodes_ptr[pack]];" % field_name,
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                acc[k] += pack_out[k];",
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                acc[k] += pack_out[k];",
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k]] += ghost_out[k];" % field_name,
+            "                ghost_out[k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for i, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if i + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(%s);" % (impl, ", ".join(call_args)),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(%s);" % (impl, ", ".join(call_args)),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [p.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type) for p in params]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for i, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if i + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
 def _scalar_packed_affine_jacobian_action_source(
     system,
     prefix,
@@ -8938,6 +9526,95 @@ def _scalar_packed_affine_jacobian_action_source(
         "scalar_t *const SFEM_RESTRICT %s_out" % field.name
         for field in system.fields
     )
+    field = system.fields[0]
+    if (
+        prefix == "laplace_tet4"
+        and dim == 3
+        and n_shape == 4
+        and n_fields == 1
+        and uses_cached_affine_metric
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return _laplace_tet4_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+        )
+    if (
+        prefix == "laplace_proteus_hex8"
+        and dim == 3
+        and n_shape == 8
+        and n_fields == 1
+        and not uses_cached_affine_metric
+        and dependencies.uses_adjugate
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return (
+            _laplace_metric_direct_packed_affine_jacobian_action_source(
+                "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa",
+                "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa_impl",
+                str(dependencies.parameters[0]),
+                field.name,
+                n_shape,
+                32,
+                "hex8_laplacian_apply_fff_integral_soa_tpl",
+                "<scalar_t>",
+                primitive_shape_order=(0, 1, 3, 2, 4, 5, 7, 6),
+            )
+            + _laplace_direct_fff_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+            n_shape,
+            32,
+            "hex8_laplacian_apply_fff_integral_soa_tpl",
+            "<scalar_t>",
+            primitive_shape_order=(0, 1, 3, 2, 4, 5, 7, 6),
+            )
+        )
+    if (
+        prefix == "laplace_tet10"
+        and dim == 3
+        and n_shape == 10
+        and n_fields == 1
+        and not uses_cached_affine_metric
+        and dependencies.uses_adjugate
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return (
+            _laplace_metric_direct_packed_affine_jacobian_action_source(
+                "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa",
+                "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa_impl",
+                str(dependencies.parameters[0]),
+                field.name,
+                n_shape,
+                32,
+                "tet10_laplacian_apply_fff_soa_tpl",
+                "<scalar_t, scalar_t>",
+            )
+            + _laplace_direct_fff_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+            n_shape,
+            32,
+            "tet10_laplacian_apply_fff_soa_tpl",
+            "<scalar_t, scalar_t>",
+            metric_measure="scalar_t(1.0 / 6.0)",
+            )
+        )
     field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
     field_element_lines, field_element_array = _single_field_element_alias_lines(
         n_shape,
@@ -9007,7 +9684,6 @@ def _scalar_packed_affine_jacobian_action_source(
             "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
         ]
     )
-    field = system.fields[0]
     if dependencies.current:
         lines.extend(
             [

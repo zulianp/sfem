@@ -1851,13 +1851,31 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
         )
     )
+    laplace_proteus_hex8_packed_metric = (
+        material.name == "laplace"
+        and _c_abi_function_exists(
+            kernel_sources,
+            "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa",
+        )
+    )
+    laplace_tet10_packed_metric = (
+        material.name == "laplace"
+        and _c_abi_function_exists(
+            kernel_sources,
+            "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa",
+        )
+    )
     action_affine_uses_metric_soa = (
         action_affine_uses_metric_soa
         or action_packed_affine_uses_metric_soa
         or laplace_tet4_packed_affine_uses_metric_soa
     )
     residual_affine_uses_metric_aos = any(residual_affine_metric_aos_flags)
-    action_affine_uses_metric_aos = any(action_affine_metric_aos_flags)
+    action_affine_uses_metric_aos = (
+        any(action_affine_metric_aos_flags)
+        or laplace_proteus_hex8_packed_metric
+        or laplace_tet10_packed_metric
+    )
     residual_affine_uses_jacobian = not all(residual_affine_metric_flags)
     action_affine_uses_jacobian = not all(action_affine_metric_flags)
 
@@ -1975,6 +1993,32 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         double *const SFEM_RESTRICT u_out
 );"""
         )
+    for private_name in (
+        "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa",
+        "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa",
+    ):
+        if material.name == "laplace" and _c_abi_function_exists(kernel_sources, private_name):
+            private_declarations.append(
+                """int %s(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);"""
+                % private_name
+            )
     if c_abi_header:
         declaration_block = (
             'extern "C" {\n%s\n}' % "\n".join(private_declarations)
@@ -5194,6 +5238,100 @@ def _residual_apply_dispatch_body(
                         and _c_abi_function_exists(
                             kernel_sources,
                             "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
+                        )
+                        else []
+                    ),
+                    *(
+                        [
+                            "%s                if (domain.element_type == smesh::HEX8) {" % indent,
+                            "%s                    uint16_t *proteus_elements[8] = {packed_elements->data()[0], packed_elements->data()[1], packed_elements->data()[3], packed_elements->data()[2], packed_elements->data()[4], packed_elements->data()[5], packed_elements->data()[7], packed_elements->data()[6]};" % indent,
+                            "%s                    return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            % (
+                                indent,
+                                ", ".join(
+                                    [
+                                        "packed->n_packs(packed_block)",
+                                        "packed->n_elements_per_pack(packed_block)",
+                                        "domain.block->n_elements()",
+                                        "mesh->n_nodes()",
+                                        "packed->max_nodes_per_pack()",
+                                        "proteus_elements",
+                                        "owned_nodes_ptr->data()",
+                                        "n_shared_nodes->data()",
+                                        "ghost_ptr->data()",
+                                        "ghost_idx->data()",
+                                        "geom_metric_aos",
+                                        *storage_args,
+                                        *field_args,
+                                    ]
+                                ),
+                            ),
+                            "%s                }" % indent,
+                            "%s                if (domain.element_type == smesh::PROTEUS_HEX8) {" % indent,
+                            "%s                    return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            % (
+                                indent,
+                                ", ".join(
+                                    [
+                                        "packed->n_packs(packed_block)",
+                                        "packed->n_elements_per_pack(packed_block)",
+                                        "domain.block->n_elements()",
+                                        "mesh->n_nodes()",
+                                        "packed->max_nodes_per_pack()",
+                                        "packed_elements->data()",
+                                        "owned_nodes_ptr->data()",
+                                        "n_shared_nodes->data()",
+                                        "ghost_ptr->data()",
+                                        "ghost_idx->data()",
+                                        "geom_metric_aos",
+                                        *storage_args,
+                                        *field_args,
+                                    ]
+                                ),
+                            ),
+                            "%s                }" % indent,
+                        ]
+                        if material_name == "laplace"
+                        and operation == "jacobian_action"
+                        and dim == 3
+                        and _c_abi_function_exists(
+                            kernel_sources,
+                            "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa",
+                        )
+                        else []
+                    ),
+                    *(
+                        [
+                            "%s                if (domain.element_type == smesh::TET10) {" % indent,
+                            "%s                    return laplace_tet10_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            % (
+                                indent,
+                                ", ".join(
+                                    [
+                                        "packed->n_packs(packed_block)",
+                                        "packed->n_elements_per_pack(packed_block)",
+                                        "domain.block->n_elements()",
+                                        "mesh->n_nodes()",
+                                        "packed->max_nodes_per_pack()",
+                                        "packed_elements->data()",
+                                        "owned_nodes_ptr->data()",
+                                        "n_shared_nodes->data()",
+                                        "ghost_ptr->data()",
+                                        "ghost_idx->data()",
+                                        "geom_metric_aos",
+                                        *storage_args,
+                                        *field_args,
+                                    ]
+                                ),
+                            ),
+                            "%s                }" % indent,
+                        ]
+                        if material_name == "laplace"
+                        and operation == "jacobian_action"
+                        and dim == 3
+                        and _c_abi_function_exists(
+                            kernel_sources,
+                            "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa",
                         )
                         else []
                     ),
