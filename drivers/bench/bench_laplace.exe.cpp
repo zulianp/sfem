@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -235,6 +236,7 @@ int main(int argc, char *argv[]) {
     const bool        run_baseline              = smesh::Env::read("SFEM_RUN_BASELINE", true);
     const bool        run_generated_packed      = smesh::Env::read("SFEM_RUN_GENERATED_PACKED", true);
     const bool        run_packed                = smesh::Env::read("SFEM_RUN_PACKED", true);
+    const bool        run_packed_two_pass       = smesh::Env::read("SFEM_RUN_PACKED_TWO_PASS", true);
 
     if (codegen_geometry != "affine" && codegen_geometry != "isoparametric") {
         SFEM_ERROR("SFEM_CODEGEN_GEOMETRY must be affine or isoparametric\n");
@@ -305,6 +307,8 @@ int main(int argc, char *argv[]) {
     }
 
     std::shared_ptr<sfem::FunctionSpace> packed_fs;
+    const bool                           run_packed_two_pass_checked =
+            run_packed_two_pass && run_packed_checked && packed_operator_name == "PackedLaplacian";
     if (run_generated_packed_checked || run_packed_checked) {
         auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
         packed_fs        = sfem::FunctionSpace::create(packed_mesh, 1);
@@ -312,6 +316,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Op> generated_packed_op;
     if (run_generated_packed_checked) {
+        setenv("SFEM_PACKED_TWO_PASS", "0", 1);
         if (generated_packed_operator_name == "GeneratedLaplace") {
             generated_packed_op = std::make_shared<sfem::GeneratedLaplace>(packed_fs);
         } else {
@@ -328,6 +333,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Op> packed_op;
     if (run_packed_checked) {
+        setenv("SFEM_PACKED_TWO_PASS", "0", 1);
         packed_op = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
         if (!packed_op) {
             SFEM_ERROR("Unable to create packed operator %s\n", packed_operator_name.c_str());
@@ -335,6 +341,19 @@ int main(int argc, char *argv[]) {
         if (packed_op->initialize() != SFEM_SUCCESS) {
             SFEM_ERROR("Unable to initialize packed operator %s\n", packed_operator_name.c_str());
         }
+    }
+
+    std::shared_ptr<sfem::Op> packed_two_pass_op;
+    if (run_packed_two_pass_checked) {
+        setenv("SFEM_PACKED_TWO_PASS", "1", 1);
+        packed_two_pass_op = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
+        if (!packed_two_pass_op) {
+            SFEM_ERROR("Unable to create packed two-pass operator %s\n", packed_operator_name.c_str());
+        }
+        if (packed_two_pass_op->initialize() != SFEM_SUCCESS) {
+            SFEM_ERROR("Unable to initialize packed two-pass operator %s\n", packed_operator_name.c_str());
+        }
+        setenv("SFEM_PACKED_TWO_PASS", "0", 1);
     }
 
     const ptrdiff_t nelements        = mesh->n_elements();
@@ -345,6 +364,7 @@ int main(int argc, char *argv[]) {
     auto            baseline         = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            generated_packed = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            packed           = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto            packed_two_pass  = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            blas             = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
 #pragma omp parallel for
@@ -372,6 +392,11 @@ int main(int argc, char *argv[]) {
         if (packed_op) {
             blas->zeros(ndofs, packed->data());
             require_success(packed_op->apply(x->data(), direction->data(), packed->data()), "packed warmup apply");
+        }
+        if (packed_two_pass_op) {
+            blas->zeros(ndofs, packed_two_pass->data());
+            require_success(packed_two_pass_op->apply(x->data(), direction->data(), packed_two_pass->data()),
+                            "packed two-pass warmup apply");
         }
     }
 
@@ -406,6 +431,14 @@ int main(int argc, char *argv[]) {
         require_success(packed_op->apply(x->data(), direction->data(), packed->data()), "packed apply");
         packed_apply_max_abs_diff = max_abs_diff(packed->data(), baseline_op ? baseline->data() : generated->data(), ndofs);
     }
+    real_t packed_two_pass_apply_max_abs_diff = 0;
+    if (packed_two_pass_op) {
+        blas->zeros(ndofs, packed_two_pass->data());
+        require_success(packed_two_pass_op->apply(x->data(), direction->data(), packed_two_pass->data()),
+                        "packed two-pass apply");
+        packed_two_pass_apply_max_abs_diff =
+                max_abs_diff(packed_two_pass->data(), baseline_op ? baseline->data() : generated->data(), ndofs);
+    }
 
     const double generated_gradient_elapsed = time_gradient(generated_f, x->data(), generated->data(), ndofs, repeat, blas);
     const double generated_apply_elapsed =
@@ -422,6 +455,11 @@ int main(int argc, char *argv[]) {
     if (packed_op) {
         packed_apply_elapsed = time_apply(packed_op, x->data(), direction->data(), packed->data(), ndofs, repeat, blas);
     }
+    double packed_two_pass_apply_elapsed = 0;
+    if (packed_two_pass_op) {
+        packed_two_pass_apply_elapsed =
+                time_apply(packed_two_pass_op, x->data(), direction->data(), packed_two_pass->data(), ndofs, repeat, blas);
+    }
     if (baseline_f) {
         baseline_gradient_elapsed = time_gradient(baseline_f, x->data(), baseline->data(), ndofs, repeat, blas);
         baseline_apply_elapsed    = time_apply(baseline_op, x->data(), direction->data(), baseline->data(), ndofs, repeat, blas);
@@ -431,6 +469,9 @@ int main(int argc, char *argv[]) {
     printf("baseline_operator %s\n", baseline_f ? baseline_operator_name.c_str() : "disabled");
     printf("generated_packed_operator %s\n", generated_packed_op ? generated_packed_operator_name.c_str() : "disabled");
     printf("packed_operator %s\n", packed_op ? packed_operator_name.c_str() : "disabled");
+    printf("packed_two_pass_operator %s\n", packed_two_pass_op ? packed_operator_name.c_str() : "disabled");
+    printf("packed_reduction %s\n", packed_op ? "atomic" : "disabled");
+    printf("packed_two_pass_reduction %s\n", packed_two_pass_op ? "two_pass" : "disabled");
     printf("geometry %s\n", assume_affine ? "affine" : "isoparametric");
     printf("generated_packed_geometry %s\n", generated_packed_assume_affine ? "affine" : "isoparametric");
     if (codegen_geometry == "affine" && !assume_affine) {
@@ -454,6 +495,7 @@ int main(int argc, char *argv[]) {
     printf("apply_max_abs_diff %g\n", static_cast<double>(apply_max_abs_diff));
     printf("generated_packed_apply_max_abs_diff %g\n", static_cast<double>(generated_packed_apply_max_abs_diff));
     printf("packed_apply_max_abs_diff %g\n", static_cast<double>(packed_apply_max_abs_diff));
+    printf("packed_two_pass_apply_max_abs_diff %g\n", static_cast<double>(packed_two_pass_apply_max_abs_diff));
     printf("\n%-40s %12s %16s %13s %12s %12s %10s %13s %12s\n",
            "Operation",
            "Time [s]",
@@ -498,6 +540,15 @@ int main(int argc, char *argv[]) {
                    packed_op->flops_apply(),
                    packed_op->memory_traffic_bytes_apply());
     }
+    if (packed_two_pass_op) {
+        print_rate("packed_two_pass_apply",
+                   packed_two_pass_apply_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   packed_two_pass_op->flops_apply(),
+                   packed_two_pass_op->memory_traffic_bytes_apply());
+    }
     if (baseline_f) {
         print_rate("baseline_gradient",
                    baseline_gradient_elapsed,
@@ -521,6 +572,10 @@ int main(int argc, char *argv[]) {
         if (packed_op) {
             printf("packed_apply_speedup_vs_baseline %g\n", baseline_apply_elapsed / packed_apply_elapsed);
         }
+        if (packed_two_pass_op) {
+            printf("packed_two_pass_apply_speedup_vs_baseline %g\n",
+                   baseline_apply_elapsed / packed_two_pass_apply_elapsed);
+        }
     } else if (run_baseline) {
         printf("baseline_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
@@ -532,6 +587,9 @@ int main(int argc, char *argv[]) {
     if (packed_op) {
         printf("packed_apply_mdofs_per_s %g\n", mdofs_per_second(packed_apply_elapsed, ndofs, repeat));
     }
+    if (packed_two_pass_op) {
+        printf("packed_two_pass_apply_mdofs_per_s %g\n", mdofs_per_second(packed_two_pass_apply_elapsed, ndofs, repeat));
+    }
     if (baseline_f) {
         printf("baseline_gradient_mdofs_per_s %g\n", mdofs_per_second(baseline_gradient_elapsed, ndofs, repeat));
         printf("baseline_apply_mdofs_per_s %g\n", mdofs_per_second(baseline_apply_elapsed, ndofs, repeat));
@@ -540,6 +598,16 @@ int main(int argc, char *argv[]) {
         printf("packed_apply_speedup_vs_generated %g\n", generated_apply_elapsed / packed_apply_elapsed);
     } else if (run_packed) {
         printf("packed_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
+    }
+    if (packed_two_pass_op) {
+        printf("packed_two_pass_apply_speedup_vs_generated %g\n",
+               generated_apply_elapsed / packed_two_pass_apply_elapsed);
+        if (packed_op) {
+            printf("packed_two_pass_apply_speedup_vs_packed_atomic %g\n",
+                   packed_apply_elapsed / packed_two_pass_apply_elapsed);
+        }
+    } else if (run_packed_two_pass && run_packed_checked) {
+        printf("packed_two_pass_skipped unsupported_operator %s\n", packed_operator_name.c_str());
     }
     if (generated_packed_op) {
         printf("generated_packed_apply_speedup_vs_generated %g\n", generated_apply_elapsed / generated_packed_apply_elapsed);

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -199,6 +200,7 @@ int main(int argc, char *argv[]) {
     const std::string codegen_geometry         = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
     const bool        run_baseline_requested   = smesh::Env::read("SFEM_RUN_BASELINE", true);
     const bool        run_packed_requested     = smesh::Env::read("SFEM_RUN_PACKED", true);
+    const bool        run_packed_two_pass_requested = smesh::Env::read("SFEM_RUN_PACKED_TWO_PASS", true);
 
     if (repeat <= 0) {
         SFEM_ERROR("SFEM_REPEAT must be positive\n");
@@ -260,12 +262,17 @@ int main(int argc, char *argv[]) {
     }
 
     const bool run_packed = run_packed_requested && packed_linear_elasticity_supported(mesh->element_type(0), packed_operator_name);
+    const bool run_packed_two_pass =
+            run_packed_two_pass_requested && run_packed && packed_operator_name == "GeneratedLinearElasticity";
     std::shared_ptr<sfem::FunctionSpace> packed_fs;
     std::shared_ptr<sfem::Function>      packed_f;
+    std::shared_ptr<sfem::Function>      packed_two_pass_f;
     if (run_packed) {
         auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true, packed_elements_per_pack);
         packed_fs        = sfem::FunctionSpace::create(packed_mesh, block_size);
-        auto packed_op   = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
+
+        setenv("SFEM_PACKED_TWO_PASS", "0", 1);
+        auto packed_op = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
         if (!packed_op) {
             SFEM_ERROR("Unable to create packed operator %s\n", packed_operator_name.c_str());
         }
@@ -277,6 +284,23 @@ int main(int argc, char *argv[]) {
 
         packed_f = sfem::Function::create(packed_fs);
         packed_f->add_operator(packed_op);
+
+        if (run_packed_two_pass) {
+            setenv("SFEM_PACKED_TWO_PASS", "1", 1);
+            auto packed_two_pass_op = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
+            if (!packed_two_pass_op) {
+                SFEM_ERROR("Unable to create packed two-pass operator %s\n", packed_operator_name.c_str());
+            }
+            set_geometry_options(packed_two_pass_op, assume_affine);
+            if (packed_two_pass_op->initialize() != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to initialize packed two-pass operator %s\n", packed_operator_name.c_str());
+            }
+            set_generated_material(packed_two_pass_op, mu, lambda);
+            setenv("SFEM_PACKED_TWO_PASS", "0", 1);
+
+            packed_two_pass_f = sfem::Function::create(packed_fs);
+            packed_two_pass_f->add_operator(packed_two_pass_op);
+        }
     }
 
     const ptrdiff_t nelements          = mesh->n_elements();
@@ -289,6 +313,8 @@ int main(int argc, char *argv[]) {
     auto            baseline_apply     = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            packed_gradient    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            packed_apply       = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto            packed_two_pass_gradient = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto            packed_two_pass_apply    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto            blas               = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
     fill_test_vectors(ndofs, x->data(), h->data());
@@ -305,6 +331,11 @@ int main(int argc, char *argv[]) {
     if (packed_f) {
         packed_f->update(x->data());
         packed_linear_op = sfem::create_linear_operator("MF", packed_f, x, sfem::EXECUTION_SPACE_HOST);
+    }
+    std::shared_ptr<sfem::Operator<real_t>> packed_two_pass_linear_op;
+    if (packed_two_pass_f) {
+        packed_two_pass_f->update(x->data());
+        packed_two_pass_linear_op = sfem::create_linear_operator("MF", packed_two_pass_f, x, sfem::EXECUTION_SPACE_HOST);
     }
 
     for (int i = 0; i < warmup; ++i) {
@@ -324,6 +355,12 @@ int main(int argc, char *argv[]) {
             blas->zeros(ndofs, packed_apply->data());
             packed_linear_op->apply(h->data(), packed_apply->data());
         }
+        if (packed_two_pass_f) {
+            blas->zeros(ndofs, packed_two_pass_gradient->data());
+            packed_two_pass_f->gradient(x->data(), packed_two_pass_gradient->data());
+            blas->zeros(ndofs, packed_two_pass_apply->data());
+            packed_two_pass_linear_op->apply(h->data(), packed_two_pass_apply->data());
+        }
     }
 
     const double generated_gradient_elapsed =
@@ -342,6 +379,14 @@ int main(int argc, char *argv[]) {
     if (packed_f) {
         packed_gradient_elapsed = time_gradient(packed_f, x->data(), packed_gradient->data(), ndofs, repeat, blas);
         packed_apply_elapsed    = time_apply(packed_linear_op, h->data(), packed_apply->data(), ndofs, repeat, blas);
+    }
+    double packed_two_pass_gradient_elapsed = 0;
+    double packed_two_pass_apply_elapsed    = 0;
+    if (packed_two_pass_f) {
+        packed_two_pass_gradient_elapsed =
+                time_gradient(packed_two_pass_f, x->data(), packed_two_pass_gradient->data(), ndofs, repeat, blas);
+        packed_two_pass_apply_elapsed =
+                time_apply(packed_two_pass_linear_op, h->data(), packed_two_pass_apply->data(), ndofs, repeat, blas);
     }
 
     blas->zeros(ndofs, generated_gradient->data());
@@ -375,10 +420,32 @@ int main(int argc, char *argv[]) {
             packed_apply_error_vs_standard    = compare_vectors(ndofs, baseline_apply->data(), packed_apply->data());
         }
     }
+    ErrorMetrics packed_two_pass_gradient_error{};
+    ErrorMetrics packed_two_pass_apply_error{};
+    ErrorMetrics packed_two_pass_gradient_error_vs_atomic{};
+    ErrorMetrics packed_two_pass_apply_error_vs_atomic{};
+    if (packed_two_pass_f) {
+        blas->zeros(ndofs, packed_two_pass_gradient->data());
+        packed_two_pass_f->gradient(x->data(), packed_two_pass_gradient->data());
+        blas->zeros(ndofs, packed_two_pass_apply->data());
+        packed_two_pass_linear_op->apply(h->data(), packed_two_pass_apply->data());
+        packed_two_pass_gradient_error =
+                compare_vectors(ndofs, generated_gradient->data(), packed_two_pass_gradient->data());
+        packed_two_pass_apply_error = compare_vectors(ndofs, generated_apply->data(), packed_two_pass_apply->data());
+        if (packed_f) {
+            packed_two_pass_gradient_error_vs_atomic =
+                    compare_vectors(ndofs, packed_gradient->data(), packed_two_pass_gradient->data());
+            packed_two_pass_apply_error_vs_atomic =
+                    compare_vectors(ndofs, packed_apply->data(), packed_two_pass_apply->data());
+        }
+    }
 
     printf("generated_operator %s\n", generated_operator_name.c_str());
     printf("baseline_operator %s\n", baseline_f ? baseline_operator_name.c_str() : "disabled");
     printf("packed_operator %s\n", packed_f ? packed_operator_name.c_str() : "disabled");
+    printf("packed_two_pass_operator %s\n", packed_two_pass_f ? packed_operator_name.c_str() : "disabled");
+    printf("packed_reduction %s\n", packed_f ? "atomic" : "disabled");
+    printf("packed_two_pass_reduction %s\n", packed_two_pass_f ? "two_pass" : "disabled");
     printf("geometry %s\n", codegen_geometry.c_str());
     printf("element_type %s\n", type_to_string(mesh->element_type(0)));
     printf("mu %.16g\n", static_cast<double>(mu));
@@ -448,6 +515,34 @@ int main(int argc, char *argv[]) {
     } else if (run_packed_requested) {
         printf("packed_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
+    if (packed_two_pass_f) {
+        print_rate("packed_two_pass_gradient",
+                   packed_two_pass_gradient_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   packed_two_pass_f->flops_gradient(),
+                   packed_two_pass_f->memory_traffic_bytes_gradient());
+        print_rate("packed_two_pass_hessian_apply",
+                   packed_two_pass_apply_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   packed_two_pass_f->flops_apply(),
+                   packed_two_pass_f->memory_traffic_bytes_apply());
+        if (packed_f) {
+            printf("packed_two_pass_gradient_speedup_vs_packed_atomic %g\n",
+                   packed_gradient_elapsed / packed_two_pass_gradient_elapsed);
+            printf("packed_two_pass_apply_speedup_vs_packed_atomic %g\n",
+                   packed_apply_elapsed / packed_two_pass_apply_elapsed);
+        }
+        printf("packed_two_pass_gradient_speedup_vs_generated %g\n",
+               generated_gradient_elapsed / packed_two_pass_gradient_elapsed);
+        printf("packed_two_pass_apply_speedup_vs_generated %g\n",
+               generated_apply_elapsed / packed_two_pass_apply_elapsed);
+    } else if (run_packed_two_pass_requested && run_packed) {
+        printf("packed_two_pass_skipped unsupported_operator %s\n", packed_operator_name.c_str());
+    }
 
     if (baseline_f) {
         printf("\ngradient_max_abs %.16e\n", static_cast<double>(gradient_error.max_abs));
@@ -467,9 +562,32 @@ int main(int argc, char *argv[]) {
             printf("packed_apply_rel_l2_vs_standard %.16e\n", static_cast<double>(packed_apply_error_vs_standard.rel_l2));
         }
     }
+    if (packed_two_pass_f) {
+        printf("packed_two_pass_gradient_max_abs_vs_generated %.16e\n",
+               static_cast<double>(packed_two_pass_gradient_error.max_abs));
+        printf("packed_two_pass_gradient_rel_l2_vs_generated %.16e\n",
+               static_cast<double>(packed_two_pass_gradient_error.rel_l2));
+        printf("packed_two_pass_apply_max_abs_vs_generated %.16e\n",
+               static_cast<double>(packed_two_pass_apply_error.max_abs));
+        printf("packed_two_pass_apply_rel_l2_vs_generated %.16e\n",
+               static_cast<double>(packed_two_pass_apply_error.rel_l2));
+        if (packed_f) {
+            printf("packed_two_pass_gradient_max_abs_vs_packed_atomic %.16e\n",
+                   static_cast<double>(packed_two_pass_gradient_error_vs_atomic.max_abs));
+            printf("packed_two_pass_gradient_rel_l2_vs_packed_atomic %.16e\n",
+                   static_cast<double>(packed_two_pass_gradient_error_vs_atomic.rel_l2));
+            printf("packed_two_pass_apply_max_abs_vs_packed_atomic %.16e\n",
+                   static_cast<double>(packed_two_pass_apply_error_vs_atomic.max_abs));
+            printf("packed_two_pass_apply_rel_l2_vs_packed_atomic %.16e\n",
+                   static_cast<double>(packed_two_pass_apply_error_vs_atomic.rel_l2));
+        }
+    }
 
     const bool finite = finite_vector(ndofs, generated_gradient->data()) && finite_vector(ndofs, generated_apply->data()) &&
-                        (!packed_f || (finite_vector(ndofs, packed_gradient->data()) && finite_vector(ndofs, packed_apply->data())));
+                        (!packed_f || (finite_vector(ndofs, packed_gradient->data()) && finite_vector(ndofs, packed_apply->data()))) &&
+                        (!packed_two_pass_f ||
+                         (finite_vector(ndofs, packed_two_pass_gradient->data()) &&
+                          finite_vector(ndofs, packed_two_pass_apply->data())));
     if (!finite) {
         return SFEM_FAILURE;
     }
@@ -480,6 +598,11 @@ int main(int argc, char *argv[]) {
     }
     if (packed_f && (packed_gradient_error.max_abs > compare_atol || packed_gradient_error.rel_l2 > compare_rtol ||
                      packed_apply_error.max_abs > compare_atol || packed_apply_error.rel_l2 > compare_rtol)) {
+        return SFEM_FAILURE;
+    }
+    if (packed_two_pass_f &&
+        (packed_two_pass_gradient_error.max_abs > compare_atol || packed_two_pass_gradient_error.rel_l2 > compare_rtol ||
+         packed_two_pass_apply_error.max_abs > compare_atol || packed_two_pass_apply_error.rel_l2 > compare_rtol)) {
         return SFEM_FAILURE;
     }
 
