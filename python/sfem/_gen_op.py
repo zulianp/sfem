@@ -412,9 +412,10 @@ def _hyperelastic_op(
     hessian_coo_cases = []
     hessian_patch_cases = []
     generated_packed_apply = any("_packed_" in source for source in kernel_sources.values())
-    packed_scratch_include = '#include "packed_thread_scratch.hpp"' if generated_packed_apply else ""
+    packed_scratch_include = '#include "packed_thread_scratch.hpp"\n#include "smesh_env.hpp"' if generated_packed_apply else ""
     packed_scratch_prealloc = (
-        """        if (impl_->space->has_packed_mesh()) {
+        """        impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
+        if (impl_->space->has_packed_mesh()) {
             auto packed = impl_->space->packed_mesh();
             const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
             const int dim = impl_->space->mesh_ptr()->spatial_dimension();
@@ -423,6 +424,12 @@ def _hyperelastic_op(
             sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
             sfem::codegen::prealloc_thread_scratch<real_t>(2, scratch_size);
             sfem::codegen::prealloc_thread_scratch<real_t>(3, scratch_size);
+            impl_->packed_ghost_buf.resize((size_t)packed->n_blocks());
+            for (int b = 0; b < packed->n_blocks(); ++b) {
+                const ptrdiff_t n_ghost = packed->n_ghost_entries(b);
+                const ptrdiff_t n_slots = (n_ghost > 0 ? n_ghost : 1) * (ptrdiff_t)dim;
+                impl_->packed_ghost_buf[b] = create_host_buffer<real_t>(n_slots);
+            }
         }"""
         if generated_packed_apply
         else ""
@@ -782,6 +789,7 @@ def _hyperelastic_op(
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 %(declaration_block)s
 
@@ -864,6 +872,8 @@ namespace sfem {
         bool objective_uses_affine{false};
         bool gradient_uses_affine{false};
         bool apply_uses_affine{false};
+        bool use_packed_two_pass{false};
+        std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     };
 
     std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -5498,6 +5508,59 @@ def _residual_apply_dispatch_body(
     return "\n".join(lines)
 
 
+def _packed_two_pass_function(function):
+    if "_packed_two_pass_" in function:
+        return function
+    return function.replace("_packed_", "_packed_two_pass_", 1)
+
+
+def _packed_call_args_common():
+    return [
+        "packed->n_packs(packed_block)",
+        "packed->n_elements_per_pack(packed_block)",
+        "domain.block->n_elements()",
+        "mesh->n_nodes()",
+        "packed->max_nodes_per_pack()",
+        "packed_elements->data()",
+        "owned_nodes_ptr->data()",
+        "n_shared_nodes->data()",
+        "ghost_ptr->data()",
+        "ghost_idx->data()",
+    ]
+
+
+def _packed_two_pass_extra_args():
+    return [
+        "packed->n_ghost_entries(packed_block)",
+        "packed->n_ghost_reduce_rows(packed_block)",
+        "ghost_reduce_ptr->data()",
+        "ghost_reduce_idx->data()",
+        "ghost_reduce_dest->data()",
+        "impl_->packed_ghost_buf[packed_block]->data()",
+    ]
+
+
+def _hyperelastic_packed_return(indent, function, leading_args, trailing_args, kernel_sources):
+    """leading_args usually ['domain.element_type']; trailing follows ghost_idx."""
+    two_pass = _packed_two_pass_function(function)
+    base = list(leading_args) + _packed_call_args_common()
+    one_call = ", ".join(base + list(trailing_args))
+    if not _c_abi_function_exists(kernel_sources, two_pass, public_only=True):
+        return ["%sreturn %s(%s);" % (indent, function, one_call)]
+    two_call = ", ".join(
+        list(leading_args)
+        + _packed_call_args_common()
+        + _packed_two_pass_extra_args()
+        + list(trailing_args)
+    )
+    return [
+        "%sif (impl_->use_packed_two_pass) {" % indent,
+        "%s    return %s(%s);" % (indent, two_pass, two_call),
+        "%s}" % indent,
+        "%sreturn %s(%s);" % (indent, function, one_call),
+    ]
+
+
 def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent):
     lines = [
         "%sconst int dim = mesh->spatial_dimension();" % indent,
@@ -5530,31 +5593,29 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                         "%s                auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
                         "%s                auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
                         "%s                auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-                        "%s                return %s(%s);" % (
-                            indent,
-                            packed_affine,
-                            ", ".join(
-                                [
-                                    "domain.element_type",
-                                    "packed->n_packs(packed_block)",
-                                    "packed->n_elements_per_pack(packed_block)",
-                                    "domain.block->n_elements()",
-                                    "mesh->n_nodes()",
-                                    "packed->max_nodes_per_pack()",
-                                    "packed_elements->data()",
-                                    "owned_nodes_ptr->data()",
-                                    "n_shared_nodes->data()",
-                                    "ghost_ptr->data()",
-                                    "ghost_idx->data()",
-                                    *("adjugate[%d]" % i for i in range(dim * dim)),
-                                    "determinant",
-                                    *parameter_args,
-                                    *current_args,
-                                    *direction_args,
-                                    *output_args,
-                                ]
-                            ),
-                        ),
+                        "%s                auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+                        "%s                auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+                        "%s                auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+                    ]
+                )
+                lines.extend(
+                    _hyperelastic_packed_return(
+                        indent + "                ",
+                        packed_affine,
+                        ["domain.element_type"],
+                        [
+                            *("adjugate[%d]" % i for i in range(dim * dim)),
+                            "determinant",
+                            *parameter_args,
+                            *current_args,
+                            *direction_args,
+                            *output_args,
+                        ],
+                        kernel_sources,
+                    )
+                )
+                lines.extend(
+                    [
                         "%s            }" % indent,
                         "%s        }" % indent,
                     ]
@@ -5596,30 +5657,28 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                     "%s            auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
                     "%s            auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
                     "%s            auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-                    "%s            return %s(%s);" % (
-                        indent,
-                        packed,
-                        ", ".join(
-                            [
-                                "domain.element_type",
-                                "packed->n_packs(packed_block)",
-                                "packed->n_elements_per_pack(packed_block)",
-                                "domain.block->n_elements()",
-                                "mesh->n_nodes()",
-                                "packed->max_nodes_per_pack()",
-                                "packed_elements->data()",
-                                "owned_nodes_ptr->data()",
-                                "n_shared_nodes->data()",
-                                "ghost_ptr->data()",
-                                "ghost_idx->data()",
-                                "points",
-                                *parameter_args,
-                                *current_args,
-                                *direction_args,
-                                *output_args,
-                            ]
-                        ),
-                    ),
+                    "%s            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+                    "%s            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+                    "%s            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+                ]
+            )
+            lines.extend(
+                _hyperelastic_packed_return(
+                    indent + "            ",
+                    packed,
+                    ["domain.element_type"],
+                    [
+                        "points",
+                        *parameter_args,
+                        *current_args,
+                        *direction_args,
+                        *output_args,
+                    ],
+                    kernel_sources,
+                )
+            )
+            lines.extend(
+                [
                     "%s        }" % indent,
                     "%s    }" % indent,
                 ]
@@ -5669,6 +5728,9 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
         "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
         "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+        "%s        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+        "%s        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
         "%s        const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted_affine = False
@@ -5688,36 +5750,23 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
             else []
         )
         output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        affine_lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
         affine_lines.extend(
-            [
-                "%s        %s (dim == %d) {" % (indent, prefix, dim),
-                "%s            return %s(%s);" % (
-                    indent,
-                    function,
-                    ", ".join(
-                        [
-                            "domain.element_type",
-                            "packed->n_packs(packed_block)",
-                            "packed->n_elements_per_pack(packed_block)",
-                            "domain.block->n_elements()",
-                            "mesh->n_nodes()",
-                            "packed->max_nodes_per_pack()",
-                            "packed_elements->data()",
-                            "owned_nodes_ptr->data()",
-                            "n_shared_nodes->data()",
-                            "ghost_ptr->data()",
-                            "ghost_idx->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
-                            *parameter_args,
-                            *current_args,
-                            *output_args,
-                        ]
-                    ),
-                ),
-                "%s        }" % indent,
-            ]
+            _hyperelastic_packed_return(
+                indent + "            ",
+                function,
+                ["domain.element_type"],
+                [
+                    *("adjugate[%d]" % i for i in range(dim * dim)),
+                    "determinant",
+                    *parameter_args,
+                    *current_args,
+                    *output_args,
+                ],
+                kernel_sources,
+            )
         )
+        affine_lines.append("%s        }" % indent)
     affine_lines.extend(
         [
             "%s    }" % indent,
@@ -5734,6 +5783,9 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
         "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
         "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+        "%s        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+        "%s        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
         "%s        const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted = False
@@ -5753,35 +5805,22 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
             else []
         )
         output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
         lines.extend(
-            [
-                "%s        %s (dim == %d) {" % (indent, prefix, dim),
-                "%s            return %s(%s);" % (
-                    indent,
-                    function,
-                    ", ".join(
-                        [
-                            "domain.element_type",
-                            "packed->n_packs(packed_block)",
-                            "packed->n_elements_per_pack(packed_block)",
-                            "domain.block->n_elements()",
-                            "mesh->n_nodes()",
-                            "packed->max_nodes_per_pack()",
-                            "packed_elements->data()",
-                            "owned_nodes_ptr->data()",
-                            "n_shared_nodes->data()",
-                            "ghost_ptr->data()",
-                            "ghost_idx->data()",
-                            "points",
-                            *parameter_args,
-                            *current_args,
-                            *output_args,
-                        ]
-                    ),
-                ),
-                "%s        }" % indent,
-            ]
+            _hyperelastic_packed_return(
+                indent + "            ",
+                function,
+                ["domain.element_type"],
+                [
+                    "points",
+                    *parameter_args,
+                    *current_args,
+                    *output_args,
+                ],
+                kernel_sources,
+            )
         )
+        lines.append("%s        }" % indent)
     lines.extend(
         [
             "%s    }" % indent,

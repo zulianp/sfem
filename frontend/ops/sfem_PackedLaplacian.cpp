@@ -175,6 +175,83 @@ struct PackedLaplacianApply {
 
         return SFEM_SUCCESS;
     }
+
+    /// Atomics-free two-pass apply (paper Alg. 2): owned writes in pass 1,
+    /// ghost contributions buffered then CSR-gathered in pass 2.
+    static int apply_two_pass(const ptrdiff_t                       n_packs,
+                              const ptrdiff_t                       n_elements_per_pack,
+                              const ptrdiff_t                       n_elements,
+                              const ptrdiff_t                       max_nodes_per_pack,
+                              pack_idx_t **const SFEM_RESTRICT      elements,
+                              const jacobian_t *const SFEM_RESTRICT fff,
+                              const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
+                              const ptrdiff_t *const SFEM_RESTRICT  ghost_ptr,
+                              const idx_t *const SFEM_RESTRICT      ghost_idx,
+                              const ptrdiff_t                       n_ghost_reduce_rows,
+                              const ptrdiff_t *const SFEM_RESTRICT  ghost_reduce_ptr,
+                              const ptrdiff_t *const SFEM_RESTRICT  ghost_reduce_idx,
+                              const idx_t *const SFEM_RESTRICT      ghost_reduce_dest,
+                              real_t *const SFEM_RESTRICT           ghost_buf,
+                              const real_t *const SFEM_RESTRICT     u,
+                              real_t *const SFEM_RESTRICT           values,
+                              PackedLaplacianScratch               &scratch) {
+#pragma omp parallel
+        {
+#ifdef _OPENMP
+            int thread_id = omp_get_thread_num();
+#else
+            int thread_id = 0;
+#endif
+
+            real_t *in  = scratch.in(thread_id);
+            real_t *out = scratch.out(thread_id);
+            memset(out, 0, max_nodes_per_pack * sizeof(real_t));
+
+#pragma omp for schedule(static)
+            for (ptrdiff_t p = 0; p < n_packs; p++) {
+                const ptrdiff_t e_start      = p * n_elements_per_pack;
+                const ptrdiff_t e_end        = MIN(n_elements, (p + 1) * n_elements_per_pack);
+                const ptrdiff_t n_contiguous = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
+                const ptrdiff_t n_ghost      = ghost_ptr[p + 1] - ghost_ptr[p];
+                const auto      ghosts       = &ghost_idx[ghost_ptr[p]];
+                scalar_t *const g_out        = &out[n_contiguous];
+
+                memcpy(in, &u[owned_nodes_ptr[p]], n_contiguous * sizeof(real_t));
+
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    in[n_contiguous + k] = u[ghosts[k]];
+                }
+
+                MicroKernel::apply(e_start, e_end, elements, fff, in, out);
+
+                real_t *const SFEM_RESTRICT acc = &values[owned_nodes_ptr[p]];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    acc[k] += out[k];
+                    out[k] = 0;
+                }
+
+                const ptrdiff_t ghost_off = ghost_ptr[p];
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    ghost_buf[ghost_off + k] = g_out[k];
+                    g_out[k]                 = 0;
+                }
+            }
+        }
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+            const idx_t     dest  = ghost_reduce_dest[row];
+            const ptrdiff_t begin = ghost_reduce_ptr[row];
+            const ptrdiff_t end   = ghost_reduce_ptr[row + 1];
+            real_t          sum   = 0;
+            for (ptrdiff_t j = begin; j < end; ++j) {
+                sum += ghost_buf[ghost_reduce_idx[j]];
+            }
+            values[dest] += sum;
+        }
+
+        return SFEM_SUCCESS;
+    }
 };
 
 template <typename pack_idx_t>
@@ -534,6 +611,90 @@ static int packed_laplacian_apply(smesh::ElemType                       element_
     }
 }
 
+template <typename pack_idx_t>
+static int packed_laplacian_apply_two_pass(smesh::ElemType                       element_type,
+                                           const ptrdiff_t                       n_packs,
+                                           const ptrdiff_t                       n_elements_per_pack,
+                                           const ptrdiff_t                       n_elements,
+                                           const ptrdiff_t                       max_nodes_per_pack,
+                                           pack_idx_t **const SFEM_RESTRICT      elements,
+                                           const jacobian_t *const SFEM_RESTRICT fff,
+                                           const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
+                                           const ptrdiff_t *const SFEM_RESTRICT  ghost_ptr,
+                                           const idx_t *const SFEM_RESTRICT      ghost_idx,
+                                           const ptrdiff_t                       n_ghost_reduce_rows,
+                                           const ptrdiff_t *const SFEM_RESTRICT  ghost_reduce_ptr,
+                                           const ptrdiff_t *const SFEM_RESTRICT  ghost_reduce_idx,
+                                           const idx_t *const SFEM_RESTRICT      ghost_reduce_dest,
+                                           real_t *const SFEM_RESTRICT           ghost_buf,
+                                           const real_t *const SFEM_RESTRICT     u,
+                                           real_t *const SFEM_RESTRICT           values,
+                                           PackedLaplacianScratch               &scratch) {
+    switch (element_type) {
+        case smesh::TET4:
+            return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel<PackedIdxType>>::apply_two_pass(
+                    n_packs,
+                    n_elements_per_pack,
+                    n_elements,
+                    max_nodes_per_pack,
+                    elements,
+                    fff,
+                    owned_nodes_ptr,
+                    ghost_ptr,
+                    ghost_idx,
+                    n_ghost_reduce_rows,
+                    ghost_reduce_ptr,
+                    ghost_reduce_idx,
+                    ghost_reduce_dest,
+                    ghost_buf,
+                    u,
+                    values,
+                    scratch);
+        case smesh::HEX8:
+            return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel<PackedIdxType>>::apply_two_pass(
+                    n_packs,
+                    n_elements_per_pack,
+                    n_elements,
+                    max_nodes_per_pack,
+                    elements,
+                    fff,
+                    owned_nodes_ptr,
+                    ghost_ptr,
+                    ghost_idx,
+                    n_ghost_reduce_rows,
+                    ghost_reduce_ptr,
+                    ghost_reduce_idx,
+                    ghost_reduce_dest,
+                    ghost_buf,
+                    u,
+                    values,
+                    scratch);
+        case smesh::TET10:
+            return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel<PackedIdxType>>::apply_two_pass(
+                    n_packs,
+                    n_elements_per_pack,
+                    n_elements,
+                    max_nodes_per_pack,
+                    elements,
+                    fff,
+                    owned_nodes_ptr,
+                    ghost_ptr,
+                    ghost_idx,
+                    n_ghost_reduce_rows,
+                    ghost_reduce_ptr,
+                    ghost_reduce_idx,
+                    ghost_reduce_dest,
+                    ghost_buf,
+                    u,
+                    values,
+                    scratch);
+        default: {
+            SFEM_ERROR("packed_laplacian_apply_two_pass not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
 namespace sfem {
 
     class PackedLaplacian::Impl {
@@ -543,6 +704,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace::PackedMesh>           packed;
         std::vector<SharedBuffer<jacobian_t>>                fff;
         std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
+        std::vector<SharedBuffer<real_t>>                    ghost_buf;
+        bool                                                 use_two_pass{false};
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -551,6 +714,7 @@ namespace sfem {
 #if SFEM_PRINT_THROUGHPUT
             op_profiler = std::make_unique<OpTracer>(space, "PackedLaplacian::apply");
 #endif
+            use_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
         }
         ~Impl() {}
 
@@ -575,8 +739,11 @@ namespace sfem {
         impl_->packed = impl_->space->packed_mesh();
 
         impl_->scratch.resize(impl_->packed->n_blocks());
+        impl_->ghost_buf.resize(impl_->packed->n_blocks());
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {
             impl_->scratch[b] = std::make_shared<PackedLaplacianScratch>(impl_->packed->max_nodes_per_pack());
+            const ptrdiff_t n_ghost = impl_->packed->n_ghost_entries(b);
+            impl_->ghost_buf[b]     = create_host_buffer<real_t>(n_ghost > 0 ? n_ghost : 1);
         }
 
         impl_->fff.resize(impl_->packed->n_blocks());
@@ -732,6 +899,30 @@ namespace sfem {
             auto fff                = impl_->fff[b]->data();
             auto scratch            = impl_->scratch[b];
             auto max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
+            if (impl_->use_two_pass) {
+                auto ghost_reduce_ptr  = impl_->packed->ghost_reduce_ptr(b);
+                auto ghost_reduce_idx  = impl_->packed->ghost_reduce_idx(b);
+                auto ghost_reduce_dest = impl_->packed->ghost_reduce_dest(b);
+                return packed_laplacian_apply_two_pass<PackedIdxType>(
+                        domain.element_type,
+                        impl_->packed->n_packs(b),
+                        impl_->packed->n_elements_per_pack(b),
+                        elements->extent(1),
+                        max_nodes_per_pack,
+                        elements->data(),
+                        fff,
+                        owned_nodes_ptr->data(),
+                        ghost_ptr->data(),
+                        ghost_idx->data(),
+                        impl_->packed->n_ghost_reduce_rows(b),
+                        ghost_reduce_ptr->data(),
+                        ghost_reduce_idx->data(),
+                        ghost_reduce_dest->data(),
+                        impl_->ghost_buf[b]->data(),
+                        h,
+                        out,
+                        *scratch);
+            }
             return packed_laplacian_apply<PackedIdxType>(domain.element_type,
                                                          impl_->packed->n_packs(b),
                                                          impl_->packed->n_elements_per_pack(b),

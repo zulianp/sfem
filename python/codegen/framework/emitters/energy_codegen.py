@@ -3555,7 +3555,6 @@ def _sfem_soa_packed_apply_public_wrappers(
         return []
 
     is_affine = geometry_mode == "affine"
-    public_base = function_name.replace("_%s_" % form_name, "_%s_packed_" % form_name)
     reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
     tensor_grad_name = "%sgrad_1d" % reference_prefix
@@ -3564,432 +3563,513 @@ def _sfem_soa_packed_apply_public_wrappers(
     coordinate_streams_name = "block_coordinate_data"
     lines = ["namespace sfem {", "namespace codegen {", ""]
 
-    for scalar_type in ("double", "float"):
-        suffix = "" if scalar_type == "double" else "_float"
-        public_name = "%s%s" % (public_base, suffix)
-        lines.extend(
-            [
-                'extern "C" int %s(' % public_name,
-                "        const ptrdiff_t n_packs,",
-                "        const ptrdiff_t n_elements_per_pack,",
-                "        const ptrdiff_t nelements,",
-                "        const ptrdiff_t nnodes,",
-                "        const ptrdiff_t max_nodes_per_pack,",
-                "        uint16_t **const SFEM_RESTRICT elements,",
-                "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
-                "        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,",
-                "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
-                "        const idx_t *const SFEM_RESTRICT ghost_idx,",
-            ]
-        )
-        if is_affine:
-            for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("        const geom_t *const SFEM_RESTRICT g_%s," % stream)
-            lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
-        else:
-            lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
-        lines.extend(
-            "        const %s %s," % (scalar_type, parameter)
-            for parameter in material_parameter_names
-        )
-        if uses_current:
-            lines.append("        const ptrdiff_t u_stride,")
-            for d in range(dim):
-                lines.append(
-                    "        const %s *const SFEM_RESTRICT u%s,"
-                    % (scalar_type, _component_name(d))
-                )
-        if uses_direction:
-            lines.append("        const ptrdiff_t h_stride,")
-            for d in range(dim):
-                lines.append(
-                    "        const %s *const SFEM_RESTRICT h%s,"
-                    % (scalar_type, _component_name(d))
-                )
-        lines.append("        const ptrdiff_t out_stride,")
-        for d in range(dim):
-            comma = "," if d + 1 < dim else ""
-            lines.append(
-                "        %s *const SFEM_RESTRICT out%s%s"
-                % (scalar_type, _component_name(d), comma)
-            )
-        lines.extend(
-            [
-                ") {",
-                "    using scalar_t = %s;" % scalar_type,
-                "    static constexpr int DIM = %d;" % dim,
-                "    static constexpr int N_QP = %d;" % n_qp,
-                "    static constexpr int N_SHAPE = %d;" % n_nodes,
-                "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
-                "    (void)nnodes;",
-                "",
-            ]
-        )
-        if not is_affine:
-            for d in range(dim):
-                lines.append(
-                    "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
-                    % (_component_name(d), d)
-                )
-            lines.extend(
-                _ordered_element_pointer_array_lines(
-                    "uint16_t",
-                    "coordinate_elements",
-                    "elements",
-                    stream_shape_order,
-                    "    ",
-                )
-            )
-        lines.extend(
-            _sfem_soa_mesh_reference_alias_lines(
-                prefix,
-                quadrature_rule,
-                reference_inputs,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                geometry_mode,
-                emit_reference_basis=True,
-            )
-        )
-        if use_tensor_product_reference:
+    for pass_mode in ("one_pass", "two_pass"):
+        two_pass = pass_mode == "two_pass"
+        packed_token = "_%s_packed_two_pass_" % form_name if two_pass else "_%s_packed_" % form_name
+        public_base = function_name.replace("_%s_" % form_name, packed_token)
+        for scalar_type in ("double", "float"):
+            suffix = "" if scalar_type == "double" else "_float"
+            public_name = "%s%s" % (public_base, suffix)
             lines.extend(
                 [
-                    "    static constexpr int N_QP_1D = %d;"
-                    % quadrature_rule.tensor_product_n_qp_1d,
-                    "    static constexpr int N_SHAPE_1D = %d;"
-                    % quadrature_rule.tensor_product_n_shape_1d,
+                    'extern "C" int %s(' % public_name,
+                    "        const ptrdiff_t n_packs,",
+                    "        const ptrdiff_t n_elements_per_pack,",
+                    "        const ptrdiff_t nelements,",
+                    "        const ptrdiff_t nnodes,",
+                    "        const ptrdiff_t max_nodes_per_pack,",
+                    "        uint16_t **const SFEM_RESTRICT elements,",
+                    "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
+                    "        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,",
+                    "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
+                    "        const idx_t *const SFEM_RESTRICT ghost_idx,",
                 ]
             )
-        lines.extend(
-            [
-                "",
-                "#pragma omp parallel",
-                "    {",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);"
+            if two_pass:
+                lines.extend(
+                    [
+                        "        const ptrdiff_t n_ghost_entries,",
+                        "        const ptrdiff_t n_ghost_reduce_rows,",
+                        "        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,",
+                        "        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,",
+                        "        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,",
+                        "        %s *const SFEM_RESTRICT ghost_buf," % scalar_type,
+                    ]
+                )
+            if is_affine:
+                for stream in _soa_array_stream_names(_adjugate_input(dim)):
+                    lines.append("        const geom_t *const SFEM_RESTRICT g_%s," % stream)
+                lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+            else:
+                lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
+            lines.extend(
+                "        const %s %s," % (scalar_type, parameter)
+                for parameter in material_parameter_names
             )
-        if uses_current:
-            lines.append(
-                "        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);"
-            )
-        if uses_direction:
-            lines.append(
-                "        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);"
-            )
-        lines.extend(
-            [
-                "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);",
-                "",
-                "#pragma omp for schedule(static)",
-                "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
-                "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
-                "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
-                "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
-                "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
-                "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
-                "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
-                "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "            const geom_t *const coordinate_components[DIM] = {%s};"
-                % ", ".join(_component_name(d) for d in range(dim))
-            )
-        if uses_current:
-            lines.append(
-                "            const scalar_t *const u_components[DIM] = {%s};"
-                % ", ".join("u%s" % _component_name(d) for d in range(dim))
-            )
-        if uses_direction:
-            lines.append(
-                "            const scalar_t *const h_components[DIM] = {%s};"
-                % ", ".join("h%s" % _component_name(d) for d in range(dim))
-            )
-        lines.extend(
-            [
-                "            scalar_t *const out_components[DIM] = {%s};"
-                % ", ".join("out%s" % _component_name(d) for d in range(dim)),
-                "            for (int d = 0; d < DIM; ++d) {",
-                "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;"
-            )
-        if uses_current:
-            lines.append(
-                "                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;"
-            )
-        if uses_direction:
-            lines.append(
-                "                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;"
-            )
-        if not is_affine:
-            lines.append(
-                "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];"
-            )
-        if uses_current:
-            lines.append(
-                "                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];"
-            )
-        if uses_direction:
-            lines.append("                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];")
-        lines.extend(
-            [
-                "                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
-                "                    pack_component_out[k] = scalar_t(0);",
-                "                }",
-                "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-            ]
-        )
-        if not is_affine:
-            lines.append("                    pack_coordinate[k] = scalar_t(coordinate_component[node]);")
-        if uses_current:
-            lines.append("                    pack_u_component[k] = u_component[node * u_stride];")
-        if uses_direction:
-            lines.append("                    pack_h_component[k] = h_component[node * h_stride];")
-        lines.extend(
-            [
-                "                }",
-                "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                    const idx_t node = ghosts[k];",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);"
-            )
-        if uses_current:
-            lines.append(
-                "                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];"
-            )
-        if uses_direction:
-            lines.append(
-                "                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];"
-            )
-        lines.extend(
-            [
-                "                }",
-                "            }",
-                "",
-                "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
-                "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
-            ]
-        )
-        if uses_current:
-            lines.append("                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        if uses_direction:
-            lines.append("                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        lines.extend(
-            [
-                "                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];",
-            ]
-        )
-        if not is_affine:
-            lines.append("                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
-            for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("                scalar_t block_%s[N_QP * VECTOR_SIZE];" % stream)
+            if uses_current:
+                lines.append("        const ptrdiff_t u_stride,")
+                for d in range(dim):
+                    lines.append(
+                        "        const %s *const SFEM_RESTRICT u%s,"
+                        % (scalar_type, _component_name(d))
+                    )
+            if uses_direction:
+                lines.append("        const ptrdiff_t h_stride,")
+                for d in range(dim):
+                    lines.append(
+                        "        const %s *const SFEM_RESTRICT h%s,"
+                        % (scalar_type, _component_name(d))
+                    )
+            lines.append("        const ptrdiff_t out_stride,")
+            for d in range(dim):
+                comma = "," if d + 1 < dim else ""
+                lines.append(
+                    "        %s *const SFEM_RESTRICT out%s%s"
+                    % (scalar_type, _component_name(d), comma)
+                )
             lines.extend(
                 [
-                    "                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];",
-                    "                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {%s};"
-                    % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+                    ") {",
+                    "    using scalar_t = %s;" % scalar_type,
+                    "    static constexpr int DIM = %d;" % dim,
+                    "    static constexpr int N_QP = %d;" % n_qp,
+                    "    static constexpr int N_SHAPE = %d;" % n_nodes,
+                    "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+                    "    (void)nnodes;",
+                    "",
                 ]
             )
-        if uses_current:
+            if not is_affine:
+                for d in range(dim):
+                    lines.append(
+                        "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
+                        % (_component_name(d), d)
+                    )
+                lines.extend(
+                    _ordered_element_pointer_array_lines(
+                        "uint16_t",
+                        "coordinate_elements",
+                        "elements",
+                        stream_shape_order,
+                        "    ",
+                    )
+                )
             lines.extend(
-                _ordered_stream_pointer_array_lines(
-                        "const scalar_t *",
-                        "block_u_streams",
-                        "block_u_data",
+                _sfem_soa_mesh_reference_alias_lines(
+                    prefix,
+                    quadrature_rule,
+                    reference_inputs,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    geometry_mode,
+                    emit_reference_basis=True,
+                )
+            )
+            if use_tensor_product_reference:
+                lines.extend(
+                    [
+                        "    static constexpr int N_QP_1D = %d;"
+                        % quadrature_rule.tensor_product_n_qp_1d,
+                        "    static constexpr int N_SHAPE_1D = %d;"
+                        % quadrature_rule.tensor_product_n_shape_1d,
+                    ]
+                )
+            lines.extend(
+                [
+                    "",
+                    "#pragma omp parallel",
+                    "    {",
+                ]
+            )
+            if not is_affine:
+                lines.append(
+                    "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);"
+                )
+            if uses_current:
+                lines.append(
+                    "        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);"
+                )
+            if uses_direction:
+                lines.append(
+                    "        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);"
+                )
+            lines.extend(
+                [
+                    "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);",
+                    "",
+                    "#pragma omp for schedule(static)",
+                    "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                    "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                    "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                    "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+                ]
+            )
+            if two_pass:
+                lines.extend(
+                    [
+                        "            (void)n_shared_nodes;",
+                        "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                        "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
+                        "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                        "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
+                    ]
+                )
+            else:
+                lines.extend(
+                    [
+                        "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+                        "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+                        "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                        "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
+                        "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                    ]
+                )
+            if not is_affine:
+                lines.append(
+                    "            const geom_t *const coordinate_components[DIM] = {%s};"
+                    % ", ".join(_component_name(d) for d in range(dim))
+                )
+            if uses_current:
+                lines.append(
+                    "            const scalar_t *const u_components[DIM] = {%s};"
+                    % ", ".join("u%s" % _component_name(d) for d in range(dim))
+                )
+            if uses_direction:
+                lines.append(
+                    "            const scalar_t *const h_components[DIM] = {%s};"
+                    % ", ".join("h%s" % _component_name(d) for d in range(dim))
+                )
+            lines.extend(
+                [
+                    "            scalar_t *const out_components[DIM] = {%s};"
+                    % ", ".join("out%s" % _component_name(d) for d in range(dim)),
+                    "            for (int d = 0; d < DIM; ++d) {",
+                    "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                ]
+            )
+            if not is_affine:
+                lines.append(
+                    "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;"
+                )
+            if uses_current:
+                lines.append(
+                    "                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;"
+                )
+            if uses_direction:
+                lines.append(
+                    "                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;"
+                )
+            if not is_affine:
+                lines.append(
+                    "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];"
+                )
+            if uses_current:
+                lines.append(
+                    "                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];"
+                )
+            if uses_direction:
+                lines.append("                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];")
+            lines.extend(
+                [
+                    "                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
+                    "                    pack_component_out[k] = scalar_t(0);",
+                    "                }",
+                    "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                    "                    const idx_t node = owned_nodes_ptr[pack] + k;",
+                ]
+            )
+            if not is_affine:
+                lines.append("                    pack_coordinate[k] = scalar_t(coordinate_component[node]);")
+            if uses_current:
+                lines.append("                    pack_u_component[k] = u_component[node * u_stride];")
+            if uses_direction:
+                lines.append("                    pack_h_component[k] = h_component[node * h_stride];")
+            lines.extend(
+                [
+                    "                }",
+                    "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                    "                    const idx_t node = ghosts[k];",
+                ]
+            )
+            if not is_affine:
+                lines.append(
+                    "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);"
+                )
+            if uses_current:
+                lines.append(
+                    "                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];"
+                )
+            if uses_direction:
+                lines.append(
+                    "                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];"
+                )
+            lines.extend(
+                [
+                    "                }",
+                    "            }",
+                    "",
+                    "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+                    "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+                ]
+            )
+            if uses_current:
+                lines.append("                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+            if uses_direction:
+                lines.append("                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
+            lines.extend(
+                [
+                    "                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];",
+                ]
+            )
+            if not is_affine:
+                lines.append("                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+                for stream in _soa_array_stream_names(_adjugate_input(dim)):
+                    lines.append("                scalar_t block_%s[N_QP * VECTOR_SIZE];" % stream)
+                lines.extend(
+                    [
+                        "                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];",
+                        "                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {%s};"
+                        % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+                    ]
+                )
+            if uses_current:
+                lines.extend(
+                    _ordered_stream_pointer_array_lines(
+                            "const scalar_t *",
+                            "block_u_streams",
+                            "block_u_data",
+                            dim,
+                            stream_shape_order,
+                            "                ",
+                        )
+                )
+            if uses_direction:
+                lines.extend(
+                    _ordered_stream_pointer_array_lines(
+                            "const scalar_t *",
+                            "block_h_streams",
+                            "block_h_data",
+                            dim,
+                            stream_shape_order,
+                            "                ",
+                        )
+                )
+            lines.extend(
+                [
+                    *_ordered_stream_pointer_array_lines(
+                        "scalar_t *",
+                        "block_out_streams",
+                        "block_out_data",
                         dim,
                         stream_shape_order,
                         "                ",
-                    )
+                    ),
+                    "",
+                    "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
+                    *([] if identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
+                    "                    for (int d = 0; d < DIM; ++d) {",
+                    "#pragma omp simd",
+                    "                        for (int lane = 0; lane < nelems; ++lane) {",
+                    "                            const uint16_t packed_node = element_shape[evbegin + lane];",
+                    *([] if identity_stream_shape_order else ["                            const uint16_t coordinate_packed_node = coordinate_shape[evbegin + lane];"]),
+                ]
             )
-        if uses_direction:
+            if not is_affine:
+                lines.append(
+                    "                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
+                    % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node")
+                )
+            if uses_current:
+                lines.append(
+                    "                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];"
+                )
+            if uses_direction:
+                lines.append(
+                    "                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];"
+                )
             lines.extend(
-                _ordered_stream_pointer_array_lines(
-                        "const scalar_t *",
-                        "block_h_streams",
-                        "block_h_data",
-                        dim,
-                        stream_shape_order,
+                [
+                    "                            block_out_data[shape * DIM + d][lane] = scalar_t(0);",
+                    "                        }",
+                    "                    }",
+                    "                }",
+                    "",
+                ]
+            )
+            if is_affine:
+                lines.extend(
+                    _sfem_soa_affine_geometry_stream_lines(
+                        source_builder,
+                        (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
                         "                ",
                     )
-            )
-        lines.extend(
-            [
-                *_ordered_stream_pointer_array_lines(
-                    "scalar_t *",
-                    "block_out_streams",
-                    "block_out_data",
+                )
+            elif use_tensor_product_geometry:
+                lines.extend(
+                    tensor_product_gradient_isoparametric_geometry_lines(
+                        dim=dim,
+                        n_shape=n_nodes,
+                        n_qp=quadrature_rule.n_qp,
+                        local_prefix=local_prefix,
+                        coordinate_streams="block_coordinate_data",
+                        contiguous_coordinate_streams=True,
+                        adjugate_target=lambda component, index: (
+                            "block_jacobian_adjugate%d[%s]" % (component, index)
+                        ),
+                        determinant_target=lambda index: (
+                            "block_jacobian_determinant0[%s]" % index
+                        ),
+                        adjugate_streams=tuple(
+                            "block_jacobian_adjugate%d" % component
+                            for component in range(dim * dim)
+                        ),
+                        determinant_stream="block_jacobian_determinant0",
+                        shape_name=tensor_shape_name,
+                        grad_name=tensor_grad_name,
+                    )
+                )
+            else:
+                lines.extend(["", "                for (int q = 0; q < N_QP; ++q) {"])
+                geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                     dim,
-                    stream_shape_order,
-                    "                ",
-                ),
-                "",
-                "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
-                *([] if identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
-                "                    for (int d = 0; d < DIM; ++d) {",
-                "#pragma omp simd",
-                "                        for (int lane = 0; lane < nelems; ++lane) {",
-                "                            const uint16_t packed_node = element_shape[evbegin + lane];",
-                *([] if identity_stream_shape_order else ["                            const uint16_t coordinate_packed_node = coordinate_shape[evbegin + lane];"]),
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
-                % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node")
-            )
-        if uses_current:
-            lines.append(
-                "                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];"
-            )
-        if uses_direction:
-            lines.append(
-                "                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];"
-            )
-        lines.extend(
-            [
-                "                            block_out_data[shape * DIM + d][lane] = scalar_t(0);",
-                "                        }",
-                "                    }",
-                "                }",
-                "",
-            ]
-        )
-        if is_affine:
-            lines.extend(
-                _sfem_soa_affine_geometry_stream_lines(
-                    source_builder,
-                    (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
-                    "                ",
+                    n_nodes,
+                    quadrature_rule,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    q_major=True,
+                    reference_prefix=reference_prefix,
+                    source_builder=source_builder,
+                    coordinate_streams=coordinate_streams_name,
                 )
-            )
-        elif use_tensor_product_geometry:
-            lines.extend(
-                tensor_product_gradient_isoparametric_geometry_lines(
-                    dim=dim,
-                    n_shape=n_nodes,
-                    n_qp=quadrature_rule.n_qp,
-                    local_prefix=local_prefix,
-                    coordinate_streams="block_coordinate_data",
-                    contiguous_coordinate_streams=True,
-                    adjugate_target=lambda component, index: (
-                        "block_jacobian_adjugate%d[%s]" % (component, index)
-                    ),
-                    determinant_target=lambda index: (
-                        "block_jacobian_determinant0[%s]" % index
-                    ),
-                    adjugate_streams=tuple(
-                        "block_jacobian_adjugate%d" % component
-                        for component in range(dim * dim)
-                    ),
-                    determinant_stream="block_jacobian_determinant0",
-                    shape_name=tensor_shape_name,
-                    grad_name=tensor_grad_name,
-                )
-            )
-        else:
-            lines.extend(["", "                for (int q = 0; q < N_QP; ++q) {"])
-            geometry_lines = _sfem_soa_isoparametric_geometry_lines(
-                dim,
-                n_nodes,
-                quadrature_rule,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                reference_inputs,
-                q_major=True,
-                reference_prefix=reference_prefix,
-                source_builder=source_builder,
-                coordinate_streams=coordinate_streams_name,
-            )
-            lines.extend("    %s" % line if line else line for line in geometry_lines)
-            lines.append("                }")
+                lines.extend("    %s" % line if line else line for line in geometry_lines)
+                lines.append("                }")
 
-        call_args = [
-            "nelems",
-            "0" if is_affine else "VECTOR_SIZE",
-            *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-            "block_jacobian_determinant0",
-        ]
-        if omit_reference_basis_inputs:
-            pass
-        elif use_tensor_product_reference:
-            call_args.extend((tensor_shape_name, tensor_grad_name))
-        elif use_reference_gradient_vectors:
-            call_args.extend(
-                "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
-                for component in range(dim)
-            )
-        else:
-            call_args.extend(
-                "%s%s" % (reference_prefix, array_input.name)
-                for array_input in reference_inputs
-            )
-        call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
-        call_args.extend(material_parameter_names)
-        if uses_current:
-            call_args.append("block_u_streams")
-        if uses_direction:
-            call_args.append("block_h_streams")
-        call_args.append("block_out_streams")
-        lines.extend(
-            [
-                "",
-                "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
-                % (block_name, ", ".join(call_args)),
-                "",
-                "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
-                "                    for (int d = 0; d < DIM; ++d) {",
-                "                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
-                "                        for (int lane = 0; lane < nelems; ++lane) {",
-                "                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];",
-                "                        }",
-                "                    }",
-                "                }",
-                "            }",
-                "",
-                "            for (int d = 0; d < DIM; ++d) {",
-                "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
-                "                scalar_t *const SFEM_RESTRICT global_out = out_components[d];",
-                "                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-                "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
-                "                    pack_component_out[k] = scalar_t(0);",
-                "                }",
-                "                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-                "#pragma omp atomic update",
-                "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
-                "                    pack_component_out[k] = scalar_t(0);",
-                "                }",
-                "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "#pragma omp atomic update",
-                "                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];",
-                "                    pack_component_out[n_contiguous + k] = scalar_t(0);",
-                "                }",
-                "            }",
-                "        }",
+            call_args = [
+                "nelems",
+                "0" if is_affine else "VECTOR_SIZE",
+                *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+                "block_jacobian_determinant0",
             ]
-        )
-        lines.extend(
-            [
-                "    }",
-                "    return SFEM_SUCCESS;",
-                "}",
-                "",
-            ]
-        )
+            if omit_reference_basis_inputs:
+                pass
+            elif use_tensor_product_reference:
+                call_args.extend((tensor_shape_name, tensor_grad_name))
+            elif use_reference_gradient_vectors:
+                call_args.extend(
+                    "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
+                    for component in range(dim)
+                )
+            else:
+                call_args.extend(
+                    "%s%s" % (reference_prefix, array_input.name)
+                    for array_input in reference_inputs
+                )
+            call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
+            call_args.extend(material_parameter_names)
+            if uses_current:
+                call_args.append("block_u_streams")
+            if uses_direction:
+                call_args.append("block_h_streams")
+            call_args.append("block_out_streams")
+            lines.extend(
+                [
+                    "",
+                    "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+                    % (block_name, ", ".join(call_args)),
+                    "",
+                    "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
+                    "                    for (int d = 0; d < DIM; ++d) {",
+                    "                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                    "                        for (int lane = 0; lane < nelems; ++lane) {",
+                    "                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];",
+                    "                        }",
+                    "                    }",
+                    "                }",
+                    "            }",
+                    "",
+                ]
+            )
+            if two_pass:
+                lines.extend(
+                    [
+                        "            for (int d = 0; d < DIM; ++d) {",
+                        "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                        "                scalar_t *const SFEM_RESTRICT global_out = out_components[d];",
+                        "                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
+                        "                    pack_component_out[k] = scalar_t(0);",
+                        "                }",
+                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        "                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];",
+                        "                    pack_component_out[n_contiguous + k] = scalar_t(0);",
+                        "                }",
+                        "            }",
+                        "        }",
+                    ]
+                )
+            else:
+                lines.extend(
+                    [
+                        "            for (int d = 0; d < DIM; ++d) {",
+                        "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                        "                scalar_t *const SFEM_RESTRICT global_out = out_components[d];",
+                        "                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
+                        "                    pack_component_out[k] = scalar_t(0);",
+                        "                }",
+                        "                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+                        "#pragma omp atomic update",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
+                        "                    pack_component_out[k] = scalar_t(0);",
+                        "                }",
+                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        "#pragma omp atomic update",
+                        "                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];",
+                        "                    pack_component_out[n_contiguous + k] = scalar_t(0);",
+                        "                }",
+                        "            }",
+                        "        }",
+                    ]
+                )
+            if two_pass:
+                lines.extend(
+                    [
+                        "    }",
+                        "",
+                        "    scalar_t *const out_components[DIM] = {%s};"
+                        % ", ".join("out%s" % _component_name(d) for d in range(dim)),
+                        "#pragma omp parallel for schedule(static)",
+                        "    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
+                        "        const idx_t dest = ghost_reduce_dest[row];",
+                        "        const ptrdiff_t begin = ghost_reduce_ptr[row];",
+                        "        const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
+                        "        for (int d = 0; d < DIM; ++d) {",
+                        "            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "            scalar_t sum = scalar_t(0);",
+                        "            for (ptrdiff_t j = begin; j < end; ++j) {",
+                        "                sum += ghost_component[ghost_reduce_idx[j]];",
+                        "            }",
+                        "            out_components[d][dest * out_stride] += sum;",
+                        "        }",
+                        "    }",
+                        "    return SFEM_SUCCESS;",
+                        "}",
+                        "",
+                    ]
+                )
+            else:
+                lines.extend(
+                    [
+                        "    }",
+                        "    return SFEM_SUCCESS;",
+                        "}",
+                        "",
+                    ]
+                )
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
     return lines

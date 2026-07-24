@@ -140,15 +140,20 @@ shift = np.zeros(n)
 solutions = [xc.copy()]
 multipliers = [np.zeros(xc.shape)]
 
-njacs = 2
+print(f'h={h}')
+
+aug_damping = h 
+njacs = 1
 for i in range(2000):
     # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
 
     for j in range(njacs):
         penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
+        # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
+        shift = penalty * np.maximum(0.0, aug_damping * (xc - ub) + shift / penalty)
 
     # if (i + 1) % 10 == 0:
-    shift = omega * penalty * np.maximum(0.0, xc - ub + shift / penalty) + (1-omega) * shift
+    # shift = penalty * np.maximum(0.0, (xc - ub) + shift / penalty)
 
     solutions.append(xc.copy())
     multipliers.append(shift.copy())
@@ -161,7 +166,7 @@ for i in range(2000):
         f"norm_g[{i*njacs}]: {norm_g}, norm_pen: {norm_pen}, norm_shift: {norm_shift}"
     )
 
-    if norm_g < 1e-10:
+    if norm_g < 1e-12:
         break
 
 
