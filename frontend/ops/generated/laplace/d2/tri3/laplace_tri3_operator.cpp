@@ -1,6 +1,7 @@
 #include <type_traits>
 #include <cstdint>
 #include <cstdlib>
+#include <string.h>
 #include "../laplace_d2_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"

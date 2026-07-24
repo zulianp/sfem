@@ -36,6 +36,42 @@ int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
         const ptrdiff_t out_stride,
         double *const SFEM_RESTRICT u_out
 );
+int laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);
+int laplace_tet10_private_metric_jacobian_action_packed_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);
 }
 
 namespace sfem {
@@ -933,6 +969,16 @@ namespace sfem {
                             auto ghost_idx = packed->ghost_idx(packed_block);
                             if (domain.element_type == smesh::TET4) {
                                 return laplace_tet4_jacobian_action_packed_affine_mesh_soa(packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                            }
+                            if (domain.element_type == smesh::HEX8) {
+                                uint16_t *proteus_elements[8] = {packed_elements->data()[0], packed_elements->data()[1], packed_elements->data()[3], packed_elements->data()[2], packed_elements->data()[4], packed_elements->data()[5], packed_elements->data()[7], packed_elements->data()[6]};
+                                return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), proteus_elements, owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                            }
+                            if (domain.element_type == smesh::PROTEUS_HEX8) {
+                                return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
+                            }
+                            if (domain.element_type == smesh::TET10) {
+                                return laplace_tet10_private_metric_jacobian_action_packed_mesh_soa(packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric_aos, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                             }
                             return laplace_jacobian_action_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], FIELD_STRIDE, u_direction_data, FIELD_STRIDE, u_out);
                         }

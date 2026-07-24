@@ -1,6 +1,7 @@
 #include <type_traits>
 #include <cstdint>
 #include <cstdlib>
+#include <string.h>
 #include "../laplace_d3_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
@@ -19,6 +20,8 @@
 #include <omp.h>
 #endif
 #include <cstdio>
+
+#include "tet4_laplacian_inline_cpu.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -2089,6 +2092,127 @@ extern "C" int laplace_tet4_jacobian_action_affine_mesh_soa_aos_unit_float(
 namespace sfem {
 namespace codegen {
 
+template <typename scalar_t, typename jacobian_t, bool UnitKappa>
+static SFEM_INLINE int laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl_kernel(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric0,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric1,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric2,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric3,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric4,
+        const jacobian_t *const SFEM_RESTRICT g_geom_metric5,
+        const scalar_t kappa,
+        const ptrdiff_t direction_stride,
+        const scalar_t *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT u_out
+) {
+    static constexpr int VECTOR_SIZE = 64;
+    (void)nnodes;
+    (void)max_nodes_per_pack;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                pack_direction[k] = u_direction[(owned_nodes_ptr[pack] + k) * direction_stride];
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : kappa;
+
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const ptrdiff_t element = evbegin + lane;
+                    fff0[lane] = metric_factor * scalar_t(g_geom_metric0[element]);
+                    fff1[lane] = metric_factor * scalar_t(g_geom_metric1[element]);
+                    fff2[lane] = metric_factor * scalar_t(g_geom_metric2[element]);
+                    fff3[lane] = metric_factor * scalar_t(g_geom_metric3[element]);
+                    fff4[lane] = metric_factor * scalar_t(g_geom_metric4[element]);
+                    fff5[lane] = metric_factor * scalar_t(g_geom_metric5[element]);
+                }
+
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const ptrdiff_t element = evbegin + lane;
+                    u0[lane] = pack_direction[elements[0][element]];
+                    u1[lane] = pack_direction[elements[1][element]];
+                    u2[lane] = pack_direction[elements[2][element]];
+                    u3[lane] = pack_direction[elements[3][element]];
+                }
+
+#pragma omp simd
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    tet4_laplacian_apply_fff_soa_tpl<scalar_t, scalar_t>(
+                            fff0[lane], fff1[lane], fff2[lane], fff3[lane], fff4[lane], fff5[lane],
+                            u0[lane], u1[lane], u2[lane], u3[lane],
+                            &out0[lane], &out1[lane], &out2[lane], &out3[lane]);
+                }
+
+                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {
+                    const ptrdiff_t element = evbegin + lane;
+                    pack_out[elements[0][element]] += out0[lane];
+                    pack_out[elements[1][element]] += out1[lane];
+                    pack_out[elements[2][element]] += out2[lane];
+                    pack_out[elements[3][element]] += out3[lane];
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
+                pack_out[k] = scalar_t(0);
+            }
+            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
+                pack_out[k] = scalar_t(0);
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                u_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];
+                pack_out[n_contiguous + k] = scalar_t(0);
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
 template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE int laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl(
         const ptrdiff_t n_packs,
@@ -2113,88 +2237,18 @@ static SFEM_INLINE int laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl(
         const ptrdiff_t out_stride,
         scalar_t *const SFEM_RESTRICT u_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 1;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)max_nodes_per_pack;
-    const scalar_t *const affine_q_weight = sfem::codegen::laplace_tet4_affine_reference_data<scalar_t>::q_weight();
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const idx_t node = owned_nodes_ptr[pack] + k;
-                pack_direction[k] = u_direction[node * direction_stride];
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = elements[shape];
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];
-                        block_output[shape][lane] = scalar_t(0);
-                    }
-                }
-                const jacobian_t *const affine_geometry_sources[6] = {g_geom_metric0 + evbegin, g_geom_metric1 + evbegin, g_geom_metric2 + evbegin, g_geom_metric3 + evbegin, g_geom_metric4 + evbegin, g_geom_metric5 + evbegin};
-                scalar_t block_affine_geometry_data[6][VECTOR_SIZE];
-                const scalar_t *block_affine_geometry_streams[6];
-                for (int geometry_stream = 0; geometry_stream < 6; ++geometry_stream) {
-                    block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                            nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
-                }
-                const scalar_t *const block_geom_metric[6] = {block_affine_geometry_streams[0], block_affine_geometry_streams[1], block_affine_geometry_streams[3], block_affine_geometry_streams[2], block_affine_geometry_streams[4], block_affine_geometry_streams[5]};
-                static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};
-
-                laplace_d3_simplex_tet4_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_geom_metric, cached_affine_metric_q_weight, block_direction, kappa, block_output);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = elements[shape];
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];
-                    }
-                }
-            }
-
-            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                u_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];
-                pack_out[n_contiguous + k] = scalar_t(0);
-            }
-        }
+    if (kappa == scalar_t(1)) {
+        return laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl_kernel<scalar_t, jacobian_t, true>(
+                n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,
+                elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,
+                g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,
+                kappa, direction_stride, u_direction, out_stride, u_out);
     }
-    return SFEM_SUCCESS;
+    return laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl_kernel<scalar_t, jacobian_t, false>(
+            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,
+            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,
+            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,
+            kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 } // namespace codegen
@@ -2223,7 +2277,11 @@ extern "C" int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
         const ptrdiff_t out_stride,
         double *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl<double, geom_t>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, direction_stride, u_direction, out_stride, u_out);
+    return sfem::codegen::laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl<double, geom_t>(
+            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,
+            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,
+            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,
+            kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 extern "C" int laplace_tet4_jacobian_action_packed_affine_mesh_soa_float(
@@ -2249,7 +2307,11 @@ extern "C" int laplace_tet4_jacobian_action_packed_affine_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT u_out
 ) {
-    return sfem::codegen::laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl<float, geom_t>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5, kappa, direction_stride, u_direction, out_stride, u_out);
+    return sfem::codegen::laplace_tet4_jacobian_action_packed_affine_mesh_soa_impl<float, geom_t>(
+            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,
+            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,
+            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,
+            kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 namespace sfem {
