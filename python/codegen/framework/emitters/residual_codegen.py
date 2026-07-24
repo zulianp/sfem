@@ -5539,6 +5539,18 @@ def _mesh_operator_source(
                     basis_family,
                 )
             )
+            lines.extend(
+                _scalar_packed_affine_jacobian_action_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    affine_specialization,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                    two_pass=True,
+                )
+            )
         lines.extend(
             _isoparametric_mesh_operator_source(
                 system,
@@ -5802,6 +5814,18 @@ def _mesh_operator_source(
                 basis_family,
             )
         )
+        lines.extend(
+            _scalar_packed_affine_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                affine_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+                two_pass=True,
+            )
+        )
     lines.extend(
         _isoparametric_mesh_operator_source(
             system,
@@ -5826,6 +5850,19 @@ def _mesh_operator_source(
                 coefficients,
                 basis_family,
                 geometry_family,
+            )
+        )
+        lines.extend(
+            _scalar_packed_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                isoparametric_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+                geometry_family,
+                two_pass=True,
             )
         )
     return lines
@@ -8424,6 +8461,7 @@ def _scalar_packed_jacobian_action_source(
     coefficients,
     basis_family=None,
     geometry_family=None,
+    two_pass=False,
 ):
     if len(system.fields) != 1 or not dependencies.direction:
         return []
@@ -8446,7 +8484,8 @@ def _scalar_packed_jacobian_action_source(
         n_fields,
         shape_order,
     )
-    function = "%s_jacobian_action_packed_isoparametric_mesh_soa" % prefix
+    packed_token = "jacobian_action_packed_two_pass_isoparametric_mesh_soa" if two_pass else "jacobian_action_packed_isoparametric_mesh_soa"
+    function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
     block = "%s_jacobian_action_block" % local_prefix
     block_function = "%s_contiguous" % block
@@ -8461,8 +8500,19 @@ def _scalar_packed_jacobian_action_source(
         "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
         "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
         "const idx_t *const SFEM_RESTRICT ghost_idx",
-        "const geom_t *const *const SFEM_RESTRICT points",
     ]
+    if two_pass:
+        params.extend(
+            [
+                "const ptrdiff_t n_ghost_entries",
+                "const ptrdiff_t n_ghost_reduce_rows",
+                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr",
+                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx",
+                "const idx_t *const SFEM_RESTRICT ghost_reduce_dest",
+                "scalar_t *const SFEM_RESTRICT ghost_buf",
+            ]
+        )
+    params.append("const geom_t *const *const SFEM_RESTRICT points")
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
     if dependencies.current:
         params.append("const ptrdiff_t current_stride")
@@ -8767,30 +8817,69 @@ def _scalar_packed_jacobian_action_source(
             "                }",
             "            }",
             "",
-            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-            "                pack_out[k] = scalar_t(0);",
-            "            }",
-            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            "#pragma omp atomic update",
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-            "                pack_out[k] = scalar_t(0);",
-            "            }",
-            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "#pragma omp atomic update",
-            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
-            "                pack_out[n_contiguous + k] = scalar_t(0);",
-            "            }",
-            "        }",
-            "    }",
-            "    return SFEM_SUCCESS;",
-            "}",
-            "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-            "",
         ]
     )
+    if two_pass:
+        lines.extend(
+            [
+                "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                ghost_buf[ghost_off + k] = pack_out[n_contiguous + k];",
+                "                pack_out[n_contiguous + k] = scalar_t(0);",
+                "            }",
+                "        }",
+                "    }",
+                "",
+                "#pragma omp parallel for schedule(static)",
+                "    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
+                "        const idx_t dest = ghost_reduce_dest[row];",
+                "        const ptrdiff_t begin = ghost_reduce_ptr[row];",
+                "        const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
+                "        scalar_t sum = scalar_t(0);",
+                "        for (ptrdiff_t j = begin; j < end; ++j) {",
+                "            sum += ghost_buf[ghost_reduce_idx[j]];",
+                "        }",
+                "        %s_out[dest * out_stride] += sum;" % field.name,
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+                "#pragma omp atomic update",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "#pragma omp atomic update",
+                "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
+                "                pack_out[n_contiguous + k] = scalar_t(0);",
+                "            }",
+                "        }",
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
     for scalar_type, suffix in (("double", ""), ("float", "_float")):
         typed_params = [param.replace("scalar_t", scalar_type) for param in params]
         lines.append('extern "C" int %s%s(' % (function, suffix))
@@ -8807,8 +8896,19 @@ def _scalar_packed_jacobian_action_source(
             "n_shared_nodes",
             "ghost_ptr",
             "ghost_idx",
-            "points",
         ]
+        if two_pass:
+            call_args.extend(
+                [
+                    "n_ghost_entries",
+                    "n_ghost_reduce_rows",
+                    "ghost_reduce_ptr",
+                    "ghost_reduce_idx",
+                    "ghost_reduce_dest",
+                    "ghost_buf",
+                ]
+            )
+        call_args.append("points")
         call_args.extend(map(str, dependencies.parameters))
         if dependencies.current:
             call_args.append("current_stride")
@@ -9418,8 +9518,13 @@ def _scalar_packed_affine_jacobian_action_source(
     dependencies,
     coefficients,
     basis_family=None,
+    two_pass=False,
 ):
     if len(system.fields) != 1 or not dependencies.direction:
+        return []
+    # Affine packed two-pass is covered by isoparametric packed two-pass emission and
+    # hand-written PackedLaplacian; skip incomplete specialized affine two-pass paths.
+    if two_pass:
         return []
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -9456,7 +9561,8 @@ def _scalar_packed_affine_jacobian_action_source(
         n_fields,
         shape_order,
     )
-    function = "%s_jacobian_action_packed_affine_mesh_soa" % prefix
+    packed_token = "jacobian_action_packed_two_pass_affine_mesh_soa" if two_pass else "jacobian_action_packed_affine_mesh_soa"
+    function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
     block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
     block = "%s_jacobian_action_block" % block_prefix
@@ -9528,7 +9634,8 @@ def _scalar_packed_affine_jacobian_action_source(
     )
     field = system.fields[0]
     if (
-        prefix == "laplace_tet4"
+        not two_pass
+        and prefix == "laplace_tet4"
         and dim == 3
         and n_shape == 4
         and n_fields == 1
@@ -9545,7 +9652,8 @@ def _scalar_packed_affine_jacobian_action_source(
             field.name,
         )
     if (
-        prefix == "laplace_proteus_hex8"
+        not two_pass
+        and prefix == "laplace_proteus_hex8"
         and dim == 3
         and n_shape == 8
         and n_fields == 1
@@ -9581,7 +9689,8 @@ def _scalar_packed_affine_jacobian_action_source(
             )
         )
     if (
-        prefix == "laplace_tet10"
+        not two_pass
+        and prefix == "laplace_tet10"
         and dim == 3
         and n_shape == 10
         and n_fields == 1

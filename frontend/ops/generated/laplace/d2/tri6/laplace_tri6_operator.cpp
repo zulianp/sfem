@@ -1396,6 +1396,211 @@ extern "C" int laplace_tri6_jacobian_action_packed_isoparametric_mesh_soa_float(
     return sfem::codegen::laplace_tri6_jacobian_action_packed_isoparametric_mesh_soa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_tri6_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        scalar_t *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t kappa,
+        const ptrdiff_t direction_stride,
+        const scalar_t *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        scalar_t *const SFEM_RESTRICT u_out
+) {
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 3;
+    static constexpr int N_SHAPE = 6;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
+    static constexpr int VECTOR_SIZE = 16;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape = sfem::codegen::laplace_tri6_isoparametric_reference_data<scalar_t>::shape();
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tri6_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::laplace_tri6_isoparametric_reference_data<scalar_t>::q_weight();
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
+        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start = pack * n_elements_per_pack;
+            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+            const ptrdiff_t n_shared = n_shared_nodes[pack];
+            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
+            for (int d = 0; d < DIM; ++d) {
+                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
+                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);
+                }
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);
+                }
+            }
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                const idx_t node = owned_nodes_ptr[pack] + k;
+                pack_direction[k] = u_direction[node * direction_stride];
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
+            }
+
+            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
+                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+                scalar_t block_determinant[N_QP * VECTOR_SIZE];
+                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
+                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT coordinate_shape = elements[shape];
+                    const uint16_t *const SFEM_RESTRICT field_shape = elements[shape];
+                    for (int d = 0; d < DIM; ++d) {
+#pragma omp simd
+                        for (int lane = 0; lane < nelems; ++lane) {
+                            block_coordinates[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evbegin + lane]];
+                        }
+                    }
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];
+                        block_output[shape][lane] = scalar_t(0);
+                    }
+                }
+
+                scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
+                for (int q = 0; q < N_QP; ++q) {
+                    #pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5];
+                        const scalar_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5];
+                        const scalar_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5];
+                        const scalar_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5];
+                        geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                                J00, J01, J10, J11, block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+                    }
+                }
+                const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
+
+                laplace_d2_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, block_direction, kappa, block_output);
+
+                for (int shape = 0; shape < N_SHAPE; ++shape) {
+                    const uint16_t *const SFEM_RESTRICT field_shape = elements[shape];
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];
+                    }
+                }
+            }
+
+            const ptrdiff_t ghost_off = ghost_ptr[pack];
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
+                pack_out[k] = scalar_t(0);
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                ghost_buf[ghost_off + k] = pack_out[n_contiguous + k];
+                pack_out[n_contiguous + k] = scalar_t(0);
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+        const idx_t dest = ghost_reduce_dest[row];
+        const ptrdiff_t begin = ghost_reduce_ptr[row];
+        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+        scalar_t sum = scalar_t(0);
+        for (ptrdiff_t j = begin; j < end; ++j) {
+            sum += ghost_buf[ghost_reduce_idx[j]];
+        }
+        u_out[dest * out_stride] += sum;
+    }
+    return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tri6_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        double *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    return sfem::codegen::laplace_tri6_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_tri6_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        float *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    return sfem::codegen::laplace_tri6_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
 extern "C" int laplace_tri6_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,

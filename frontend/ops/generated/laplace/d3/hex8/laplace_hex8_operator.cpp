@@ -281,6 +281,54 @@ extern "C" int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_so
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT u_out
 );
+extern "C" int laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        double *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+);
+extern "C" int laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        float *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+);
 extern "C" int laplace_proteus_hex8_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -831,6 +879,80 @@ extern "C" int laplace_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(
         elements[6]
     };
     return laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        double *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t direction_stride,
+        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT u_out
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
+}
+
+extern "C" int laplace_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        float *const SFEM_RESTRICT ghost_buf,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t direction_stride,
+        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT u_out
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
 }
 
 extern "C" int laplace_hex8_residual_affine_mesh_soa(
