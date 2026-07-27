@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <string>
@@ -20,47 +21,203 @@
 
 namespace {
 
-    void set_material_parameter_if_present(const std::shared_ptr<sfem::Op>   &op,
-                                           const std::shared_ptr<sfem::Mesh> &mesh,
-                                           const char *const                  env_name,
-                                           const char *const                  parameter_name) {
-        if (!std::getenv(env_name)) {
-            return;
+    struct EnvOptions {
+        int         refine_level;
+        bool        promote_to_p2;
+        bool        verbose;
+        std::string operator_name;
+
+        bool   has_mu;
+        bool   has_lambda;
+        bool   has_c1;
+        bool   has_c2;
+        bool   has_kappa;
+        real_t mu;
+        real_t lambda;
+        real_t c1;
+        real_t c2;
+        real_t kappa;
+
+        real_t rho;
+        real_t dt;
+        real_t t_end;
+        int    n_steps;
+        int    export_freq;
+
+        int    nl_max_it;
+        real_t nl_tol;
+        real_t lsolve_rtol;
+        real_t newton_alpha;
+        bool   enable_line_search;
+
+        std::string linear_op_type;
+        int         lsolve_max_it;
+        real_t      lsolve_atol;
+        bool        use_preconditioner;
+
+        real_t load_scale;
+        real_t load_ramp_time;
+
+        std::string control_point_csv;
+        geom_t      control_point_x;
+        geom_t      control_point_y;
+        geom_t      control_point_z;
+
+        real_t      rotate_angle;
+        std::string rotate_sideset;
+        int         rotate_steps;
+        bool        rotate_verbose;
+        real_t      rotate_rcenter[3];
+
+        static EnvOptions read() {
+            EnvOptions ret{};
+
+            ret.refine_level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+            ret.promote_to_p2 = smesh::Env::read("SFEM_PROMOTE_TO_P2", false);
+            ret.verbose       = smesh::Env::read("SFEM_VERBOSE", false);
+            ret.operator_name = smesh::Env::read_string("SFEM_OPERATOR", "GeneratedNeoHookeanOgden");
+
+            ret.has_mu     = std::getenv("SFEM_MU") != nullptr;
+            ret.has_lambda = std::getenv("SFEM_LAMBDA") != nullptr;
+            ret.has_c1     = std::getenv("SFEM_C1") != nullptr;
+            ret.has_c2     = std::getenv("SFEM_C2") != nullptr;
+            ret.has_kappa  = std::getenv("SFEM_KAPPA") != nullptr;
+            ret.mu         = smesh::Env::read("SFEM_MU", 1.0);
+            ret.lambda     = smesh::Env::read("SFEM_LAMBDA", 1.0);
+            ret.c1         = smesh::Env::read("SFEM_C1", 1.0);
+            ret.c2         = smesh::Env::read("SFEM_C2", 1.0);
+            ret.kappa      = smesh::Env::read("SFEM_KAPPA", 1.0);
+
+            ret.rho         = smesh::Env::read("SFEM_RHO", 1.0);
+            ret.dt          = smesh::Env::read("SFEM_DT", 0.01);
+            ret.t_end       = smesh::Env::read("SFEM_T_END", 1.0);
+            ret.n_steps     = std::max<int>(1, smesh::Env::read("SFEM_STEPS", (int)std::ceil(ret.t_end / ret.dt)));
+            ret.export_freq = std::max<int>(1, smesh::Env::read("SFEM_EXPORT_FREQ", 1));
+
+            ret.nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
+            ret.nl_tol             = smesh::Env::read("SFEM_NL_TOL", 1e-9);
+            ret.lsolve_rtol        = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
+            ret.newton_alpha       = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
+            ret.enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
+
+            ret.linear_op_type     = smesh::Env::read_string("SFEM_LINEAR_OP_TYPE", sfem::op_type::BSR);
+            ret.lsolve_max_it      = smesh::Env::read("SFEM_LSOLVE_MAX_IT", 20000);
+            ret.lsolve_atol        = smesh::Env::read("SFEM_LSOLVE_ATOL", 1e-12);
+            ret.use_preconditioner = smesh::Env::read("SFEM_USE_PRECONDITIONER", false);
+
+            ret.load_scale     = smesh::Env::read("SFEM_LOAD_SCALE", 1.0);
+            ret.load_ramp_time = smesh::Env::read("SFEM_LOAD_RAMP_TIME", 0.0);
+
+            ret.control_point_csv = smesh::Env::read_string("SFEM_CONTROL_POINT_CSV", "");
+            ret.control_point_x   = (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_X", 0.0);
+            ret.control_point_y   = (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_Y", 0.0);
+            ret.control_point_z   = (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_Z", 0.0);
+
+            ret.rotate_angle      = smesh::Env::read("SFEM_ROTATE_ANGLE", 0.0);
+            ret.rotate_sideset    = smesh::Env::read_string("SFEM_ROTATE_SIDESET", "");
+            ret.rotate_steps      = smesh::Env::read("SFEM_ROTATE_STEPS", 10);
+            ret.rotate_verbose    = smesh::Env::read("SFEM_ROTATE_VERBOSE", false);
+            ret.rotate_rcenter[0] = smesh::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
+            ret.rotate_rcenter[1] = smesh::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
+            ret.rotate_rcenter[2] = smesh::Env::read("SFEM_ROTATE_RCENTER_Z", 0.0);
+
+            return ret;
         }
 
-        const real_t value = smesh::Env::read(env_name, 1.0);
+        void print(std::ostream &os) const {
+            os << "EnvOptions:" << std::endl;
+            os << "  refine_level: " << refine_level << std::endl;
+            os << "  promote_to_p2: " << promote_to_p2 << std::endl;
+            os << "  verbose: " << verbose << std::endl;
+            os << "  operator_name: " << operator_name << std::endl;
+            os << "  has_mu: " << has_mu << ", mu: " << mu << std::endl;
+            os << "  has_lambda: " << has_lambda << ", lambda: " << lambda << std::endl;
+            os << "  has_c1: " << has_c1 << ", c1: " << c1 << std::endl;
+            os << "  has_c2: " << has_c2 << ", c2: " << c2 << std::endl;
+            os << "  has_kappa: " << has_kappa << ", kappa: " << kappa << std::endl;
+            os << "  rho: " << rho << std::endl;
+            os << "  dt: " << dt << std::endl;
+            os << "  t_end: " << t_end << std::endl;
+            os << "  n_steps: " << n_steps << std::endl;
+            os << "  export_freq: " << export_freq << std::endl;
+            os << "  nl_max_it: " << nl_max_it << std::endl;
+            os << "  nl_tol: " << nl_tol << std::endl;
+            os << "  lsolve_rtol: " << lsolve_rtol << std::endl;
+            os << "  newton_alpha: " << newton_alpha << std::endl;
+            os << "  enable_line_search: " << enable_line_search << std::endl;
+            os << "  linear_op_type: " << linear_op_type << std::endl;
+            os << "  lsolve_max_it: " << lsolve_max_it << std::endl;
+            os << "  lsolve_atol: " << lsolve_atol << std::endl;
+            os << "  use_preconditioner: " << use_preconditioner << std::endl;
+            os << "  load_scale: " << load_scale << std::endl;
+            os << "  load_ramp_time: " << load_ramp_time << std::endl;
+            os << "  control_point_csv: " << control_point_csv << std::endl;
+            os << "  control_point: " << control_point_x << ", " << control_point_y << ", " << control_point_z << std::endl;
+            os << "  rotate_angle: " << rotate_angle << std::endl;
+            os << "  rotate_sideset: " << rotate_sideset << std::endl;
+            os << "  rotate_steps: " << rotate_steps << std::endl;
+            os << "  rotate_verbose: " << rotate_verbose << std::endl;
+            os << "  rotate_rcenter: " << rotate_rcenter[0] << ", " << rotate_rcenter[1] << ", " << rotate_rcenter[2]
+               << std::endl;
+        }
+    };
+
+    void set_material_parameter(const std::shared_ptr<sfem::Op>   &op,
+                                const std::shared_ptr<sfem::Mesh> &mesh,
+                                const char *const                  parameter_name,
+                                const real_t                       value) {
         for (const auto &block : mesh->blocks()) {
             op->set_value_in_block(block->name(), parameter_name, value);
         }
     }
 
-    void set_material_parameters_from_env(const std::shared_ptr<sfem::Op> &op, const std::shared_ptr<sfem::Mesh> &mesh) {
-        if (std::getenv("SFEM_MU")) {
-            set_material_parameter_if_present(op, mesh, "SFEM_MU", "mu");
+    void set_material_parameters(const EnvOptions                        &env,
+                                 const std::shared_ptr<sfem::Op>        &op,
+                                 const std::shared_ptr<sfem::Mesh>      &mesh) {
+        if (env.has_mu) {
+            set_material_parameter(op, mesh, "mu", env.mu);
         }
 
-        if (std::getenv("SFEM_LAMBDA")) {
-            set_material_parameter_if_present(op, mesh, "SFEM_LAMBDA", "lmbda");
+        if (env.has_lambda) {
+            set_material_parameter(op, mesh, "lmbda", env.lambda);
         }
 
-        if (std::getenv("SFEM_C1")) {
-            set_material_parameter_if_present(op, mesh, "SFEM_C1", "c1");
+        if (env.has_c1) {
+            set_material_parameter(op, mesh, "c1", env.c1);
         }
 
-        if (std::getenv("SFEM_C2")) {
-            set_material_parameter_if_present(op, mesh, "SFEM_C2", "c2");
+        if (env.has_c2) {
+            set_material_parameter(op, mesh, "c2", env.c2);
         }
 
-        if (std::getenv("SFEM_KAPPA")) {
-            set_material_parameter_if_present(op, mesh, "SFEM_KAPPA", "kappa");
+        if (env.has_kappa) {
+            set_material_parameter(op, mesh, "kappa", env.kappa);
         }
     }
 
-    real_t load_factor(const real_t t) {
-        const real_t scale      = smesh::Env::read("SFEM_LOAD_SCALE", 1.0);
-        const real_t ramp_time  = smesh::Env::read("SFEM_LOAD_RAMP_TIME", 0.0);
-        const real_t ramp_value = ramp_time > 0 ? std::min<real_t>(t / ramp_time, 1) : 1;
-        return scale * ramp_value;
+    real_t load_factor(const EnvOptions &env, const real_t t) {
+        const real_t ramp_value = env.load_ramp_time > 0 ? std::min<real_t>(t / env.load_ramp_time, 1) : 1;
+        return env.load_scale * ramp_value;
+    }
+
+    std::shared_ptr<sfem::RotateYZ> create_rotate_conditions(const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                                             const EnvOptions                           &env) {
+        if (env.rotate_sideset.empty()) {
+            return nullptr;
+        }
+
+        if (env.rotate_verbose) {
+            printf("Rotating sideset %s with angle %g\n", env.rotate_sideset.c_str(), (double)env.rotate_angle);
+        }
+
+        auto sideset = sfem::Sideset::create_from_file(fs->mesh_ptr()->comm(), smesh::Path(env.rotate_sideset));
+        auto ret     = sfem::RotateYZ::create(fs, sideset, env.rotate_steps, env.rotate_angle, sfem::EXECUTION_SPACE_HOST);
+        ret->verbose = env.rotate_verbose;
+        ret->rcenter[0] = env.rotate_rcenter[0];
+        ret->rcenter[1] = env.rotate_rcenter[1];
+        ret->rcenter[2] = env.rotate_rcenter[2];
+        ret->create_constraint();
+        return ret;
     }
 
     void scale_neumann_values(const std::shared_ptr<sfem::NeumannConditions> &neumann,
@@ -222,45 +379,40 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     const smesh::Path neumann_path{argv[3]};
     const smesh::Path output_path{argv[4]};
 
-    int         refine_level  = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
-    const bool  promote_to_p2 = smesh::Env::read("SFEM_PROMOTE_TO_P2", false);
-    const bool  verbose       = smesh::Env::read("SFEM_VERBOSE", false);
-    const char *op_name       = "GeneratedNeoHookeanOgden";
-    const char *SFEM_OPERATOR = nullptr;
-    SFEM_READ_ENV(SFEM_OPERATOR, );
-    if (SFEM_OPERATOR) {
-        op_name = SFEM_OPERATOR;
+    const EnvOptions env = EnvOptions::read();
+    if (env.verbose && !comm->rank()) {
+        env.print(std::cout);
     }
 
     auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
-    if (promote_to_p2) {
+    if (env.promote_to_p2) {
         if (mesh->spatial_dimension() == 3) {
             mesh = smesh::promote_to(smesh::TET10, mesh);
         } else {
             mesh = smesh::promote_to(smesh::TRI6, mesh);
         }
-    } else if (refine_level > 0) {
-        mesh = smesh::to_semistructured(refine_level, mesh, true, false);
+    } else if (env.refine_level > 0) {
+        mesh = smesh::to_semistructured(env.refine_level, mesh, true, false);
     }
 
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
     auto      f          = sfem::Function::create(fs);
 
-    auto elastic_op = sfem::create_op(fs, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto elastic_op = sfem::create_op(fs, env.operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
     if (!elastic_op) {
-        SFEM_ERROR("Failed to create operator %s\n", op_name);
+        SFEM_ERROR("Failed to create operator %s\n", env.operator_name.c_str());
         return SFEM_FAILURE;
     }
 
     if (elastic_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
-    set_material_parameters_from_env(elastic_op, mesh);
+    set_material_parameters(env, elastic_op, mesh);
     f->add_operator(elastic_op);
 
     auto inertia_op = std::make_shared<sfem::BDF2InertiaPotential>(fs);
-    inertia_op->set_density(smesh::Env::read("SFEM_RHO", 1.0));
+    inertia_op->set_density(env.rho);
     if (inertia_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
@@ -271,7 +423,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         f->add_constraint(dirichlet_conditions);
     }
 
-    auto rotate_conds = sfem::RotateYZ::create_from_env(fs, sfem::EXECUTION_SPACE_HOST);
+    auto rotate_conds = create_rotate_conditions(fs, env);
     if (rotate_conds) {
         f->add_constraint(rotate_conds->create_constraint());
     }
@@ -305,29 +457,16 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
 
-    const real_t dt          = smesh::Env::read("SFEM_DT", 0.01);
-    const real_t t_end       = smesh::Env::read("SFEM_T_END", 1.0);
-    const int    n_steps     = std::max<int>(1, smesh::Env::read("SFEM_STEPS", (int)std::ceil(t_end / dt)));
-    const int    export_freq = std::max<int>(1, smesh::Env::read("SFEM_EXPORT_FREQ", 1));
-
-    const int    nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
-    const real_t nl_tol             = smesh::Env::read("SFEM_NL_TOL", 1e-9);
-    const real_t lsolve_rtol        = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
-    const real_t newton_alpha       = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
-    const bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
-
-    const std::string linear_op_type = smesh::Env::read_string("SFEM_LINEAR_OP_TYPE", sfem::op_type::BSR);
-    auto              linear_op      = sfem::create_linear_operator(linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+    auto              linear_op      = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
     auto              cg             = sfem::create_cg<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
-    cg->verbose                      = verbose;
-    cg->set_max_it(smesh::Env::read("SFEM_LSOLVE_MAX_IT", 20000));
-    cg->set_rtol(lsolve_rtol);
-    cg->set_atol(smesh::Env::read("SFEM_LSOLVE_ATOL", 1e-12));
+    cg->verbose                      = env.verbose;
+    cg->set_max_it(env.lsolve_max_it);
+    cg->set_rtol(env.lsolve_rtol);
+    cg->set_atol(env.lsolve_atol);
 
-    const bool use_preconditioner = smesh::Env::read("SFEM_USE_PRECONDITIONER", false);
-    auto       diag               = sfem::create_host_buffer<real_t>(ndofs);
-    auto       jacobi             = sfem::create_shiftable_jacobi(diag, sfem::EXECUTION_SPACE_HOST);
-    if (use_preconditioner) {
+    auto diag   = sfem::create_host_buffer<real_t>(ndofs);
+    auto jacobi = sfem::create_shiftable_jacobi(diag, sfem::EXECUTION_SPACE_HOST);
+    if (env.use_preconditioner) {
         cg->set_preconditioner_op(jacobi);
     }
 
@@ -350,48 +489,49 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
     FILE             *control_csv      = nullptr;
     idx_t             control_node     = 0;
-    const std::string control_csv_path = smesh::Env::read_string("SFEM_CONTROL_POINT_CSV", "");
-    if (!control_csv_path.empty()) {
-        geom_t target[3] = {(geom_t)smesh::Env::read("SFEM_CONTROL_POINT_X", 0.0),
-                            (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_Y", 0.0),
-                            (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_Z", 0.0)};
+    if (!env.control_point_csv.empty()) {
+        geom_t target[3] = {env.control_point_x, env.control_point_y, env.control_point_z};
         control_node     = nearest_node(mesh, target);
-        control_csv      = fopen(control_csv_path.c_str(), "w");
+        control_csv      = fopen(env.control_point_csv.c_str(), "w");
         if (!control_csv) {
-            SFEM_ERROR("Unable to open control point CSV %s\n", control_csv_path.c_str());
+            SFEM_ERROR("Unable to open control point CSV %s\n", env.control_point_csv.c_str());
             return SFEM_FAILURE;
         }
 
         fprintf(control_csv, "time,ux,uy,uz,vx,vy,vz,ax,ay,az\n");
         write_control_point(control_csv, 0, block_size, control_node, u_n->data(), v_n->data(), a->data());
         if (!comm->rank()) {
-            printf("Writing control point CSV %s at node %d\n", control_csv_path.c_str(), (int)control_node);
+            printf("Writing control point CSV %s at node %d\n", env.control_point_csv.c_str(), (int)control_node);
         }
     }
 
     if (!comm->rank()) {
-        printf("Solving BDF2 hyperelasticity: op=%s, ndofs=%td, dt=%g, steps=%d\n", op_name, ndofs, (double)dt, n_steps);
+        printf("Solving BDF2 hyperelasticity: op=%s, ndofs=%td, dt=%g, steps=%d\n",
+               env.operator_name.c_str(),
+               ndofs,
+               (double)env.dt,
+               env.n_steps);
         printf("%-8s %-10s %-5s %-14s %-14s %-10s\n", "step", "newton", "cg", "gnorm", "energy", "alpha");
     }
 
     ptrdiff_t total_linear_iterations = 0;
     int       last_iterations         = 0;
 
-    for (int step = 1; step <= n_steps; ++step) {
-        const real_t t = step * dt;
+    for (int step = 1; step <= env.n_steps; ++step) {
+        const real_t t = step * env.dt;
 
         if (rotate_conds) {
             rotate_conds->update(step);
         }
 
-        scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(t));
+        scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(env, t));
 
         if (step == 1) {
-            inertia_op->set_alpha(1 / (dt * dt));
-            bdf2_predictor_be(ndofs, dt, u_n->data(), v_n->data(), u_hat->data());
+            inertia_op->set_alpha(1 / (env.dt * env.dt));
+            bdf2_predictor_be(ndofs, env.dt, u_n->data(), v_n->data(), u_hat->data());
         } else {
-            inertia_op->set_alpha(real_t(9.0 / 4.0) / (dt * dt));
-            bdf2_predictor(ndofs, dt, u_n->data(), u_nm1->data(), v_n->data(), v_nm1->data(), u_hat->data());
+            inertia_op->set_alpha(real_t(9.0 / 4.0) / (env.dt * env.dt));
+            bdf2_predictor(ndofs, env.dt, u_n->data(), u_nm1->data(), v_n->data(), v_nm1->data(), u_hat->data());
         }
 
         blas->copy(ndofs, u_n->data(), u->data());
@@ -400,9 +540,9 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         real_t energy = 0;
         f->value(u->data(), &energy);
 
-        for (int it = 0; it < nl_max_it; ++it) {
+        for (int it = 0; it < env.nl_max_it; ++it) {
             f->update(u->data());
-            if (use_preconditioner) {
+            if (env.use_preconditioner) {
                 blas->zeros(ndofs, diag->data());
                 if (f->hessian_diag(u->data(), diag->data()) != SFEM_SUCCESS) {
                     return SFEM_FAILURE;
@@ -416,9 +556,15 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             f->set_value_to_constrained_dofs(0, rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            if (gnorm < nl_tol) {
+            if (gnorm < env.nl_tol) {
                 if (!comm->rank()) {
-                    printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g\n", step, it, 0, (double)gnorm, (double)energy, 0.0);
+                    printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g (converged)\n",
+                           step,
+                           it,
+                           0,
+                           (double)gnorm,
+                           (double)energy,
+                           0.0);
                 }
                 break;
             }
@@ -430,20 +576,20 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             last_iterations = cg->iterations();
             total_linear_iterations += last_iterations;
 
-            real_t selected_alpha = -newton_alpha;
+            real_t selected_alpha = -env.newton_alpha;
             bool   no_progress    = false;
-            if (enable_line_search) {
-                std::vector<real_t> alphas{-2 * newton_alpha,
-                                           -newton_alpha,
-                                           real_t(-0.9) * newton_alpha,
-                                           real_t(-2.0 / 3.0) * newton_alpha,
-                                           real_t(-0.5) * newton_alpha,
-                                           real_t(-0.25) * newton_alpha,
-                                           real_t(-0.125) * newton_alpha,
-                                           real_t(-1.0 / 32.0) * newton_alpha,
-                                           real_t(-1.0 / 128.0) * newton_alpha,
-                                           real_t(-1.0 / 256.0) * newton_alpha,
-                                           real_t(-1.0 / 512.0) * newton_alpha,
+            if (env.enable_line_search) {
+                std::vector<real_t> alphas{-2 * env.newton_alpha,
+                                           -env.newton_alpha,
+                                           real_t(-0.9) * env.newton_alpha,
+                                           real_t(-2.0 / 3.0) * env.newton_alpha,
+                                           real_t(-0.5) * env.newton_alpha,
+                                           real_t(-0.25) * env.newton_alpha,
+                                           real_t(-0.125) * env.newton_alpha,
+                                           real_t(-1.0 / 32.0) * env.newton_alpha,
+                                           real_t(-1.0 / 128.0) * env.newton_alpha,
+                                           real_t(-1.0 / 256.0) * env.newton_alpha,
+                                           real_t(-1.0 / 512.0) * env.newton_alpha,
                                            0};
                 std::vector<real_t> energies(alphas.size(), 0);
                 if (f->value_steps(u->data(), incr->data(), (int)alphas.size(), alphas.data(), energies.data()) != SFEM_SUCCESS) {
@@ -462,7 +608,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             blas->axpy(ndofs, selected_alpha, incr->data(), u->data());
             f->apply_constraints(u->data());
 
-            if (!enable_line_search) {
+            if (!env.enable_line_search) {
                 energy = 0;
                 f->value(u->data(), &energy);
             }
@@ -477,17 +623,20 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
                        (double)selected_alpha);
             }
 
-            if (no_progress) break;
+            if (no_progress) {
+                fprintf(stderr, "No progress made, stopping Newton iteration\n");
+                break;
+            }
         }
 
         if (step == 1) {
-            update_velocity_be(ndofs, 1 / dt, u->data(), u_n->data(), v->data());
+            update_velocity_be(ndofs, 1 / env.dt, u->data(), u_n->data(), v->data());
         } else {
-            update_velocity_bdf2(ndofs, 1 / (2 * dt), u->data(), u_n->data(), u_nm1->data(), v->data());
+            update_velocity_bdf2(ndofs, 1 / (2 * env.dt), u->data(), u_n->data(), u_nm1->data(), v->data());
         }
-        update_acceleration(ndofs, 1 / dt, v->data(), v_n->data(), a->data());
+        update_acceleration(ndofs, 1 / env.dt, v->data(), v_n->data(), a->data());
 
-        if (step % export_freq == 0 || step == n_steps) {
+        if (step % env.export_freq == 0 || step == env.n_steps) {
             out->write_time_step("disp", t, u->data());
             out->write_time_step("velocity", t, v->data());
             out->write_time_step("acceleration", t, a->data());
